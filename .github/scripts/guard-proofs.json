@@ -558,6 +558,15 @@
       "hors_mutation": "ce n'est pas un garde mais une table : ses valeurs et la statistique retenue (meilleur des 3 runs) sont verrouillées par son test, et le verdict appartient au runner lhci — neutraliser la table ne prouverait rien de plus"
     },
     {
+      "chemin": "frontend/scripts/lcp-app-budgets.cjs",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/lcp-app-budgets.test.js",
+      "runner": "vitest",
+      "motif": "la TABLE de l'AIRE LCP des cinq routes d'APPLICATION (`CADRES_APP` de src/config/app-cadres.js), par route ET par taille, avec le relevé qui l'adosse (3 runs par cellule, l'élément élu nommé) et la BANDE qui s'en dérive : plancher à 60 % de la mesure, plafond à ×1,25 par `plafondDe` de `lhci-cls-budgets.cjs` — LUE, jamais réécrite, pour que les deux tables ne puissent pas diverger d'un cran d'arrondi. Ce module n'est pas un garde : il ne lit pas le dépôt et ne sort jamais en 1 — le verdict est prononcé EN NAVIGATEUR par `frontend/e2e/lcp-app.spec.js`, qui n'entre PAS dans le périmètre de ce registre (frontend/scripts/, .github/scripts/, backend/scripts/) et qui roule dans le job e2e via `npm run test:e2e`. CE QUI A ÉTÉ MESURÉ, ET POURQUOI LA TABLE EST PAR ROUTE ET PAR TAILLE (09/10/2026, fixture, coquille de production lue dans vercel.json, `--repeat-each=3`) : les TRENTE relevés sont identiques au px², deux à deux, et le MÊME élément est élu à chaque run — 8 626 / 17 172 px² pour /dashboard (<h1> « Bienvenue, Demo! »), 11 211 / 21 012 pour /profile, 4 256 / 8 478 pour /messages (<h1> « Messages »), 11 792 / 13 446 pour /create-job, 30 361 / 142 848 pour /jobs/:id. L'aire LCP de ces pages est donc de la GÉOMÉTRIE (DOM + CSS), comme le CLS : il n'y a AUCUN bruit de machine à couvrir, et la marge ne pouvait pas être justifiée comme telle. Elle l'est par la plus grande re-justification LÉGITIME relevée sur ces routes (+10,2 %, le titre de mission de /jobs/:id desktop qui passe sur deux lignes, 26 136 → 28 800 px², en-tête de e2e/lcp-app.spec.js) et par la classe de défaut qu'elle attrape (un CHANGEMENT D'ÉLÉMENT ÉLU : la photo du héros de l'accueil vaut 69 920 / 306 870 px² dans e2e/lcp-geometrie.spec.js, soit ×2,4 du plus grand peintre de /jobs/:id desktop). UNE BANDE, PAS SEULEMENT UN PLAFOND : un plafond seul est satisfait par une page VIDE (1 px² passe sous n'importe quelle borne haute), donc le plancher à 60 % — la proportion déjà retenue par `PLANCHERS_NOEUDS` et `PLANCHERS_PREMIER_ECRAN` — nomme l'autre faute, une route qui ne peint plus ce qu'elle peignait. LA TAILLE FAIT PARTIE DE LA CLÉ parce que la mesure le dit : /jobs/:id élit l'encart du séquestre en mobile et la DESCRIPTION de l'annonce en desktop (six fois plus grande), donc un plafond unique aurait été décoratif sur l'une des deux tailles.",
+      "hors_mutation": "ce n'est pas un garde mais une table : elle ne prononce aucun verdict et ne sort jamais en 1, donc « neutraliser » son contrôle ne ferait rougir aucun bras. Ses valeurs et ses RELATIONS sont verrouillées par son test direct (frontend/scripts/__tests__/lcp-app-budgets.test.js, 5 cas : ≥3 runs par cellule avec l'élément élu nommé, dérivation ÉGALE à `plafondDe(pire, MARGE)`, rapport plafond/mesure dans la marge publiée, plancher dérivé et non nul, trois verdicts épuisés bornes INCLUSES dont la contrepartie anti-faux-vert — la page réduite à 1 px² passe le plafond et est refusée par le plancher —, et le refus nommé d'une cellule non mesurée). Comme pour `lhci-cls-budgets.cjs` et `style-layout-budgets.cjs`, aucune mutation du harnais ne s'applique à ce fichier, et LE PARTAGE DES DEUX MOITIÉS A ÉTÉ MESURÉ le 09/10/2026 plutôt que supposé : remplacer les runs de `/dashboard` par 100 000 px² (la page en peint 8 626) laisse le test unitaire VERT — la table reste bien formée et correctement dérivée, elle décrit simplement une autre page — pendant que la sonde e2e, elle, rougit en nommant le côté franchi (« sous la bande mesurée 60000–125000 px² », puis, mutation séparée, « au-dessus la bande mesurée 600–1300 px² » : le describe de la sonde est en mode SÉRIEL, donc chaque côté se rejoue seul). Le garde unitaire tient donc la FORME et la DÉRIVATION, la sonde tient l'accord avec la PAGE, et les deux limites sont écrites dans leurs fichiers respectifs — aucune des deux ne se fait passer pour l'autre."
+    },
+    {
       "chemin": "frontend/scripts/setup-seo-env.js",
       "role": "outil",
       "invoque_par": "ci",
@@ -664,7 +673,7 @@
       "invoque_par": "ci",
       "preuve": "frontend/scripts/__tests__/check-classes-sans-regle.test.js",
       "runner": "vitest",
-      "motif": "la TROISIÈME direction du même fait que check-css-selecteurs-morts.js : une classe POSÉE par une page livrée doit avoir sa règle dans la feuille SERVIE. Les deux autres directions étaient tenues (un nom de sélecteur sans porteur, une règle servie sans porteur) et le garde des sélecteurs écrivait lui-même la phrase qu'il ne vérifiait pas — « et une classe POSÉE doit exister dans la feuille servie » — à une exception près, les neuf noms de la blocklist. Le SUJET est le HTML des PAGES, et c'est une MESURE (09/10/2026) : Tailwind scanne src/** et génère un utilitaire dès qu'un jeton candidat apparaît dans un fichier scanné, donc un littéral de className écrit dans src/ a sa règle par construction ; mesuré sur le build du jour, le corpus du bundle retenait 2 802 valeurs de classe dont 515 jetons sans règle — et ce vocabulaire était 'leaflet-', 'lucide', 'En', 'cours', 'page', 'completed', 'none', 'canvas', <path, d=\"M15, du SVG, de la prose et des noms de route, c'est-à-dire du bruit (le corpus ne distingue pas une classe d'un fragment de gabarit ou d'un argument de document.createElement('canvas')). Les pages, elles, n'ont aucune ambiguïté : un attribut class= EST une position de classe, et c'est l'artefact où le trou est réel — vite-plugins/prerender/** n'est PAS dans le content de Tailwind, donc une classe qui n'y est écrite que là n'est générée par personne, et c'est la peinture du premier écran. Aucun autre garde ne pouvait le voir : celui des sélecteurs juge des noms morts d'une feuille, ceux des coquilles comparent la géométrie et les mots — une classe manquante ne déplace rien et n'écrit rien. TROUVÉ À SON PREMIER PASSAGE : 'opacity-50' sur le bouton de suivi de /support, écrit par vite-plugins/prerender/shells-routes.js alors que src/components/TicketTracker.js écrit 'disabled:opacity-50' — Tailwind ne génère aucune règle .opacity-50 nue, donc la coquille publiait un bouton PLEIN que React grise au montage (corrigé à la source : la coquille publie maintenant les classes de React et son attribut disabled). MESURÉ APRÈS CORRECTIF sur l'arbre livré : 14 pages, 15 feuilles servies (11 726 règles, 788 noms de classe), 313 classes DISTINCTES posées, 1 nom accepté sans règle (App) et 0 classe sans règle. LE GARDE REFUSE de juger sous cinq planchers de lecture (10 pages, 2 feuilles, 400 règles, 300 noms servis, 150 classes posées — la moitié du mesuré) et REFUSE AUSSI une exemption SANS MOTIF comme une exemption PÉRIMÉE (une exception qu'on n'ose plus retirer est une exception qui mente) ; le seul nom accepté sans règle est App, enveloppe du chrome dont la règle a été retirée le 25/09/2026 (elle recentrait par héritage) et que check-prerender-shells.js exige POSÉE dans #root — c'est la seule classe de l'arbre dont l'absence de règle est exigée des deux côtés."
+      "motif": "la TROISIÈME direction du même fait que check-css-selecteurs-morts.js : une classe POSÉE — par une page livrée OU par le JAVASCRIPT LIVRÉ — doit avoir sa règle dans la feuille SERVIE. Les deux autres directions étaient tenues (un nom de sélecteur sans porteur, une règle servie sans porteur) et le garde des sélecteurs écrivait lui-même la phrase qu'il ne vérifiait pas — « et une classe POSÉE doit exister dans la feuille servie » — à une exception près, les neuf noms de la blocklist. LES DEUX SUJETS sont le HTML des PAGES et le JAVASCRIPT LIVRÉ, et ce partage est une MESURE (09/10/2026). Tailwind scanne src/** et génère une règle pour les UTILITAIRES qu'il reconnaît, donc un littéral de className écrit dans src/ a sa règle par construction SI c'est un utilitaire — et c'est ce « si » qui laissait passer une classe de SITE écrite dans un composant que jamais une coquille ne rend. Le corpus LARGE des poseurs (2 762 valeurs de classe et 979 jetons distincts, mesurés le 09/10/2026) retenait 255 jetons sans règle — et ce vocabulaire était 'leaflet-', 'lucide', 'En', 'cours', 'page', 'completed', 'none', 'canvas', <path, d=\"M15, du SVG, de la prose et des noms de route, c'est-à-dire du bruit (le corpus ne distingue pas une classe d'un fragment de gabarit ou d'un argument de document.createElement('canvas')). Les pages, elles, n'ont aucune ambiguïté : un attribut class= EST une position de classe, et c'est l'artefact où le trou est réel — vite-plugins/prerender/** n'est PAS dans le content de Tailwind, donc une classe qui n'y est écrite que là n'est générée par personne, et c'est la peinture du premier écran. Aucun autre garde ne pouvait le voir : celui des sélecteurs juge des noms morts d'une feuille, ceux des coquilles comparent la géométrie et les mots — une classe manquante ne déplace rien et n'écrit rien. TROUVÉ À SON PREMIER PASSAGE : 'opacity-50' sur le bouton de suivi de /support, écrit par vite-plugins/prerender/shells-routes.js alors que src/components/TicketTracker.js écrit 'disabled:opacity-50' — Tailwind ne génère aucune règle .opacity-50 nue, donc la coquille publiait un bouton PLEIN que React grise au montage (corrigé à la source : la coquille publie maintenant les classes de React et son attribut disabled). MESURÉ APRÈS CORRECTIF sur l'arbre livré (09/10/2026) : 14 pages et 60 scripts servis (2 638 valeurs entières en position de classe, 679 jetons distincts), 15 feuilles servies (11 726 règles, 788 noms de classe), 683 classes DISTINCTES posées dont 313 par les pages, 1 nom accepté sans règle (App) et 0 classe sans règle ; le lecteur du bundle refuse de juger 373 positions non littérales et 1 fragment d'assemblage, et il le PUBLIE plutôt que de taire son angle mort. LE GARDE REFUSE de juger sous huit planchers de lecture (10 pages, 30 scripts, 2 feuilles, 400 règles, 300 noms servis, 150 classes posées par les pages, 1 300 valeurs entières et 340 jetons distincts du bundle — la moitié du mesuré), REFUSE AUSSI de juger quand un script est ILLISIBLE (un lecteur partiel ne rend pas un verdict complet), et REFUSE AUSSI une exemption SANS MOTIF comme une exemption PÉRIMÉE (une exception qu'on n'ose plus retirer est une exception qui mente) ; le seul nom accepté sans règle est App, enveloppe du chrome dont la règle a été retirée le 25/09/2026 (elle recentrait par héritage) et que check-prerender-shells.js exige POSÉE dans #root — c'est la seule classe de l'arbre dont l'absence de règle est exigée des deux côtés. TROUVÉ PAR LE SUJET NEUF, et c'est ce qui le justifie : profile-photo-container (src/components/ProfilePhoto.js) et profile-photo-uploader (src/components/ProfilePhotoUploader.js) étaient posées par le bundle et peintes par AUCUNE règle — deux classes INERTES, invisibles pour la sonde des pages (ces composants ne sont rendus que par React, jamais par une coquille) et pour Tailwind (ce ne sont pas des utilitaires) ; elles ont été RETIRÉES de la source, ce qui a clos au passage un undefined latent publié par le gabarit qui les portait."
     },
     {
       "chemin": "frontend/scripts/classes-sans-regle.js",
@@ -672,8 +681,8 @@
       "invoque_par": "test",
       "preuve": "frontend/scripts/__tests__/check-classes-sans-regle.test.js",
       "runner": "vitest",
-      "motif": "la règle elle-même (ce qu'une page POSE — l'attribut class=, les blocs <style> RETIRÉS avant lecture pour qu'une feuille ne se justifie pas elle-même, la valeur qui porte chaque nom pour que le verdict désigne la ligne ; ce que la feuille SERVIE offre — les classes SEULES, l'option marques empêchant #root de disculper class=\"root\", et le compte des règles ; la liste des noms acceptés sans règle, avec sa raison obligatoire et ses deux refus) : le garde prononce le verdict, ce module fournit la lecture et les planchers",
-      "hors_mutation": "le harnais ne mute que le garde lui-même (`cible` = `garde`) : les décodeurs de ce module sont verrouillés par leurs cas unitaires directs (attributs class= en guillemets simples et doubles, découpage des listes, content/role ignorés, blocs <style> retirés, valeur porteuse d'un nom, nom compté une fois, échappements CSS des variantes et valeurs arbitraires, ID refusés, union de plusieurs feuilles, verdict et exemptions, exemption sans motif, exemption périmée, motifs réels non vides) et les sept mutations qui prouvent le VERDICT portent sur les lignes du garde (comparaison neutralisée, verdict neutralisé, exemptions neutralisées, lecture des pages neutralisée, quatre planchers de lecture neutralisés)"
+      "motif": "la règle elle-même (ce qu'une page POSE — l'attribut class=, les blocs <style> RETIRÉS avant lecture pour qu'une feuille ne se justifie pas elle-même, la valeur qui porte chaque nom pour que le verdict désigne la ligne ; ce que le JAVASCRIPT LIVRÉ pose — les LITTÉRAUX ENTIERS écrits en position de classe (une chaîne, un gabarit sans expression, les éléments littéraux d'un tableau, les deux branches d'un ternaire), les jetons de l'INTÉRIEUR d'un gabarit et jamais ceux COLLÉS à une expression, JAMAIS un résultat d'appel (le faux positif mesuré de lienDesktop('/dashboard') : sept noms de route pris pour des classes) ni un fragment de concaténation, les deux étant COMPTÉS pour être publiés ; ce que la feuille SERVIE offre — les classes SEULES, l'option marques empêchant #root de disculper class=\"root\", et le compte des règles ; la liste des noms acceptés sans règle, avec sa raison obligatoire et ses deux refus) : le garde prononce le verdict, ce module fournit la lecture et les planchers",
+      "hors_mutation": "le harnais ne mute que le garde lui-même (`cible` = `garde`) : les décodeurs de ce module sont verrouillés par leurs cas unitaires directs (attributs class= en guillemets simples et doubles, découpage des listes, content/role ignorés, blocs <style> retirés, valeur porteuse d'un nom, nom compté une fois, échappements CSS des variantes et valeurs arbitraires, ID refusés, union de plusieurs feuilles, verdict et exemptions, exemption sans motif, exemption périmée, motifs réels non vides, littéraux entiers d'une position de classe, jetons intérieurs d'un gabarit, résultat d'appel refusé, identifiant et fragment refusés ET comptés, chaîne hors position ignorée, positions classList et setAttribute, fichier illisible annoncé, forme d'un nom de classe — sept jetons acceptés et six refusés) et les DIX mutations qui prouvent le VERDICT portent sur les lignes du garde (comparaison neutralisée, verdict neutralisé, exemptions neutralisées, lecture des pages neutralisée, LECTURE DU BUNDLE neutralisée, et planchers neutralisés — pages, sujet, bundle — plus le refus du script illisible)"
     },
     {
       "chemin": "frontend/scripts/check-shell-text-provenance.js",
@@ -823,7 +832,23 @@
       "preuve": "frontend/scripts/__tests__/check-css-inline-budget.test.js",
       "runner": "vitest",
       "motif": "budget de CSS inline PAR PAGE pré-rendue : la feuille critique du build est recopiée dans CHAQUE document et lue AVANT le premier paint. Le fait vivait en PROSE dans check-bundle-size.js, avec un compte PÉRIMÉ (22 pages, ~1,5 Mo) que la mesure du 09/10/2026 contredit (14 documents, dont 13 portant la même feuille : 69 276 o, sha d8c74e2cb457a497 ; 404.html 392 o ; total 900 980 o = 0,86 Mo) — un budget global ne dit donc ni QUELLE page a enflé ni de combien. Six refus NOMMÉS : dépassement chiffré, plancher (la contrepartie sans laquelle un budget plafond déclarerait « meilleure » une page qui a PERDU sa feuille critique), nombre de blocs <style> (0 = plugin d'inlining inerte, 2 = feuille sans propriétaire), feuille divergente d'une page qui ne l'a pas déclarée, page pré-rendue sans ligne, ligne périmée ; plus deux planchers de lecture qui refusent de juger un build vide ou incomplet. La table est la mesure du build réel, une ligne par document."
-    }
+    },
+  {
+    "chemin": "frontend/scripts/check-classes-coquilles.js",
+    "role": "garde",
+    "invoque_par": "ci",
+    "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
+    "runner": "vitest",
+    "motif": "LE FAIT, ET LE TROU QU'IL FERME (mesure du 09/10/2026) : une coquille pré-rendue et React peignent la MÊME page deux fois, et jusqu'ici les deux peintures RECOPIAIENT leurs classes — 236 listes écrites en littéral dans vite-plugins/prerender/**, dont 203 avaient un jumeau EXACT dans src/**. Rien ne rougissait quand un seul des deux côtés changeait : une classe recopiée ne déplace aucun texte et ne change aucun mot, elle change une bordure, une ombre ou un état grisé — cela ne se voit qu'à l'œil, sur la page, et aucune des sondes existantes ne pouvait le voir (celles de géométrie comparent l'encre et le text-align calculé, celles de texte comparent les mots). Il tient donc les DEUX moitiés du remède : la RÉUTILISATION (ce qui est partagé vit dans un domicile unique, src/config/classes-chrome.js, lu par React ET par la coquille — un champ lu par un seul canal est un défaut, et un champ RETAPÉ dans une coquille aussi) et la DÉTECTION (toute autre liste doit avoir un jumeau chez React ou être déclarée propre à la coquille avec son motif, dans CLASSES_PROPRES_AUX_COQUILLES). Les déclarations sont tenues honnêtes par trois refus : une exemption SANS MOTIF est un oubli avec un droit de passage, une exemption PÉRIMÉE ne protège plus rien et mentirait le jour où la liste reviendrait, une exemption MENTEUSE n'est plus propre à la coquille. VOLUMES ET PLANCHERS, mesurés puis dérivés : la passe a ramené le compte à 213 listes publiées dont 182 jumelles et 31 déclarées (les 23 autres sont passées au domicile : les 18 listes du chrome et les 5 conteneurs de page de l'accueil), et le garde refuse de juger sous 5 modules de pré-rendu, 90 sources React, 128 listes et 110 jumelles (~60 % du relevé, la proportion déjà retenue par PLANCHERS_NOEUDS et PLANCHERS_PREMIER_ECRAN) — un lecteur CASSÉ rend zéro, pas 20 % de moins, donc un plancher serré n'ajoute pas de mordant et refuse du vert. Deux NIVEAUX sont séparés : un refus de juger (dossier de pré-rendu absent, src/ absent, balayage trop maigre, domicile introuvable) n'est pas un écart — les confondre ferait passer une panne de lecture pour un verdict. CE QU'IL NE PROUVE PAS, écrit plutôt que tu : un jumeau prouve que la CHAÎNE est écrite quelque part chez React, pas que c'est le MÊME ÉLÉMENT ; cette moitié est mesurée en navigateur (e2e/geometrie-coquille-react.spec.js, e2e/texte-coquille-react.spec.js), et le domicile partagé, lui, garantit l'identité de la VALEUR par construction. Il porte enfin un refus qu'aucun autre garde ne rend : une liste qui CONTIENT la valeur d'un champ sans être ce champ est ACCEPTÉE (la frontière est l'ÉGALITÉ — mesurée : le bloc social de l'accueil publie `font-medium hover:text-orange-800 underline underline-offset-2`, qui contient le libellé de lien du pied de page pour un autre élément), et une liste MODIFIÉE, elle, perd son jumeau et c'est le verdict des listes qui la renvoie."
+  },
+  {
+    "chemin": "frontend/scripts/classes-coquilles.js",
+    "role": "outil",
+    "invoque_par": "test",
+    "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
+    "runner": "vitest",
+    "motif": "la RÈGLE elle-même, pure et sans E/S : ce que publie une coquille (les listes de classes LITTÉRALES d'un attribut class=, avec leur ligne ; une liste COMPOSÉE n'est pas lue, elle assemble des valeurs, et ce sont ces valeurs que le domicile doit fournir), ce que React écrit (les trois formes de className : guillemets doubles, simples et gabarit, les composées ignorées), la liste des exemptions propres aux coquilles avec leurs trois refus (sans motif, périmée, menteuse, plus la déclaration en double), et le verdict du DOMICILE (chaque champ lu par au moins un module de pré-rendu ET par au moins une source React ; aucune coquille ne retape sa valeur, la frontière étant l'ÉGALITÉ de la liste entière — un fragment partagé est un autre élément, et une liste modifiée n'a plus de jumeau). Le garde prononce le verdict, ce module fournit la lecture, les planchers et les refus ; ses mutations le visent DIRECTEMENT (le harnais n'accepte que `cible` = `garde`), chacune prouvée par un cas nommé de scripts/__tests__/check-classes-coquilles.test.js."
+  }
   ],
   "rejeux": [
     {
@@ -2706,8 +2731,8 @@
       "id": "classes-sans-regle: lecture des pages neutralisee",
       "garde": "frontend/scripts/check-classes-sans-regle.js",
       "cible": "frontend/scripts/check-classes-sans-regle.js",
-      "trouve": "for (const [nom, porteur] of classesPoseesDePage(html).porteurDe) {",
-      "remplace": "for (const [nom, porteur] of []) {",
+      "trouve": "for (const [nom, porteur] of classesPoseesDePage(html).porteurDe) retenir(nom, porteur, 'page', page);",
+      "remplace": "for (const [nom, porteur] of []) retenir(nom, porteur, 'page', page);",
       "runner": "node",
       "preuve": "frontend/scripts/__tests__/check-classes-sans-regle.test.js",
       "commande": [
@@ -2786,7 +2811,7 @@
       "id": "classes-sans-regle: plancher du sujet neutralise",
       "garde": "frontend/scripts/check-classes-sans-regle.js",
       "cible": "frontend/scripts/check-classes-sans-regle.js",
-      "trouve": "if (posees.size < MIN_CLASSES_POSEES) {",
+      "trouve": "if (poseesParLesPages < MIN_CLASSES_POSEES) {",
       "remplace": "if (false) {",
       "runner": "node",
       "preuve": "frontend/scripts/__tests__/check-classes-sans-regle.test.js",
@@ -3784,6 +3809,309 @@
       "attend": [
         "< plancher 61440 o"
       ]
-    }
+    },
+    {
+      "id": "classes-sans-regle: lecture du bundle neutralisee",
+      "garde": "frontend/scripts/check-classes-sans-regle.js",
+      "cible": "frontend/scripts/check-classes-sans-regle.js",
+      "trouve": "const lecture = classesPoseesDuJs(fs.readFileSync(script, 'utf8'));",
+      "remplace": "const lecture = { noms: [], porteurDe: new Map(), valeurs: 0, fichiersRefuses: { fragments: 0, nonLitteral: 0 }, lisible: true };",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-classes-sans-regle.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-classes-sans-regle.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "sort 1 en NOMMANT le SCRIPT et la classe (une classe que seul React peint)",
+        "sort 0 sur un arbre conforme, et PUBLIE ce qu’il a lu"
+      ]
+    },
+    {
+      "id": "classes-sans-regle: plancher du bundle neutralise",
+      "garde": "frontend/scripts/check-classes-sans-regle.js",
+      "cible": "frontend/scripts/check-classes-sans-regle.js",
+      "trouve": "if (scripts.length < MIN_FICHIERS_JS || valeursJs < MIN_VALEURS_JS || nomsDuJs.size < MIN_JETONS_JS) {",
+      "remplace": "if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-classes-sans-regle.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-classes-sans-regle.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "REFUSE de juger un livré sans scripts (plancher de fichiers JavaScript)",
+        "REFUSE de juger un bundle trop pauvre en VALEURS entières",
+        "REFUSE de juger un bundle pauvre en JETONS distincts"
+      ]
+    },
+    {
+      "id": "classes-sans-regle: refus du script illisible neutralise",
+      "garde": "frontend/scripts/check-classes-sans-regle.js",
+      "cible": "frontend/scripts/check-classes-sans-regle.js",
+      "trouve": "if (illisibles.length) {",
+      "remplace": "if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-classes-sans-regle.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-classes-sans-regle.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "REFUSE de juger un script ILLISIBLE (un lecteur partiel ne rend pas un verdict complet)"
+      ]
+    },
+  {
+    "id": "classes-coquilles: jumeau neutralise",
+    "garde": "frontend/scripts/classes-coquilles.js",
+    "cible": "frontend/scripts/classes-coquilles.js",
+    "trouve": "const sansJumelle = listes.filter((liste) => !liste.jumelles.length);",
+    "remplace": "const sansJumelle = [];",
+    "runner": "node",
+    "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
+    "commande": [
+      "npx",
+      "vitest",
+      "run",
+      "scripts/__tests__/check-classes-coquilles.test.js",
+      "--reporter=basic"
+    ],
+    "cwd": "frontend",
+    "attend": [
+      "refuse une liste sans jumeau ni déclaration"
+    ]
+  },
+  {
+    "id": "classes-coquilles: exemption sans motif toleree",
+    "garde": "frontend/scripts/classes-coquilles.js",
+    "cible": "frontend/scripts/classes-coquilles.js",
+    "trouve": "if (!String(entree.motif ?? '').trim()) {",
+    "remplace": "if (false) {",
+    "runner": "node",
+    "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
+    "commande": [
+      "npx",
+      "vitest",
+      "run",
+      "scripts/__tests__/check-classes-coquilles.test.js",
+      "--reporter=basic"
+    ],
+    "cwd": "frontend",
+    "attend": [
+      "refuse une exemption SANS MOTIF"
+    ]
+  },
+  {
+    "id": "classes-coquilles: exemption perimee toleree",
+    "garde": "frontend/scripts/classes-coquilles.js",
+    "cible": "frontend/scripts/classes-coquilles.js",
+    "trouve": "if (!publiee) {",
+    "remplace": "if (false) {",
+    "runner": "node",
+    "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
+    "commande": [
+      "npx",
+      "vitest",
+      "run",
+      "scripts/__tests__/check-classes-coquilles.test.js",
+      "--reporter=basic"
+    ],
+    "cwd": "frontend",
+    "attend": [
+      "refuse une exemption PÉRIMÉE"
+    ]
+  },
+  {
+    "id": "classes-coquilles: exemption menteuse toleree",
+    "garde": "frontend/scripts/classes-coquilles.js",
+    "cible": "frontend/scripts/classes-coquilles.js",
+    "trouve": "if (jumelles.has(entree.publiee)) {",
+    "remplace": "if (false) {",
+    "runner": "node",
+    "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
+    "commande": [
+      "npx",
+      "vitest",
+      "run",
+      "scripts/__tests__/check-classes-coquilles.test.js",
+      "--reporter=basic"
+    ],
+    "cwd": "frontend",
+    "attend": [
+      "refuse une exemption MENTEUSE"
+    ]
+  },
+  {
+    "id": "classes-coquilles: recopie de la valeur toleree",
+    "garde": "frontend/scripts/classes-coquilles.js",
+    "cible": "frontend/scripts/classes-coquilles.js",
+    "trouve": "if (listes.some((liste) => liste.valeur === valeur)) {",
+    "remplace": "if (false) {",
+    "runner": "node",
+    "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
+    "commande": [
+      "npx",
+      "vitest",
+      "run",
+      "scripts/__tests__/check-classes-coquilles.test.js",
+      "--reporter=basic"
+    ],
+    "cwd": "frontend",
+    "attend": [
+      "refuse une coquille qui RECOPIE la valeur du domicile"
+    ]
+  },
+  {
+    "id": "classes-coquilles: champ non lu par une coquille tolere",
+    "garde": "frontend/scripts/classes-coquilles.js",
+    "cible": "frontend/scripts/classes-coquilles.js",
+    "trouve": "if (!luParCoquille.length) {",
+    "remplace": "if (false) {",
+    "runner": "node",
+    "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
+    "commande": [
+      "npx",
+      "vitest",
+      "run",
+      "scripts/__tests__/check-classes-coquilles.test.js",
+      "--reporter=basic"
+    ],
+    "cwd": "frontend",
+    "attend": [
+      "refuse un champ du domicile lu par AUCUNE coquille"
+    ]
+  },
+  {
+    "id": "classes-coquilles: champ non lu par react tolere",
+    "garde": "frontend/scripts/classes-coquilles.js",
+    "cible": "frontend/scripts/classes-coquilles.js",
+    "trouve": "if (!luParReact.length) {",
+    "remplace": "if (false) {",
+    "runner": "node",
+    "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
+    "commande": [
+      "npx",
+      "vitest",
+      "run",
+      "scripts/__tests__/check-classes-coquilles.test.js",
+      "--reporter=basic"
+    ],
+    "cwd": "frontend",
+    "attend": [
+      "refuse un champ du domicile lu par AUCUNE source React"
+    ]
+  },
+  {
+    "id": "classes-coquilles: plancher du sujet neutralise",
+    "garde": "frontend/scripts/check-classes-coquilles.js",
+    "cible": "frontend/scripts/check-classes-coquilles.js",
+    "trouve": "if (coquilles.length < MIN_MODULES_COQUILLES || react.length < MIN_SOURCES_REACT) {",
+    "remplace": "if (false) {",
+    "runner": "node",
+    "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
+    "commande": [
+      "npx",
+      "vitest",
+      "run",
+      "scripts/__tests__/check-classes-coquilles.test.js",
+      "--reporter=basic"
+    ],
+    "cwd": "frontend",
+    "attend": [
+      "refuse un balayage trop maigre"
+    ]
+  },
+  {
+    "id": "classes-coquilles: plancher des listes neutralise",
+    "garde": "frontend/scripts/check-classes-coquilles.js",
+    "cible": "frontend/scripts/check-classes-coquilles.js",
+    "trouve": "if (volumes.listes < MIN_LISTES_LUES || volumes.avecJumelle < MIN_LISTES_AVEC_JUMELLE) {",
+    "remplace": "if (false) {",
+    "runner": "node",
+    "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
+    "commande": [
+      "npx",
+      "vitest",
+      "run",
+      "scripts/__tests__/check-classes-coquilles.test.js",
+      "--reporter=basic"
+    ],
+    "cwd": "frontend",
+    "attend": [
+      "refuse un sujet trop maigre en LISTES"
+    ]
+  },
+  {
+    "id": "classes-coquilles: dossier de pre-rendu absent tolere",
+    "garde": "frontend/scripts/check-classes-coquilles.js",
+    "cible": "frontend/scripts/check-classes-coquilles.js",
+    "trouve": "const dossier = path.join(racine, DOSSIER_COQUILLES);\n    if (!fs.existsSync(dossier)) {",
+    "remplace": "const dossier = path.join(racine, DOSSIER_COQUILLES);\n    if (false) {",
+    "runner": "node",
+    "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
+    "commande": [
+      "npx",
+      "vitest",
+      "run",
+      "scripts/__tests__/check-classes-coquilles.test.js",
+      "--reporter=basic"
+    ],
+    "cwd": "frontend",
+    "attend": [
+      "refuse un dossier de pré-rendu absent"
+    ]
+  },
+  {
+    "id": "classes-coquilles: racine sans src tolerée",
+    "garde": "frontend/scripts/check-classes-coquilles.js",
+    "cible": "frontend/scripts/check-classes-coquilles.js",
+    "trouve": "const dossierReact = path.join(racine, 'src');\n    if (!fs.existsSync(dossierReact)) {",
+    "remplace": "const dossierReact = path.join(racine, 'src');\n    if (false) {",
+    "runner": "node",
+    "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
+    "commande": [
+      "npx",
+      "vitest",
+      "run",
+      "scripts/__tests__/check-classes-coquilles.test.js",
+      "--reporter=basic"
+    ],
+    "cwd": "frontend",
+    "attend": [
+      "refuse une racine sans"
+    ]
+  },
+  {
+    "id": "classes-coquilles: domicile introuvable tolere",
+    "garde": "frontend/scripts/check-classes-coquilles.js",
+    "cible": "frontend/scripts/check-classes-coquilles.js",
+    "trouve": "if (!domicileLisible) {",
+    "remplace": "if (false) {",
+    "runner": "node",
+    "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
+    "commande": [
+      "npx",
+      "vitest",
+      "run",
+      "scripts/__tests__/check-classes-coquilles.test.js",
+      "--reporter=basic"
+    ],
+    "cwd": "frontend",
+    "attend": [
+      "refuse un domicile introuvable"
+    ]
+  }
   ]
 }

@@ -11,6 +11,16 @@ import NotificationBell from './NotificationBell';
 import { Icone } from './chrome-icons';
 import { LANGUAGES } from '../config/languages';
 import { MarqueKojo } from '../config/marque-kojo';
+// Les CLASSES du chrome : UN propriétaire (src/config/classes-chrome.js), lu par
+// cette barre ET par le placeholder des coquilles pré-rendues
+// (vite-plugins/prerender/app-chrome.js) — c'est la hauteur (border-b + h-16 =
+// 65 px mesurés) qui décide où tombe le contenu des deux peintures.
+import {
+  CONTENEUR_CLASS,
+  NAV_RANGEE_CLASS,
+  NAV_CLASS,
+  NAV_PWA_SUFFIXE,
+} from '../config/classes-chrome';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -78,9 +88,10 @@ export default function Navbar() {
     setIsMobileMenuOpen(false);
   };
 
-  const navbarClass = isPWA()
-    ? 'sticky top-0 z-50 border-b bg-white/95 shadow-sm backdrop-blur pt-safe-area-inset-top'
-    : 'sticky top-0 z-50 border-b bg-white/95 shadow-sm backdrop-blur';
+  // La base vient du domicile partagé ; le seul ajout propre à React est le
+  // retrait d'encoche (PWA), et il est DÉCLARÉ dans le domicile plutôt que
+  // retapé ici.
+  const navbarClass = isPWA() ? `${NAV_CLASS} ${NAV_PWA_SUFFIXE}` : NAV_CLASS;
 
   // L'entrée de menu est SOULIGNÉE quand on est déjà dessus : sans ce repère, un
   // visiteur qui navigue ne sait pas où il se trouve. Le soulignement reprend la
@@ -94,8 +105,11 @@ export default function Navbar() {
 
   return (
     <nav className={navbarClass}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
+      <div className={CONTENEUR_CLASS}>
+        {/* La rangée intérieure est lue dans le domicile (NAV_RANGEE_CLASS,
+            src/config/classes-chrome.js) : la coquille la publie avec la même
+            classe, donc les deux peintures portent le même porteur de hauteur. */}
+        <div className={NAV_RANGEE_CLASS}>
           <div className="flex items-center">
             {/* ── Le verrou de marque ────────────────────────────────────────────
                 Il n'y a plus QU'UNE chose à gauche : la marque. Le mot « Kojo »

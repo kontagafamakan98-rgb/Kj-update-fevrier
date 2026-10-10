@@ -4,7 +4,12 @@ import { test, expect } from '@playwright/test';
 // déclaration que la sonde confronte à ce que le navigateur peint. Recopier
 // `max-w-7xl` ici ferait deux endroits à tenir d'accord, et le premier oublié
 // laisserait la sonde verte sur un cadre qui a changé.
-import { CADRES_APP, REGLES_DE_SQUELETTE } from '../src/config/app-cadres.js';
+import {
+  CADRES_APP,
+  HAUTEUR_PIED_HORS_ECRAN,
+  REGLES_DE_CHARGEMENT,
+  REGLES_DE_SQUELETTE,
+} from '../src/config/app-cadres.js';
 // LE BUDGET CLS AUSSI est lu, jamais recopié : `scripts/lhci-cls-budgets.cjs` porte
 // la table mesurée de la CI (un plafond par route, avec son relevé). Deux tables
 // divergeraient en silence — et la sonde mesure la MÊME grandeur que la CI.
@@ -198,6 +203,48 @@ const PLANCHERS_NOEUDS = {
 };
 
 /**
+ * LE PLANCHER DU PREMIER ÉCRAN, par route — mesuré, jamais deviné (09/10/2026).
+ *
+ * Deux nombres, et ils ne mesurent pas la même chose : `elements` est le nombre
+ * d'éléments de CONTENU (texte direct ou média) visibles sans défiler dans le
+ * cadre, `caracteres` la longueur du texte qu'ils portent. Le second existe
+ * parce qu'une page peut garder ses icônes et perdre ses phrases : le compte
+ * d'éléments ne le verrait pas, la longueur si.
+ *
+ * Relevé du 09/10/2026 (fixture, 412×823 et 1350×940, même compte) — la valeur
+ * retenue est TOUJOURS la plus BASSE des deux tailles, et le plancher vaut ~60 %
+ * d'elle, comme `PLANCHERS_NOEUDS` :
+ *
+ *   route          mobile (élém./car.)   desktop (élém./car.)   plancher retenu
+ *   /dashboard     12 / 149              24 / 288                7 /  89
+ *   /profile       19 / 275              26 / 436               11 / 165
+ *   /messages       4 /  74               5 / 118                2 /  44
+ *   /create-job     7 / 139              10 / 227                4 /  83
+ *   /jobs/:id      11 / 397              18 / 491                6 / 238
+ *
+ * (les deux nombres de `/jobs/:id` sont ceux du cas COURT — la fiche brève,
+ * qui fixe le plancher : son annonce longue peint 2 856 / 2 952 caractères, soit
+ * sept fois la valeur courte, et un plancher calé sur elle ne dirait rien du cas
+ * risqué.)
+ *
+ * LE MOBILE EST LE CONTRAIGNANT sur les cinq routes (fenêtre plus étroite,
+ * contenu plus haut) : le plancher est donc un plancher MOBILE, et la valeur
+ * desktop garde ~2× la marge. Un plancher de 0 est REFUSÉ (cas de surface) :
+ * un zéro est toujours vrai, il ne lit rien de la page.
+ *
+ * La fiche de mission se visite DEUX FOIS sous la MÊME clé : le plancher est
+ * celui de la clé, donc les deux cas lui sont confrontés — c'est voulu, et c'est
+ * le cas COURT qui l'impose.
+ */
+const PLANCHERS_PREMIER_ECRAN = {
+  '/dashboard': { elements: 7, caracteres: 89 },
+  '/profile': { elements: 11, caracteres: 165 },
+  '/messages': { elements: 2, caracteres: 44 },
+  '/create-job': { elements: 4, caracteres: 83 },
+  '/jobs/:id': { elements: 6, caracteres: 238 },
+};
+
+/**
  * LES ROUTES DONT L'ÉTAT DE CHARGEMENT A UN SUJET — la liste du cas « pied de
  * page hors écran », DÉRIVÉE de la déclaration et jamais recopiée.
  *
@@ -226,6 +273,38 @@ const PLANCHERS_NOEUDS = {
 export const ROUTES_A_SQUELETTE_PEINT = ROUTES_CONNECTEES.filter(
   ({ route }) => CADRES_APP[route].squelette.regle !== REGLES_DE_SQUELETTE.GENERIQUE
 );
+
+/**
+ * LES ROUTES DONT L'ÉTAT D'ATTENTE EST LE FALLBACK GÉNÉRIQUE — la liste
+ * DÉRIVÉE de la déclaration, exactement le complément de celle ci-dessus.
+ *
+ * Elles n'ont pas de squelette dédié ET n'attendent aucune donnée : leur seul
+ * état d'attente est le repli du `<Suspense>` de `src/App.js` pendant le
+ * chargement du CHUNK de la route. C'est donc le chunk — et non `/api/**` — qui
+ * est le sujet de la règle pour elles, et le seul cas de chargement qui les
+ * atteigne.
+ */
+export const ROUTES_A_FALLBACK_GENERIQUE = ROUTES_CONNECTEES.filter(
+  ({ route }) => CADRES_APP[route].squelette.regle === REGLES_DE_SQUELETTE.GENERIQUE
+);
+
+/**
+ * LE PRÉFIXE DU CHUNK DE PAGE, par route à repli générique — le nom que Vite
+ * donne au fichier de la page (`assets/<Préfixe>-<empreinte>.js`).
+ *
+ * Il n'est pas DÉRIVABLE de la clé de route (`/create-job` n'écrit nulle part
+ * « CreateJob ») : une convention implicite se paierait en silence, le jour où
+ * le chunk est renommé. Le motif est donc DÉCLARÉ, il est confronté au build par
+ * la sonde elle-même (`retenues > 0` : une requête qui ne correspond à rien est
+ * un rouge nommé), et une route générique SANS motif est refusée (cas de
+ * surface) — sans lui, elle aurait un cas de chargement perdu sans que rien ne
+ * le dise.
+ */
+const CHUNKS_DE_ROUTE = {
+  // `src/App.js` : `const CreateJob = lazy(() => import('./pages/CreateJob'))`
+  // → `assets/CreateJob-DsPCDuPl.js` au build du 09/10/2026.
+  '/create-job': 'CreateJob',
+};
 
 /**
  * Les deux tailles mesurées, les mêmes que partout ailleurs dans le dépôt :
@@ -343,6 +422,58 @@ export const RELEVE_DU_CADRE = () => {
           }
         : null,
     noeudsDansCadre: cadre ? cadre.querySelectorAll('*').length : 0,
+    // ── LE CONTENU DU PREMIER ÉCRAN, relevé dans la MÊME visite (09/10/2026)
+    // « Ce qu'un visiteur voit sans défiler » a une définition, et elle s'écrit
+    // ici plutôt que de rester dans une intention : un élément du CADRE dont la
+    // boîte INTERSECTE la fenêtre sur les DEUX axes (la même condition que
+    // `EST_DANS_LE_VIEWPORT`, `helpers/parcours-carte.js`), qui est PEINT
+    // (`display`, `visibility`, `opacity`) et qui PORTE du CONTENU — du texte
+    // direct, ou un MÉDIA. Les enveloppes vides ne comptent pas : elles sont
+    // innombrables et ne disent rien de ce qu'on voit ; compter TOUS les
+    // éléments donnerait un nombre qui ne baisse pas quand le contenu disparaît.
+    // Le CADRE est le périmètre, pas `document` : l'en-tête et le pied de page
+    // sont le CHROME, identiques sur ces routes, et les compter aplatirait
+    // justement la différence que cette mesure existe pour lire.
+    //
+    // `caracteres` est la MÊME matière comptée en LONGUEUR : une phrase qui
+    // disparaîtrait laisserait les mêmes enveloppes peintes, et le seul nombre
+    // d'éléments ne la verrait pas. Le plancher porte sur les deux.
+    premierEcran: (() => {
+      const fenetre = { l: window.innerWidth, h: window.innerHeight };
+      const intersecte = (r) =>
+        r.bottom > 0 && r.top < fenetre.h && r.right > 0 && r.left < fenetre.l;
+      const peint = (element) => {
+        const style = getComputedStyle(element);
+        return style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity) > 0;
+      };
+      const texteDirect = (element) =>
+        [...element.childNodes]
+          .filter((noeud) => noeud.nodeType === 3)
+          .map((noeud) => noeud.textContent.trim())
+          .join(' ');
+      const MEDIAS = new Set(['IMG', 'SVG', 'CANVAS', 'VIDEO', 'PICTURE']);
+      const elements = cadre ? [...cadre.querySelectorAll('*')] : [];
+      const peints = [];
+      const porteurs = [];
+      let caracteres = 0;
+      for (const element of elements) {
+        const r = element.getBoundingClientRect();
+        if (r.width <= 0 || r.height <= 0 || !intersecte(r) || !peint(element)) continue;
+        peints.push(element);
+        const texte = texteDirect(element);
+        if (texte) caracteres += texte.length;
+        if (texte || MEDIAS.has(element.tagName)) porteurs.push(element);
+      }
+      return {
+        fenetre,
+        // « SANS DÉFILER » est une propriété du relevé, pas un sous-entendu :
+        // `scrollY` non nul mesurerait une tranche arbitraire du document.
+        defilement: window.scrollY,
+        elements: porteurs.length,
+        peints: peints.length,
+        caracteres,
+      };
+    })(),
     // ── Le RYTHME, relevé dans la MÊME visite (09/10/2026) ───────────────
     // Les jetons sont RÉSOLUS, jamais lus comme texte de déclaration :
     // `getPropertyValue('--rythme-bloc')` rend `clamp(…)`, pas la longueur
@@ -430,6 +561,60 @@ test('budgets CLS — chaque route connectée sondée a un plafond MESURÉ', () 
     sansPlancher.map(({ route }) => route),
     `route(s) sans plancher de lecture : ${sansPlancher.map(({ route }) => route).join(', ')} — mesurer (cette sonde publie son ` +
       'relevé) puis l’ajouter à PLANCHERS_NOEUDS. Un plancher hérité ne dirait rien du contenu de la page.'
+  ).toEqual([]);
+  // Le plancher du PREMIER ÉCRAN non plus n'hérite pas — et il est refusé à
+  // ZÉRO : `elements: 0` ou `caracteres: 0` rendrait l'assertion toujours vraie,
+  // c'est-à-dire un plancher qui ne lit rien (le faux vert exact que la table
+  // existe pour fermer).
+  const sansPlancherEcran = ROUTES_CONNECTEES.filter(
+    ({ route }) => !Object.hasOwn(PLANCHERS_PREMIER_ECRAN, route)
+  );
+  expect(
+    sansPlancherEcran.map(({ route }) => route),
+    `route(s) sans plancher de premier écran : ${sansPlancherEcran.map(({ route }) => route).join(', ')} — ` +
+      'mesurer (cette sonde publie son relevé) puis l’ajouter à PLANCHERS_PREMIER_ECRAN, comme pour les nœuds : ' +
+      'un plancher hérité ne dirait rien de ce que la page montre sans défiler.'
+  ).toEqual([]);
+  const planchersVides = [...new Set(ROUTES_CONNECTEES.map(({ route }) => route))].filter((route) => {
+    const plancher = PLANCHERS_PREMIER_ECRAN[route];
+    return !plancher || !(plancher.elements > 0) || !(plancher.caracteres > 0);
+  });
+  expect(
+    planchersVides,
+    `route(s) dont le plancher de premier écran est nul ou absent : ${planchersVides.join(', ') || 'aucune'} — ` +
+      'un plancher de 0 est toujours satisfait : il ne lit rien de la page.'
+  ).toEqual([]);
+  // ── LE REPLI GÉNÉRIQUE A SON CAS, ET IL LUI FAUT SON MOTIF ────────────
+  // Le cas « chunk retenu » ne juge que les routes à repli générique (liste
+  // DÉRIVÉE de la déclaration), et il ne peut rien retenir sans le préfixe du
+  // chunk que le build publie pour elles. Une route générique sans motif serait un
+  // cas de chargement PERDU en silence ; un motif dont la route n'est plus en
+  // repli générique est une ligne périmée, qui survivrait à la décision qu'elle
+  // décrit. Le plancher, lui, dit que la sonde rejoue la décision écrite pour
+  // `/create-job` : faire disparaître la dernière route générique demande donc de
+  // retirer AUSSI cette ligne — la décision ne peut pas s'évaporer en silence.
+  expect(
+    ROUTES_A_FALLBACK_GENERIQUE.length,
+    'aucune route à repli générique : le cas « chunk retenu » aurait zéro cas et ne jugerait plus rien '
+  ).toBeGreaterThanOrEqual(1);
+  const generiquesSansChunk = ROUTES_A_FALLBACK_GENERIQUE.filter(
+    ({ route }) => !Object.hasOwn(CHUNKS_DE_ROUTE, route)
+  );
+  expect(
+    generiquesSansChunk.map(({ route }) => route),
+    `route(s) à repli générique sans préfixe de chunk : ${generiquesSansChunk
+      .map(({ route }) => route)
+      .join(', ')} — ajouter l’entrée à CHUNKS_DE_ROUTE : le cas retient le chunk de la route, sans quoi il ` +
+      'mesurerait une navigation ordinaire.'
+  ).toEqual([]);
+  const chunksOrphelins = Object.keys(CHUNKS_DE_ROUTE).filter(
+    (route) => !ROUTES_A_FALLBACK_GENERIQUE.some((entree) => entree.route === route)
+  );
+  expect(
+    chunksOrphelins,
+    `préfixe(s) de chunk déclaré(s) pour une route qui n’est plus en repli générique : ` +
+      `${chunksOrphelins.join(', ')} — une ligne périmée de la table des chunks décrirait encore une ` +
+      'décision qui a changé.'
   ).toEqual([]);
   // LE CHEMIN EST CONCRET. Un `chemin` qui garderait le paramètre de la clé
   // ferait naviguer la sonde vers une URL littérale (`/jobs/:id`), que le routeur
@@ -552,12 +737,38 @@ export const RELEVE_DU_CHARGEMENT = () => {
   const arrondi = (valeur) => +valeur.toFixed(2);
   const cadre = document.querySelector('.cadre-page');
   const pied = document.querySelector('footer');
-  const reserve = cadre ? cadre.querySelector('.reserve-pied-hors-ecran') : null;
+  // La réserve est cherchée dans `main`, PAS dans le cadre : /payment n'a AUCUN
+  // `.cadre-page` (son cadre est déclaré dans son plan à deux canaux) et sa
+  // réserve vit donc directement dans `main` — la chercher dans le cadre aurait
+  // annoncé « aucune réserve posée » sur une route qui en pose une.
+  const reserve = document.querySelector('main .reserve-pied-hors-ecran');
   const styleReserve = reserve ? getComputedStyle(reserve) : null;
   return {
     url: location.pathname,
+    // L'URL COMPLÈTE, en plus du chemin : les branches de /payment ne diffèrent
+    // que par leur CHAÎNE DE RECHERCHE (`?job_id=…`), et c'est elle qui décide de
+    // ce qui est réservé — un relevé qui ne publierait que `pathname` ne
+    // pourrait pas dire laquelle des deux branches a été mesurée.
+    urlComplete: location.pathname + location.search,
     fenetre: { l: window.innerWidth, h: window.innerHeight },
+    // Le repli GÉNÉRIQUE ne publie AUCUN `.cadre-page` (c'est le `PageSkeleton`
+    // partagé) : `pulses` ci-dessous, scopé au cadre, y vaut donc 0 — mesuré,
+    // pas supposé. Les deux champs qui suivent existent pour ce cas-là :
+    // `cadrePresent` prouve qu'on regarde bien l'état d'attente et non la page,
+    // et `pulsesDansMain` compte les pulses du repli, qui vivent dans `main`.
+    cadrePresent: Boolean(cadre),
+    pulsesDansMain: document.querySelectorAll('main .animate-pulse').length,
     pulses: document.querySelectorAll('.cadre-page .animate-pulse').length,
+    // LE TITRE DE LA PAGE, comme repère de « c'est la page, pas son état
+    // d'attente » : le repli dédié de /payment ne publie AUCUN `<h1>` (il peint
+    // des barres grises), donc un titre VIDE pendant le retrait du chunk prouve
+    // qu'on mesure le repli — et un titre non vide après, que la page est
+    // arrivée. Le repère est publié (jamais un booléen nu) : un rouge doit
+    // pouvoir nommer ce qu'il a lu.
+    titre: (() => {
+      const h1 = document.querySelector('main h1');
+      return h1 ? String(h1.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40) : '';
+    })(),
     pied: pied
       ? (() => {
           const r = pied.getBoundingClientRect();
@@ -565,6 +776,17 @@ export const RELEVE_DU_CHARGEMENT = () => {
         })()
       : null,
     piedHorsEcran: pied ? pied.getBoundingClientRect().top >= window.innerHeight : null,
+    // La BOÎTE de `main`, en plus de celle du pied de page : la hauteur du
+    // contenu est ce que l'état de chargement de /payment doit égaler à sa
+    // destination (le pied de page, lui, n'en est que la conséquence visible :
+    // il vaut `main` + la barre de navigation). Publier les deux laisse un rouge
+    // nommer LAQUELLE des deux grandeurs a bougé.
+    main: document.querySelector('main')
+      ? (() => {
+          const r = document.querySelector('main').getBoundingClientRect();
+          return { y: arrondi(r.y + window.scrollY), h: arrondi(r.height) };
+        })()
+      : null,
     reservePresente: Boolean(reserve),
     reserveHauteurPx: reserve ? arrondi(reserve.getBoundingClientRect().height) : null,
     minHeightPx: styleReserve ? arrondi(parseFloat(styleReserve.minHeight)) : null,
@@ -608,6 +830,74 @@ async function releverSousChargement(browser, route, viewport) {
         await requete.continue();
       } catch {
         // déjà relâchée, ou page fermée : rien à faire.
+      }
+    }
+    await page.close();
+  }
+}
+
+/**
+ * Ouvre la route avec le CHUNK DE SA PAGE RETENU, puis le relâche, et rend les
+ * deux états peints plus le CLS de la transition.
+ *
+ * Pourquoi ce protocole et non celui de `releverSousChargement` : une route en
+ * repli générique n'attend AUCUNE donnée, donc retenir ses requêtes `/api` ne
+ * peint rien de plus qu'une navigation ordinaire (mesuré : 0 pulse dans le
+ * cadre, le formulaire se peint quand même, cf. la déclaration de la route).
+ * Son seul état d'attente est le repli du `<Suspense>` de `src/App.js` pendant
+ * le chargement du chunk de la route — c'est donc le CHUNK qu'il faut retenir,
+ * et le relâchement qui suit EST la transition à mesurer.
+ *
+ * L'espion CLS est posé AVANT le retrait : sans cela, la seule transition où
+ * cette route peut bouger serait mesurée à l'aveugle — et sur une navigation
+ * ordinaire, ce repli n'est même jamais peint (React résout le chunk avant la
+ * première peinture), donc le CLS d'une navigation ordinaire ne peut pas juger.
+ * Le relâchement est dans le `finally` : une requête jamais relâchée laisserait
+ * le worker Playwright attendre sa fin.
+ */
+async function releverSousChunkRetenu(browser, chemin, viewport, motif) {
+  const page = await browser.newPage({ viewport });
+  const retenues = [];
+  try {
+    await connexionALaFixture(page, COMPTES_DE_LA_FIXTURE[0].email);
+    await page.addInitScript(ESPION_CLS);
+    await page.route(motif, (requete) => {
+      retenues.push(requete);
+    });
+    await page.goto(chemin, { waitUntil: 'commit' });
+    // On attend le REPLI **ou** la page, jamais le repli seul : si le chunk
+    // n'était pas retenu (motif périmé), le repli peut n'être jamais peint —
+    // attendre son seul sélecteur donnerait un timeout MUET là où les cas
+    // veulent un rouge qui NOMME la cause (`retenues` à zéro).
+    await page.waitForFunction(
+      () => document.querySelector('main .animate-pulse') || document.querySelector('.cadre-page'),
+      { timeout: 15000 }
+    );
+    await attendreLaStabilite(page);
+    const pendant = await page.evaluate(RELEVE_DU_CHARGEMENT);
+    for (const requete of retenues) {
+      try {
+        await requete.continue();
+      } catch {
+        // déjà relâchée, ou page fermée : rien à faire.
+      }
+    }
+    await page.waitForSelector('.cadre-page', { timeout: 20000 });
+    await attendreLaStabilite(page);
+    const apres = await page.evaluate(RELEVE_DU_CHARGEMENT);
+    await attendreLaFenetreDeSession(page);
+    const brut = await page.evaluate(() =>
+      window.__kojoCls
+        ? { decalages: window.__kojoCls.decalages, fcp: window.__kojoCls.fcp }
+        : { decalages: [], fcp: null }
+    );
+    return { pendant, apres, retenues: retenues.length, fcp: brut.fcp, ...clsDesDecalages(brut.decalages) };
+  } finally {
+    for (const requete of retenues) {
+      try {
+        await requete.continue();
+      } catch {
+        // déjà relâchée : rien à faire.
       }
     }
     await page.close();
@@ -706,6 +996,123 @@ test.describe('Parcours E2E — le pied de page reste hors de l’écran pendant
   }
 });
 
+/**
+ * LE REPLI GÉNÉRIQUE TIENT LA RÈGLE PENDANT LE CHUNK DE SA ROUTE — et ce cas
+ * existe parce que c'est la MESURE QUI A DÉCIDÉ de la règle `generique`.
+ *
+ * ── Pourquoi le CHUNK, et non `/api/**` ─────────────────────────────────
+ * Le cas « pied de page hors écran » ci-dessus retient les requêtes de DONNÉES,
+ * ce qui peint le squelette DÉDIÉ d'une route. Une route en repli générique n'a
+ * pas de squelette dédié ET n'attend aucune donnée : ses requêtes `/api`
+ * retenues ne peignent rien de plus. Son SEUL état d'attente est le repli du
+ * `<Suspense>` pendant le chargement du chunk de la route — c'est donc le chunk
+ * qui est le sujet, et c'est lui que ce cas retient.
+ *
+ * ── Ce qu'il mesure, et pourquoi c'est DÉCISIF ──────────────────────────
+ * Un squelette a une raison d'être : que rien ne bouge quand la page arrive.
+ * Deux nombres le disent, mesurés dans la même visite :
+ *   • la position du pied de page PENDANT le retrait du chunk — il doit démarrer
+ *     SOUS la ligne de flottaison (mesuré : y=984 pour une fenêtre de 823 en
+ *     mobile, y=1005 pour 940 en desktop, soit 22 px sous la barre et son
+ *     rembourrage) ;
+ *   • le CLS du RELÂCHEMENT — c'est-à-dire de l'arrivée de la page — parce qu'un
+ *     chargement ordinaire ne peint JAMAIS ce repli sur cet hôte (React résout le
+ *     chunk avant la première peinture) : le CLS d'une navigation ordinaire ne
+ *     dit donc rien du remplacement et ne peut pas décider.
+ * Si l'un des deux manquait, un squelette dédié serait la réponse (réserve
+ * `HAUTEUR_PIED_HORS_ECRAN`, comme `/dashboard`, `/profile` et `/jobs/:id`) —
+ * c'est écrit dans la déclaration de la route, et c'est ce cas qui le rejouerait.
+ */
+test.describe('Parcours E2E — le repli GÉNÉRIQUE tient la règle pendant le chunk de sa route', () => {
+  for (const { route, chemin, cas } of ROUTES_A_FALLBACK_GENERIQUE) {
+    for (const { nom: taille, viewport } of TAILLES) {
+      test(`${route}${cas ? ` (${cas})` : ''} — ${taille}`, async ({ browser }) => {
+        const budget = CLS_BUDGETS[route] ? CLS_BUDGETS[route].max : null;
+        expect(
+          budget,
+          `${route} (${taille}) : aucun budget CLS mesuré dans scripts/lhci-cls-budgets.cjs — la route ne ` +
+            'peut pas être sondée sans plafond.'
+        ).not.toBeNull();
+        const prefixe = CHUNKS_DE_ROUTE[route];
+        const motif = new RegExp(`/assets/${prefixe}[\\w.-]*\\.js$`);
+        const releve = await releverSousChunkRetenu(browser, chemin, viewport, motif);
+
+        // ── Anti-faux-vert n° 0 : le chunk a bien été RETENU ───────────────
+        // Sans ce contrôle, un motif qui ne nomme plus le fichier produit par le
+        // build laisserait la page se charger normalement : le cas mesurerait
+        // une navigation ordinaire et serait vert sans avoir rien retenu.
+        expect(
+          releve.retenues,
+          `${route} (${taille}) : aucune requête retenue pour « ${prefixe} » — le motif (${motif}) ne nomme ` +
+            'plus le chunk que le build publie pour cette page, donc le repli n’a jamais été peint et le cas ' +
+            'mesurerait la PAGE.'
+        ).toBeGreaterThan(0);
+
+        // ── Anti-faux-vert n° 1 : c'est bien le REPLI qui est peint ────────
+        // `.cadre-page` n'existe que sur la page : s'il est là, le chunk n'était
+        // pas retenu (ou l'a été trop tard) et la règle serait vérifiée sur la
+        // mauvaise peinture. Les pulses, eux, prouvent que le repli est là.
+        expect(
+          releve.pendant.url,
+          `${route} (${taille}) : le chargement retenu a abouti sur ${releve.pendant.url} — la sonde décrit ` +
+            'un autre écran que celui qu’elle nomme.'
+        ).toBe(chemin);
+        expect(
+          releve.pendant.cadrePresent,
+          `${route} (${taille}) : un \`.cadre-page\` est peint alors que le chunk est RETENU — la sonde mesure ` +
+            'donc la PAGE, pas son état d’attente.'
+        ).toBe(false);
+        expect(
+          releve.pendant.pulsesDansMain,
+          `${route} (${taille}) : ${releve.pendant.pulsesDansMain} pulse(s) dans \`main\` pendant le retrait du ` +
+            'chunk — le repli du `<Suspense>` n’était pas peint, donc le cas mesurerait une page vide.'
+        ).toBeGreaterThan(0);
+
+        // ── LE SUJET : la règle est tenue PENDANT le retrait du chunk ──────
+        expect(
+          releve.pendant.piedHorsEcran,
+          `${route} (${taille}) : le pied de page est VISIBLE (y=${releve.pendant.pied.y} pour une fenêtre de ` +
+            `${releve.pendant.fenetre.h} px) pendant le chargement du chunk — le repli générique ne tient donc ` +
+            'pas la règle, et un squelette dédié (réserve `HAUTEUR_PIED_HORS_ECRAN`) serait la réponse.'
+        ).toBe(true);
+
+        console.log(
+          `ℹ️  ${route} (${taille}) CHUNK RETENU : repli ${releve.pendant.pulsesDansMain} pulses · ` +
+            `pied ${releve.pendant.pied.h} px à y=${releve.pendant.pied.y} ` +
+            `(${releve.pendant.piedHorsEcran ? 'HORS écran' : 'VISIBLE'}) pour une fenêtre de ` +
+            `${releve.pendant.fenetre.h} px · ${releve.retenues} requête(s) retenue(s) · ` +
+            `CLS du relâchement ${releve.cls.toFixed(4)} pour ${budget}`
+        );
+        for (const decalage of plusGrands(releve)) {
+          console.log(`      · décalage : ${decrireDecalage(decalage)}`);
+        }
+
+        // ── Et l'arrivée de la page ne déplace rien de visible ─────────────
+        expect(
+          releve.apres.cadrePresent,
+          `${route} (${taille}) : après relâchement du chunk, aucun \`.cadre-page\` — la page n’est pas arrivée, ` +
+            'donc le CLS mesuré ne décrit pas le remplacement.'
+        ).toBe(true);
+        expect(
+          releve.fcp,
+          `${route} (${taille}) : premier paint absent — le CLS relevé ne décrit rien.`
+        ).not.toBeNull();
+        expect(
+          releve.cls,
+          `${route} (${taille}) : le remplacement du repli par la page déplace celle-ci de ` +
+            `${releve.cls.toFixed(4)} pour un plafond de ${budget} (scripts/lhci-cls-budgets.cjs : ` +
+            `${CLS_BUDGETS[route].mesure}).\n      ${decrireCls(releve.cls, releve)}\n` +
+            plusGrands(releve)
+              .map((decalage) => `      · ${decrireDecalage(decalage)}`)
+              .join('\n') +
+            '\n      Un décalage dont une source est DANS `main` est le signal qu’un squelette dédié apporterait ' +
+            'ce que le repli générique n’apporte pas — corriger la DÉCLARATION de la route, pas le plafond.'
+        ).toBeLessThanOrEqual(budget);
+      });
+    }
+  }
+});
+
 test.describe('Parcours E2E — le cadre et le CLS des routes connectées, par la fixture', () => {
   for (const { route, chemin, cas } of ROUTES_CONNECTEES) {
     for (const { nom: taille, viewport } of TAILLES) {
@@ -744,6 +1151,41 @@ test.describe('Parcours E2E — le cadre et le CLS des routes connectées, par l
         ).toBeGreaterThanOrEqual(PLANCHERS_NOEUDS[route]);
         expect(releve.cadre.h, `${route} (${taille}) : cadre de ${releve.cadre.h} px de haut`).toBeGreaterThan(200);
 
+        // ── LE CONTENU DU PREMIER ÉCRAN — ce qu'un visiteur voit SANS DÉFILER ─
+        // Le plancher est PAR ROUTE et lu dans la déclaration ci-dessus. Trois
+        // contrôles l'encadrent, et les deux premiers sont des anti-faux-vert :
+        // la fenêtre mesurée doit être celle qui a été DEMANDÉE (sinon « le
+        // premier écran » ne désignerait pas la bonne hauteur), le relevé doit
+        // avoir été pris SANS défilement (un `scrollY` non nul mesurerait une
+        // tranche arbitraire du document), et les DEUX nombres du contenu — le
+        // compte d'éléments ET la longueur du texte — sont confrontés au leur :
+        // une page peut garder ses icônes et perdre ses phrases, et le seul
+        // compte d'éléments ne le verrait pas.
+        const plancherEcran = PLANCHERS_PREMIER_ECRAN[route];
+        expect(
+          releve.premierEcran.fenetre,
+          `${route} (${taille}) : le relevé a mesuré une fenêtre de ` +
+            `${releve.premierEcran.fenetre.l}×${releve.premierEcran.fenetre.h} px pour ` +
+            `${viewport.width}×${viewport.height} demandés — « le premier écran » ne décrit pas la bonne taille.`
+        ).toEqual({ l: viewport.width, h: viewport.height });
+        expect(
+          releve.premierEcran.defilement,
+          `${route} (${taille}) : le relevé a été pris à scrollY=${releve.premierEcran.defilement} — ` +
+            'ce n’est plus « ce qu’un visiteur voit sans défiler », c’est une tranche arbitraire du document.'
+        ).toBe(0);
+        expect(
+          releve.premierEcran.elements,
+          `${route} (${taille}) : ${releve.premierEcran.elements} élément(s) de contenu visible(s) sans ` +
+            `défiler pour un plancher de ${plancherEcran.elements} — la page montre moins que ce qu’elle ` +
+            'montrait au relevé du 09/10/2026 (état d’erreur, bloc non monté, ou contenu sorti du cadre).'
+        ).toBeGreaterThanOrEqual(plancherEcran.elements);
+        expect(
+          releve.premierEcran.caracteres,
+          `${route} (${taille}) : ${releve.premierEcran.caracteres} caractère(s) de texte visible(s) sans ` +
+            `défiler pour un plancher de ${plancherEcran.caracteres} — le compte d’éléments peut tenir avec ` +
+            'des icônes seules ; c’est la LONGUEUR qui dit que la page parle encore.'
+        ).toBeGreaterThanOrEqual(plancherEcran.caracteres);
+
         // ── La géométrie ANNONCÉE, puis la géométrie PEINTE ────────────────
         const annonce = geometrieAnnoncee(CADRES_APP[route].frameClass, viewport.width);
         expect(
@@ -773,6 +1215,11 @@ test.describe('Parcours E2E — le cadre et le CLS des routes connectées, par l
         for (const decalage of plusGrands(releve)) {
           console.log(`      · décalage : ${decrireDecalage(decalage)}`);
         }
+        console.log(
+          `      · premier écran : ${releve.premierEcran.elements} élément(s) de contenu visible(s) ` +
+            `(dont ${releve.premierEcran.caracteres} caractères) sur ${releve.premierEcran.peints} ` +
+            `élément(s) peint(s), dans ${releve.premierEcran.fenetre.l}×${releve.premierEcran.fenetre.h}`
+        );
 
         expect(
           releve.paddingGauche,
@@ -877,6 +1324,554 @@ test.describe('Parcours E2E — le cadre et le CLS des routes connectées, par l
               .join('\n') +
             '\n      Corriger la STABILITÉ (le squelette doit partager le cadre ET la hauteur de la page), ' +
             'pas le budget.'
+        ).toBeLessThanOrEqual(budget);
+      });
+    }
+  }
+});
+
+/**
+ * LES ROUTES À REPLI DÉDIÉ DONT LE CADRE EST DÉCLARÉ AILLEURS (09/10/2026).
+ *
+ * /payment a une COQUILLE pré-rendue : son cadre appartient à
+ * `src/config/page-sections.js` (les deux canaux de cette route lisent le même
+ * plan, et un test unitaire refuse son entrée dans `CADRES_APP`). Sa RÈGLE DE
+ * CHARGEMENT, elle, est purement React — une coquille n'a aucun état de
+ * chargement à publier — et elle a été écrite dans le plan SANS POUVOIR Y
+ * RESTER : `npm run build` a REFUSÉ la coquille de /payment en réclamant
+ * « pied-hors-ecran », que le plan déclarait alors comme un texte à publier
+ * (contrat de `page-sections.js` : « un plan ne porte AUCUNE donnée interne : ce
+ * qu'il déclare est publié par la coquille, sans exception »).
+ *
+ * Elle vit donc chez le propriétaire des règles de chargement,
+ * `REGLES_DE_CHARGEMENT` (`src/config/app-cadres.js`), sous la MÊME forme que
+ * `CADRES_APP[route].squelette` — et c'est ce cas-ci qui la rejoue, au même
+ * protocole que les routes de `CADRES_APP` (chunk de la route retenu puis
+ * relâché), parce que la mesure qui a décidé de la règle n'a de valeur que si
+ * elle est rejouée.
+ */
+export const ROUTES_A_REPLI_HORS_CADRE = [{ route: '/payment', chemin: '/payment' }];
+
+/**
+ * LE PRÉFIXE DU CHUNK DE PAGE, par route à repli dédié hors cadre — le nom que
+ * Vite donne au fichier de la page (`assets/<Préfixe>-<empreinte>.js`).
+ *
+ * Même contrat que `CHUNKS_DE_ROUTE`, et pour la même raison : il n'est pas
+ * DÉRIVABLE de la clé de route, une route sans motif serait un cas de chargement
+ * perdu en silence (elle mesurerait une navigation ordinaire), et un motif
+ * orphelin décrirait une décision qui a changé. Les deux refus sont des cas de
+ * surface.
+ */
+const CHUNKS_DES_REPLIS_HORS_CADRE = {
+  // `src/App.js` : `const Payment = lazy(() => import('./pages/Payment'))`
+  // → `assets/Payment-Csiv17TS.js` au build du 09/10/2026.
+  '/payment': 'Payment',
+};
+
+test('les replis dédiés hors cadre sont DÉCLARÉS, avec leur motif de chunk et leur plafond', () => {
+  expect(
+    ROUTES_A_REPLI_HORS_CADRE.length,
+    'cette liste est vide : le cas de chargement ne jugerait rien'
+  ).toBeGreaterThanOrEqual(1);
+
+  const sansRegle = ROUTES_A_REPLI_HORS_CADRE.filter(
+    ({ route }) => !Object.hasOwn(REGLES_DE_CHARGEMENT, route)
+  );
+  expect(
+    sansRegle.map(({ route }) => route),
+    `route(s) à repli dédié sans règle déclarée dans REGLES_DE_CHARGEMENT (src/config/app-cadres.js) : ` +
+      `${sansRegle.map(({ route }) => route).join(', ')} — une règle non déclarée ne tient rien, et le cas ` +
+      'de chargement n’aurait rien à comparer.'
+  ).toEqual([]);
+
+  // La règle est CONNUE, la raison est une MESURE, et la réserve suit la règle :
+  // les trois exigences que `cadres-app.test.jsx` applique à CADRES_APP, ici sur
+  // la table des routes dont le cadre est ailleurs.
+  for (const { route } of ROUTES_A_REPLI_HORS_CADRE) {
+    const { regle, hauteurClass, pourquoi } = REGLES_DE_CHARGEMENT[route];
+    expect(
+      Object.values(REGLES_DE_SQUELETTE),
+      `${route} : règle « ${regle} » inconnue du vocabulaire (REGLES_DE_SQUELETTE).`
+    ).toContain(regle);
+    expect(
+      String(pourquoi || ''),
+      `${route} : la raison déclarée ne porte AUCUNE mesure — « une règle est une mesure, pas une intention ».`
+    ).toMatch(/px/);
+    if (regle === REGLES_DE_SQUELETTE.PIED_HORS_ECRAN) {
+      expect(
+        hauteurClass,
+        `${route} : règle « pied-hors-ecran » sans la réserve déclarée — la classe qui place le pied de page ` +
+          `sous la ligne de flottaison est « ${HAUTEUR_PIED_HORS_ECRAN} ».`
+      ).toBe(HAUTEUR_PIED_HORS_ECRAN);
+    }
+  }
+
+  const sansChunk = ROUTES_A_REPLI_HORS_CADRE.filter(
+    ({ route }) => !Object.hasOwn(CHUNKS_DES_REPLIS_HORS_CADRE, route)
+  );
+  expect(
+    sansChunk.map(({ route }) => route),
+    `route(s) à repli dédié sans préfixe de chunk : ${sansChunk.map(({ route }) => route).join(', ')} — sans ` +
+      'lui, le cas retiendrait n’importe quoi et mesurerait une navigation ordinaire.'
+  ).toEqual([]);
+  const chunksOrphelins = Object.keys(CHUNKS_DES_REPLIS_HORS_CADRE).filter(
+    (route) => !ROUTES_A_REPLI_HORS_CADRE.some((entree) => entree.route === route)
+  );
+  expect(
+    chunksOrphelins,
+    `préfixe(s) de chunk déclaré(s) pour une route qui n’a plus de repli dédié ici : ${chunksOrphelins.join(', ')}`
+  ).toEqual([]);
+
+  const sansBudget = ROUTES_A_REPLI_HORS_CADRE.filter(({ route }) => !Object.hasOwn(CLS_BUDGETS, route));
+  expect(
+    sansBudget.map(({ route }) => route),
+    `route(s) sans budget CLS dans scripts/lhci-cls-budgets.cjs : ${sansBudget.map(({ route }) => route).join(', ')} — ` +
+      'sans valeur mesurée, la route serait sondée sans plafond.'
+  ).toEqual([]);
+
+  // Et leur cadre n'est PAS dans CADRES_APP : il appartient à leur plan (deux
+  // canaux). Le déclarer ici demanderait un `CadrePage` que ces routes n'ont pas
+  // — `cadres-app.test.jsx` le refuse de l'autre côté, ce cas-ci le dit de ce
+  // côté.
+  const dansCadres = ROUTES_A_REPLI_HORS_CADRE.filter(({ route }) => Object.hasOwn(CADRES_APP, route)).map(
+    ({ route }) => route
+  );
+  expect(
+    dansCadres,
+    `route(s) déclarée(s) à la fois ici et dans CADRES_APP : ${dansCadres.join(', ')} — le cadre d’une route a UN ` +
+      'propriétaire, et ces routes-là ont une coquille (leur plan).'
+  ).toEqual([]);
+});
+
+/**
+ * Ouvre la route avec le CHUNK DE SA PAGE RETENU, puis le relâche : le repli
+ * dédié est peint pour de bon, et la transition mesurée EST le relâchement.
+ *
+ * Pourquoi ce protocole pour /payment : sa page n'attend pas toujours de donnée
+ * (la branche « mission requise » n'en a aucune) et son repli est celui du
+ * `<Suspense>` de `src/App.js`. Retenir `/api/**` peindrait l'ÉTAT DE CHARGEMENT
+ * DE LA PAGE, qui n'est pas le sujet ici (celui-là est mesuré et corrigé : cf.
+ * `src/pages/Payment.js` et son propriétaire `src/utils/paymentBranche.js`). Le
+ * sujet est le sort du pied de page quand la page n'existe pas encore.
+ *
+ * Le repère de « page arrivée » n'est pas `.cadre-page` (cette route n'en a pas)
+ * mais le TITRE : le repli peint des barres grises, la page peint son `<h1>`.
+ * Le relâchement est dans le `finally` : une requête jamais relâchée laisserait
+ * le worker Playwright attendre sa fin.
+ */
+async function releverLeRepliDedie(browser, chemin, viewport, motif) {
+  const page = await browser.newPage({ viewport });
+  const retenues = [];
+  try {
+    await connexionALaFixture(page, COMPTES_DE_LA_FIXTURE[0].email);
+    await page.addInitScript(ESPION_CLS);
+    await page.route(motif, (requete) => {
+      retenues.push(requete);
+    });
+    await page.goto(chemin, { waitUntil: 'commit' });
+    // Le REPLI **ou** la page, jamais le repli seul : un motif périmé doit donner
+    // un rouge qui NOMME la cause (`retenues` à zéro), pas une attente muette.
+    await page.waitForFunction(
+      () => document.querySelector('main .animate-pulse') || document.querySelector('main h1'),
+      { timeout: 15000 }
+    );
+    await attendreLaStabilite(page);
+    const pendant = await page.evaluate(RELEVE_DU_CHARGEMENT);
+    for (const requete of retenues) {
+      try {
+        await requete.continue();
+      } catch {
+        // déjà relâchée, ou page fermée : rien à faire.
+      }
+    }
+    await page.waitForFunction(
+      () => Boolean(document.querySelector('main h1')) && document.querySelectorAll('main .animate-pulse').length === 0,
+      { timeout: 20000 }
+    );
+    await attendreLaStabilite(page);
+    const apres = await page.evaluate(RELEVE_DU_CHARGEMENT);
+    await attendreLaFenetreDeSession(page);
+    const brut = await page.evaluate(() =>
+      window.__kojoCls
+        ? { decalages: window.__kojoCls.decalages, fcp: window.__kojoCls.fcp }
+        : { decalages: [], fcp: null }
+    );
+    return { pendant, apres, retenues: retenues.length, fcp: brut.fcp, ...clsDesDecalages(brut.decalages) };
+  } finally {
+    for (const requete of retenues) {
+      try {
+        await requete.continue();
+      } catch {
+        // rien à faire.
+      }
+    }
+    await page.close();
+  }
+}
+
+/**
+ * LE REPLI DÉDIÉ DE /payment TIENT LA RÈGLE PENDANT LE CHUNK DE SA ROUTE.
+ *
+ * Deux nombres, mesurés dans la même visite : la position du pied de page
+ * PENDANT le chargement — il doit démarrer SOUS la ligne de flottaison, sinon il
+ * a quelque part où descendre quand la page arrive, et c'est ce déplacement que
+ * Chrome compte — et le CLS du RELÂCHEMENT (l'arrivée de la page). Et la réserve
+ * PEINTE est confrontée à celle qui est ANNONCÉE, comme pour les routes de
+ * `CADRES_APP` : un correctif qui cesserait d'être appliqué (déclaration non
+ * lue, `min-height` battue, règle CSS invalide) serait vu là, alors qu'un pied
+ * de page hors écran par chance ne le serait pas.
+ *
+ * Relevé du 09/10/2026 (chunk retenu puis relâché, connexion à la fixture,
+ * 412×823 et 1350×940) : pied de page à y=1019 (mobile, fenêtre 823) et y=1004
+ * (desktop, 940) — HORS écran aux DEUX tailles, réserve peinte 758 / 875 px —
+ * puis 765,4 / 859 à l'arrivée de la page, CLS 0,0218 / 0,0132 pour un plafond
+ * de 0,06. Le témoin SANS la réserve (même journée) laissait le pied de page
+ * VISIBLE en desktop pendant tout le chargement (y=859, déjà à sa place finale)
+ * pour un CLS de 0,0148 : c'est ce témoin qui a décidé la déclaration.
+ */
+/**
+ * LES DEUX BRANCHES DE CHARGEMENT DE LA PAGE /payment — celles que l'URL décide,
+ * mesurées l'une CONTRE l'autre (09/10/2026).
+ *
+ * La règle que ces cas tiennent est celle de `src/utils/paymentBranche.js` :
+ * `carteMissionRequise()` ne lit QUE l'URL, donc la page — et son état de
+ * chargement — sait, AVANT que la moindre donnée n'arrive, laquelle de ses deux
+ * destinations elle peint. C'est ce qui permet d'affirmer, et de vérifier, que
+ * l'état de chargement réserve ce que SA branche montrera :
+ *
+ *   • `mission requise` (aucun paramètre) — la destination est la carte
+ *     « mission requise », qui ne porte AUCUNE carte de paiement. L'état de
+ *     chargement doit donc faire EXACTEMENT la hauteur de sa destination ; c'est
+ *     le correctif du 09/10/2026 (`src/pages/Payment.js`), dont le défaut était
+ *     mesuré : 1 376,4 px de `main` pour une destination de 700,4 en mobile,
+ *     ~630 px de cartes réservées qui n'apparaissent jamais, le pied de page
+ *     remontant DANS l'écran à l'arrivée des données (CLS 0,0579, nommé sur
+ *     `<footer>`).
+ *   • `mission` (`?job_id=…`) — la destination porte le formulaire ET les cartes
+ *     de paiement : le même état de chargement les RÉSERVE (12 pulses, au lieu
+ *     de 0). Même règle, résultat inverse — et c'est cette CONTREPARTIE qui
+ *     empêche de « corriger » le cas court en rétrécissant le repli sous la
+ *     hauteur de sa destination (le défaut mesuré à 0,0801 : `main` à 617 px, le
+ *     pied de page inséré dans l'écran dès le chargement).
+ *
+ * `reserveLesCartes` et `hauteurDeLaDestination` ne sont pas des commentaires :
+ * ce sont les deux faits mesurés ci-dessus, et les cas les confrontent au
+ * navigateur sur les DEUX tailles. La surface les vérifie aussi (deux branches,
+ * deux issues opposées, la branche courte déclarée à la hauteur de sa
+ * destination).
+ */
+export const BRANCHES_DE_PAYMENT = [
+  { branche: 'mission requise', chemin: '/payment', reserveLesCartes: false, hauteurDeLaDestination: true },
+  {
+    branche: 'mission',
+    chemin: '/payment?job_id=playtest-job-1',
+    reserveLesCartes: true,
+    hauteurDeLaDestination: false,
+  },
+];
+
+/**
+ * L'état de chargement de la PAGE /payment : ses requêtes de données sont
+ * RETENUES (`/api/**`, sauf `/auth/me` qui porte la session), donc la page est
+ * peinte avec SON PROPRE squelette — et non le repli de `<Suspense>`, qui est le
+ * sujet de l'autre describe (là c'est le chunk qui est retenu).
+ *
+ * Le repère de « on regarde bien la page » est le TITRE : il est peint dans les
+ * deux états de cette route (le repli, lui, ne publie aucune `<h1>`), donc un
+ * titre vide signalerait qu'on mesure autre chose que la page.
+ *
+ * Le relâchement est dans le `finally` : une requête jamais relâchée laisserait
+ * le worker Playwright attendre sa fin.
+ */
+async function releverLEtatDeChargementDeLaPage(browser, chemin, viewport) {
+  const page = await browser.newPage({ viewport });
+  const retenues = [];
+  let retenir = true;
+  try {
+    await connexionALaFixture(page, COMPTES_DE_LA_FIXTURE[0].email);
+    await page.addInitScript(ESPION_CLS);
+    await page.route(
+      (url) => url.href.includes('/api/') && !url.href.includes('/auth/me'),
+      (requete) => {
+        if (retenir) retenues.push(requete);
+        else requete.continue();
+      }
+    );
+    await page.goto(chemin, { waitUntil: 'commit' });
+    await page.waitForFunction(() => Boolean(document.querySelector('main h1')), { timeout: 15000 });
+    await attendreLaStabilite(page);
+    const pendant = await page.evaluate(RELEVE_DU_CHARGEMENT);
+    retenir = false;
+    for (const requete of retenues) {
+      try {
+        await requete.continue();
+      } catch {
+        // déjà relâchée : rien à faire.
+      }
+    }
+    await page.waitForFunction(() => document.querySelectorAll('main .animate-pulse').length === 0, {
+      timeout: 20000,
+    });
+    await attendreLaStabilite(page);
+    // La fenêtre de session CLS se ferme au moins une seconde APRÈS le dernier
+    // décalage : c'est la règle de la métrique, donc le relevé « après » est
+    // pris quand la page a fini de se poser (et non au milieu de l'arrivée des
+    // données).
+    await attendreLaFenetreDeSession(page);
+    const apres = await page.evaluate(RELEVE_DU_CHARGEMENT);
+    const brut = await page.evaluate(() =>
+      window.__kojoCls
+        ? { decalages: window.__kojoCls.decalages, fcp: window.__kojoCls.fcp }
+        : { decalages: [], fcp: null }
+    );
+    return { pendant, apres, retenues: retenues.length, fcp: brut.fcp, ...clsDesDecalages(brut.decalages) };
+  } finally {
+    retenir = false;
+    for (const requete of retenues) {
+      try {
+        await requete.continue();
+      } catch {
+        // rien à faire.
+      }
+    }
+    await page.close();
+  }
+}
+
+test('les deux branches de /payment sont DÉCLARÉES, opposées, et la courte à la hauteur de sa destination', () => {
+  expect(
+    BRANCHES_DE_PAYMENT.length,
+    'la sonde des branches de /payment ne déclare pas ses deux cas : la branche qui réserve les cartes et celle qui ne les réserve pas'
+  ).toBeGreaterThanOrEqual(2);
+  const chemins = BRANCHES_DE_PAYMENT.map(({ chemin }) => chemin);
+  expect(new Set(chemins).size, `les deux branches doivent être deux URL distinctes : ${chemins.join(', ')}`).toBe(
+    chemins.length
+  );
+  const courte = BRANCHES_DE_PAYMENT.find(({ chemin }) => chemin === '/payment');
+  expect(
+    courte,
+    'aucune branche ne visite /payment SANS paramètre — c’est pourtant celle que publie la coquille pré-rendue et celle ' +
+      'd’un visiteur sans mission, donc celle du correctif du 09/10/2026.'
+  ).toBeTruthy();
+  expect(
+    courte.hauteurDeLaDestination,
+    'la branche « mission requise » ne demande plus la hauteur de sa destination — c’est EXACTEMENT le correctif du ' +
+      '09/10/2026 que ce cas existe pour rejouer.'
+  ).toBe(true);
+  const avecMission = BRANCHES_DE_PAYMENT.find(({ chemin }) => chemin.includes('job_id='));
+  expect(
+    avecMission,
+    'aucune branche ne visite /payment AVEC `job_id` — la contrepartie (les cartes DOIVENT y être réservées) manquerait.'
+  ).toBeTruthy();
+  expect(
+    [courte.reserveLesCartes, avecMission.reserveLesCartes],
+    'les deux branches déclarent la MÊME issue — la règle mesurée est qu’elles diffèrent (0 pulse contre 12).'
+  ).toEqual([false, true]);
+  expect(courte.chemin.includes('?'), 'la branche courte ne doit porter AUCUN paramètre').toBe(false);
+});
+
+test.describe('Parcours E2E — l’état de chargement de /payment réserve ce que sa BRANCHE montrera', () => {
+  for (const { branche, chemin, reserveLesCartes, hauteurDeLaDestination } of BRANCHES_DE_PAYMENT) {
+    for (const { nom: taille, viewport } of TAILLES) {
+      test(`${branche} — ${taille}`, async ({ browser }) => {
+        const budget = CLS_BUDGETS['/payment'] ? CLS_BUDGETS['/payment'].max : null;
+        expect(
+          budget,
+          `${branche} (${taille}) : aucun budget CLS mesuré pour /payment dans scripts/lhci-cls-budgets.cjs.`
+        ).not.toBeNull();
+        const releve = await releverLEtatDeChargementDeLaPage(browser, chemin, viewport);
+
+        // ── Anti-faux-vert n° 0 : les requêtes de données ont bien été RETENUES
+        // Sans elles, la page aurait reçu ses données et le relevé « pendant »
+        // décrirait la page finie — c’est-à-dire le cas voisin, pas celui-ci.
+        expect(
+          releve.retenues,
+          `${branche} (${taille}) : aucune requête retenue pour /payment — la page n’était donc pas dans son état de ` +
+            'chargement, et le relevé décrit la page finie.'
+        ).toBeGreaterThan(0);
+        expect(
+          releve.pendant.urlComplete,
+          `${branche} (${taille}) : l’état de chargement a abouti sur ${releve.pendant.urlComplete} — la sonde décrit ` +
+            'une autre branche que celle qu’elle nomme (et c’est la CHAÎNE DE RECHERCHE qui décide de ce qui est réservé).'
+        ).toBe(chemin);
+        expect(
+          releve.pendant.titre,
+          `${branche} (${taille}) : aucun titre de page pendant le chargement — c’est le repli de \`<Suspense>\` qui était ` +
+            'peint, donc le sujet de l’autre describe (le chunk), pas l’état de chargement de la page.'
+        ).not.toBe('');
+
+        // ── LE SUJET N° 1 : LA BRANCHE décide de ce qui est réservé ──────────
+        // 0 pulse sur la branche « mission requise » (aucune carte de paiement
+        // n’y est réservée), 12 sur la branche « mission ». Le même état de
+        // chargement, deux issues — et c’est la déclaration qui dit laquelle.
+        if (reserveLesCartes) {
+          expect(
+            releve.pendant.pulsesDansMain,
+            `${branche} (${taille}) : ${releve.pendant.pulsesDansMain} pulse(s) pendant le chargement — la branche ` +
+              'portant `job_id` DOIT réserver ses cartes de paiement (mesuré : 12).'
+          ).toBeGreaterThan(0);
+        } else {
+          expect(
+            releve.pendant.pulsesDansMain,
+            `${branche} (${taille}) : ${releve.pendant.pulsesDansMain} pulse(s) pendant le chargement alors que la ` +
+              'carte « mission requise » ne porte AUCUNE carte de paiement — c’est le défaut du 09/10/2026 ' +
+              '(1 376,4 px de `main` pour une destination de 700,4 en mobile).'
+          ).toBe(0);
+        }
+
+        // ── LE SUJET N° 2 : le réservé n’est jamais plus COURT que la destination ─
+        // La contrainte est celle qui a fait RETIRER la variante réduite le
+        // 09/10/2026 : plus court que sa destination, le repli laissait le pied
+        // de page s’insérer dans l’écran puis le faisait pousser vers le bas
+        // (CLS 0,0801). Elle tient sur les DEUX branches, et elle n’interdit pas
+        // de réduire la réserve : seulement de passer SOUS la destination.
+        const delta = releve.apres.main.h - releve.pendant.main.h;
+        expect(
+          delta,
+          `${branche} (${taille}) : l’état de chargement réserve ${releve.pendant.main.h} px de \`main\` pour une ` +
+            `destination de ${releve.apres.main.h} px — il est PLUS COURT de ${Math.abs(delta)} px, donc la page le ` +
+            'pousse vers le bas en arrivant. C’est le défaut mesuré le 09/10/2026 (repli réduit : 0,0801).'
+        ).toBeLessThanOrEqual(1);
+
+        // ── LE SUJET N° 3 (la branche courte) : la hauteur EST celle de sa
+        // destination — le correctif du 09/10/2026, à 0,00 px près.
+        if (hauteurDeLaDestination) {
+          expect(
+            Math.abs(delta),
+            `${branche} (${taille}) : l’état de chargement fait ${releve.pendant.main.h} px de \`main\` quand sa ` +
+              `destination fait ${releve.apres.main.h} px (Δ ${delta.toFixed(2)}) — la carte « mission requise » ne ` +
+              'réserve rien d’autre qu’elle-même, donc la hauteur doit être la MÊME (mesuré : 700,38 mobile / ' +
+              '794 desktop, Δ 0,00).'
+          ).toBeLessThanOrEqual(1);
+        }
+
+        console.log(
+          `ℹ️  /payment (${branche}) (${taille}) : ${releve.retenues} requête(s) retenue(s) · pendant ${releve.pendant.pulsesDansMain} pulse(s), ` +
+            `\`main\` ${releve.pendant.main.h} px, pied à y=${releve.pendant.pied.y} ` +
+            `(${releve.pendant.piedHorsEcran ? 'HORS écran' : 'VISIBLE'}) · après \`main\` ${releve.apres.main.h} px, ` +
+            `pied à y=${releve.apres.pied.y} · Δ main ${delta.toFixed(2)} px · CLS ${releve.cls.toFixed(4)} pour ${budget}`
+        );
+        for (const decalage of plusGrands(releve)) {
+          console.log(`      · décalage : ${decrireDecalage(decalage)}`);
+        }
+
+        expect(
+          releve.fcp,
+          `${branche} (${taille}) : premier paint absent — le CLS relevé ne décrit rien.`
+        ).not.toBeNull();
+        expect(
+          releve.cls,
+          `${branche} (${taille}) : le relâchement des données déplace la page de ${releve.cls.toFixed(4)} pour un ` +
+            `plafond de ${budget} (scripts/lhci-cls-budgets.cjs : ${CLS_BUDGETS['/payment'].mesure}).\n      ` +
+            `${decrireCls(releve.cls, releve)}\n` +
+            plusGrands(releve)
+              .map((decalage) => `      · ${decrireDecalage(decalage)}`)
+              .join('\n') +
+            '\n      Un décalage dont une source est DANS `main` est le signal que l’état de chargement ne fait plus la ' +
+            'hauteur de sa destination — corriger la BRANCHE (src/utils/paymentBranche.js) ou le squelette, pas le plafond.'
+        ).toBeLessThanOrEqual(budget);
+      });
+    }
+  }
+});
+
+test.describe('Parcours E2E — le repli dédié de /payment tient la règle pendant le chunk de sa route', () => {
+  for (const { route, chemin } of ROUTES_A_REPLI_HORS_CADRE) {
+    for (const { nom: taille, viewport } of TAILLES) {
+      test(`${route} — ${taille}`, async ({ browser }) => {
+        const budget = CLS_BUDGETS[route] ? CLS_BUDGETS[route].max : null;
+        expect(
+          budget,
+          `${route} (${taille}) : aucun budget CLS mesuré dans scripts/lhci-cls-budgets.cjs — la route ne peut ` +
+            'pas être sondée sans plafond.'
+        ).not.toBeNull();
+        const declaration = REGLES_DE_CHARGEMENT[route];
+        const prefixe = CHUNKS_DES_REPLIS_HORS_CADRE[route];
+        const motif = new RegExp(`/assets/${prefixe}[\\w.-]*\\.js$`);
+        const releve = await releverLeRepliDedie(browser, chemin, viewport, motif);
+
+        expect(
+          releve.retenues,
+          `${route} (${taille}) : aucune requête retenue pour « ${prefixe} » — le motif (${motif}) ne nomme plus ` +
+            'le chunk que le build publie pour cette page, donc le repli n’a jamais été peint et le cas mesurerait ' +
+            'la PAGE.'
+        ).toBeGreaterThan(0);
+        expect(
+          releve.pendant.url,
+          `${route} (${taille}) : le chargement retenu a abouti sur ${releve.pendant.url} — la sonde décrit un autre ` +
+            'écran que celui qu’elle nomme.'
+        ).toBe(chemin);
+        expect(
+          releve.pendant.pulsesDansMain,
+          `${route} (${taille}) : ${releve.pendant.pulsesDansMain} pulse(s) dans \`main\` pendant le retrait du ` +
+            'chunk — le repli du `<Suspense>` n’était pas peint, donc le cas mesurerait une page vide.'
+        ).toBeGreaterThan(0);
+        expect(
+          releve.pendant.titre,
+          `${route} (${taille}) : le titre de la page était DÉJÀ peint (« ${releve.pendant.titre} ») pendant le ` +
+            'retrait du chunk — la sonde mesure donc la PAGE, pas son état d’attente.'
+        ).toBe('');
+
+        expect(
+          releve.pendant.piedHorsEcran,
+          `${route} (${taille}) : le pied de page est VISIBLE (y=${releve.pendant.pied.y} pour une fenêtre de ` +
+            `${releve.pendant.fenetre.h} px) pendant le chargement — il a donc quelque part où descendre quand la ` +
+            `page arrive. Règle déclarée : « ${declaration.regle} » (${declaration.pourquoi}).`
+        ).toBe(true);
+
+        const attendue = HAUTEUR_RESERVE_PX(releve.pendant.fenetre.h);
+        expect(
+          releve.pendant.reservePresente,
+          `${route} (${taille}) : aucun élément « .${declaration.hauteurClass} » dans \`main\` — la réserve déclarée ` +
+            'par la route n’est pas posée (déclaration non lue, ou classe écrite ailleurs).'
+        ).toBe(true);
+        expect(
+          releve.pendant.minHeightPx,
+          `${route} (${taille}) : la réserve annonce ${releve.pendant.minHeightPx} px de hauteur minimale pour ` +
+            `${attendue} px attendus (fenêtre ${releve.pendant.fenetre.h} − barre 65). Une valeur de 0 px est le ` +
+            'signe d’une règle CSS INVALIDE (cf. `calc(100vh-65px)`, que Tailwind recopie verbatim).'
+        ).toBeCloseTo(attendue, 0);
+        expect(
+          releve.pendant.reserveHauteurPx,
+          `${route} (${taille}) : la réserve PEINT ${releve.pendant.reserveHauteurPx} px de haut pour une hauteur ` +
+            `minimale de ${releve.pendant.minHeightPx} px — \`min-height\` ne s’applique pas.`
+        ).toBeGreaterThanOrEqual(releve.pendant.minHeightPx - 1);
+
+        console.log(
+          `ℹ️  ${route} (${taille}) CHUNK RETENU : repli ${releve.pendant.pulsesDansMain} pulses · ` +
+            `pied ${releve.pendant.pied.h} px à y=${releve.pendant.pied.y} ` +
+            `(${releve.pendant.piedHorsEcran ? 'HORS écran' : 'VISIBLE'}) pour une fenêtre de ` +
+            `${releve.pendant.fenetre.h} px · réserve ${releve.pendant.minHeightPx} px peinte ` +
+            `${releve.pendant.reserveHauteurPx} px · ${releve.retenues} requête(s) retenue(s) · CLS du ` +
+            `relâchement ${releve.cls.toFixed(4)} pour ${budget}`
+        );
+        for (const decalage of plusGrands(releve)) {
+          console.log(`      · décalage : ${decrireDecalage(decalage)}`);
+        }
+        console.log(
+          `      · après relâchement : pied ${releve.apres.pied.h} px à y=${releve.apres.pied.y} · ` +
+            `titre « ${releve.apres.titre} »`
+        );
+
+        expect(
+          releve.apres.titre,
+          `${route} (${taille}) : après relâchement du chunk, aucun titre dans \`main\` — la page n’est pas arrivée, ` +
+            'donc le CLS mesuré ne décrit pas le remplacement.'
+        ).not.toBe('');
+        expect(
+          releve.fcp,
+          `${route} (${taille}) : premier paint absent — le CLS relevé ne décrit rien.`
+        ).not.toBeNull();
+        expect(
+          releve.cls,
+          `${route} (${taille}) : le remplacement du repli par la page déplace celle-ci de ` +
+            `${releve.cls.toFixed(4)} pour un plafond de ${budget} (scripts/lhci-cls-budgets.cjs : ` +
+            `${CLS_BUDGETS[route].mesure}).\n      ${decrireCls(releve.cls, releve)}\n` +
+            plusGrands(releve)
+              .map((decalage) => `      · ${decrireDecalage(decalage)}`)
+              .join('\n') +
+            '\n      Un décalage dont une source est DANS `main` est le signal que la réserve ou la hauteur du repli ' +
+            'ne tient plus — corriger la DÉCLARATION de la route, pas le plafond.'
         ).toBeLessThanOrEqual(budget);
       });
     }

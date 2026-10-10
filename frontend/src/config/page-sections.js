@@ -49,6 +49,7 @@ const BLOC_CONTACT = {
   valeurContactClass: 'valeur-contact',
 };
 
+
 // ── La GÉOMÉTRIE du héros de l'accueil ────────────────────────────────────────
 // L'ÉLÉMENT LCP DE « / » A CHANGÉ DE NATURE LE 27/09/2026, et c'est mesuré : la
 // refonte éditoriale a donné au héros une ILLUSTRATION — aujourd'hui une PHOTO
@@ -704,6 +705,24 @@ export const PAGE_SECTIONS = {
     // faisait diverger les deux peintures en silence, et une seconde peinture
     // PLUS GRANDE devient un nouvel élément LCP.
     legalContactClass: 'text-xs text-stone-600',
+    // Classes de la page : lues par src/pages/Login.js ET par la coquille.
+    frameClass: 'min-h-full flex items-center justify-center fond-sable py-12 px-4 sm:px-6 lg:px-8',
+    colonneClass: 'max-w-md w-full space-y-8',
+    titleClass: 'mt-6 text-center titre-page',
+    formClass: 'mt-8 space-y-6',
+    champsClass: 'space-y-4',
+    labelClass: 'block text-sm font-medium text-gray-700',
+    champClass: 'mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm',
+    ligneMotDePasseClass: 'flex items-center justify-between',
+    lienMotDePasseClass: 'text-sm font-medium text-orange-600 hover:text-orange-500',
+    champMotDePasseClass: 'appearance-none relative block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm',
+    boutonClass: 'group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50',
+    encadreLegalClass: 'rounded-lg border border-orange-200 bg-orange-50 p-4 space-y-2',
+    legalNoticeClass: 'text-sm font-semibold text-orange-900',
+    legalLienClass: 'inline-flex items-center text-sm font-medium text-orange-700 hover:text-orange-800 underline',
+    noAccountClass: 'text-center',
+    noAccountTexteClass: 'text-sm text-gray-600',
+    lienInscriptionClass: 'font-medium text-orange-600 hover:text-orange-500',
     // Le glyphe du bloc légal est DESSINÉ (page-icons.js) : le plan nomme une
     // icône, pas une clé i18n d'emoji (`iconLegalNotice` reste au dictionnaire
     // comme valeur interdite pour les coquilles, cf. check-prerender-shells).
@@ -822,6 +841,24 @@ export const PAGE_SECTIONS = {
     requestMessageKey: 'forgotPasswordRequestMessage',
     sendCodeKey: 'forgotPasswordSendCode',
     backToLoginKey: 'forgotPasswordBackToLogin',
+    // Classes de la page : lues par src/pages/ForgotPassword.js ET par la coquille.
+    frameClass: 'min-h-full flex items-center justify-center fond-sable py-12 px-4 sm:px-6 lg:px-8',
+    colonneClass: 'max-w-md w-full space-y-8',
+    enteteClass: 'text-center',
+    badgeClass: 'mx-auto h-14 w-14 flex items-center justify-center rounded-lg bg-orange-600',
+    badgeTexteClass: 'text-white text-2xl font-bold',
+    titleClass: 'mt-6 text-3xl font-bold text-stone-900',
+    carteClass: 'carte-editoriale carte-publique space-y-6',
+    etapesClass: 'flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-gray-500',
+    etapeActiveClass: 'text-orange-600',
+    etapeAttenteClass: 'text-stone-500',
+    formClass: 'space-y-5',
+    labelClass: 'block text-sm font-medium text-gray-700',
+    champClass: 'mt-1 block w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-orange-500',
+    aideClass: 'text-xs text-gray-500',
+    boutonClass: 'relative w-full rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-700',
+    retourClass: 'text-center',
+    lienRetourClass: 'text-sm font-medium text-orange-600 hover:text-orange-500',
   },
 
   '/payment': {
@@ -844,6 +881,15 @@ export const PAGE_SECTIONS = {
     frameClass: 'min-h-full bg-gray-50 py-8',
     corpsClass: 'max-w-6xl mx-auto px-4 space-y-6',
     titleClass: 'titre-page mb-2',
+    // ── LA RÈGLE DE SON ÉTAT DE CHARGEMENT N'EST PAS ICI, ET C'EST UN REFUS MESURÉ ──
+    // Elle a été écrite dans ce plan le 09/10/2026, et `npm run build` l'a REFUSÉE :
+    // `exigerCorpsDeclare` a lu `squelette.regle` comme un texte déclaré et a réclamé
+    // « pied-hors-ecran » dans la coquille de /payment — or une coquille n'a AUCUN état
+    // de chargement à publier. Le contrat de ce fichier est explicite (« un plan ne porte
+    // aucune donnée interne : ce qu'il déclare est publié par la coquille, sans
+    // exception »), donc une déclaration que la coquille ne peut pas porter n'a rien à y
+    // faire. Elle vit chez le propriétaire des RÈGLES DE CHARGEMENT :
+    // `REGLES_DE_CHARGEMENT['/payment']` dans `src/config/app-cadres.js`.
     noJobTitleKey: 'paymentPageNoJobTitle',
     noJobTextKey: 'paymentPageNoJobText',
     noJobCtaKey: 'paymentPageNoJobCta',
@@ -873,6 +919,20 @@ export const PAGE_SECTIONS = {
     // aucun des deux ne la recopie (c'est ce que vérifie
     // scripts/__tests__/check-lcp-geometrie.test.js).
     subtitleClass: 'text-stone-600',
+    // Classes de la page : lues par src/pages/Support.js, par TicketTracker.js ET par la coquille.
+    titleClass: 'titre-page mb-2',
+    enteteClass: 'mb-6 text-center',
+    modeSousTitreClass: 'text-xs text-stone-500',
+    directTitleClass: 'titre-entree mb-1',
+    directSousTitreClass: 'text-sm text-stone-500 mb-5',
+    liensClass: 'mt-6 text-center text-sm text-stone-500',
+    lienClass: 'text-orange-600 underline underline-offset-2',
+    suiviCarteClass: 'mb-6 carte-editoriale carte-publique',
+    suiviTitreClass: 'titre-entree mb-1',
+    suiviSousTitreClass: 'text-sm text-stone-500 mb-4',
+    suiviRangeeClass: 'flex flex-col sm:flex-row gap-2',
+    suiviChampClass: 'flex-1 rounded-lg border border-stone-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500',
+    suiviBoutonClass: 'rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-black disabled:opacity-50',
     // La carte de contact publie le titre du mode « contact direct » — même
     // texte, donc même clé (elle était écrite deux fois dans le dictionnaire).
     directCard: {

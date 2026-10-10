@@ -32,7 +32,13 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CADRES_APP, cadreAppDe, HAUTEUR_PIED_HORS_ECRAN, REGLES_DE_SQUELETTE } from '../../config/app-cadres';
+import {
+  CADRES_APP,
+  cadreAppDe,
+  HAUTEUR_PIED_HORS_ECRAN,
+  REGLES_DE_CHARGEMENT,
+  REGLES_DE_SQUELETTE,
+} from '../../config/app-cadres';
 
 const ICI = path.dirname(fileURLToPath(import.meta.url));
 const SRC = path.resolve(ICI, '..', '..');
@@ -176,6 +182,53 @@ describe('la forme du dépôt — les pages lisent, elles ne recopient pas', () 
   });
 });
 
+/**
+ * Les manquements d’une déclaration de squelette — PUR, pour que les cas
+ * synthétiques puissent prouver que le contrôle SAIT mordre.
+ *
+ * Il vit à la RACINE du fichier parce qu'il juge DEUX tables, et pas une :
+ * `CADRES_APP[route].squelette` (les routes servies par `CadrePage`) et
+ * `REGLES_DE_CHARGEMENT[route]` (celles dont le cadre est déclaré ailleurs, la
+ * forme étant la même) — une copie par table divergerait, et c'est exactement ce
+ * qu'une déclaration unique existe pour empêcher.
+ *
+ * @param {Record<string, {squelette?: object}>} cadres Les cadres à juger.
+ * @returns {string[]} Un message par manquement, vide si la déclaration tient.
+ */
+function manquementsDeLaRegle(cadres) {
+  const manquements = [];
+  for (const [route, cadre] of Object.entries(cadres)) {
+    const squelette = cadre.squelette;
+    if (!squelette) {
+      manquements.push(`${route} : aucune règle déclarée pour son état de chargement`);
+      continue;
+    }
+    if (!Object.values(REGLES_DE_SQUELETTE).includes(squelette.regle)) {
+      manquements.push(`${route} : règle « ${squelette.regle} » inconnue`);
+    }
+    if (!String(squelette.pourquoi || '').trim()) {
+      manquements.push(`${route} : aucune mesure écrite (pourquoi)`);
+    }
+    if (
+      squelette.regle === REGLES_DE_SQUELETTE.PIED_HORS_ECRAN &&
+      squelette.hauteurClass !== HAUTEUR_PIED_HORS_ECRAN
+    ) {
+      manquements.push(
+        `${route} : règle pied-hors-ecran sans la réserve déclarée (hauteurClass « ` +
+          `${squelette.hauteurClass} » au lieu de « ${HAUTEUR_PIED_HORS_ECRAN} »)`
+      );
+    }
+    if (squelette.hauteurClass && squelette.regle !== REGLES_DE_SQUELETTE.PIED_HORS_ECRAN) {
+      manquements.push(`${route} : une réserve déclarée pour la règle « ${squelette.regle} »`);
+    }
+  }
+  return manquements;
+}
+
+/** La même forme que `CADRES_APP` pour une table PLATE de règles. */
+const commeDesCadres = (table) =>
+  Object.fromEntries(Object.entries(table).map(([route, squelette]) => [route, { squelette }]));
+
 describe('la règle du pied de page pendant le chargement', () => {
   /**
    * LES SQUELETTES QUI PORTENT LA RÈGLE, nommés un par un.
@@ -190,43 +243,6 @@ describe('la règle du pied de page pendant le chargement', () => {
    * pied de page au lieu de le laisser tranquille.
    */
   const ROUTES_A_PIED_HORS_ECRAN = ['/dashboard', '/profile', '/jobs/:id'];
-
-  /**
-   * Les manquements d’une déclaration de squelettes — PUR, pour que les cas
-   * synthétiques puissent prouver que le contrôle SAIT mordre.
-   *
-   * @param {Record<string, {squelette?: object}>} cadres Les cadres à juger.
-   * @returns {string[]} Un message par manquement, vide si la déclaration tient.
-   */
-  function manquementsDeLaRegle(cadres) {
-    const manquements = [];
-    for (const [route, cadre] of Object.entries(cadres)) {
-      const squelette = cadre.squelette;
-      if (!squelette) {
-        manquements.push(`${route} : aucune règle déclarée pour son état de chargement`);
-        continue;
-      }
-      if (!Object.values(REGLES_DE_SQUELETTE).includes(squelette.regle)) {
-        manquements.push(`${route} : règle « ${squelette.regle} » inconnue`);
-      }
-      if (!String(squelette.pourquoi || '').trim()) {
-        manquements.push(`${route} : aucune mesure écrite (pourquoi)`);
-      }
-      if (
-        squelette.regle === REGLES_DE_SQUELETTE.PIED_HORS_ECRAN &&
-        squelette.hauteurClass !== HAUTEUR_PIED_HORS_ECRAN
-      ) {
-        manquements.push(
-          `${route} : règle pied-hors-ecran sans la réserve déclarée (hauteurClass « ` +
-            `${squelette.hauteurClass} » au lieu de « ${HAUTEUR_PIED_HORS_ECRAN} »)`
-        );
-      }
-      if (squelette.hauteurClass && squelette.regle !== REGLES_DE_SQUELETTE.PIED_HORS_ECRAN) {
-        manquements.push(`${route} : une réserve déclarée pour la règle « ${squelette.regle} »`);
-      }
-    }
-    return manquements;
-  }
 
   it('CHAQUE squelette de route déclare sa règle ET la mesure qui l’a décidée', () => {
     // Le plancher : juger une déclaration vide annoncerait un vert sur rien.
@@ -328,5 +344,57 @@ describe('/payment — le cadre à DEUX canaux reste chez son propriétaire', ()
     expect(coquille, 'la coquille ré-écrit la largeur de /payment à la main').not.toContain(
       'max-w-6xl mx-auto px-4 space-y-6'
     );
+  });
+
+  it('déclare sa RÈGLE DE CHARGEMENT chez le propriétaire des règles, PAS dans le plan', () => {
+    // Le plan ne peut pas la porter, et ce n'est pas une préférence :
+    // `exigerCorpsDeclare` lit TOUT ce qu'un plan déclare comme devant être publié
+    // par la coquille — et une coquille n'a aucun état de chargement à publier.
+    // Essayé le 09/10/2026, refusé par le build (« la coquille /payment ne porte
+    // pas « pied-hors-ecran » »), ce qui est le contrat écrit de ce fichier :
+    // « un plan ne porte AUCUNE donnée interne : ce qu'il déclare est publié par
+    // la coquille, sans exception ».
+    const plan = lire('config/page-sections.js');
+    expect(
+      plan,
+      'le plan de /payment déclare une règle de chargement (`squelette:`) — le build refusera sa coquille, ' +
+        'qui ne peut pas la publier.'
+    ).not.toContain('squelette:');
+
+    // Elle est donc déclarée là où vivent les règles, sous la MÊME forme que
+    // `CADRES_APP[route].squelette` — et jugée par le MÊME contrôle, ce qui est
+    // la seule façon de garantir que la deuxième table ne dérive pas de la
+    // première (règle connue, mesure écrite, réserve cohérente).
+    const declaration = REGLES_DE_CHARGEMENT['/payment'];
+    expect(declaration, 'REGLES_DE_CHARGEMENT ne déclare pas /payment').toBeTruthy();
+    expect(
+      manquementsDeLaRegle(commeDesCadres({ '/payment': declaration })),
+      'la déclaration de /payment ne tient pas les trois exigences (règle connue, mesure écrite, réserve) '
+    ).toEqual([]);
+    expect(
+      declaration.regle,
+      'la règle de /payment a changé : le relevé du 09/10/2026 a mesuré le pied de page HORS écran pendant ' +
+        'le chargement (y=1019 pour 823, y=1004 pour 940) avec la réserve peinte 758 / 875 px.'
+    ).toBe(REGLES_DE_SQUELETTE.PIED_HORS_ECRAN);
+    expect(declaration.hauteurClass).toBe(HAUTEUR_PIED_HORS_ECRAN);
+  });
+
+  it('le REPLI lit sa déclaration au lieu de la recopier', () => {
+    // Un squelette qui recopie la géométrie de sa page est exactement le CLS
+    // qu'il existe pour empêcher : le repli de /payment peignait `fond-sable`
+    // (le fond de l'APPLICATION, App.js) là où la page ET sa coquille lisent
+    // `bg-gray-50` dans le plan, et il ne portait AUCUNE réserve — le pied de
+    // page restait visible en desktop pendant tout le chargement (y=859 pour une
+    // fenêtre de 940).
+    const source = lire('components/SkeletonLoader.js');
+    const repli = source.slice(source.indexOf('export const PaymentSkeleton'));
+    expect(repli, 'le repli ne lit pas son cadre dans le plan').toContain("PAGE_SECTIONS['/payment']");
+    expect(repli, 'le repli ne lit pas sa règle de chargement').toContain("REGLES_DE_CHARGEMENT['/payment']");
+    expect(repli).toContain('plan.frameClass');
+    expect(repli).toContain('plan.corpsClass');
+    // Les copies ont disparu, et chacune aurait divergé en silence.
+    expect(repli, 'le repli recopie encore le fond de la page').not.toContain('fond-sable');
+    expect(repli, 'le repli recopie encore sa largeur').not.toContain('max-w-6xl');
+    expect(repli, 'le repli recopie encore sa hauteur minimale').not.toContain('min-h-full');
   });
 });

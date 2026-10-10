@@ -136,6 +136,19 @@ export function viewBoxDuDrapeau(nom) {
 }
 
 /**
+ * Le cadre que la page pose sur TOUT drapeau : un arrondi et une ombre. Il vit
+ * ici, lu par `FlagIcon` (React) et par la coquille de l'accueil (`svgDuDrapeau`) :
+ * la sonde de classes calculées a trouvé que la coquille publiait la taille seule,
+ * et que chaque drapeau gagnait son ombre au montage de React.
+ */
+export const CADRE_DU_DRAPEAU = 'rounded shadow-sm';
+
+/** La classe complète d'un drapeau : sa taille, puis le cadre partagé. */
+export function classeDuDrapeau(taille) {
+  return `${taille} ${CADRE_DU_DRAPEAU}`;
+}
+
+/**
  * Le drapeau de la PAGE : un SVG de remplissage, `classe` portant la taille (un
  * SVG ne suit pas `font-size`). `data-drapeau` rend le dessin vérifiable — c'est
  * aussi ce repère qui permet de reconstruire une variante en emoji dans le

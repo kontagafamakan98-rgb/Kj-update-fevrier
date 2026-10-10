@@ -14,6 +14,7 @@ import { handleApiError } from '../services/api';
 import { PaymentContentSkeleton } from '../components/SkeletonLoader';
 import { usePageMeta } from '../utils/seo';
 import { PAGE_SECTIONS } from '../config/page-sections';
+import { carteMissionRequise, retourDuPayeur } from '../utils/paymentBranche';
 import { AlertTriangle } from 'lucide-react';
 
 // Pays proposés, statuts de paiement et méthodes : des CODES, jamais du texte.
@@ -61,12 +62,30 @@ const Payment = () => {
   const [checkoutError, setCheckoutError] = useState('');
   // Retour depuis PayDunya (payment_id/token) : la page affiche alors le
   // statut même sans contexte de mission — on ne remplace ce mode que pour
-  // un checkout "libre" (aucune mission, aucun retour de payeur).
-  const statusParams = useMemo(() => {
-    const params = new URLSearchParams(window.location.search);
-    return Boolean(params.get('payment_id') || params.get('token'));
-  }, []);
+  // un checkout "libre" (aucune mission, aucun retour de payeur). Cette
+  // décision-là, comme son contraire, vit dans `carteMissionRequise()` (cf. son
+  // import et `cartesDePaiementAttendues` plus bas) : la page et le repli de
+  // `<Suspense>` doivent lire la MÊME définition, et il n'y en a donc qu'une.
 
+  // ── LA BRANCHE DÉCIDE DE CE QU'IL FAUT RÉSERVER (mesuré le 09/10/2026) ────
+  // La carte « mission requise » (ni mission, ni retour de payeur) ne contient
+  // AUCUNE carte de paiement : réserver leur hauteur pendant le chargement
+  // peignait donc ~630 px (mobile) / ~450 px (desktop) de cartes qui
+  // n'apparaissent JAMAIS, et c'est la destination qui en payait le prix.
+  // Relevé à la sonde navigateur (chunk de la route retenu puis relâché,
+  // 412×823 et 1350×940) : l'état de chargement valait 1 376,4 px de `main` en
+  // mobile pour une destination de 700,4 — le pied de page remontait donc DANS
+  // l'écran (y=765,4) alors qu'il était resté au-dessus (y=1019) pendant tout
+  // le chargement : CLS 0,0579, nommé sur `<footer>`. En desktop le même écart
+  // valait 1 028,1 contre 794 (CLS 0,0447, trois décalages, tous sur le pied de
+  // page). Le squelette est donc peint LÀ OÙ SA BRANCHE LE MONTRE — les deux
+  // branches de la page restent couvertes, et la règle ne change pas : ce qui
+  // est réservé est ce qui apparaîtra.
+  //
+  // ET LA BRANCHE A UN SEUL PROPRIÉTAIRE : `src/utils/paymentBranche.js`, lu
+  // ici ET par `PaymentSkeleton`. Une règle écrite deux fois divergerait —
+  // c'est exactement le défaut que ce relevé a mis au jour.
+  const cartesDePaiementAttendues = !carteMissionRequise();
   const [form, setForm] = useState({
     // Plus de valeur "démo" (25000) codée en dur : sans contexte de mission,
     // le montant part de 0 plutôt que de suggérer un chiffre arbitraire qui
@@ -132,9 +151,10 @@ const Payment = () => {
   }, [form.amount, form.country, form.method]);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const paymentId = params.get('payment_id');
-    const token = params.get('token');
+    // Les identifiants du retour du payeur sont lus chez leur propriétaire
+    // (`src/utils/paymentBranche.js`), pas relus ici : la branche et les
+    // identifiants qui la composent n'ont qu'une définition.
+    const { paymentId, token } = retourDuPayeur();
 
     const loadStatus = async () => {
       if (!user) return;
@@ -277,7 +297,7 @@ const Payment = () => {
           </div>
         )}
 
-        {!jobPaymentContext && !statusParams ? (
+        {carteMissionRequise() ? (
           <div className="carte-editoriale p-8 text-center">
             <div className="text-4xl mb-3"><IconePage nom={pagePlan.noJobIcon} role="carteVide" /></div>
             <h2 className="titre-entree mb-2">{t(pagePlan.noJobTitleKey)}</h2>
@@ -440,8 +460,12 @@ const Payment = () => {
         {/* État de chargement : skeleton structuré répliquant la hauteur du
             layout réel (carte titre + formulaire quote + carte paiements)
             pour que l'arrivée des données async (providerConfig, quote,
-            payments) ne fasse pas bouger le footer — anti-CLS uniforme. */}
-        {loading && <PaymentContentSkeleton />}
+            payments) ne fasse pas bouger le footer — anti-CLS uniforme.
+            Il n'est peint QUE dans la branche qui le montre : la carte
+            « mission requise » ne porte aucune carte de paiement, donc les
+            réserver y faisait grandir l'état de chargement au-dessus de sa
+            destination (voir `cartesDePaiementAttendues`). */}
+        {loading && cartesDePaiementAttendues && <PaymentContentSkeleton />}
       </div>
     </div>
   );

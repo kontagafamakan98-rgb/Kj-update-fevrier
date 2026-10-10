@@ -293,7 +293,7 @@ export function corpusPoseurs(outDir) {
  *     et le verdict de la feuille LIVRÉE les déclarait donc mortes ; le nom a été
  *     rendu au fait, pas la lecture élargie (07/10/2026).
  */
-const EST_UNE_CLE_DE_CLASSE = (nom) =>
+export const EST_UNE_CLE_DE_CLASSE = (nom) =>
   Boolean(nom) &&
   (nom === 'className' ||
     nom === 'class' ||

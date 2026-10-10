@@ -9,7 +9,7 @@
 // l'accueil (src/config/page-sections.js, que lit src/pages/Home.js).
 
 import { COUNTRIES } from '../../src/config/countries.js'
-import { nomDuDrapeau } from '../../src/config/flags.js'
+import { classeDuDrapeau, nomDuDrapeau } from '../../src/config/flags.js'
 // La COUPURE du titre du héros appartient au plan : la coquille peint les deux
 // mêmes moitiés que src/pages/Home.js, sur les cinq langues, sans recopier la
 // règle (voir `couperLeTitre`, src/config/page-sections.js).
@@ -30,6 +30,15 @@ import {
   srcsetHeros,
 } from '../../src/config/photos-heros.js'
 import { svgDeLIcone, svgDuDrapeau } from './icons-serveur.js'
+// Le conteneur de page du corps : une SEULE déclaration, partagée avec le
+// chrome des coquilles (app-chrome.js) et avec React (src/App.js,
+// src/components/Navbar.js). Les cinq sections de l'accueil la recopiaient en
+// littéral, donc une retouche du conteneur (une largeur, une gouttière) laissait
+// l'accueil derrière elle — et rien ne rougissait : la classe recopiée ne
+// déplace aucun texte, elle change une largeur de colonne. Le garde
+// `scripts/check-classes-coquilles.js` refuse qu'un champ du domicile soit
+// RETAPÉ ici.
+import { CONTENEUR_CLASS } from '../../src/config/classes-chrome.js'
 
 export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
   // ── Shell statique de l'ACCUEIL (index.html) ────────────────────
@@ -275,7 +284,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
         // depuis toujours). Un crawler qui ne lit pas le JavaScript atteint
         // donc les offres de chaque pays sans passer par l'accueil React.
         `<a href="/jobs?country=${esc(country.code)}" class="${rubanJetonClass}">` +
-        svgDuDrapeau(drapeau, 'h-4 w-6 rounded-sm') +
+        svgDuDrapeau(drapeau, classeDuDrapeau('h-4 w-6 rounded-sm')) +
         `${esc(country.name)}` +
         `</a>`
       )
@@ -287,7 +296,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // Catégories (liens INTERNES réels, avec le filtre de la liste) : des
     // LIGNES, comme la page.
     `<section class="${sectionClass} ${paperClass}">`,
-    `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
+    `<div class="${CONTENEUR_CLASS}">`,
     `<div class="${entreeSectionClass}">`,
     `<h2 class="${headClass}">${esc(T('popularServices'))}</h2>`,
     `<p class="${sectionIntroClass}">${esc(T('findServiceYouNeed'))}</p>`,
@@ -311,7 +320,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // coquille publie donc exactement ce que React publie, y compris les
     // attributs de dimension qui réservent la boîte (aucun décalage au chargement).
     `<section class="${sectionClass} ${sandClass}">`,
-    `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
+    `<div class="${CONTENEUR_CLASS}">`,
     `<div class="${galerieGrilleClass}">`,
     ...homePlan.galerie.map(
       ({ labelKey, image }) =>
@@ -326,7 +335,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
 
     // Trois promesses
     `<section class="${sectionClass} ${paperClass}">`,
-    `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
+    `<div class="${CONTENEUR_CLASS}">`,
     `<div class="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">`,
     ...homePlan.promises.map(
       ({ icone, titleKey, descriptionKey: textKey }) =>
@@ -345,7 +354,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // l'entête de la même grille — dont la première colonne porte la photo du
     // parcours, dont le chemin est lu dans le plan.
     `<section class="${sectionClass} ${sandClass}">`,
-    `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
+    `<div class="${CONTENEUR_CLASS}">`,
     `<div class="${etapesGrilleClass}">`,
     `<div class="${etapesTeteClass}">`,
     `<h2 class="${headClass}">${esc(T('howItWorksTitle'))}</h2>`,
@@ -465,7 +474,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // suivants au même écart). Une classe d'un seul token suffisait à décaler
     // la moitié basse de la page.
     `<section class="${sectionClass} ${sandClass} border-t border-stone-100">`,
-    `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
+    `<div class="${CONTENEUR_CLASS}">`,
     `<div class="${entreeSectionClass}">`,
     `<h2 class="${headClass}">${esc(T('contactTitle'))}</h2>`,
     `<p class="${sectionIntroClass}">${esc(T('homeContactText'))}</p>`,

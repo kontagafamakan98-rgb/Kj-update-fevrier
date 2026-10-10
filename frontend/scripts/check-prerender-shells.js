@@ -286,7 +286,7 @@ if (login) {
   // Le bouton est un `<button>` : `[type="submit"]` (l'en-tête de
   // src/index.css) porte `min-height: 48px` quand un
   // `<div>` s'arrêtait à 36-40 px — la sonde de géométrie refusait l'écart.
-  if (!login.includes(`bg-orange-600">${fr.login}</button>`)) {
+  if (!new RegExp(`bg-orange-600[^"]*">${fr.login}</button>`).test(login)) {
     errors.push('login.html : bouton Connexion (bg-orange-600) absent du shell');
   }
   // Le chunk lazy de Login doit être préchargé (modulepreload) dans le HTML

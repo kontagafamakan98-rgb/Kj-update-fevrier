@@ -670,6 +670,28 @@ jobs:
         working-directory: frontend
         run: node scripts/check-classes-sans-regle.js
 
+      # AUCUNE CLASSE RECOPIÉE D'UNE COQUILLE PAR RENDU PRÉALABLE — le fait que le
+      # garde ci-dessus ne peut pas voir, par construction. Une coquille
+      # pré-rendue et React peignent la MÊME page deux fois, et jusqu'ici les deux
+      # peintures RECOPIAIENT leurs classes : mesuré le 09/10/2026, 236 listes de
+      # classes écrites en littéral dans vite-plugins/prerender/**, dont 203
+      # avaient un jumeau EXACT dans src/**. Rien ne rougissait quand un seul des
+      # deux côtés changeait — une classe recopiée ne déplace aucun texte, elle
+      # change une bordure, une ombre ou un état grisé, et aucune sonde ne le
+      # voyait (celles de géométrie comparent l'encre et le text-align, celles de
+      # texte comparent les mots). Le garde tient les deux moitiés : ce qui est
+      # partagé vit dans un domicile unique (src/config/classes-chrome.js, lu par
+      # React ET par la coquille — un champ lu par un seul canal est un défaut) et
+      # toute autre liste doit avoir un jumeau chez React ou être déclarée propre à
+      # la coquille AVEC son motif. Les 23 listes qui sont passées au domicile
+      # (18 du chrome, 5 conteneurs de page) ne sont plus des copies du tout. La
+      # règle vit dans scripts/classes-coquilles.js ; preuve d'échec dans
+      # scripts/__tests__/check-classes-coquilles.test.js (12 mutations au
+      # registre) ; les deux pistes ont été déclarées dans le registre de preuves.
+      - name: Check no class copied by a prerendered shell (declared home + twins)
+        working-directory: frontend
+        run: node scripts/check-classes-coquilles.js
+
       # AUCUN JETON SANS LECTEUR, AUCUN MOT ÉTRANGER. Le garde ci-dessus juge des
       # NOMS DE CLASSES ; celui-ci juge des JETONS — deux sujets distincts, et le
       # second n'était tenu par rien : mesuré le 08/10/2026, le `:root` de
@@ -1144,6 +1166,10 @@ jobs:
   #      SEO / sans-JavaScript (voir frontend/e2e/style-layout-document.spec.js).
   #      Aucun job ni budget Lighthouse ajouté : c'est le job e2e existant qui la
   #      porte, ~1 min de plus.
+  #   7. Classes calculées : pour chaque route pré-rendue et chaque taille, les
+  #      éléments rendus qui occupent la même boîte dans la coquille et chez React
+  #      doivent porter les mêmes classes ; un écart non déclaré échoue en nommant
+  #      la paire (voir frontend/e2e/classes-coquille-react.spec.js).
   e2e-playwright:
     name: E2E Playwright tests (Chromium)
     runs-on: ubuntu-latest

@@ -5,6 +5,12 @@ import React from 'react';
 // prétend empêcher — et cette divergence-là ne rougissait nulle part
 // (`antiClsSkeletons.test.jsx` ne lit que les classes qu'il connaît).
 import CadrePage from './CadrePage';
+// /payment ne passe PAS par `CadrePage` (elle a une coquille pré-rendue : ses
+// deux canaux lisent `PAGE_SECTIONS['/payment']`), donc son repli lit le MÊME
+// plan — cadre, corps et règle de chargement — au lieu d'en recopier les
+// classes. C'est la déclaration qui a un propriétaire, pas le squelette.
+import { PAGE_SECTIONS } from '../config/page-sections';
+import { REGLES_DE_CHARGEMENT } from '../config/app-cadres';
 
 // Composant de base Skeleton.
 //
@@ -226,6 +232,24 @@ export const PageSkeleton = () => {
 // 3 blocs courts) laissait un saut de ~118 px au remplacement de /jobs
 // → CLS résiduel. La page affiche elle-même ListSkeleton(count=12) pendant
 // son chargement : le fallback Suspense a exactement la même hauteur.
+//
+// ── CE QUI EST VRAI DE CETTE HAUTEUR, RE-MESURÉ LE 09/10/2026 ──────────────
+// « exactement la même hauteur » est la CIBLE, pas le relevé : la sonde du
+// protocole (chunk de la route retenu puis relâché, 412×823 et 1350×940) a
+// mesuré les TROIS états de la route, chacun dans son propre run — repli 4 354
+// / 2 838 px de `main`, état de chargement INTERNE de la page (chunk relâché,
+// `GET /api/jobs` retenu) 4 312,8 / 2 981,8, page servie 4 231,0 / 2 714,6. Le
+// repli diverge donc de l'état de chargement de la page de 41 px en mobile et
+// de 144 px en desktop (il est plus haut dans l'un, plus bas dans l'autre) :
+// les deux répliquent le même écran avec des blocs calibrés séparément, et le
+// texte, lui, ne peut pas être partagé (il vit dans le dictionnaire du scope
+// `jobs`, chargé avec le chunk de la page — cf. le commentaire de l'intro).
+// CE QUI N'EST PAS UNE RAISON DE RELÂCHER LA RÈGLE QUI COMPTE, elle mesurée à
+// 0,0000 dans les TROIS transitions (repli → chargement → page) aux deux
+// tailles : le pied de page est à 4 419 / 2 903 px du haut, très au-dessous de
+// la ligne de flottaison (823 / 940) dans chacun des états, donc rien de
+// visible ne bouge — contrairement à /payment, où la même divergence tombe sur
+// un pied de page visible (cf. `PaymentSkeleton`).
 export const JobsSkeleton = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -755,10 +779,46 @@ export const PaymentContentSkeleton = () => {
 // max-w-6xl) et la carte de titre, puis le contenu ci-dessus — le swap
 // chunk → page ne déplace ni le footer ancré (flex-1, cf. App.js) ni les
 // cartes.
+//
+// ── CE QUE CE REPLI RÉSERVE, ET POURQUOI IL LE RÉSERVE ENTIÈREMENT ────────
+// Il est peint AVANT que la page existe, donc sans savoir dans laquelle de ses
+// trois branches la page tombera (`job_id`, retour du payeur, ou la carte
+// « mission requise » — cf. `src/utils/paymentBranche.js`). Il réserve donc les
+// cartes de la branche la PLUS HAUTE, et c'est un choix MESURÉ, pas un défaut
+// de copie : une variante qui ne réservait que l'en-tête sur la branche « pas
+// de mission » (celle que publie la coquille) a été écrite puis RETIRÉE le
+// 09/10/2026, parce qu'elle rendait la route PIRE. Relevé de la sonde, chunk
+// de la route retenu puis relâché, 412×823, quatre runs par variante :
+//   • repli entier  — pied de page HORS écran pendant le chargement (y=1019),
+//     il entre une seule fois à l'arrivée de la page (y=765,4) ;
+//   • repli réduit  — `main` tombe à 617 px, le pied de page est INSÉRÉ DANS
+//     l'écran dès le chargement (y=682) et sa hauteur vaut alors 141 px (il
+//     re-coupe ses lignes avant que la police ne se pose) : deux décalages,
+//     CLS 0,0801 contre 0,0579.
+// Ce qui a été corrigé sur cette route n'est donc pas ici, mais dans
+// `src/pages/Payment.js` : c'est l'ÉTAT DE CHARGEMENT DE LA PAGE qui
+// réservait des cartes que sa branche ne montre pas (1 376,4 px de `main` pour
+// une destination de 700,4 en mobile).
+//
+// ── LA RÈGLE, ELLE, EST DÉCLARÉE ET LUE (09/10/2026) ──────────────────────
+// Ce repli ne recopie plus rien : son CADRE vient du plan de /payment
+// (`PAGE_SECTIONS['/payment']` : `frameClass`, `corpsClass` — les deux canaux de
+// cette route lisent le même plan, et la coquille peint ce cadre) et sa RÈGLE
+// vient de `REGLES_DE_CHARGEMENT['/payment']` (`src/config/app-cadres.js`), qui
+// dit `pied-hors-ecran` et nomme la réserve. Le squelette peignait `fond-sable`
+// là où la page peint le fond de son plan — deux fonds pour un seul écran, vus
+// au remplacement — et n'avait aucune réserve : le pied de page restait VISIBLE
+// en desktop pendant tout le chargement (mesuré : y=859 pour une fenêtre de
+// 940, déjà à sa place finale). Avec la réserve déclarée, il démarre HORS écran
+// aux deux tailles (1019 pour 823 ; 1004 pour 940) et le relâchement passe de
+// 0,0148 à 0,0132 en desktop, en restant à 0,0218 en mobile (où la réserve est
+// sans effet : le contenu du repli, 794 px, dépasse déjà les 758 px du plancher).
 export const PaymentSkeleton = () => {
+  const plan = PAGE_SECTIONS['/payment'];
+  const { hauteurClass } = REGLES_DE_CHARGEMENT['/payment'];
   return (
-    <div className="min-h-full fond-sable py-8">
-      <div className="max-w-6xl mx-auto px-4 space-y-6">
+    <div className={plan.frameClass}>
+      <div className={`${plan.corpsClass} ${hauteurClass}`}>
         <div className="carte-editoriale p-6">
           {/* h1 text-3xl + sous-titre */}
           <Skeleton className="h-9 w-72 max-w-full" />

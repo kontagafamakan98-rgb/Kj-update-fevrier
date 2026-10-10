@@ -126,8 +126,8 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-full flex items-center justify-center fond-sable py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className={pagePlan.frameClass}>
+      <div className={pagePlan.colonneClass}>
         <div>
           {/* La marque : un tracé partagé, pas la lettre « K » du dictionnaire
               (voir src/config/marque-kojo.js). Même pastille, même boîte. */}
@@ -137,12 +137,12 @@ export default function Login() {
               niveau que le shell statique pré-rendu (login.html). Les classes
               Tailwind sont identiques à celles d'origine — le rendu ne change
               pas, seule la sémantique est corrigée. */}
-          <h1 className="mt-6 text-center titre-page">
+          <h1 className={pagePlan.titleClass}>
             {t(pagePlan.titleKey)}
           </h1>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <form className={pagePlan.formClass} onSubmit={handleSubmit}>
           {displayedError && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">
               {displayedError}
@@ -176,9 +176,9 @@ export default function Login() {
             </>
           )}
 
-          <div className="space-y-4">
+          <div className={pagePlan.champsClass}>
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="email" className={pagePlan.labelClass}>
                 {t(pagePlan.emailLabelKey)}
               </label>
               <input
@@ -187,7 +187,7 @@ export default function Login() {
                 type="email"
                 autoComplete="email"
                 required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm"
+                className={pagePlan.champClass}
                 placeholder={t(pagePlan.emailLabelKey)}
                 value={formData.email}
                 onChange={handleChange}
@@ -195,11 +195,11 @@ export default function Login() {
             </div>
 
             <div>
-              <div className="flex items-center justify-between">
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              <div className={pagePlan.ligneMotDePasseClass}>
+                <label htmlFor="password" className={pagePlan.labelClass}>
                   {t(pagePlan.passwordLabelKey)}
                 </label>
-                <Link to="/forgot-password" className="text-sm font-medium text-orange-600 hover:text-orange-500">
+                <Link to="/forgot-password" className={pagePlan.lienMotDePasseClass}>
                   {forgotPasswordLabel}
                 </Link>
               </div>
@@ -210,7 +210,7 @@ export default function Login() {
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   required
-                  className="appearance-none relative block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm"
+                  className={pagePlan.champMotDePasseClass}
                   placeholder={t(pagePlan.passwordLabelKey)}
                   value={formData.password}
                   onChange={handleChange}
@@ -232,27 +232,27 @@ export default function Login() {
             <LoadingButton
               type="submit"
               loading={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50"
+              className={pagePlan.boutonClass}
             >
               {t(pagePlan.titleKey)}
             </LoadingButton>
           </div>
 
-          <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 space-y-2">
-            <p className="text-sm font-semibold text-orange-900"><IconePage nom={pagePlan.legalNoticeIcon} role="notice" /> {pageT(pagePlan.legalNoticeTitleKey)}</p>
+          <div className={pagePlan.encadreLegalClass}>
+            <p className={pagePlan.legalNoticeClass}><IconePage nom={pagePlan.legalNoticeIcon} role="notice" /> {pageT(pagePlan.legalNoticeTitleKey)}</p>
             <a
               href={legalDocumentUrl}
-              className="inline-flex items-center text-sm font-medium text-orange-700 hover:text-orange-800 underline"
+              className={pagePlan.legalLienClass}
             >
               {pageT(pagePlan.legalConsentLinkKey)}
             </a>
             <p className={pagePlan.legalContactClass}>{pageT(pagePlan.legalContactLineKey)}</p>
           </div>
 
-          <div className="text-center">
-            <span className="text-sm text-gray-600">
+          <div className={pagePlan.noAccountClass}>
+            <span className={pagePlan.noAccountTexteClass}>
               {t(pagePlan.noAccountKey)}{' '}
-              <Link to="/register" className="font-medium text-orange-600 hover:text-orange-500">
+              <Link to="/register" className={pagePlan.lienInscriptionClass}>
                 {t(pagePlan.registerKey)}
               </Link>
             </span>

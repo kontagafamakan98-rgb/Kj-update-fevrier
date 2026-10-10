@@ -13,6 +13,12 @@ import {
   DashboardSkeleton,
   ProfileSkeleton,
 } from '../SkeletonLoader';
+import { carteMissionRequise } from '../../utils/paymentBranche';
+// Le cadre de /payment est lu dans son PROPRIÉTAIRE (le plan à deux canaux),
+// jamais recopié : c'est ce que le repli fait lui-même depuis le 09/10/2026.
+import { PAGE_SECTIONS } from '../../config/page-sections';
+import { REGLES_DE_CHARGEMENT, REGLES_DE_SQUELETTE } from '../../config/app-cadres';
+import { sourcesLivrees } from './aide-sources-livrees';
 
 // Garde-fou anti-CLS (niveau source + rendu).
 //
@@ -78,7 +84,22 @@ describe('anti-CLS — les pages partagent leur squelette (pas de doublon)', () 
   it('Payment.js utilise PaymentContentSkeleton au lieu de son propre squelette', () => {
     const src = fs.readFileSync(path.resolve(__dirname, '../../pages/Payment.js'), 'utf8');
     expect(src).toMatch(/import \{[^}]*PaymentContentSkeleton[^}]*\} from '\.\.\/components\/SkeletonLoader'/);
-    expect(src).toMatch(/\{loading && <PaymentContentSkeleton \/>\}/);
+    // 09/10/2026 — LE SQUELETTE N'EST PEINT QUE DANS LA BRANCHE QUI LE MONTRE.
+    // La carte « mission requise » (ni mission, ni retour de payeur) ne porte
+    // aucune carte de paiement : les réserver faisait valoir à l'état de
+    // chargement 1 376,4 px de `main` pour une destination de 700,4 (412×823),
+    // et le pied de page remontait DANS l'écran à l'arrivée des données
+    // (CLS 0,0579, nommé sur `<footer>`). La condition est LUE, jamais
+    // ré-écrite ici : `src/utils/paymentBranche.js` en est le propriétaire.
+    expect(src).toMatch(/\{loading && cartesDePaiementAttendues && <PaymentContentSkeleton \/>\}/);
+    expect(src).toMatch(/import \{[^}]*carteMissionRequise[^}]*\} from '\.\.\/utils\/paymentBranche'/);
+    expect(src).toMatch(/const cartesDePaiementAttendues = !carteMissionRequise\(\);/);
+    // Le test de branche n'est écrit qu'UNE fois dans la page : le retour du
+    // payeur n'y est plus relu du tout, et l'ancienne condition double
+    // (`!jobPaymentContext && !statusParams`) a disparu au profit du prédicat.
+    expect(src).not.toMatch(/params\.get\('payment_id'\)/);
+    expect(src).not.toMatch(/params\.get\('token'\)/);
+    expect(src).not.toMatch(/!jobPaymentContext && !statusParams/);
     // Plus de primitive Skeleton locale ni de squelette dupliqué dans la page.
     expect(src).not.toMatch(/^const Skeleton = \(/m);
     expect(src).not.toMatch(/function PaymentPageSkeleton\(/);
@@ -96,11 +117,21 @@ describe('anti-CLS — les pages partagent leur squelette (pas de doublon)', () 
 describe('anti-CLS — structure des squelettes (hauteurs du layout réel)', () => {
   const CASES = [
     ['MessagesSkeleton', MessagesSkeleton, ['max-w-6xl', 'h-[75vh]', 'sm:w-[320px]']],
-    // 28/09/2026 : le fond `bg-gray-50` du squelette devient `fond-sable`, comme
-    // celui de la page RÉELLE — c'est la classe qui doit rester, pas la teinte
-    // d'avant (les deux sont des gris CHAUDS ; le squelette ne peut pas peindre
-    // autre chose que ce que la page peindra au swap).
-    ['PaymentSkeleton', PaymentSkeleton, ['min-h-full', 'fond-sable', 'max-w-6xl']],
+    // 09/10/2026 : LE REPLI LIT SON CADRE AU LIEU DE LE RECOPIER. Il peignait
+    // `fond-sable` — le fond de l'APPLICATION (App.js) — là où la page ET sa
+    // coquille lisent `bg-gray-50` dans le plan : deux fonds pour un seul écran,
+    // vus au remplacement. Les jetons attendus sont donc LUS dans la
+    // déclaration (`PAGE_SECTIONS['/payment']` : cadre + corps), jamais
+    // recopiés ici — un test qui les recopierait divergerait à la première
+    // retouche du plan, le défaut même que la lecture ferme.
+    [
+      'PaymentSkeleton',
+      PaymentSkeleton,
+      [
+        ...PAGE_SECTIONS['/payment'].frameClass.split(/\s+/),
+        ...PAGE_SECTIONS['/payment'].corpsClass.split(/\s+/),
+      ],
+    ],
     // 28/09/2026 : la carte du squelette prend le dessin de la carte RÉELLE
     // (`carte-editoriale`, src/index.css) — la forme arrondie `rounded-2xl`
     // n'est plus ce que les deux peignent. La boîte, elle, ne bouge pas : elle
@@ -135,6 +166,20 @@ describe('anti-CLS — structure des squelettes (hauteurs du layout réel)', () 
     });
   }
 
+  // CE CAS A DÉFENDU UN RETRAIT (09/10/2026). Une variante du repli — ne
+  // réserver que l'en-tête sur la branche « pas de mission », celle que publie
+  // la coquille — a été écrite, mesurée, puis RETIRÉE : elle rendait la route
+  // PIRE. Relevé de la sonde (chunk de la route retenu puis relâché, 412×823,
+  // quatre runs par variante) :
+  //   • repli entier  — le pied de page reste HORS écran pendant le chargement
+  //     (y=1019) et n'entre qu'une fois, à l'arrivée de la page (y=765,4) ;
+  //   • repli réduit  — `main` tombe à 617 px, le pied de page est INSÉRÉ DANS
+  //     l'écran dès le chargement (y=682) et sa hauteur vaut alors 141 px (il
+  //     re-coupe ses lignes avant que la police ne se pose) : deux décalages,
+  //     CLS 0,0801 contre 0,0579.
+  // Ce qui a été corrigé sur cette route n'est donc pas le repli, mais l'ÉTAT
+  // DE CHARGEMENT DE LA PAGE, qui réservait les cartes d'une branche qu'il ne
+  // montre pas (cas précédent) : ce test tient la moitié qui reste.
   it('PaymentSkeleton reprend exactement le contenu de PaymentContentSkeleton', () => {
     const full = render(<PaymentSkeleton />);
     const content = render(<PaymentContentSkeleton />);
@@ -145,6 +190,62 @@ describe('anti-CLS — structure des squelettes (hauteurs du layout réel)', () 
     expect(pulseCount(full.container) - pulseCount(content.container)).toBe(2); // h1 + sous-titre
     full.unmount();
     content.unmount();
+  });
+
+});
+
+// ── LA BRANCHE A UN SEUL PROPRIÉTAIRE (09/10/2026) ──────────────────────────
+// Le défaut corrigé n'était pas « un squelette trop haut » : c'était une RÈGLE
+// écrite à deux endroits (ce que la page réserve / ce que son repli réserve),
+// deux endroits qui ont fini par ne plus dire la même chose. Ces cas tiennent
+// la règle unique, et ils mordent : ré-écrire le test d'URL dans l'une des deux
+// surfaces rougit ici en la nommant.
+describe('anti-CLS — la branche de /payment a un propriétaire unique', () => {
+  it('carteMissionRequise décide sur la SEULE URL', () => {
+    expect(carteMissionRequise('')).toBe(true);
+    expect(carteMissionRequise('?amount=25000&country=senegal')).toBe(true);
+    expect(carteMissionRequise('?job_id=playtest-job-1')).toBe(false);
+    expect(carteMissionRequise('?job_id=j&amount=1000')).toBe(false);
+    expect(carteMissionRequise('?payment_id=abc')).toBe(false);
+    expect(carteMissionRequise('?token=abc')).toBe(false);
+  });
+
+  it('la page LIT le propriétaire au lieu de ré-écrire la règle', () => {
+    const page = fs.readFileSync(path.resolve(__dirname, '../../pages/Payment.js'), 'utf8');
+    expect(page, 'Payment.js ne lit pas le propriétaire de la branche').toContain(
+      'carteMissionRequise'
+    );
+    // Le retour du payeur (payment_id/token) n'appartient QU'AU propriétaire :
+    // c'est la moitié de la règle qui avait divergé. `job_id`, lui, se lit aussi
+    // pour BÂTIR le contexte de mission (`jobPaymentContext`) — ce n'est pas un
+    // second test de branche, donc il reste permis.
+    expect(page, 'Payment.js ré-écrit la moitié « retour du payeur » de la branche').not.toMatch(
+      /params\.get\('(payment_id|token)'\)/
+    );
+    expect(page).not.toMatch(/!jobPaymentContext && !statusParams/);
+  });
+
+  it('aucune autre source LIVRÉE ne relit les paramètres de la branche', () => {
+    // Le balayage partagé des sources livrées : `src/` sans les tests, sans le
+    // harnais — la même population que les autres gardes de forme du dépôt.
+    const coupables = [];
+    let lus = 0;
+    for (const { relatif, contenu } of sourcesLivrees()) {
+      if (relatif === 'utils/paymentBranche.js') continue;
+      lus += 1;
+      // Le nom de champ de la RÉPONSE d'API (`checkout.payment_id`) n'est pas
+      // une lecture d'URL : la règle ne vise que l'appel `get(...)` d'une chaîne
+      // de recherche, quel que soit le nom de la variable qui la porte (le
+      // nommer `params` ne suffit pas — la fuite peut l'appeler autrement, et
+      // c'est exactement ce que la mutation rejouée a montré).
+      if (/\.get\(\s*['"](payment_id|token)['"]\s*\)/.test(contenu)) coupables.push(relatif);
+    }
+    // Un balayage qui n'a rien lu ne prouve rien (règle du dépôt).
+    expect(lus, 'le balayage n’a lu aucune source livrée').toBeGreaterThan(50);
+    expect(
+      coupables,
+      `La branche de /payment a UN propriétaire (utils/paymentBranche.js) ; ces fichiers relisent ses paramètres : ${coupables.join(', ')}`
+    ).toEqual([]);
   });
 });
 
@@ -235,6 +336,10 @@ const PAGES_MIN_H_FULL = [
  */
 const CADRES_DECLARES = {
   'Payment.js': { plan: '../../config/page-sections.js', cle: "'/payment': {" },
+  // /login et /forgot-password lisent leur cadre dans le plan (passe du 09/10/2026) :
+  // la valeur est suivie jusqu'au bloc de sa clé, comme pour /payment.
+  'Login.js': { plan: '../../config/page-sections.js', cle: "'/login': {" },
+  'ForgotPassword.js': { plan: '../../config/page-sections.js', cle: "'/forgot-password': {" },
 };
 
 /** Le bloc d'une clé de plan : de la clé à la clé suivante (ou à la fin). */

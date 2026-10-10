@@ -189,7 +189,7 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
   const currentPhoto = getCurrentPhotoUrl();
 
   return (
-    <div className={`profile-photo-uploader ${className}`}>
+    <div className={className}>
       {/* Photo Preview */}
       <div className="mb-4 text-center">
         <div className="relative inline-block">

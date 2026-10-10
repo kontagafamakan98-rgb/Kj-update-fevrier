@@ -35,14 +35,14 @@ function DirectContactCard() {
   // plan : /contact lit les mêmes chaînes pour les mêmes quatre moyens de
   // contact, donc les deux pages ne peuvent pas s'habiller différemment.
   const {
-    directCard, rows, carteClass, titreEntreeClass,
+    directCard, rows, carteClass, directTitleClass, directSousTitreClass,
     listeContactClass, pastilleContactClass, etiquetteContactClass, valeurContactClass,
   } = PAGE_SECTIONS['/support'];
 
   return (
     <div className={carteClass}>
-      <h2 className={`${titreEntreeClass} mb-1`}>{t(directCard.titleKey)}</h2>
-      <p className="text-sm text-stone-500 mb-5">{t(directCard.subtitleKey)}</p>
+      <h2 className={directTitleClass}>{t(directCard.titleKey)}</h2>
+      <p className={directSousTitreClass}>{t(directCard.subtitleKey)}</p>
 
       <div className={listeContactClass}>
         {rows.map((row) => {
@@ -90,13 +90,13 @@ const Support = () => {
   const [mode, setMode] = useState(null); // null | 'robot' | 'direct'
   const {
     titleKey, subtitleKey, subtitleClass, frameClass, modes, carteModeClass, pastilleModeClass,
-    titreEntreeClass,
+    titreEntreeClass, titleClass, enteteClass, modeSousTitreClass, liensClass, lienClass,
   } = PAGE_SECTIONS['/support'];
 
   return (
     <div className={frameClass}>
-      <div className="mb-6 text-center">
-        <h1 className="titre-page mb-2">{t(titleKey)}</h1>
+      <div className={enteteClass}>
+        <h1 className={titleClass}>{t(titleKey)}</h1>
         <p className={subtitleClass}>{t(subtitleKey)}</p>
       </div>
 
@@ -121,7 +121,7 @@ const Support = () => {
                 <IconePage nom={modeDuPlan.icone} role="mode" />
               </span>
               <span className={titreEntreeClass}>{t(modeDuPlan.titleKey)}</span>
-              <span className="text-xs text-stone-500">{t(modeDuPlan.subtitleKey)}</span>
+              <span className={modeSousTitreClass}>{t(modeDuPlan.subtitleKey)}</span>
             </button>
           ))}
         </div>
@@ -146,12 +146,12 @@ const Support = () => {
       {/* Maillage interne : le support mène au fonctionnement du service et à
           la liste des missions. Le shell statique (vite.config.js) rend
           EXACTEMENT ce bloc — sinon la ligne disparaîtrait au montage React. */}
-      <p className="mt-6 text-center text-sm text-stone-500">
-        <Link to="/how-it-works" className="text-orange-600 underline underline-offset-2">
+      <p className={liensClass}>
+        <Link to="/how-it-works" className={lienClass}>
           {t('howItWorksTitle')}
         </Link>
         {' · '}
-        <Link to="/jobs" className="text-orange-600 underline underline-offset-2">
+        <Link to="/jobs" className={lienClass}>
           {t('viewJobs')}
         </Link>
       </p>

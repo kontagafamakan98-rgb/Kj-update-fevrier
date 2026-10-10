@@ -159,6 +159,73 @@ export const REGLES_DE_SQUELETTE = {
 };
 
 /**
+ * LES RÈGLES DE CHARGEMENT DES ROUTES DONT LE CADRE EST DÉCLARÉ AILLEURS
+ * (09/10/2026).
+ *
+ * ── Pourquoi une table À PART, alors que `CADRES_APP` en porte déjà une ────
+ * Une seule raison, et elle est mesurée : /payment a une COQUILLE pré-rendue,
+ * donc son cadre appartient à `src/config/page-sections.js` (les deux canaux de
+ * cette route lisent la même chaîne — c'est un test de `cadres-app.test.jsx`),
+ * et son cadre n'a rien à faire dans `CADRES_APP`. Sa règle de CHARGEMENT, elle,
+ * est purement React : la coquille ne publie pas d'état de chargement. La
+ * déclarer dans le plan a été essayé le 09/10/2026 et `npm run build` l'a
+ * REFUSÉE (`exigerCorpsDeclare` a réclamé « pied-hors-ecran » dans la coquille),
+ * ce qui est le contrat même de `page-sections.js` : « un plan ne porte AUCUNE
+ * donnée interne : ce qu'il déclare est publié par la coquille, sans
+ * exception ». Une règle que la coquille ne peut pas porter vit donc ici, avec
+ * le vocabulaire et la réserve — pas dans le plan.
+ *
+ * ── La forme est CELLE de `CADRES_APP[route].squelette` ────────────────────
+ * `{ regle, hauteurClass?, pourquoi }`, pour que le même contrôle de déclaration
+ * s'y applique sans second vocabulaire (cf. `cadres-app.test.jsx`, qui rejoue
+ * `manquementsDeLaRegle` sur les DEUX tables) et pour que le consommateur
+ * (ici `PaymentSkeleton`) lise la règle au lieu de recopier une classe.
+ *
+ * ── La règle de /payment, MESURÉE le 09/10/2026 ────────────────────────────
+ * Protocole : chunk de la route RETENU (le repli de `<Suspense>` est peint pour
+ * de bon) puis relâché, connexion à la fixture, 412×823 et 1350×940 — la même
+ * sonde que les routes de `CADRES_APP`, désormais PERMANENTE
+ * (`e2e/cadres-app.spec.js`, cas « chunk retenu » de /payment).
+ *   • PENDANT, réserve active : `main` 954 px (mobile) et 939 (desktop), pied de
+ *     page 141 px à y=1019 pour une fenêtre de 823, 81 px à y=1004 pour 940 —
+ *     HORS écran aux deux tailles ; réserve PEINTE 758 / 875 px, soit la fenêtre
+ *     moins les 65 px de la barre.
+ *   • APRÈS (la page) : `main` 700,38 px et pied à 765,38 (mobile, branche
+ *     « mission requise », la plus COURTE) ; 794 et 859 (desktop).
+ *   • CLS du relâchement : 0,0218 mobile — un seul décalage, le pied de page qui
+ *     entre UNE fois dans l'écran — et 0,0132 desktop (0,0093 le pied de page,
+ *     0,0039 la pastille de la barre du haut).
+ *   • TÉMOIN SANS LA RÉSERVE (même journée, même protocole) : en desktop le pied
+ *     de page restait VISIBLE pendant tout le chargement (y=859, déjà à sa place
+ *     finale) et le CLS valait 0,0148. La réserve ne coûte donc rien : elle
+ *     GAGNE 0,0016 et rend la règle vraie aux DEUX tailles. (Le témoin du repli
+ *     RÉDUIT — en-tête seul, sans réserve — avait été mesuré la veille : 0,0801,
+ *     le pied de page inséré dans l'écran dès le chargement, puis poussé vers le
+ *     bas quand la page plus haute arrivait. C'est ce relevé-là qui interdit de
+ *     rétrécir le repli sous la hauteur de sa destination.)
+ *   • CE QUI FERAIT BASCULER LA DÉCISION, écrit pour que la prochaine mesure le
+ *     voie : un pied de page VISIBLE pendant le retrait du chunk (le cas
+ *     permanent rougit) — la réponse serait de réserver PLUS, pas moins ; ou une
+ *     réserve de 0 px peinte alors qu'elle est annoncée (le cas permanent
+ *     rougit aussi, cf. `calc(100vh-65px)` et son CSS invalide).
+ */
+export const REGLES_DE_CHARGEMENT = {
+  '/payment': {
+    regle: REGLES_DE_SQUELETTE.PIED_HORS_ECRAN,
+    hauteurClass: HAUTEUR_PIED_HORS_ECRAN,
+    pourquoi:
+      'sa hauteur dépend de la BRANCHE de l’URL (formulaire et cartes de paiement avec `job_id`, ' +
+      'carte « mission requise » sans elle : 700,4 px de `main` en mobile) et le repli de ' +
+      '`<Suspense>` est peint AVANT que la page existe : il réserve la branche la PLUS HAUTE. ' +
+      'Mesuré le 09/10/2026 : sans réserve le pied de page restait VISIBLE en desktop pendant tout ' +
+      'le chargement (y=859 pour une fenêtre de 940, déjà à sa place finale) ; avec elle il démarre ' +
+      'HORS écran aux deux tailles — 1019 pour 823 (mobile), 1004 pour 940 (desktop), réserve ' +
+      'peinte 758 / 875 px — et le relâchement vaut 0,0218 mobile / 0,0132 desktop (témoin sans ' +
+      'réserve : 0,0148 desktop)',
+  },
+};
+
+/**
  * Le cadre d'une route d'application. `emplacement` est le fichier CONSOMMATEUR,
  * relativement à `src/` — pas une décoration : c'est lui que le test ouvre pour
  * vérifier que la page lit bien sa déclaration au lieu de la recopier.
@@ -224,12 +291,30 @@ export const CADRES_APP = {
     squelette: {
       regle: REGLES_DE_SQUELETTE.GENERIQUE,
       pourquoi:
-        'aucun squelette dédié : son repli est le PageSkeleton partagé, en 100vh parce que sa destination ' +
-        'est inconnue (cf. src/components/SkeletonLoader.js) — la règle y est donc déjà tenue. MESURÉ le ' +
-        '08/10/2026 (sonde des routes connectées, 412×823 et 1350×940) : avec ses trois requêtes `/api` ' +
-        'RETENUES, le formulaire est peint quand même — 0 pulse, aucune réserve, et une page de 1 902 px ' +
-        'pour une fenêtre de 823, donc un pied de page hors écran par la seule taille du formulaire. La ' +
-        'route n’a donc PAS d’état de chargement à réserver : ce qu’elle peindrait serait la page, pas elle',
+        'AUCUN squelette dédié, et c’est une MESURE qui l’a décidé (09/10/2026) — pas une préférence. La ' +
+        'route n’attend AUCUNE donnée : avec ses trois requêtes `/api` RETENUES, le formulaire se peint ' +
+        'quand même (0 pulse dans le cadre, aucune réserve, relevé du 08/10/2026). Son SEUL état d’attente ' +
+        'est donc le repli du `<Suspense>` de `src/App.js` pendant le chargement du CHUNK de la route, ' +
+        'c’est-à-dire le `PageSkeleton` partagé — en 100vh pour la raison inverse (sa destination est ' +
+        'inconnue, cf. `src/components/SkeletonLoader.js`). LA MESURE QUI TRANCHE retient ce chunk pour ' +
+        'que le repli soit peint pour de bon (sonde des routes connectées, 412×823 et 1350×940, quatre ' +
+        'runs par taille) : pendant tout le chargement le pied de page démarre SOUS la ligne de ' +
+        'flottaison — y=984 pour une fenêtre de 823 (mobile), y=1005 pour 940 (desktop) — et le ' +
+        'relâchement ne déplace RIEN de visible : CLS 0,0000 en mobile (ZÉRO décalage) et 0,0039 en ' +
+        'desktop, identiques sur les quatre runs, dont l’unique source est la pastille de notifications ' +
+        'de la barre du HAUT — le même décalage que les quatre autres routes connectées, et qu’un ' +
+        'squelette dédié ne toucherait pas (la barre du haut n’est pas dans son périmètre). Un squelette ' +
+        'dédié n’enlèverait donc rien de mesurable : il ne changerait ni la position du pied de page ' +
+        '— 100vh et `HAUTEUR_PIED_HORS_ECRAN` (100vh − 65 px) gardent tous deux le pied de page sous la ' +
+        'ligne de flottaison, quelle que soit la hauteur de la fenêtre — ni le CLS. CE QUI FERAIT ' +
+        'BASCULER LA DÉCISION, écrit pour que la prochaine mesure le voie : un pied de page VISIBLE ' +
+        'pendant le retrait du chunk, ou un décalage du relâchement attribué à un nœud du CADRE. Le cas ' +
+        '« repli GÉNÉRIQUE » de la sonde rejoue cette mesure à chaque exécution et rougirait alors — la ' +
+        'réponse serait la réserve, comme pour `/dashboard`, `/profile` et `/jobs/:id`. CONTREPARTIE ' +
+        'MESURÉE, et elle n’est PAS un argument pour un cinquième squelette : ce repli ne publie aucun ' +
+        'TEXTE (22 nœuds peints, 0 élément de contenu dans le premier écran), mais les quatre squelettes ' +
+        'dédiés du dépôt sont eux aussi des barres grises sans texte — un squelette dédié peindrait la ' +
+        'même chose, en gris.',
     },
   },
   '/jobs/:id': {

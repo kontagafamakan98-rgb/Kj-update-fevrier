@@ -4,16 +4,18 @@
  *
  *   1. la RÈGLE (`scripts/classes-sans-regle.js`) est éprouvée DIRECTEMENT, sur
  *      des cas synthétiques : ce qu'une page POSE (un attribut `class`, jamais le
- *      contenu d'un bloc `<style>`, qui ne peut pas se poser lui-même), ce qu'une
- *      feuille SERVIE offre (des classes, pas des ID), et la liste des noms
- *      acceptés sans règle — qui doit refuser un motif vide comme une entrée
- *      périmée.
+ *      contenu d'un bloc `<style>`, qui ne peut pas se poser lui-même), ce que le
+ *      JAVASCRIPT LIVRÉ pose (des LITTÉRAUX ENTIERS en position de classe, jamais
+ *      un résultat d'appel ni un fragment d'assemblage), ce qu'une feuille SERVIE
+ *      offre (des classes, pas des ID), et la liste des noms acceptés sans règle —
+ *      qui doit refuser un motif vide comme une entrée périmée.
  *   2. le GARDE (`scripts/check-classes-sans-regle.js`) est lancé en
  *      SOUS-PROCESSUS sur des arbres de fixture — parce que ce qui compte est son
  *      CODE DE SORTIE et ses messages, pas ses fonctions. Les fixtures sont
- *      ENGENDRÉES au-dessus des planchers de lecture (10 pages, 2 feuilles, 400
- *      règles, 300 noms servis, 150 classes posées) : sans ça, le garde refuserait
- *      de juger et le test confondrait « refus » et « verdict ».
+ *      ENGENDRÉES au-dessus des planchers de lecture (10 pages, 30 scripts, 2
+ *      feuilles, 400 règles, 300 noms servis, 150 classes posées, 1 300 valeurs et
+ *      340 jetons du bundle) : sans ça, le garde refuserait de juger et le test
+ *      confondrait « refus » et « verdict ».
  *
  * Le cas positif sur l'arbre RÉEL est joué quand le build est là ET plus jeune
  * que les sources qu'il publie : la CI exécute `vitest` SANS build (le cas est
@@ -24,14 +26,20 @@
  * Preuves d'échec rejouées à la main, et une par le harnais de mutation :
  *   • poser `opacity-50` dans une page de fixture (le cas réel du 09/10/2026) →
  *     sortie 1, nommant la page, la classe ET la valeur qui la porte ;
+ *   • poser une classe sans règle dans un SCRIPT de fixture (une classe que Tailwind
+ *     ne génère pas, celle que React seul peint) → sortie 1, nommant le SCRIPT et
+ *     la classe — c'est la forme du défaut réel `profile-photo-container` ;
  *   • retirer `App` des pages d'une fixture → sortie 1 par l'exemption PÉRIMÉE
  *     (une exception que plus rien ne pose mentirait sur l'arbre) ;
  *   • neutraliser la comparaison (`classesSansRegle` → `[]`) → le cas
  *     `opacity-50` passe au vert ;
  *   • neutraliser le verdict (`if (!sansRegle.length && …)` → toujours vrai) →
  *     les trois cas de verdict passent au vert ;
- *   • neutraliser chacun des trois planchers de lecture → le refus nommé
- *     correspondant passe au vert.
+ *   • neutraliser la lecture du bundle (`classesPoseesDuJs` → lecture vide) → le
+ *     cas de la classe posée par un script passe au vert ;
+ *   • neutraliser chacun des planchers de lecture (pages, feuilles, noms servis,
+ *     classes posées, fichiers JavaScript, valeurs et jetons du bundle) et le refus
+ *     du script ILLISIBLE → le refus nommé correspondant passe au vert.
  */
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
@@ -41,10 +49,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   MIN_CLASSES_POSEES,
+  MIN_FICHIERS_JS,
+  MIN_JETONS_JS,
   MIN_REGLES_SERVIES,
+  MIN_VALEURS_JS,
   NOMS_ACCEPTES_SANS_REGLE,
   classesPoseesDePage,
+  classesPoseesDuJs,
   classesSansRegle,
+  estUnNomDeClasse,
   exemptionsEnDefaut,
   feuilleServie,
 } from '../classes-sans-regle.js';
@@ -146,15 +159,110 @@ describe('classes-sans-regle — le verdict et les exemptions', () => {
   });
 });
 
+describe('classes-sans-regle — ce que le JavaScript LIVRÉ pose', () => {
+  const nomsDe = (code) => classesPoseesDuJs(code).noms;
+
+  it('ne lit que les LITTÉRAUX ENTIERS d’une position de classe', () => {
+    expect(nomsDe(`const a={className:'une deux'};`)).toEqual(['deux', 'une']);
+    expect(nomsDe('const a={className:`une deux`};')).toEqual(['deux', 'une']);
+    expect(nomsDe(`const a={className:['une','deux']};`)).toEqual(['deux', 'une']);
+    expect(nomsDe(`const a={className:x?'une':'deux'};`)).toEqual(['deux', 'une']);
+  });
+
+  it('garde les jetons de l’INTÉRIEUR d’un gabarit, jamais ceux COLLÉS à une expression', () => {
+    // `` `w-5 h-5 ${x}` `` : les deux jetons sont entiers (séparés par une espace).
+    expect(nomsDe('const a={className:`w-5 h-5 ${x}`};')).toEqual(['h-5', 'w-5']);
+    // `` `bg-${c}-500` `` : chaque fragment TOUCHE l'expression, donc aucun jeton.
+    expect(nomsDe('const a={className:`bg-${c}-500`};')).toEqual([]);
+  });
+
+  it('ne lit PAS le résultat d’un appel — le faux positif de `lienDesktop`', () => {
+    // Mesuré le 09/10/2026 : lire les arguments d'un appel écrit en position de
+    // classe (soit `className={lienDesktop('/dashboard')}` de
+    // `src/components/Navbar.js`) rendait SEPT NOMS DE ROUTE pour des classes.
+    const lecture = classesPoseesDuJs(`const a={className:b('/dashboard')};`);
+    expect(lecture.noms).toEqual([]);
+    expect(lecture.fichiersRefuses.nonLitteral).toBe(1);
+  });
+
+  it('ne lit PAS un identifiant, ni les fragments d’une concaténation — mais les COMPTE', () => {
+    const lecture = classesPoseesDuJs(
+      "const a={className:classeCalculee};const b={className:'text-'+taille};"
+    );
+    expect(lecture.noms).toEqual([]);
+    expect(lecture.fichiersRefuses.nonLitteral).toBe(1);
+    expect(lecture.fichiersRefuses.fragments).toBe(1);
+  });
+
+  it('ignore une chaîne qui n’est PAS en position de classe', () => {
+    expect(
+      nomsDe(`console.log('jamais-une-classe');document.createElement('canvas');t('cle.de.traduction');`)
+    ).toEqual([]);
+  });
+
+  it('lit les positions de la convention du dépôt, y compris `classe*` et `*Class`', () => {
+    expect(nomsDe(`const a={className:'une'};const b={classe:'deux'};const c={titreClass:'trois'};`)).toEqual([
+      'deux',
+      'trois',
+      'une',
+    ]);
+    expect(nomsDe(`el.classList.add('quatre');el.setAttribute('class','cinq');`)).toEqual(['cinq', 'quatre']);
+  });
+
+  it('rend une lecture vide ET le dit quand le fichier est illisible', () => {
+    // Un parseur qui échoue ne condamne aucun nom : c'est le garde qui refuse de
+    // juger, pas le fichier qui accuse ses voisins.
+    const lecture = classesPoseesDuJs('const a = "x');
+    expect(lecture.lisible).toBe(false);
+    expect(lecture.noms).toEqual([]);
+    expect(lecture.valeurs).toBe(0);
+  });
+});
+
+describe('classes-sans-regle — la FORME d’un nom de classe', () => {
+  it('accepte les jetons que Tailwind lui-même accepte', () => {
+    for (const jeton of [
+      'w-[340px]',
+      'hover:bg-gray-50',
+      '-translate-x-1/2',
+      'md:min-h-[10rem]',
+      'w-1/2',
+      'group-hover:opacity-100',
+      'profile-photo-container',
+    ]) {
+      expect(estUnNomDeClasse(jeton), jeton).toBe(true);
+    }
+  });
+
+  it('refuse le vocabulaire qui ne peut pas être un nom : SVG, ponctuation seule, préfixe assemblé', () => {
+    for (const jeton of ['<path', 'd="M15', '-', ':', 'text-', '']) {
+      expect(estUnNomDeClasse(jeton), jeton).toBe(false);
+    }
+  });
+
+  it('N’EST PAS un dictionnaire : un mot de prose passe la forme (c’est la POSITION qui le refuse)', () => {
+    // Écrit pour que personne ne demande à ce test de forme ce qu'il ne peut pas
+    // faire : `summary` est refusé ailleurs (la leçon des `kojo-pack-*.css`), pas ici.
+    expect(estUnNomDeClasse('summary')).toBe(true);
+    expect(classesPoseesDuJs(`console.log('summary');`).noms).toEqual([]);
+  });
+});
+
 /**
  * Arbre de fixture ENGENDRÉ au-dessus des planchers du garde.
  *
- * Les trois sujets sont indépendants, et c'est ce qui rend chaque plancher
- * prouvable : un arbre peut être complet en pages et en classes posées tout en
- * étant illisible en feuilles servies (aucun bloc `<style>`, aucun `.css`), ou
- * complet en règles mais pauvre en NOMS servis (les règles de remplissage d'une
+ * Les quatre sujets sont indépendants, et c'est ce qui rend chaque plancher
+ * prouvable : un arbre peut être complet en pages, en scripts et en classes posées
+ * tout en étant illisible en feuilles servies (aucun bloc `<style>`, aucun `.css`),
+ * ou complet en règles mais pauvre en NOMS servis (les règles de remplissage d'une
  * page nomment toutes le même sélecteur, ce qui gonfle le compte de règles sans
  * gonfler celui des noms).
+ *
+ * Le VOCABULAIRE DES SCRIPTS est celui des pages (`classe-pX-Y` plus les règles de
+ * remplissage, toutes servies par les blocs `<style>`) : les scripts n'ajoutent donc
+ * aucune classe accusée, et chaque cas négatif accuse la SEULE faute qu'il décrit.
+ * `jetonsJs` restreint la tranche lue, pour prouver le plancher des jetons distincts
+ * sans toucher aux pages.
  *
  * `App` est POSÉ par défaut : c'est l'exemption réelle que le garde lit dans le
  * module de règle, et une exemption périmée est refusée — donc une fixture qui ne
@@ -170,6 +278,11 @@ function ecrireArbre({
   classeAssetSeule = true,
   classeSansRegle = null,
   sansApp = false,
+  nbScripts = 32,
+  valeursParScript = 42,
+  jetonsJs = null,
+  classeJsSansRegle = null,
+  scriptIllisible = null,
 } = {}) {
   const racine = fs.mkdtempSync(path.join(os.tmpdir(), 'kojo-classes-'));
   const build = path.join(racine, 'build');
@@ -199,6 +312,29 @@ function ecrireArbre({
       'utf8'
     );
   }
+
+  // ── Le SUJET JavaScript : des scripts servis, au-dessus des planchers ───────
+  // Un arbre sans vocabulaire de page ne peut pas nourrir ses scripts : il n'en
+  // écrit aucun, et c'est alors le plancher de FICHIERS qui refuse de juger —
+  // ce qui est la vérité (un sujet qu'on n'a pas su lire n'est pas un sujet lu).
+  const vocabulaire = [];
+  for (let i = 0; i < nbPages; i += 1) {
+    for (let j = 0; j < classesParPage; j += 1) vocabulaire.push(`classe-p${i}-${j}`);
+    for (let k = 0; k < reglesDeRemplissage; k += 1) {
+      vocabulaire.push(`remplissage-${remplissagePartage ? 'commun' : `${i}-${k}`}`);
+    }
+  }
+  const tranche = jetonsJs ? vocabulaire.slice(0, jetonsJs) : vocabulaire;
+  for (let s = 0; s < nbScripts && tranche.length; s += 1) {
+    const lignes = [];
+    for (let v = 0; v < valeursParScript; v += 1) {
+      lignes.push(`export const v${v}={className:'${tranche[(s * valeursParScript + v) % tranche.length]}'};`);
+    }
+    if (s === 0 && classeJsSansRegle) lignes.push(`export const faute={className:'${classeJsSansRegle}'};`);
+    fs.writeFileSync(path.join(assets, `chunk-${s}.js`), `${lignes.join('\n')}\n`, 'utf8');
+  }
+  if (scriptIllisible) fs.writeFileSync(path.join(assets, 'casse.js'), scriptIllisible, 'utf8');
+
   return { racine, build };
 }
 
@@ -220,8 +356,11 @@ describe('check-classes-sans-regle — le garde, sur des arbres de fixture', () 
     const { build } = ecrireArbre();
     const { code, sortie } = lancerGarde(build);
     expect(code).toBe(0);
-    expect(sortie).toMatch(/Aucune classe posée sans règle|Toute classe POSÉE par une page livrée a sa règle/);
-    expect(sortie).toMatch(/12 page\(s\) livrée\(s\), 13 feuille\(s\) servie\(s\)/);
+    expect(sortie).toMatch(/Toute classe POSÉE a sa règle dans la feuille servie/);
+    // Les DEUX sujets sont publiés avec leurs volumes : un zéro qui ne dirait pas
+    // ce qu'il a lu serait indistinguable d'un lecteur qui n'a rien lu.
+    expect(sortie).toMatch(/12 page\(s\) livrée\(s\) et 32 script\(s\) servi\(s\) \(1344 valeur\(s\)/);
+    expect(sortie).toMatch(/13 feuille\(s\) servie\(s\)/);
     // L'exemption RÉELLE est publiée avec son compte : un zéro qui ne dirait pas
     // combien de noms il a acceptés serait indistinguable d'une liste vide.
     expect(sortie).toMatch(/1 nom\(s\) accepté\(s\) sans règle dont 1 posé\(s\)/);
@@ -240,6 +379,21 @@ describe('check-classes-sans-regle — le garde, sur des arbres de fixture', () 
     expect(sortie).not.toMatch(/« App »/);
   });
 
+  it('sort 1 en NOMMANT le SCRIPT et la classe (une classe que seul React peint)', () => {
+    // C'est la forme du défaut réel du 09/10/2026 : `profile-photo-container`,
+    // posée par un composant que JAMAIS une coquille ne rend, et qu'AUCUNE règle
+    // ne peignait — invisible pour la sonde des pages, et pour Tailwind (ce n'est
+    // pas un utilitaire).
+    const { build } = ecrireArbre({ classeJsSansRegle: 'classe-inerte-de-react' });
+    const { code, sortie } = lancerGarde(build);
+    expect(code).toBe(1);
+    // Le nom du SCRIPT est la moitié actionnable du message : la valeur, ici, EST
+    // la classe, donc elle ne localise rien — c'est le fichier qui localise.
+    expect(sortie).toMatch(/« classe-inerte-de-react » est POSÉE par assets[\\/]chunk-0\.js \(bundle\)/);
+    // Et l'exemption déclarée n'avale pas les autres noms.
+    expect(sortie).not.toMatch(/« App »/);
+  });
+
   it('sort 1 quand la règle n’existe que dans le `.css` du build et qu’il est absent', () => {
     // Contrepartie du cas conforme : la même classe est disculpée par le fichier
     // `.css` serv quand il est là, et signalée quand il ne l'est plus.
@@ -253,7 +407,7 @@ describe('check-classes-sans-regle — le garde, sur des arbres de fixture', () 
     const { build } = ecrireArbre({ sansApp: true });
     const { code, sortie } = lancerGarde(build);
     expect(code).toBe(1);
-    expect(sortie).toMatch(/« App » est accepté SANS RÈGLE alors qu’AUCUNE page livrée ne le pose/);
+    expect(sortie).toMatch(/« App » est accepté SANS RÈGLE alors qu’AUCUNE page livrée ni AUCUN script servi ne le pose/);
   });
 
   // Les planchers de lecture, un arbre par plancher : chacun est prouvé par une
@@ -290,6 +444,45 @@ describe('check-classes-sans-regle — le garde, sur des arbres de fixture', () 
     expect(sortie).toMatch(new RegExp(`plancher ${MIN_CLASSES_POSEES}`));
   });
 
+  // Les planchers du SUJET JavaScript, un arbre par plancher.
+  it('REFUSE de juger un livré sans scripts (plancher de fichiers JavaScript)', () => {
+    const { build } = ecrireArbre({ nbScripts: 0 });
+    const { code, sortie } = lancerGarde(build);
+    expect(code).toBe(1);
+    // `[^—]*` et pas `[^)]*` : le message nomme ses unités (`0 fichier(s)`), donc
+    // ses parenthèses ne sont pas la fin du groupe.
+    expect(sortie).toMatch(
+      new RegExp(
+        `sujet JavaScript illisible \\(0 fichier\\(s\\), 0 valeur\\(s\\)[^—]*— planchers ${MIN_FICHIERS_JS}, ${MIN_VALEURS_JS} et ${MIN_JETONS_JS}`
+      )
+    );
+  });
+
+  it('REFUSE de juger un bundle trop pauvre en VALEURS entières', () => {
+    // 32 scripts × 5 valeurs = 160 littéraux (< 1 300) : le lecteur tourne, mais
+    // sur un sujet trop mince pour qu'un vert veuille dire quelque chose.
+    const { build } = ecrireArbre({ valeursParScript: 5 });
+    const { code, sortie } = lancerGarde(build);
+    expect(code).toBe(1);
+    expect(sortie).toMatch(/\(32 fichier\(s\), 160 valeur\(s\)/);
+  });
+
+  it('REFUSE de juger un bundle pauvre en JETONS distincts (lire deux fois le même nom n’est pas lire)', () => {
+    // 1 344 valeurs, mais puisées dans 40 noms : le compte des valeurs est bon et
+    // le sujet ne couvre presque rien — d'où deux planchers et pas un seul.
+    const { build } = ecrireArbre({ jetonsJs: 40 });
+    const { code, sortie } = lancerGarde(build);
+    expect(code).toBe(1);
+    expect(sortie).toMatch(new RegExp(`40 jeton\\(s\\) distinct\\(s\\)\\) — planchers [^:]*${MIN_JETONS_JS}`));
+  });
+
+  it('REFUSE de juger un script ILLISIBLE (un lecteur partiel ne rend pas un verdict complet)', () => {
+    const { build } = ecrireArbre({ scriptIllisible: 'const a = "x' });
+    const { code, sortie } = lancerGarde(build);
+    expect(code).toBe(1);
+    expect(sortie).toMatch(/1 fichier\(s\) JavaScript illisible\(s\) \(assets[\\/]casse\.js\)/);
+  });
+
   it('REFUSE de juger sans build (« un garde qui n’a rien lu n’a rien vérifié »)', () => {
     const { racine } = ecrireArbre();
     const { code, sortie } = lancerGarde(path.join(racine, 'absent'));
@@ -320,7 +513,11 @@ describe('check-classes-sans-regle — le garde, sur des arbres de fixture', () 
 
   it.skipIf(!buildAJour)('sort 0 sur l’arbre RÉEL (build à jour)', () => {
     const { code, sortie } = lancerGarde(build);
-    expect(sortie).toMatch(/Toute classe POSÉE par une page livrée a sa règle/);
+    expect(sortie).toMatch(/Toute classe POSÉE a sa règle dans la feuille servie/);
+    // Le contrat des lectures PARTIELLES est publié : combien de positions le
+    // lecteur du bundle a REFUSÉ de juger. Un verdict qui tairait son angle mort
+    // se lirait comme un verdict complet.
+    expect(sortie).toMatch(/position\(s\) non littérale\(s\)/);
     expect(code).toBe(0);
   });
 });

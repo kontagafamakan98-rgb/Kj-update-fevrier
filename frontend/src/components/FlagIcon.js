@@ -1,6 +1,6 @@
 import React from 'react';
 import { Flag } from 'lucide-react';
-import { IconeDrapeau, nomDuDrapeau } from '../config/flags';
+import { IconeDrapeau, classeDuDrapeau, nomDuDrapeau } from '../config/flags';
 
 /**
  * LE DRAPEAU d'un pays (ou d'une langue) — un DESSIN, jamais un emoji.
@@ -33,5 +33,5 @@ export default function FlagIcon({ country, className = 'w-12 h-8' }) {
     );
   }
 
-  return <IconeDrapeau nom={nom} classe={`${className} rounded shadow-sm`} />;
+  return <IconeDrapeau nom={nom} classe={classeDuDrapeau(className)} />;
 }

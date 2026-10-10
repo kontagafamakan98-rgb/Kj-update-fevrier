@@ -67,7 +67,7 @@ function basculeListeCarte({ esc, T }) {
   const icone = (paths) =>
     `<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">${paths}</svg>`
   const bouton = (actif, paths, cle) =>
-    `<button type="button" class="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold ${
+    `<button type="button" class="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
       actif ? 'bg-orange-600 text-white' : 'text-gray-600 hover:bg-gray-100'
     }">${icone(paths)}${esc(T(cle))}</button>`
   return (
@@ -112,12 +112,12 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
 
   // Le paragraphe de liens internes en fin de page : même balisage pour
   // chaque coquille, seul l'habillage du paragraphe change.
-  const liensDePage = (plan, classes) =>
+  const liensDePage = (plan, classes, lien = 'text-orange-600 underline underline-offset-2') =>
     `<p class="${classes}">` +
     plan.links
       .map(
         ({ to, labelKey }) =>
-          `<a href="${to}" class="text-orange-600 underline underline-offset-2">${esc(T(labelKey))}</a>`
+          `<a href="${to}" class="${lien}">${esc(T(labelKey))}</a>`
       )
       .join(' · ') +
     `</p>`
@@ -156,17 +156,17 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
     // statique différente décalerait tout le bloc au montage React
     // (CLS). La bascule est invisible : createRoot efface #root et
     // rend la même structure.
-    login: `<div class="min-h-full flex items-center justify-center fond-sable py-12 px-4 sm:px-6 lg:px-8">`
-      + `<div class="max-w-md w-full space-y-8">`
+    login: `<div class="${loginPlan.frameClass}">`
+      + `<div class="${loginPlan.colonneClass}">`
       + `<div>`
       // La marque : le tracé partagé, pas la lettre `brandMark` du dictionnaire
       // — `svgDeLaMarque` lit la MÊME déclaration que le composant React
       // (src/config/marque-kojo.js), donc la coquille et la page peignent la
       // même pastille et le même dessin.
       + svgDeLaMarque('entete')
-      + `<h1 class="mt-6 text-center titre-page">${esc(T(loginPlan.titleKey))}</h1>`
+      + `<h1 class="${loginPlan.titleClass}">${esc(T(loginPlan.titleKey))}</h1>`
       + `</div>`
-      + `<form class="mt-8 space-y-6">`
+      + `<form class="${loginPlan.formClass}">`
       // ── LES RÉSEAUX D'ABORD (28/09/2026) : le même ORDRE que /login
       // (src/pages/Login.js) — le bouton avant les champs, puis le séparateur.
       // Le séparateur coupe la ligne avec la couleur de la SURFACE (`fond-sable`),
@@ -181,18 +181,18 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
           + `<div class="relative flex justify-center text-sm"><span class="fond-sable px-3 text-gray-400">${esc(T('orSeparator'))}</span></div>`
           + `</div>`
         : '')
-      + `<div class="space-y-4">`
+      + `<div class="${loginPlan.champsClass}">`
       + `<div>`
-      + `<label for="email" class="block text-sm font-medium text-gray-700">${esc(T(loginPlan.emailLabelKey))}</label>`
-      + `<input id="email" name="email" type="email" autocomplete="email" readonly placeholder="${esc(T(loginPlan.emailLabelKey))}" class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md sm:text-sm" />`
+      + `<label for="email" class="${loginPlan.labelClass}">${esc(T(loginPlan.emailLabelKey))}</label>`
+      + `<input id="email" name="email" type="email" autocomplete="email" readonly placeholder="${esc(T(loginPlan.emailLabelKey))}" class="${loginPlan.champClass}" />`
       + `</div>`
       + `<div>`
-      + `<div class="flex items-center justify-between">`
-      + `<label for="password" class="block text-sm font-medium text-gray-700">${esc(T(loginPlan.passwordLabelKey))}</label>`
-      + `<span class="text-sm font-medium text-orange-600">${esc(T(loginPlan.forgotPasswordLinkKey))}</span>`
+      + `<div class="${loginPlan.ligneMotDePasseClass}">`
+      + `<label for="password" class="${loginPlan.labelClass}">${esc(T(loginPlan.passwordLabelKey))}</label>`
+      + `<span class="${loginPlan.lienMotDePasseClass}">${esc(T(loginPlan.forgotPasswordLinkKey))}</span>`
       + `</div>`
       + `<div class="relative mt-1">`
-      + `<input id="password" name="password" type="password" autocomplete="current-password" readonly placeholder="${esc(T(loginPlan.passwordLabelKey))}" class="appearance-none relative block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md sm:text-sm" />`
+      + `<input id="password" name="password" type="password" autocomplete="current-password" readonly placeholder="${esc(T(loginPlan.passwordLabelKey))}" class="${loginPlan.champMotDePasseClass}" />`
       + `</div>`
       + `</div>`
       + `</div>`
@@ -204,15 +204,15 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       // `min-height: 48px` et l'emporte par spécificité sur le
       // `button { min-height: 44px }` de App.css — un `type="button"`
       // intermédiaire peindrait 4 px de moins que la page.
-      + `<button type="submit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600">${esc(T(loginPlan.titleKey))}</button>`
+      + `<button type="submit" class="${loginPlan.boutonClass}">${esc(T(loginPlan.titleKey))}</button>`
       + `</div>`
-      + `<div class="rounded-lg border border-orange-200 bg-orange-50 p-4 space-y-2">`
-      + `<p class="text-sm font-semibold text-orange-900">${svgDeLIcone(loginPlan.legalNoticeIcon, 'notice')} ${esc(registerT('legalNoticeTitle'))}</p>`
-      + `<span class="inline-flex items-center text-sm font-medium text-orange-700 underline">${esc(registerT('legalConsentLink'))}</span>`
+      + `<div class="${loginPlan.encadreLegalClass}">`
+      + `<p class="${loginPlan.legalNoticeClass}">${svgDeLIcone(loginPlan.legalNoticeIcon, 'notice')} ${esc(registerT('legalNoticeTitle'))}</p>`
+      + `<span class="${loginPlan.legalLienClass}">${esc(registerT('legalConsentLink'))}</span>`
       + `<p class="${loginPlan.legalContactClass}">${esc(registerT('legalContactLine'))}</p>`
       + `</div>`
-      + `<div class="text-center">`
-      + `<span class="text-sm text-gray-600">${esc(T(loginPlan.noAccountKey))} <span class="font-medium text-orange-600">${esc(T(loginPlan.registerKey))}</span></span>`
+      + `<div class="${loginPlan.noAccountClass}">`
+      + `<span class="${loginPlan.noAccountTexteClass}">${esc(T(loginPlan.noAccountKey))} <span class="${loginPlan.lienInscriptionClass}">${esc(T(loginPlan.registerKey))}</span></span>`
       + `</div>`
       + `</form>`
       + `</div></div>`,
@@ -371,31 +371,31 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
     // statique différente décalerait tout le bloc au montage React
     // (CLS). Mêmes classes que le composant réel (thème BLEU),
     // inputs readonly (inertes jusqu'au boot), libellés français.
-    'forgot-password': `<div class="min-h-full flex items-center justify-center fond-sable py-12 px-4 sm:px-6 lg:px-8">`
-      + `<div class="max-w-md w-full space-y-8">`
-      + `<div class="text-center">`
-      + `<div class="mx-auto h-14 w-14 flex items-center justify-center rounded-lg bg-orange-600">`
-      + `<span class="text-white text-2xl font-bold">${svgDeLIcone(forgotPasswordPlan.badgeIcon, 'badgeEtape')}</span>`
+    'forgot-password': `<div class="${forgotPasswordPlan.frameClass}">`
+      + `<div class="${forgotPasswordPlan.colonneClass}">`
+      + `<div class="${forgotPasswordPlan.enteteClass}">`
+      + `<div class="${forgotPasswordPlan.badgeClass}">`
+      + `<span class="${forgotPasswordPlan.badgeTexteClass}">${svgDeLIcone(forgotPasswordPlan.badgeIcon, 'badgeEtape')}</span>`
       + `</div>`
-      + `<h1 class="mt-6 text-3xl font-bold text-stone-900">${esc(T(forgotPasswordPlan.titleKey))}</h1>`
+      + `<h1 class="${forgotPasswordPlan.titleClass}">${esc(T(forgotPasswordPlan.titleKey))}</h1>`
       + `<p class="${forgotPasswordPlan.subtitleClass}">${esc(T(forgotPasswordPlan.subtitleKey))}</p>`
       + `</div>`
-      + `<div class="carte-editoriale carte-publique space-y-6">`
-      + `<div class="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-gray-500">`
-      + `<span class="text-orange-600">1. ${esc(T(forgotPasswordPlan.stepEmailKey))}</span>`
-      + `<span class="text-stone-500">2. ${esc(T(forgotPasswordPlan.stepCodeKey))}</span>`
-      + `<span class="text-stone-500">3. ${esc(T(forgotPasswordPlan.stepPasswordKey))}</span>`
+      + `<div class="${forgotPasswordPlan.carteClass}">`
+      + `<div class="${forgotPasswordPlan.etapesClass}">`
+      + `<span class="${forgotPasswordPlan.etapeActiveClass}">1. ${esc(T(forgotPasswordPlan.stepEmailKey))}</span>`
+      + `<span class="${forgotPasswordPlan.etapeAttenteClass}">2. ${esc(T(forgotPasswordPlan.stepCodeKey))}</span>`
+      + `<span class="${forgotPasswordPlan.etapeAttenteClass}">3. ${esc(T(forgotPasswordPlan.stepPasswordKey))}</span>`
       + `</div>`
-      + `<form class="space-y-5">`
+      + `<form class="${forgotPasswordPlan.formClass}">`
       + `<div>`
-      + `<label for="reset-email" class="block text-sm font-medium text-gray-700">${esc(T(forgotPasswordPlan.emailLabelKey))}</label>`
-      + `<input id="reset-email" type="email" autocomplete="email" readonly class="mt-1 block w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-orange-500" placeholder="${esc(T(loginPlan.emailLabelKey))}" />`
+      + `<label for="reset-email" class="${forgotPasswordPlan.labelClass}">${esc(T(forgotPasswordPlan.emailLabelKey))}</label>`
+      + `<input id="reset-email" type="email" autocomplete="email" readonly class="${forgotPasswordPlan.champClass}" placeholder="${esc(T(loginPlan.emailLabelKey))}" />`
       + `</div>`
-      + `<p class="text-xs text-gray-500">${esc(T(forgotPasswordPlan.requestMessageKey))}</p>`
-      + `<button type="submit" class="w-full rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700">${esc(T(forgotPasswordPlan.sendCodeKey))}</button>`
+      + `<p class="${forgotPasswordPlan.aideClass}">${esc(T(forgotPasswordPlan.requestMessageKey))}</p>`
+      + `<button type="submit" class="${forgotPasswordPlan.boutonClass}">${esc(T(forgotPasswordPlan.sendCodeKey))}</button>`
       + `</form>`
-      + `<div class="text-center">`
-      + `<span class="text-sm font-medium text-orange-600 hover:text-orange-500">${esc(T(forgotPasswordPlan.backToLoginKey))}</span>`
+      + `<div class="${forgotPasswordPlan.retourClass}">`
+      + `<span class="${forgotPasswordPlan.lienRetourClass}">${esc(T(forgotPasswordPlan.backToLoginKey))}</span>`
       + `</div>`
       + `</div>`
       + `</div></div>`,
@@ -541,8 +541,8 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
     // ce que fait src/components/TicketTracker.js, donc la coquille et le
     // runtime ne peuvent plus annoncer deux libellés différents.
     support: `<div class="${supportPlan.frameClass}">`
-      + `<div class="mb-6 text-center">`
-      + `<h1 class="titre-page mb-2">${esc(T(supportPlan.titleKey))}</h1>`
+      + `<div class="${supportPlan.enteteClass}">`
+      + `<h1 class="${supportPlan.titleClass}">${esc(T(supportPlan.titleKey))}</h1>`
       + `<p class="${supportPlan.subtitleClass}">${esc(T(supportPlan.subtitleKey))}</p>`
       + `</div>`
       // ── Le vocabulaire éditorial, LU dans le plan (28/09/2026) ────────────
@@ -556,12 +556,12 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       // les deux champs y portent le rayon du socle de formulaire (0,5 rem),
       // qu'ils n'héritent pas de `form :is(input…)` puisqu'ils vivent hors
       // d'un `<form>`.
-      + `<div class="mb-6 carte-editoriale carte-publique">`
-      + `<h2 class="titre-entree mb-1">${esc(T(supportPlan.tracker.titleKey))}</h2>`
-      + `<p class="text-sm text-stone-500 mb-4">${esc(T(supportPlan.tracker.subtitleKey))}</p>`
-      + `<div class="flex flex-col sm:flex-row gap-2">`
-      + `<input type="text" readonly placeholder="${esc(T(supportPlan.tracker.idPlaceholderKey))}" aria-label="${esc(T(supportPlan.tracker.idPlaceholderKey))}" class="flex-1 rounded-lg border border-stone-300 px-4 py-2.5 text-sm" />`
-      + `<input type="email" readonly placeholder="${esc(T(supportPlan.tracker.emailPlaceholderKey))}" aria-label="${esc(T(supportPlan.tracker.emailPlaceholderKey))}" class="flex-1 rounded-lg border border-stone-300 px-4 py-2.5 text-sm" />`
+      + `<div class="${supportPlan.suiviCarteClass}">`
+      + `<h2 class="${supportPlan.suiviTitreClass}">${esc(T(supportPlan.tracker.titleKey))}</h2>`
+      + `<p class="${supportPlan.suiviSousTitreClass}">${esc(T(supportPlan.tracker.subtitleKey))}</p>`
+      + `<div class="${supportPlan.suiviRangeeClass}">`
+      + `<input type="text" readonly placeholder="${esc(T(supportPlan.tracker.idPlaceholderKey))}" aria-label="${esc(T(supportPlan.tracker.idPlaceholderKey))}" class="${supportPlan.suiviChampClass}" />`
+      + `<input type="email" readonly placeholder="${esc(T(supportPlan.tracker.emailPlaceholderKey))}" aria-label="${esc(T(supportPlan.tracker.emailPlaceholderKey))}" class="${supportPlan.suiviChampClass}" />`
       // Sans attribut `type` : ni TicketTracker.js ni les deux cartes de mode
       // n'en déclarent — or `[type="button"]` porterait `min-height: 48px` au
       // lieu des 44 px d'un `<button>` nu, et la carte de suivi peindrait 4 px
@@ -579,7 +579,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       // manquante ne déplace rien et n'écrit rien. C'est
       // `scripts/check-classes-sans-regle.js` qui le nomme (mesuré :
       // `support.html`, porté par `… text-white opacity-50`).
-      + `<button disabled class="rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-black disabled:opacity-50">${esc(T(supportPlan.tracker.ctaKey))}</button>`
+      + `<button disabled class="${supportPlan.suiviBoutonClass}">${esc(T(supportPlan.tracker.ctaKey))}</button>`
       + `</div>`
       + `</div>`
       + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">`
@@ -596,14 +596,14 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
               `<button class="${supportPlan.carteModeClass}">` +
               `<span class="${supportPlan.pastilleModeClass}">${svgDeLIcone(icone, 'mode')}</span>` +
               `<span class="${supportPlan.titreEntreeClass}">${esc(T(titleKey))}</span>` +
-              `<span class="text-xs text-stone-500">${esc(T(subtitleKey))}</span>` +
+              `<span class="${supportPlan.modeSousTitreClass}">${esc(T(subtitleKey))}</span>` +
               `</button>`
           )
           .join('') +
       `</div>`
       + `<div class="${supportPlan.carteClass}">`
-      + `<h2 class="${supportPlan.titreEntreeClass} mb-1">${esc(T(supportPlan.directCard.titleKey))}</h2>`
-      + `<p class="text-sm text-stone-500 mb-5">${esc(T(supportPlan.directCard.subtitleKey))}</p>`
+      + `<h2 class="${supportPlan.directTitleClass}">${esc(T(supportPlan.directCard.titleKey))}</h2>`
+      + `<p class="${supportPlan.directSousTitreClass}">${esc(T(supportPlan.directCard.subtitleKey))}</p>`
       + `<div class="${supportPlan.listeContactClass}">`
       + supportPlan.rows
           .map((row) => {
@@ -624,7 +624,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       // Maillage interne : le support mène au fonctionnement du service
       // et à la liste des missions (page utile pour un crawler qui
       // arrive ici depuis une recherche de contact).
-      + liensDePage(supportPlan, 'mt-6 text-center text-sm text-stone-500')
+      + liensDePage(supportPlan, supportPlan.liensClass, supportPlan.lienClass)
       + `</div>`,
     // ── Les trois pages de CONFIANCE ─────────────────────────────
     // /about, /contact, /privacy : ce qu'un moteur (et une régie

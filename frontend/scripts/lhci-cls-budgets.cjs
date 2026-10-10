@@ -150,7 +150,71 @@ const CLS_BUDGETS = {
     mesure: '0,0000 sur 27 runs (0,1353 le 16/09/2026, corrigé)',
   },
   '/dashboard': { max: 0.06, pireMediane: 0.045, mesure: '0,0450 sur 27 runs' },
-  '/payment': { max: 0.06, pireMediane: 0.045, mesure: '0,0450 sur 18 runs' },
+  // ── LA SOURCE DU 0,0450 DE /payment EST NOMMÉE (09/10/2026) ───────────────
+  // Elle était « valeur EXACTE, décalage fixe » : le chiffre était stable,
+  // mais rien ne disait QUEL nœud bougeait. La sonde navigateur de la sonde des
+  // cadres (`e2e/cadres-app.spec.js`, protocole du chunk retenu puis relâché,
+  // 412×823 et 1350×940) le nomme : `<footer>`, qui entre dans l'écran quand la
+  // page remplace le repli de `<Suspense>`.
+  //
+  // CAUSE, MESURÉE, ET CORRIGÉE : l'ÉTAT DE CHARGEMENT DE LA PAGE réservait les
+  // cartes de paiement sur une branche qui ne les montre pas (la carte « mission
+  // requise », celle que publie la coquille pré-rendue). Relevé : 1 376,4 px de
+  // `main` en mobile pour une destination de 700,4 — ~630 px de cartes qui
+  // n'apparaissent jamais (mobile) et ~450 px (desktop), d'où le pied de page
+  // qui remonte DANS l'écran (y=1019 → 765,4) au moment où les données
+  // arrivent. Corrigé dans `src/pages/Payment.js` : le squelette n'est peint que
+  // dans la branche qui le montre, et la branche n'a qu'un propriétaire
+  // (`src/utils/paymentBranche.js`). Après correctif, l'état de chargement de la
+  // page fait EXACTEMENT la hauteur de sa destination : 700,38 px de `main`,
+  // pied de page à 765,38 (mobile), 794 / 859 (desktop) — mesuré aux deux
+  // tailles.
+  //
+  // RESTE MESURÉ, ET ASSUMÉ : le repli de `<Suspense>` est peint AVANT que la
+  // page existe, donc sans savoir dans quelle branche elle tombera ; il réserve
+  // la PLUS HAUTE, ce qui laisse le pied de page hors écran pendant le
+  // chargement et le fait entrer une fois à l'arrivée de la page. Une variante
+  // qui ne réservait que l'en-tête sur la branche courte a été écrite, mesurée
+  // puis RETIRÉE (elle valait PIRE : `main` tombait à 617 px, le pied de page
+  // était inséré dans l'écran dès le chargement avec une hauteur transitoire de
+  // 141 px avant que la police ne se pose, deux décalages, 0,0801 contre
+  // 0,0579). Ce que le plafond couvre est donc ce relevé-là, pas l'ancien :
+  // 0,0801 au pire mesuré par la sonde le 09/10/2026, soit 1,33× de marge sur
+  // 0,06 — et 1,25× sous le seuil « bon » de Lighthouse (0,1).
+  '/payment': {
+    max: 0.06,
+    pireMediane: 0.045,
+    mesure:
+      '0,0450 sur 18 runs de main ; source NOMMÉE le 09/10/2026 par la sonde des cadres : le pied de page, '
+      + 'qui entre dans l’écran au swap repli → page. Cause corrigée (l’état de chargement de la page réservait '
+      + 'les cartes d’une branche qui ne les montre pas : 1 376,4 px de `main` pour une destination de 700,4 en '
+      + 'mobile). Après correctif, l’état de chargement fait la hauteur de sa destination (700,38 / 765,38 mobile, '
+      + '794 / 859 desktop) ; le pire relevé de la sonde vaut 0,0801, obtenu par la variante de repli RÉDUITE, '
+      +      'mesurée puis retirée (elle insérait le pied de page dans l’écran dès le chargement, hauteur transitoire '
+      + 'de 141 px avant la pose de la police) — le repli entier, lui, mesure 0,0579. '
+      + 'LA SONDE PERMANENTE, DEPUIS LE 09/10/2026 (`e2e/cadres-app.spec.js`, cas « chunk retenu » de /payment : '
+      + 'le chunk de la route est retenu puis relâché, donc c’est le repli de <Suspense> qui est mesuré), rejoue '
+      + 'cette route au même protocole que les routes de CADRES_APP : pied de page HORS écran pendant le '
+      + 'chargement aux DEUX tailles (y=1019 pour une fenêtre de 823, y=1004 pour 940), réserve peinte 758 / '
+      + '875 px, puis 765,4 / 859 à l’arrivée de la page — CLS 0,0218 mobile / 0,0132 desktop. Le TÉMOIN SANS LA '
+      + 'RÉSERVE, mesuré le même jour, laissait le pied de page VISIBLE en desktop pendant tout le chargement '
+      + '(y=859, déjà à sa place finale) pour 0,0148 : c’est lui qui a décidé la déclaration '
+      + '(`REGLES_DE_CHARGEMENT[’/payment’]`, src/config/app-cadres.js). Le pire relevé de la journée reste le '
+      + '0,0801 de la variante réduite, et le plafond de 0,06 n’a pas été touché. '
+      + 'LA SONDE PERMANENTE MESURE AUSSI LES DEUX BRANCHES DE LA PAGE (`/api/**` RETENU, donc l’état de '
+      + 'chargement DE LA PAGE, celui que le correctif du 09/10/2026 a rendu dépendant de la branche) : sur '
+      + '« mission requise » (aucun paramètre, la branche que publie la coquille) l’état de chargement fait '
+      + 'EXACTEMENT la hauteur de sa destination — 0,00 px d’écart sur `main` (700,38 mobile / 794 desktop), '
+      + 'AUCUN pulse, CLS 0,0188 / 0,0148 — quand le défaut d’origine réservait 1 376,4 px pour 700,4 ; sur la '
+      + 'branche « mission » (`?job_id=…`) le MÊME état de chargement réserve ses 12 pulses (1 876,8 px de '
+      + '`main` en mobile pour une destination de 1 048,9, CLS 0,0000 ; 1 159,25 pour 794 en desktop, CLS '
+      + '0,0288 à 0,0458 selon le run — la valeur varie, ses sources sont nommées par la sonde). '
+      + 'CE QUI RESTE UNE LIMITE MESURÉE : sur la branche « mission », le squelette est PLUS HAUT que sa '
+      + 'destination (les barres réservées dépassent le formulaire réel), donc la page se RÉTRÉCIT à l’arrivée '
+      + 'des données — c’est là que naît ce 0,0288-0,0458, à comparer au plafond de 0,06 (marge ~25 %). '
+      + 'La contrainte que la sonde interdit est l’inverse (réserver MOINS que sa destination : variante '
+      + 'réduite, 0,0801) ; réduire ce squelette-là sans passer sous le formulaire réel reste à mesurer'
+  },
   '/profile': { max: 0.06, pireMediane: 0.045, mesure: '0,0450 sur 27 runs' },
   // Route CONNECTÉE qu'AUCUNE passe Lighthouse n'audite (`/messages` n'est pas
   // dans `DEPLOYMENT_PATHS`) : ce plafond sert la SONDE NAVIGATEUR

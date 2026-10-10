@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { supportAPI } from '../services/apiEndpoints';
 import { useLanguage } from '../contexts/LanguageContext';
+import { PAGE_SECTIONS } from '../config/page-sections';
 
 // Les textes de ce bloc vivent dans les dictionnaires du dépôt
 // (src/i18n/*.json, clés `supportTicket…`) : ils étaient auparavant reçus par
@@ -27,6 +28,9 @@ export const getLastStoredTicket = () => {
 
 export default function TicketTracker() {
   const { t } = useLanguage();
+  // Les classes de la carte de suivi sont celles du plan de /support, lues aussi
+  // par la coquille pré-rendue : les deux canaux peignent la même carte.
+  const plan = PAGE_SECTIONS['/support'];
   const lastTicket = getLastStoredTicket();
   const [ticketId, setTicketId] = useState(lastTicket?.id || '');
   const [ticketEmail, setTicketEmail] = useState(lastTicket?.email || '');
@@ -75,18 +79,18 @@ export default function TicketTracker() {
     // page, et ses deux champs sont les seuls du site qui vivent HORS d'un
     // `<form>` — donc les seuls que le socle `form :is(input…)` ne dessine pas.
     // Ils portent maintenant le même rayon (0,5 rem) que ce socle, en clair.
-    <div className="mb-6 carte-editoriale carte-publique">
-      <h2 className="titre-entree mb-1">{t('supportTrackTitle')}</h2>
-      <p className="text-sm text-stone-500 mb-4">{t('supportTrackSubtitle')}</p>
+    <div className={plan.suiviCarteClass}>
+      <h2 className={plan.suiviTitreClass}>{t('supportTrackTitle')}</h2>
+      <p className={plan.suiviSousTitreClass}>{t('supportTrackSubtitle')}</p>
 
-      <div className="flex flex-col sm:flex-row gap-2">
+      <div className={plan.suiviRangeeClass}>
         <input
           type="text"
           value={ticketId}
           onChange={(e) => setTicketId(e.target.value)}
           placeholder={t('supportTicketIdPlaceholder')}
           aria-label={t('supportTicketIdPlaceholder')}
-          className="flex-1 rounded-lg border border-stone-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+          className={plan.suiviChampClass}
         />
         <input
           type="email"
@@ -94,12 +98,12 @@ export default function TicketTracker() {
           onChange={(e) => setTicketEmail(e.target.value)}
           placeholder={t('supportTicketEmailPlaceholder')}
           aria-label={t('supportTicketEmailPlaceholder')}
-          className="flex-1 rounded-lg border border-stone-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+          className={plan.suiviChampClass}
         />
         <button
           onClick={trackTicket}
           disabled={tracking || !ticketId.trim() || !ticketEmail.trim()}
-          className="rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-black disabled:opacity-50"
+          className={plan.suiviBoutonClass}
         >
           {tracking ? t('supportTracking') : t('supportTrackCta')}
         </button>

@@ -198,11 +198,11 @@ const ForgotPassword = () => {
   };
 
   return (
-    <div className="min-h-full flex items-center justify-center fond-sable py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <div className="mx-auto h-14 w-14 flex items-center justify-center rounded-lg bg-orange-600">
-            <span className="text-white text-2xl font-bold"><IconePage nom={pagePlan.badgeIcon} role="badgeEtape" /></span>
+    <div className={pagePlan.frameClass}>
+      <div className={pagePlan.colonneClass}>
+        <div className={pagePlan.enteteClass}>
+          <div className={pagePlan.badgeClass}>
+            <span className={pagePlan.badgeTexteClass}><IconePage nom={pagePlan.badgeIcon} role="badgeEtape" /></span>
           </div>
           {/* Titre de PAGE en h1 (voir Login.js) : un h1 par page, identique au
               shell statique du build (forgot-password.html). Classes inchangées. */}
@@ -212,15 +212,15 @@ const ForgotPassword = () => {
               sous-titre que le plan déclare), et les deux tailles n'élisent pas
               le même élément — une déclaration ne peut en décrire qu'un. Seule
               la TEINTE change (encre chaude). */}
-          <h1 className="mt-6 text-3xl font-bold text-stone-900">{t(pagePlan.titleKey)}</h1>
+          <h1 className={pagePlan.titleClass}>{t(pagePlan.titleKey)}</h1>
           <p className={pagePlan.subtitleClass}>{t(pagePlan.subtitleKey)}</p>
         </div>
 
-        <div className="carte-editoriale carte-publique space-y-6">
-          <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-gray-500">
-            <span className={step === 'email' ? 'text-orange-600' : 'text-green-600'}>1. {t(pagePlan.stepEmailKey)}</span>
-            <span className={step === 'code' ? 'text-orange-600' : step === 'password' ? 'text-green-600' : 'text-stone-500'}>2. {t(pagePlan.stepCodeKey)}</span>
-            <span className={step === 'password' ? 'text-orange-600' : 'text-stone-500'}>3. {t(pagePlan.stepPasswordKey)}</span>
+        <div className={pagePlan.carteClass}>
+          <div className={pagePlan.etapesClass}>
+            <span className={step === 'email' ? pagePlan.etapeActiveClass : 'text-green-600'}>1. {t(pagePlan.stepEmailKey)}</span>
+            <span className={step === 'code' ? pagePlan.etapeActiveClass : step === 'password' ? 'text-green-600' : pagePlan.etapeAttenteClass}>2. {t(pagePlan.stepCodeKey)}</span>
+            <span className={step === 'password' ? pagePlan.etapeActiveClass : pagePlan.etapeAttenteClass}>3. {t(pagePlan.stepPasswordKey)}</span>
           </div>
 
           {displayedEmail && step !== 'email' && (
@@ -236,27 +236,27 @@ const ForgotPassword = () => {
           )}
 
           {step === 'email' && (
-            <form className="space-y-5" onSubmit={(e) => { e.preventDefault(); handleRequestCode('send'); }}>
+            <form className={pagePlan.formClass} onSubmit={(e) => { e.preventDefault(); handleRequestCode('send'); }}>
               <div>
-                <label htmlFor="reset-email" className="block text-sm font-medium text-gray-700">{t('forgotPasswordEmailLabel')}</label>
+                <label htmlFor="reset-email" className={pagePlan.labelClass}>{t('forgotPasswordEmailLabel')}</label>
                 <input
                   id="reset-email"
                   type="email"
                   autoComplete="email"
                   required
-                  className="mt-1 block w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-orange-500"
+                  className={pagePlan.champClass}
                   placeholder={t('email')}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
 
-              <p className="text-xs text-gray-500">{t(pagePlan.requestMessageKey)}</p>
+              <p className={pagePlan.aideClass}>{t(pagePlan.requestMessageKey)}</p>
 
               <LoadingButton
                 type="submit"
                 loading={loading}
-                className="w-full rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-700"
+                className={pagePlan.boutonClass}
               >
                 {t(pagePlan.sendCodeKey)}
               </LoadingButton>
@@ -264,9 +264,9 @@ const ForgotPassword = () => {
           )}
 
           {step === 'code' && (
-            <form className="space-y-5" onSubmit={handleVerifyCode}>
+            <form className={pagePlan.formClass} onSubmit={handleVerifyCode}>
               <div>
-                <label htmlFor="reset-otp" className="block text-sm font-medium text-gray-700">{t('forgotPasswordCodeLabel')}</label>
+                <label htmlFor="reset-otp" className={pagePlan.labelClass}>{t('forgotPasswordCodeLabel')}</label>
                 <input
                   id="reset-otp"
                   type="text"
@@ -290,7 +290,7 @@ const ForgotPassword = () => {
               <LoadingButton
                 type="submit"
                 loading={loading}
-                className="w-full rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-700"
+                className={pagePlan.boutonClass}
               >
                 {t('forgotPasswordVerifyCode')}
               </LoadingButton>
@@ -307,15 +307,15 @@ const ForgotPassword = () => {
           )}
 
           {step === 'password' && (
-            <form className="space-y-5" onSubmit={handleResetPassword}>
+            <form className={pagePlan.formClass} onSubmit={handleResetPassword}>
               <div>
-                <label htmlFor="new-password" className="block text-sm font-medium text-gray-700">{t('forgotPasswordStepPassword')}</label>
+                <label htmlFor="new-password" className={pagePlan.labelClass}>{t('forgotPasswordStepPassword')}</label>
                 <input
                   id="new-password"
                   type="password"
                   autoComplete="new-password"
                   required
-                  className="mt-1 block w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-orange-500"
+                  className={pagePlan.champClass}
                   placeholder={t('forgotPasswordStepPassword')}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
@@ -323,13 +323,13 @@ const ForgotPassword = () => {
               </div>
 
               <div>
-                <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700">{t('forgotPasswordConfirmPasswordLabel')}</label>
+                <label htmlFor="confirm-password" className={pagePlan.labelClass}>{t('forgotPasswordConfirmPasswordLabel')}</label>
                 <input
                   id="confirm-password"
                   type="password"
                   autoComplete="new-password"
                   required
-                  className="mt-1 block w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-orange-500"
+                  className={pagePlan.champClass}
                   placeholder={t('forgotPasswordConfirmPasswordLabel')}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
@@ -339,15 +339,15 @@ const ForgotPassword = () => {
               <LoadingButton
                 type="submit"
                 loading={loading}
-                className="w-full rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-700"
+                className={pagePlan.boutonClass}
               >
                 {t('forgotPasswordResetPassword')}
               </LoadingButton>
             </form>
           )}
 
-          <div className="text-center">
-            <Link to="/login" className="text-sm font-medium text-orange-600 hover:text-orange-500">
+          <div className={pagePlan.retourClass}>
+            <Link to="/login" className={pagePlan.lienRetourClass}>
               {t(pagePlan.backToLoginKey)}
             </Link>
           </div>

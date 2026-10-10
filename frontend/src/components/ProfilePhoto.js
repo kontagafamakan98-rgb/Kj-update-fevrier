@@ -301,7 +301,7 @@ const ProfilePhoto = ({
 
   return (
     <div 
-      className={`profile-photo-container ${className}`}
+      className={className}
       style={containerStyle}
       onMouseEnter={() => setShowDeleteButton(true)}
       onMouseLeave={() => setShowDeleteButton(false)}
