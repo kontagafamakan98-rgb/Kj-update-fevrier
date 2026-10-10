@@ -53,7 +53,15 @@ const extractTokenFromRawValue = (raw) => {
   return '';
 };
 
+// Le web ne lit JAMAIS de jeton dans le stockage du navigateur : la session y
+// est le seul cookie httpOnly. Un jeton n'existe en stockage que dans le shell
+// natif (Capacitor), dont la WebView n'a pas de cookie de session fiable.
+export const isNativeShell = () => typeof window !== 'undefined'
+  && Boolean(window.Capacitor?.isNativePlatform?.());
+
 export const getAuthToken = () => {
+  if (!isNativeShell()) return '';
+
   const keys = [
     'token',
     'auth_token',
@@ -386,8 +394,10 @@ const request = async (method, path, { params, data, headers, signal, skipUnauth
   // quand le courant approche de l'expiration (X-Kojo-Token). On le stocke
   // immédiatement ('token' + token_expires_at) pour ne pas être déconnecté à
   // 24 h. Le cookie httpOnly est reposé par le backend dans la même réponse.
+  // Côté web, le backend re-pose le cookie httpOnly dans la même réponse : rien
+  // à stocker. Seul le shell natif garde un jeton en stockage.
   const rotatedToken = response.headers?.get?.('X-Kojo-Token');
-  if (rotatedToken) {
+  if (rotatedToken && isNativeShell()) {
     try {
       localStorage.setItem('token', rotatedToken);
       const parts = String(rotatedToken).split('.');

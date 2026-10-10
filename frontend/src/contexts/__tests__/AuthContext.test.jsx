@@ -35,11 +35,14 @@ vi.mock('../../services/api', () => ({
   // anonyme de loadUser est ainsi testé sur son vrai critère (jeton présent ou
   // non), pas sur une doublure qui répondrait toujours la même chose.
   getAuthToken: vi.fn(() => localStorage.getItem('token') || ''),
-  // Cookie CSRF lisible : TOUJOURS absent en web cross-origin (Vercel → Fly).
+  // Cookie CSRF lisible : absent par défaut (les tests web le posent).
   hasSessionCookie: vi.fn(() => false),
+  // Les scénarios historiques modélisent une session portée par le jeton, donc
+  // le shell natif. Le web (cookie seul) est couvert en fin de fichier.
+  isNativeShell: vi.fn(() => true),
 }));
 
-import { markSoftRedirectConsumed } from '../../services/api';
+import { markSoftRedirectConsumed, isNativeShell, hasSessionCookie } from '../../services/api';
 
 // Réseau « bon » : loadUser doit appeler /auth/me (pas le chemin cache pauvre).
 vi.mock('../../utils/networkOptimizer', () => ({
@@ -205,5 +208,49 @@ describe('AuthContext — cohérence du snapshot localStorage user', () => {
 
     await waitFor(() => expect(screen.getByTestId('country').textContent).toBe('none'));
     expect(markSoftRedirectConsumed).toHaveBeenCalled();
+  });
+});
+
+describe('AuthContext — web : la session est le cookie httpOnly seul', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    sessionStorage.clear();
+    isNativeShell.mockReturnValue(false);
+    hasSessionCookie.mockReturnValue(false);
+  });
+
+  afterEach(() => {
+    isNativeShell.mockReturnValue(true);
+    hasSessionCookie.mockReturnValue(false);
+    vi.restoreAllMocks();
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+
+  it('un jeton laissé par une ancienne version est purgé au démarrage, sans sonde', async () => {
+    localStorage.setItem('token', 'jeton-herite');
+    sessionStorage.setItem('access_token', 'jeton-herite-session');
+    authAPI.getProfile.mockResolvedValue({ ...FRESH_USER });
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('loading').textContent).toBe('false'));
+    expect(localStorage.getItem('token')).toBeNull();
+    expect(sessionStorage.getItem('access_token')).toBeNull();
+    // Sans cookie de session lisible, le jeton hérité ne vaut plus rien : pas de sonde.
+    expect(authAPI.getProfile).not.toHaveBeenCalled();
+  });
+
+  it('cookie de session présent (sans aucun jeton) → le profil est restauré au rechargement', async () => {
+    hasSessionCookie.mockReturnValue(true);
+    authAPI.getProfile.mockResolvedValue({ ...FRESH_USER });
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('country').textContent).toBe('mali'));
+    expect(authAPI.getProfile).toHaveBeenCalledTimes(1);
+    // Aucun jeton n'a été écrit pour y parvenir.
+    expect(localStorage.getItem('token')).toBeNull();
   });
 });

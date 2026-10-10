@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { authAPI, handleApiError, markSoftRedirectConsumed, getAuthToken, hasSessionCookie } from '../services/api';
+import { authAPI, handleApiError, markSoftRedirectConsumed, getAuthToken, hasSessionCookie, isNativeShell } from '../services/api';
 import { devLog, safeLog } from '../utils/env';
 import kojoCache, { CACHE_KEYS } from '../utils/cache';
 import networkOptimizer from '../utils/networkOptimizer';
@@ -16,22 +16,15 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // NOTE AUTH (mode HYBRIDE) : la session vit dans le cookie httpOnly
-  // (kojo_session) posé par le backend POUR LES NAVIGATEURS qui acceptent les
-  // cookies cross-site, ET le jeton access_token est AUSSI persisté en
-  // localStorage (fallback en-tête Authorization: Bearer).
-  //
-  // Pourquoi ce retour en arrière assumé : le frontend Vercel appelle le
-  // backend Fly en CROSS-ORIGINE → le cookie de session est un cookie TIERS,
-  // rejeté par les navigateurs stricts (Chrome 2026, Safari/ITP, navigation
-  // privée) : le login « réussissait » (le serveur posait le cookie) mais le
-  // navigateur le jetait → session inexistante → 401 sur tous les appels
-  // authentifiés → boucle vers /login. Le backend accepte les deux modes
-  // (dual-mode) : api.js envoie Authorization: Bearer quand un token est
-  // présent, le cookie sinon. Le cookie httpOnly reste posé (défense en
-  // profondeur) là où il fonctionne ; le token localStorage garantit le
-  // login partout. Compromis : le token est lisible par JS (risque XSS
-  // assumé — c'est le standard des SPA de production).
+  // NOTE AUTH (web) : la session est UNIQUEMENT le cookie httpOnly posé par le
+  // backend. Aucun jeton n'est stocké dans localStorage ni sessionStorage, et
+  // aucun en-tête Authorization n'est envoyé depuis le web : un script ne peut
+  // donc pas relire la session. Le jeton ne subsiste en stockage que dans le
+  // shell natif Capacitor (isNativeShell), qui n'a pas de cookie fiable.
+  // Prérequis : le navigateur doit voir le cookie comme de première partie, donc
+  // l'API passe par le proxy même-origine (VITE_USE_SAME_ORIGIN_API=true) ; sans
+  // lui, kojo_csrf n'est pas lisible et la session n'est pas restaurée au
+  // rechargement.
 
   const clearToken = () => {
     const keys = [
@@ -100,6 +93,22 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Web : supprime les jetons laissés par les versions précédentes, dans les
+  // deux stockages, pour qu'ils ne soient ni relus ni envoyés. Le natif garde le
+  // sien (isNativeShell).
+  const purgeWebSessionTokens = () => {
+    if (isNativeShell()) return;
+    for (const storage of [localStorage, sessionStorage]) {
+      ['token', 'token_expires_at', 'auth_token', 'access_token'].forEach((key) => {
+        try {
+          storage.removeItem(key);
+        } catch (_error) {
+          // Stockage indisponible (navigation privée) : rien à purger.
+        }
+      });
+    }
+  };
+
   const isTokenExpiredLocally = () => {
     const expiresAt = localStorage.getItem('token_expires_at');
     if (!expiresAt) return false; // token sans expiry stockée = ancien format, on laisse le serveur décider
@@ -140,6 +149,7 @@ export function AuthProvider({ children }) {
     // Migration privacy : purge les numéros de paiement stockés par une
     // ancienne version du code dans le profil localStorage.
     purgeStoredPaymentAccounts();
+    purgeWebSessionTokens();
     const token = localStorage.getItem('token');
     if (token && isTokenExpiredLocally()) {
       // Token expiré côté client : on nettoie sans appel réseau inutile,
@@ -294,12 +304,10 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Persiste le jeton en localStorage pour l'en-tête Authorization (mode
-  // hybride) — le cookie httpOnly reste le canal primaire là où il est
-  // accepté. Clé 'token' : lue par getAuthToken (api.js) et purgée par
-  // clearToken / handleUnauthorized.
+  // Persiste le jeton UNIQUEMENT dans le shell natif (Capacitor). Sur le web,
+  // la session reste le cookie httpOnly : rien n'est écrit en stockage.
   const persistSessionToken = (accessToken) => {
-    if (!accessToken) return;
+    if (!accessToken || !isNativeShell()) return;
     try {
       localStorage.setItem('token', accessToken);
       const expiry = readJwtExpiry(accessToken);
@@ -325,9 +333,7 @@ export function AuthProvider({ children }) {
     try {
       const response = await authAPI.login({ email, password });
       const { user } = response;
-      // Mode hybride : on persiste le jeton (fallback en-tête Authorization) ;
-      // le cookie httpOnly reste posé par le backend pour les navigateurs qui
-      // l'acceptent.
+      // Web : le cookie httpOnly posé par le backend porte la session.
       establishSession(user, response.access_token);
       devLog.info('✅ User logged in successfully');
       return { success: true, user };
@@ -407,9 +413,8 @@ export function AuthProvider({ children }) {
   // Nouvelle fonction pour connexion automatique après inscription
   const autoLoginAfterRegistration = (userData, token) => {
     try {
-      // Mode hybride : on persiste le jeton (fallback en-tête Authorization),
-      // le cookie httpOnly reste posé par le backend sur
-      // /auth/register-verified.
+      // Web : le cookie httpOnly posé par /auth/register-verified porte la
+      // session ; le jeton n'est persisté que dans le shell natif.
       persistSessionToken(token);
       localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(userData)));
       setUser(userData);
@@ -438,8 +443,7 @@ export function AuthProvider({ children }) {
       // obligatoire côté backend). userData doit contenir email_verification_token.
       const response = await authAPI.registerVerified(userData);
       const { user } = response;
-      // Mode hybride : on persiste le jeton (fallback en-tête Authorization),
-      // le cookie httpOnly reste posé par le backend.
+      // Web : le cookie httpOnly porte la session ; rien n'est stocké.
       persistSessionToken(response.access_token);
       localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(user)));
       setUser(user);
