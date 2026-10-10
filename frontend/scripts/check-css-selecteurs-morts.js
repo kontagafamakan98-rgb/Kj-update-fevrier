@@ -42,7 +42,7 @@
  *      dette est fermée, nom par nom : (1) ceux qui SONT des classes ont reçu un
  *      porteur que le corpus peut lire (props renommées, registres de classes
  *      nommés comme tels) ; (2) ceux qui n'en sont pas ont CESSÉ D'ÊTRE GÉNÉRÉS
- *      (`blocklist` de `tailwind.config.cjs`), et le garde REFUSE qu'un nom de
+ *      (`@source not inline` de `src/index.css`), et le garde REFUSE qu'un nom de
  *      cette liste soit posé quelque part — un nom bloqué mais posé serait une
  *      classe dont la règle n'existe plus, l'autre moitié du même mensonge.
  * Les verdicts ne se répètent pas : un nom déjà nommé par le 1 est retiré des
@@ -191,7 +191,7 @@ function main() {
   }
 
   // ── Verdict 3 : les noms volontairement NON générés ─────────────────────────
-  // `blocklist` retire un nom de la feuille servie. Le revers de cette décision
+  // `@source not inline` retire un nom de la feuille servie. Le revers de cette décision
   // est mesuré ici : un nom bloqué mais POSÉ par le livré est une classe dont la
   // règle n'existe plus — l'autre moitié du même mensonge que ce garde combat.
   const nomsNonGeneres = lireNomsNonGeneres();
@@ -227,14 +227,14 @@ function main() {
         `::error::${d.page} : règle servie sans porteur « ${d.selecteur} » (${d.noms.join(', ')}) — ` +
           'GÉNÉRÉE depuis un jeton qui n\'est pas une classe (prose, identifiant, valeur CSS) ou depuis un composant ' +
           'que le build élimine : la poser, la nommer dans un registre de classes, ou CESSER DE LA GÉNÉRER ' +
-          '(`blocklist` de `tailwind.config.cjs`)'
+          '(`@source not inline` de `src/index.css`)'
       );
     }
   }
   if (nomsNonGeneresPoses.length) {
     for (const nom of nomsNonGeneresPoses) {
       console.error(
-        `::error::« ${nom} » est dans la liste des noms volontairement NON générés (\`tailwind.config.cjs\`) et il est POSÉ ` +
+        `::error::« ${nom} » est dans la liste des noms volontairement NON générés (\`@source not inline\` de \`src/index.css\`) et il est POSÉ ` +
           'par le livré : sa règle n\'existe donc plus, et la classe ne peint rien. Le retirer du livré, ou le sortir de la liste.'
       );
     }
