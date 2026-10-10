@@ -882,7 +882,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-api-split.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -902,7 +902,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-formulaire-differe.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -922,7 +922,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-origines-bundles.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -942,7 +942,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-drapeaux-emoji.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -962,7 +962,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-keyframes-animations.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -982,7 +982,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-keyframes-animations.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1002,7 +1002,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-keyframes-animations.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1022,7 +1022,7 @@
         "vitest",
         "run",
         "scripts/__tests__/audit_api_returns.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1149,7 +1149,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-bundle-size.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1169,7 +1169,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-cors-preflight.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1273,7 +1273,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-generated-icons.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1356,7 +1356,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-home-shell.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1376,7 +1376,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-job-og-contract.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1396,7 +1396,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-og-assets.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1416,7 +1416,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-og-images.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1436,7 +1436,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-og-job-200.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1477,7 +1477,7 @@
         "vitest",
         "run",
         "scripts/__tests__/pack2-size.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1497,7 +1497,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-pack2-i18n-hygiene.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1517,7 +1517,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-page-meta.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1537,7 +1537,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-prerender-shells.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1578,7 +1578,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-pwa-manifest.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1598,7 +1598,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-script-deps.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1618,7 +1618,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-seo-production.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1638,7 +1638,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-seo-production.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1658,7 +1658,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-seo-production.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1678,7 +1678,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-spa-routes.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1719,7 +1719,7 @@
         "vitest",
         "run",
         "scripts/__tests__/audit-tdz.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1739,7 +1739,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-spa-routes.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1759,7 +1759,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-spa-routes.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1779,7 +1779,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-spa-routes.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1799,7 +1799,7 @@
         "vitest",
         "run",
         "scripts/__tests__/validate-vercel-json.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1882,7 +1882,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-seo-production.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1944,7 +1944,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-retard-main.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1964,7 +1964,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-retard-main.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -1984,7 +1984,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-retard-main.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2004,7 +2004,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-deployed-revision.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2024,7 +2024,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-deployed-revision.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2213,7 +2213,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-test-environment.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2233,7 +2233,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-test-environment.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2253,7 +2253,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-test-environment.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2273,7 +2273,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-test-environment.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2293,7 +2293,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-test-environment.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2313,7 +2313,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-test-environment.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2333,7 +2333,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-test-environment.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2353,7 +2353,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-test-environment.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2373,7 +2373,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-prerender-shells.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2393,7 +2393,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-prerender-shells.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2413,7 +2413,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-prerender-shells.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2433,7 +2433,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-prerender-shells.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2453,7 +2453,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-shell-remote-resources.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2475,7 +2475,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-shell-remote-resources.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2495,7 +2495,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-shell-remote-resources.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2515,7 +2515,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-css-selecteurs-morts.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2537,7 +2537,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-css-selecteurs-morts.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2557,7 +2557,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-css-selecteurs-morts.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2577,7 +2577,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-css-selecteurs-morts.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2597,7 +2597,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-css-selecteurs-morts.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2617,7 +2617,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-css-selecteurs-morts.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2625,10 +2625,10 @@
       ]
     },
     {
-      "id": "css-selecteurs-morts: blocklist non lue neutralisee",
+      "id": "css-selecteurs-morts: noms non generes non lus neutralises",
       "garde": "frontend/scripts/check-css-selecteurs-morts.js",
       "cible": "frontend/scripts/check-css-selecteurs-morts.js",
-      "trouve": "const nomsNonGeneres = Array.isArray(CONFIG_TAILWIND.blocklist) ? CONFIG_TAILWIND.blocklist : [];",
+      "trouve": "const nomsNonGeneres = lireNomsNonGeneres();",
       "remplace": "const nomsNonGeneres = [];",
       "runner": "node",
       "preuve": "frontend/scripts/__tests__/check-css-selecteurs-morts.test.js",
@@ -2637,7 +2637,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-css-selecteurs-morts.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2657,7 +2657,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-css-selecteurs-morts.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2677,7 +2677,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-classes-sans-regle.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2698,7 +2698,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-classes-sans-regle.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2720,7 +2720,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-classes-sans-regle.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2740,7 +2740,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-classes-sans-regle.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2760,7 +2760,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-classes-sans-regle.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2780,7 +2780,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-classes-sans-regle.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2800,7 +2800,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-classes-sans-regle.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2820,7 +2820,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-classes-sans-regle.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2840,7 +2840,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-shell-text-provenance.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2860,7 +2860,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-shell-text-provenance.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2880,7 +2880,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-shell-text-provenance.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2900,7 +2900,7 @@
         "vitest",
         "run",
         "scripts/__tests__/style-layout-budgets.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2921,7 +2921,7 @@
         "vitest",
         "run",
         "scripts/__tests__/style-layout-budgets.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2942,7 +2942,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-composants-etat-partage-ecouteurs.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2962,7 +2962,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-composants-etat-partage-ecouteurs.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -2982,7 +2982,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-appui-demontage-controles.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3002,7 +3002,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-appui-demontage-controles.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3022,7 +3022,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-juges-de-temps.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3042,7 +3042,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-juges-de-temps.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3062,7 +3062,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-juges-de-temps.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3082,7 +3082,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-juges-de-temps.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3102,7 +3102,7 @@
         "vitest",
         "run",
         "scripts/__tests__/import-health.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3122,7 +3122,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-juges-de-temps.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3142,7 +3142,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-juges-de-temps.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3163,7 +3163,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-juges-de-temps.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3183,7 +3183,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-test-environment.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3203,7 +3203,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-test-environment.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3223,7 +3223,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-generated-icons.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3243,7 +3243,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-og-assets.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3263,7 +3263,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-marque-kojo.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3283,7 +3283,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-marque-kojo.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3303,7 +3303,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-marque-kojo.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3323,7 +3323,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-marque-kojo.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3343,7 +3343,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-couverture-tiers.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3363,7 +3363,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-couverture-tiers.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3383,7 +3383,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-couverture-tiers.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3403,7 +3403,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-couverture-tiers.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3423,7 +3423,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-couverture-tiers.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3443,7 +3443,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-couverture-tiers.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3463,7 +3463,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-pwa-manifest.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3483,7 +3483,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-pwa-manifest.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3503,7 +3503,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-pwa-manifest.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3523,7 +3523,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-pwa-manifest.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3543,7 +3543,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-pwa-manifest.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3563,7 +3563,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-pwa-manifest.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3583,7 +3583,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-reliquats-css.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3603,7 +3603,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-reliquats-css.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3623,7 +3623,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-reliquats-css.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3643,7 +3643,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-reliquats-css.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3663,7 +3663,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-reliquats-css.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3683,7 +3683,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-test-environment.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3703,7 +3703,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-hero-images.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3723,7 +3723,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-hero-images.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3743,7 +3743,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-hero-images.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3763,7 +3763,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-hero-images.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3783,7 +3783,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-css-inline-budget.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3803,7 +3803,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-css-inline-budget.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3823,7 +3823,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-classes-sans-regle.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3844,7 +3844,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-classes-sans-regle.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3866,7 +3866,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-classes-sans-regle.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3886,7 +3886,7 @@
       "vitest",
       "run",
       "scripts/__tests__/check-classes-coquilles.test.js",
-      "--reporter=basic"
+      "--reporter=default"
     ],
     "cwd": "frontend",
     "attend": [
@@ -3906,7 +3906,7 @@
       "vitest",
       "run",
       "scripts/__tests__/check-classes-coquilles.test.js",
-      "--reporter=basic"
+      "--reporter=default"
     ],
     "cwd": "frontend",
     "attend": [
@@ -3926,7 +3926,7 @@
       "vitest",
       "run",
       "scripts/__tests__/check-classes-coquilles.test.js",
-      "--reporter=basic"
+      "--reporter=default"
     ],
     "cwd": "frontend",
     "attend": [
@@ -3946,7 +3946,7 @@
       "vitest",
       "run",
       "scripts/__tests__/check-classes-coquilles.test.js",
-      "--reporter=basic"
+      "--reporter=default"
     ],
     "cwd": "frontend",
     "attend": [
@@ -3966,7 +3966,7 @@
       "vitest",
       "run",
       "scripts/__tests__/check-classes-coquilles.test.js",
-      "--reporter=basic"
+      "--reporter=default"
     ],
     "cwd": "frontend",
     "attend": [
@@ -3986,7 +3986,7 @@
       "vitest",
       "run",
       "scripts/__tests__/check-classes-coquilles.test.js",
-      "--reporter=basic"
+      "--reporter=default"
     ],
     "cwd": "frontend",
     "attend": [
@@ -4006,7 +4006,7 @@
       "vitest",
       "run",
       "scripts/__tests__/check-classes-coquilles.test.js",
-      "--reporter=basic"
+      "--reporter=default"
     ],
     "cwd": "frontend",
     "attend": [
@@ -4026,7 +4026,7 @@
       "vitest",
       "run",
       "scripts/__tests__/check-classes-coquilles.test.js",
-      "--reporter=basic"
+      "--reporter=default"
     ],
     "cwd": "frontend",
     "attend": [
@@ -4046,7 +4046,7 @@
       "vitest",
       "run",
       "scripts/__tests__/check-classes-coquilles.test.js",
-      "--reporter=basic"
+      "--reporter=default"
     ],
     "cwd": "frontend",
     "attend": [
@@ -4066,7 +4066,7 @@
       "vitest",
       "run",
       "scripts/__tests__/check-classes-coquilles.test.js",
-      "--reporter=basic"
+      "--reporter=default"
     ],
     "cwd": "frontend",
     "attend": [
@@ -4086,7 +4086,7 @@
       "vitest",
       "run",
       "scripts/__tests__/check-classes-coquilles.test.js",
-      "--reporter=basic"
+      "--reporter=default"
     ],
     "cwd": "frontend",
     "attend": [
@@ -4106,7 +4106,7 @@
       "vitest",
       "run",
       "scripts/__tests__/check-classes-coquilles.test.js",
-      "--reporter=basic"
+      "--reporter=default"
     ],
     "cwd": "frontend",
     "attend": [
