@@ -1942,13 +1942,11 @@ jobs:
   #     avis haut/critique » ne relève pas un seuil, il constate un état ;
   #   • les dépendances de DÉVELOPPEMENT (frontend) SONT un gate depuis le
   #     10/10/2026 : l'audit complet (dev incluses) relève 0 avis après la
-  #     migration Tailwind 4 et les overrides LHCI. Les paquets Python ne le
-  #     sont pas ENCORE : pip-audit rapporte des avis réels au 20/09/2026
-  #     (starlette, pillow, pytest, black — versions épinglées du dépôt), et les
-  #     corriger est une mise à jour de dépendances avec ses propres risques de
-  #     rupture : c'est une décision de maintenance, pas un effet de bord d'un
-  #     ajout de job. Le job les publie en annotation et dans le résumé du run —
-  #     constatés, nommés, pas transformés en vert silencieux.
+  #     migration Tailwind 4 et les overrides LHCI.
+  #   • les dépendances PYTHON (backend/requirements.txt, dev incluses) SONT un
+  #     gate depuis le 10/10/2026 : pip-audit relève 0 avis après la relève des
+  #     épinglages (starlette, pillow, pytest, black). Un avis futur fait
+  #     échouer le job, et le résumé du run le nomme avec sa version corrigée.
   dependency-audit:
     name: Dépendances (avis de sécurité)
     runs-on: ubuntu-latest
@@ -1973,20 +1971,34 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Avis sur les dépendances Python (rapportés, non bloquants)
+      - name: Avis sur les dépendances Python (backend/requirements.txt, dev incluses) — BLOQUANT
         working-directory: backend
         run: |
           set -uo pipefail
           python -m pip install --quiet pip-audit
+          # pip-audit sort 0 si aucun avis, 1 si au moins un avis (ou si la
+          # résolution échoue : le gate échoue alors aussi, c'est voulu).
+          python -m pip_audit -r requirements.txt --progress-spinner off > /tmp/pip-audit.txt 2>&1
+          STATUT=$?
           echo "### Avis de sécurité — dépendances Python (backend/requirements.txt)" >> "$GITHUB_STEP_SUMMARY"
-          if python -m pip_audit -r requirements.txt --progress-spinner off > /tmp/pip-audit.txt 2>&1; then
+          if [ "$STATUT" -eq 0 ]; then
             echo "Aucun avis : les versions épinglées de requirements.txt sont à jour." | tee -a "$GITHUB_STEP_SUMMARY"
-          else
-            echo "Avis CONSTATÉS (non bloquants — voir le motif dans ci.yml) :" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            grep -Ei '^[a-z0-9_.-]+ +[0-9]' /tmp/pip-audit.txt | head -40 >> "$GITHUB_STEP_SUMMARY" || true
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            while read -r paquet version avis corrige; do
-              echo "::warning title=Avis Python::$paquet $version — $avis (corrigé en $corrige)"
-            done < <(grep -Ei '^[a-z0-9_.-]+ +[0-9]' /tmp/pip-audit.txt | head -40)
+            exit 0
           fi
+          # Lignes de tableau « paquet version identifiant version_corrigée » ;
+          # la ligne de synthèse « Found N known vulnerabilities » en est exclue.
+          LIGNES=$(grep -Ei '^[a-z0-9_.-]+ +[0-9]' /tmp/pip-audit.txt | grep -vi '^found ' | sort -u | head -40 || true)
+          if [ -z "$LIGNES" ]; then
+            # Sortie sans tableau (erreur de résolution, réseau) : nommée, pas avalée.
+            echo "Pip-audit a échoué sans verdict de tableau (voir les lignes en erreur du log)." >> "$GITHUB_STEP_SUMMARY"
+            echo "::error title=pip-audit sans verdict::$(tail -n 3 /tmp/pip-audit.txt | tr '\n' ' ')"
+          else
+            echo "Avis CONSTATÉS (bloquant) :" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            printf '%s\n' "$LIGNES" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            printf '%s\n' "$LIGNES" | while read -r paquet version avis corrige; do
+              echo "::error title=Avis Python::$paquet $version — $avis (corrigé en $corrige)"
+            done
+          fi
+          exit 1
