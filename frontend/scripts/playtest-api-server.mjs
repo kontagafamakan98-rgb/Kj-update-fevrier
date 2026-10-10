@@ -224,10 +224,26 @@ const readBody = (req) => new Promise((resolve, reject) => {
   req.on('end', () => { try { resolve(text ? JSON.parse(text) : {}); } catch (error) { reject(error); } });
   req.on('error', reject);
 });
+// Session web : le cookie httpOnly `kojo_session` (comme le vrai backend,
+// AUTH_COOKIE_NAME). Depuis que le web ne garde plus de jeton en localStorage,
+// c'est lui qui porte la session ; le Bearer reste accepté pour les clients natifs.
+const cookieDe = (req, nom) => {
+  const brut = String(req.headers.cookie || '');
+  const trouve = brut.split(';').map((morceau) => morceau.trim()).find((morceau) => morceau.startsWith(`${nom}=`));
+  return trouve ? decodeURIComponent(trouve.slice(nom.length + 1)) : '';
+};
 const currentUser = (req) => {
-  const token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  const token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '') || cookieDe(req, 'kojo_session');
   return sessions.get(token) || null;
 };
+// Les deux cookies que le backend pose à la connexion : la session (httpOnly) et
+// le jeton CSRF (lisible par le JavaScript, c'est ce que `hasSessionCookie` lit).
+const enTetesDeSession = (token) => ({
+  'Set-Cookie': [
+    `kojo_session=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax`,
+    `kojo_csrf=csrf-${encodeURIComponent(token)}; Path=/; SameSite=Lax`,
+  ],
+});
 const route = (req) => new URL(req.url, `http://${req.headers.host}`);
 
 const server = http.createServer(async (req, res) => {
@@ -309,12 +325,12 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req); const user = users.get(body.email);
       if (!user || user.password !== body.password) return send(res, 401, { detail: 'Identifiants invalides' });
       const token = `fixture-${user.id}`; sessions.set(token, user); reposerLEtatDuCompte(user);
-      return send(res, 200, { user, token, access_token: token, token_expires_at: Date.now() + 3600000 });
+      return send(res, 200, { user, token, access_token: token, token_expires_at: Date.now() + 3600000 }, enTetesDeSession(token));
     }
     if (req.method === 'POST' && path === '/auth/register-verified') {
       const body = await readBody(req); const user = { id: `user-${users.size + 1}`, email: body.email, password: body.password, user_type: body.user_type || 'client', first_name: body.first_name || 'Demo', last_name: body.last_name || 'User', is_verified: true, payment_accounts_count: 2 };
       users.set(user.email, user); const token = `fixture-${user.id}`; sessions.set(token, user);
-      return send(res, 201, { user, token, access_token: token, token_expires_at: Date.now() + 3600000 });
+      return send(res, 201, { user, token, access_token: token, token_expires_at: Date.now() + 3600000 }, enTetesDeSession(token));
     }
     // Le VRAI backend renvoie l'utilisateur NU (`return current_user.model_dump(...)`,
     // kojo_routers_auth.py), et le frontend le pose tel quel (`setUser(userData)`
