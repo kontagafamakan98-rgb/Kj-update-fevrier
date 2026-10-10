@@ -78,7 +78,7 @@ export function DemoJobsEmptyState({ t }) {
           <div>
             <h2 id="demo-jobs-title" className="text-xl font-semibold text-gray-900">Découvrez le type de missions publiées sur Kojo</h2>
             <p className="mt-2 max-w-2xl text-sm text-gray-600">Ces exemples montrent le fonctionnement de la plateforme. Créez un compte pour consulter les missions actuellement disponibles et proposer vos services.</p>
-            <Link to="/register" className="mt-4 inline-flex rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2">
+            <Link to="/register" className="mt-4 inline-flex rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-orange-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2">
               {t('getStarted')}
             </Link>
           </div>
@@ -86,7 +86,7 @@ export function DemoJobsEmptyState({ t }) {
       </div>
       <div className="grid grid-cols-1 gap-4">
         {DEMO_JOBS.map((job) => (
-          <article key={job.id} className="block rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <article key={job.id} className="block rounded-2xl border border-gray-100 bg-white p-6 shadow-xs">
             <div className="flex flex-wrap items-start justify-between gap-6">
               <div className="min-w-[240px] flex-1">
                 <div className="mb-2 flex flex-wrap items-center gap-3">
@@ -151,7 +151,7 @@ export function JobCard({ job, user, userType, appliedJobIds, t }) {
                 annulée = gris. Le POINT suit la teinte du texte
                 (`currentColor`), donc les deux ne peuvent pas se contredire. */}
             <span
-              className="pastille-statut inline-flex items-center gap-1.5 rounded border px-2 py-1 text-xs"
+              className="pastille-statut inline-flex items-center gap-1.5 rounded-sm border px-2 py-1 text-xs"
               data-statut={job.status || 'inconnu'}
             >
               <span className="pastille-statut-point h-1.5 w-1.5 rounded-full" aria-hidden="true"></span>
@@ -168,8 +168,8 @@ export function JobCard({ job, user, userType, appliedJobIds, t }) {
         <div className="ml-0 min-w-[170px] text-right md:ml-6">
           <div className="text-2xl font-bold text-orange-600">{formatBudgetRange(job.budget_min, job.budget_max)}</div>
           {job.estimated_duration && <div className="mt-1 text-sm text-stone-500">{job.estimated_duration}</div>}
-          {userType === 'worker' && job.status === 'open' && !hasApplied && <div className="mt-2 inline-flex rounded border border-green-200 bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">{t('applyAvailable')}</div>}
-          {hasApplied && <div className="mt-2 inline-flex rounded border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">{t('proposalSent')}</div>}
+          {userType === 'worker' && job.status === 'open' && !hasApplied && <div className="mt-2 inline-flex rounded-sm border border-green-200 bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">{t('applyAvailable')}</div>}
+          {hasApplied && <div className="mt-2 inline-flex rounded-sm border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">{t('proposalSent')}</div>}
         </div>
       </div>
     </Link>

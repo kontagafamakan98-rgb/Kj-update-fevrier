@@ -307,7 +307,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       // Un `<select>` de substitution mesurait 1 px de moins — mesuré, les 47
       // textes du bas du formulaire étaient 1 px trop haut.
       + `<div class="relative mt-1">`
-      + `<button type="button" id="country" class="w-full flex items-center justify-between px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-white text-left" aria-haspopup="listbox" aria-expanded="false" aria-required="true">`
+      + `<button type="button" id="country" class="w-full flex items-center justify-between px-4 py-3 border border-gray-300 rounded-lg shadow-xs bg-white text-left" aria-haspopup="listbox" aria-expanded="false" aria-required="true">`
       + `<span class="flex items-center gap-3 min-w-0">`
       + `<span class="text-lg leading-none">${svgDeLIcone(registerPlan.countryGlobeIcon, 'paysGlobe')}</span>`
       + `<span class="truncate text-gray-400">${esc(COUNTRY_PLACEHOLDER(registerT('country')))}</span>`
@@ -318,20 +318,20 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `</div>`
       + `</div>`
       + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">`
-      + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('firstName'))}</label><input readonly placeholder="${esc(registerT('firstName'))}..." class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /></div>`
-      + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('lastName'))}</label><input readonly placeholder="${esc(registerT('lastName'))}..." class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /></div>`
+      + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('firstName'))}</label><input readonly placeholder="${esc(registerT('firstName'))}..." class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-xs" /></div>`
+      + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('lastName'))}</label><input readonly placeholder="${esc(registerT('lastName'))}..." class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-xs" /></div>`
       + `</div>`
-      + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('email'))}</label><input readonly type="email" placeholder="${esc(registerT('emailPlaceholder'))}" class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /></div>`
+      + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('email'))}</label><input readonly type="email" placeholder="${esc(registerT('emailPlaceholder'))}" class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-xs" /></div>`
       + `<div>`
       + `<label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('phone'))}</label>`
-      + `<div class="flex rounded-lg shadow-sm">`
+      + `<div class="flex rounded-lg shadow-xs">`
       + `<span class="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">${esc(PHONE_PREFIX_FALLBACK)}</span>`
       + `<input readonly placeholder="${esc(phoneNumberExample())}" class="flex-1 block w-full px-4 py-3 border border-gray-300 rounded-r-lg" />`
       + `</div>`
       + `<p class="mt-1 text-sm text-gray-500">${esc(registerT('phoneFormatHint'))}: ${esc(phoneNumberExample())}</p>`
       + `</div>`
-      + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('password'))}</label><input readonly type="password" class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /><p class="mt-1 text-xs text-gray-500">${esc(registerT('passwordTooShort'))}</p></div>`
-      + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('confirmPassword'))}</label><input readonly type="password" class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /></div>`
+      + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('password'))}</label><input readonly type="password" class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-xs" /><p class="mt-1 text-xs text-gray-500">${esc(registerT('passwordTooShort'))}</p></div>`
+      + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('confirmPassword'))}</label><input readonly type="password" class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-xs" /></div>`
       + `<div class="bloc-differe-photo carte-editoriale carte-publique mb-6">`
       + `<div class="mb-4 flex items-center gap-3">${svgDeLIcone(registerPlan.photoIcon, 'photoTitre')}<h3 class="titre-entree">${esc(registerT('profilePhotoOptional'))}</h3></div>`
       + `<p class="mb-4 text-sm text-stone-600">${esc(registerT('profilePhotoHelps'))}</p>`
@@ -359,7 +359,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<div class="bloc-differe-legal rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-3">`
       + `<div><h3 class="text-sm font-semibold text-orange-900">${svgDeLIcone(registerPlan.legalNoticeIcon, 'notice')} ${esc(registerT('legalNoticeTitle'))}</h3><p class="text-xs text-orange-800 mt-1">${esc(registerT('legalConsentHelp'))}</p></div>`
       + `<span class="inline-flex items-center text-sm font-medium text-orange-700 underline">${esc(registerT('legalConsentLink'))}</span>`
-      + `<label class="flex items-start gap-3 cursor-pointer"><input type="checkbox" readonly class="mt-1 h-4 w-4 rounded border-gray-300 text-orange-600" /><span class="text-sm text-gray-700">${esc(registerT('legalConsentLabel'))}</span></label>`
+      + `<label class="flex items-start gap-3 cursor-pointer"><input type="checkbox" readonly class="mt-1 h-4 w-4 rounded-sm border-gray-300 text-orange-600" /><span class="text-sm text-gray-700">${esc(registerT('legalConsentLabel'))}</span></label>`
       + `<p class="text-xs text-gray-600">${esc(registerT('legalContactLine'))}</p>`
       + `</div>`
       + `<div class="bloc-differe-envoi"><button type="submit" class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-orange-600">${esc(registerT('continueButton'))}</button></div>`
@@ -408,11 +408,11 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
     // apparaissent après le boot comme sur la page réelle.
     payment: `<div class="${paymentPlan.frameClass}">`
       + `<div class="${paymentPlan.corpsClass}">`
-      + `<div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">`
+      + `<div class="bg-white rounded-2xl shadow-xs border border-gray-200 p-6">`
       + `<h1 class="${paymentPlan.titleClass}">${esc(T(paymentPlan.titleKey))}</h1>`
       + `<p class="text-gray-600">${esc(T(paymentPlan.subtitleKey))}</p>`
       + `</div>`
-      + `<div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center">`
+      + `<div class="bg-white rounded-2xl shadow-xs border border-gray-200 p-8 text-center">`
       + `<div class="text-4xl mb-3">${svgDeLIcone(paymentPlan.noJobIcon, 'carteVide')}</div>`
       + `<h2 class="text-xl font-semibold text-gray-900 mb-2">${esc(T(paymentPlan.noJobTitleKey))}</h2>`
       + `<p class="text-gray-600 max-w-lg mx-auto mb-5">${esc(T(paymentPlan.noJobTextKey))}</p>`
@@ -547,7 +547,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `</div>`
       // ── Le vocabulaire éditorial, LU dans le plan (28/09/2026) ────────────
       // Cette page portait les trois dernières cartes à OMBRE du site
-      // (`shadow-sm`), quatre pastilles de teinte empruntée (`bg-blue-100`,
+      // (`shadow-xs`), quatre pastilles de teinte empruntée (`bg-blue-100`,
       // `bg-emerald-100`) et du gris froid. Elle publie maintenant la carte à
       // filet, la ligne à filet et la pastille ronde de l'accueil — les mêmes
       // chaînes que src/pages/Support.js, lues au même endroit que lui.

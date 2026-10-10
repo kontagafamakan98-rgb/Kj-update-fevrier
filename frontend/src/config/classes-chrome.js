@@ -48,7 +48,7 @@ export const COLONNE_CLASS = 'min-h-screen fond-sable relative flex flex-col';
  * (64 px) = les 65 px mesurés aux deux profils (412 et 1350 px). Un placeholder
  * à 64 px décalait tout le contenu au montage de React.
  */
-export const NAV_CLASS = 'sticky top-0 z-50 border-b bg-white/95 shadow-sm backdrop-blur';
+export const NAV_CLASS = 'sticky top-0 z-50 border-b bg-white/95 shadow-xs backdrop-blur-sm';
 
 /**
  * Le suffixe PWA de la navbar (encoche de l'écran) — React seul le pose, quand
@@ -87,7 +87,7 @@ export const NAV_RANGEE_CLASS = `flex justify-between ${HAUTEUR_NAV_CLASS}`;
 export const MAIN_CLASS = 'flex-1 pb-24 md:pb-0';
 
 /** Le pied de page légal, peint par src/App.js et par chaque coquille. */
-export const PIED_CLASS = 'border-t border-orange-100 bg-white/95 backdrop-blur-sm';
+export const PIED_CLASS = 'border-t border-orange-100 bg-white/95 backdrop-blur-xs';
 export const PIED_INTERIEUR_CLASS = `${CONTENEUR_CLASS} py-4 space-y-3`;
 export const PIED_ADRESSE_CLASS =
   'not-italic flex flex-wrap items-center justify-center md:justify-end gap-x-4 gap-y-2 text-xs text-gray-600';

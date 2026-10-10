@@ -201,7 +201,7 @@ export default function Home() {
             canaux : la coquille pré-rendue publie la même classe
             (vite-plugins/prerender/shells-home.js), sinon le HTML d'avant
             l'hydratation garderait deux boutons morts. */}
-        <div className="absolute inset-0 bg-black bg-opacity-5 pointer-events-none"></div>
+        <div className="absolute inset-0 bg-black/5 pointer-events-none"></div>
         <div className={heroGrilleClass}>
           <div className={heroCopieClass}>
             <span className={`${heroKickerClass} mb-6`}>
@@ -334,7 +334,7 @@ export default function Home() {
                 to={`/jobs?country=${country.code}`}
                 className={rubanJetonClass}
               >
-                <FlagIcon country={country.code} className="h-4 w-6 rounded-sm" />
+                <FlagIcon country={country.code} className="h-4 w-6 rounded-xs" />
                 {country.name}
               </Link>
             ))}

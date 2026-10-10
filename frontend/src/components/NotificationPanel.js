@@ -178,11 +178,11 @@ export default function NotificationPanel() {
       // pas non plus — la minification renomme les variables, et l'objet vit dans
       // un autre module que son lecteur. Ce que le corpus lit, c'est un LITTÉRAL
       // dans une position de classe : il est ici, à l'endroit qui peint.
-      className={`carte-flottante absolute right-0 ${sens === VERS_LE_HAUT ? 'bottom-full mb-2' : 'mt-2'} w-[340px] sm:w-[380px] max-h-[520px] flex flex-col z-50 overflow-hidden outline-none`}
+      className={`carte-flottante absolute right-0 ${sens === VERS_LE_HAUT ? 'bottom-full mb-2' : 'mt-2'} w-[340px] sm:w-[380px] max-h-[520px] flex flex-col z-50 overflow-hidden outline-hidden`}
       style={{ maxHeight: 'calc(100vh - 80px)' }}
     >
       {/* En-tête */}
-      <div className="flex items-center justify-between border-b border-stone-200 fond-sable px-4 py-3 flex-shrink-0">
+      <div className="flex items-center justify-between border-b border-stone-200 fond-sable px-4 py-3 shrink-0">
         <div className="flex items-center gap-2">
           <Icone nom="cloche" classe="w-5 h-5 text-orange-600" />
           <span className="font-semibold text-stone-800 text-sm">{t('notificationsTitle')}</span>
@@ -289,7 +289,7 @@ export default function NotificationPanel() {
                   aria-label={`${notif.title}: ${notif.body}`}
                 >
                   {/* Indicateur non-lu */}
-                  <div className="flex-shrink-0 mt-1">
+                  <div className="shrink-0 mt-1">
                     {!notif.is_read && (
                       <span className="block w-2 h-2 rounded-full bg-orange-500" aria-hidden="true" />
                     )}
@@ -303,7 +303,7 @@ export default function NotificationPanel() {
                       cercle blanc à ombre par ligne faisait quarante disques
                       flottants, et l'ombre d'un carreau de 36 px ne se voyait
                       pas assez pour porter quoi que ce soit. */}
-                  <div className="flex-shrink-0 w-9 h-9 rounded-[3px] border border-stone-200 bg-orange-50 flex items-center justify-center">
+                  <div className="shrink-0 w-9 h-9 rounded-[3px] border border-stone-200 bg-orange-50 flex items-center justify-center">
                     <TypeIcon type={notif.type} className="h-4 w-4 text-orange-700" />
                   </div>
 
@@ -330,7 +330,7 @@ export default function NotificationPanel() {
                   <button
                     onClick={(e) => { e.stopPropagation(); deleteNotification(notif.id); }}
                     aria-label={t('deleteNotification')}
-                    className="flex-shrink-0 inline-flex items-center justify-center w-11 h-11 -my-2 -mr-2 rounded-[3px] text-stone-400 hover:text-red-600 hover:bg-red-50 active:bg-red-100 transition-all focus:outline-none focus:ring-2 focus:ring-red-400 sm:w-9 sm:h-9 sm:-my-1 sm:-mr-1 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
+                    className="shrink-0 inline-flex items-center justify-center w-11 h-11 -my-2 -mr-2 rounded-[3px] text-stone-400 hover:text-red-600 hover:bg-red-50 active:bg-red-100 transition-all focus:outline-hidden focus:ring-2 focus:ring-red-400 sm:w-9 sm:h-9 sm:-my-1 sm:-mr-1 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
                   >
                     <Icone nom="croix" classe="w-5 h-5 sm:w-4 sm:h-4" />
                   </button>

@@ -27,7 +27,7 @@ export default function GoogleButton({ onClick, label, disabled = false }) {
       type="button"
       onClick={handleClick}
       disabled={disabled || loading}
-      className="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-gray-300 rounded-md bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 transition-colors"
+      className="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-gray-300 rounded-md bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 transition-colors"
     >
       {loading ? (
         <span className="inline-block h-4 w-4 border-2 border-orange-600 border-t-transparent rounded-full animate-spin" />

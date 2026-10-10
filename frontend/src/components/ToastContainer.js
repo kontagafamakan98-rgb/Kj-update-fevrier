@@ -26,7 +26,7 @@ import { Icone } from './chrome-icons';
  * même ordre.
  */
 const CLASSES_TOAST = {
-  base: 'flex items-center gap-3 p-4 rounded-lg shadow-lg backdrop-blur-sm transition-all duration-300 ease-in-out transform',
+  base: 'flex items-center gap-3 p-4 rounded-lg shadow-lg backdrop-blur-xs transition-all duration-300 ease-in-out transform',
   success: 'bg-green-50 border-l-4 border-green-500 text-green-800',
   error: 'bg-red-50 border-l-4 border-red-500 text-red-800',
   warning: 'bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800',
@@ -87,7 +87,7 @@ const ToastContainer = () => {
             animationDelay: `${index * 0.1}s`
           }}
         >
-          <div className="flex-shrink-0">
+          <div className="shrink-0">
             {getIcon(toast.type)}
           </div>
           
@@ -99,7 +99,7 @@ const ToastContainer = () => {
 
           <button
             onClick={() => removeToast(toast.id)}
-            className="flex-shrink-0 ml-2 text-gray-400 hover:text-gray-600 transition-colors"
+            className="shrink-0 ml-2 text-gray-400 hover:text-gray-600 transition-colors"
             aria-label={t('toastCloseAria')}
           >
             <Icone nom="fermer" classe="w-5 h-5" />

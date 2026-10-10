@@ -306,7 +306,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
           <div className="flex items-center mb-3">
             <Wallet className="h-6 w-6 mr-3 text-orange-500" aria-hidden="true" />
             <h3 className="text-lg font-semibold text-gray-900">{t('orangeMoney')}</h3>
-            <span className="ml-2 text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">
+            <span className="ml-2 text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-sm">
               {supportedOrangeMoneyCountries}
             </span>
           </div>
@@ -334,7 +334,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
           <div className="flex items-center mb-3">
             <Waves className="h-6 w-6 mr-3 text-blue-500" aria-hidden="true" />
             <h3 className="text-lg font-semibold text-gray-900">{t('wave')}</h3>
-            <span className={`ml-2 text-xs px-2 py-1 rounded ${isWaveUnavailable ? 'bg-gray-200 text-gray-600' : 'bg-blue-100 text-blue-800'}`}>
+            <span className={`ml-2 text-xs px-2 py-1 rounded-sm ${isWaveUnavailable ? 'bg-gray-200 text-gray-600' : 'bg-blue-100 text-blue-800'}`}>
               {t('availableAcrossWestAfrica')}
             </span>
           </div>
@@ -370,7 +370,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
           <div className="flex items-center mb-3">
             <Landmark className="h-6 w-6 mr-3 text-green-600" aria-hidden="true" />
             <h3 className="text-lg font-semibold text-gray-900">{t('bankAccount')}</h3>
-            <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+            <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded-sm">
               {t('forBankTransfers')}
             </span>
           </div>
@@ -478,7 +478,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
             <p className="text-red-500 text-sm mt-1">{validationErrors.bank_account}</p>
           )}
           
-          <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded text-xs text-green-800">
+          <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-sm text-xs text-green-800">
             <p className="flex items-start gap-1"><Lightbulb className="h-4 w-4 mt-0.5 shrink-0" aria-hidden="true" /><strong>{t('whyTheseInfo')}</strong></p>
             <p>• {t('bankRequiredFieldsInfo')}</p>
             <p>• {t('bankOptionalFieldsInfo')}</p>

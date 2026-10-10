@@ -305,7 +305,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow">
+      <div className="bg-white rounded-lg shadow-sm">
         <div className="carte-cotes py-4 border-b border-gray-200">
           <h2 className="text-lg font-medium text-gray-900">
             {user?.user_type === 'client' ? t('myRecentJobs') : t('availableJobs')}

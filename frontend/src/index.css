@@ -1,3 +1,59 @@
+@import "tailwindcss" source(none);
+@config "../tailwind.config.cjs";
+
+/* Sources scannées : le même périmètre que le `content` de v3. */
+@source "../index.html";
+@source "../src";
+
+/* v3 ne lisait que js/jsx/ts/tsx : les JSON (traductions, configuration) ne sont
+   pas des sources de classes. v4 scanne tout, donc on les exclut ici. */
+@source not "./i18n";
+@source not "./config/contact.json";
+@source not "./config/marque-kojo.json";
+@source not "./config/social-networks.json";
+
+/* Les deux pages de DIAGNOSTIC ne sont pas livrées en production : `App.js`
+   les importe derrière `import.meta.env.DEV`. Leurs classes ne doivent pas
+   peupler la feuille servie. */
+@source not "./pages/MobileTest.js";
+@source not "./components/MobilePhotoTest.js";
+
+/* Les NOMS QUE LE SITE A DÉCIDÉ DE NE PLUS GÉNÉRER (ex-`blocklist` de v3, qui n'existe
+   plus en v4). Ce sont de vrais utilitaires que la prose ou une variable font
+   détecter. `check-css-selecteurs-morts.js` lit CETTE liste, et refuse qu'un de
+   ces noms soit posé par le livré. */
+@source not inline("{container,visible,static,table,resize,blur,filter,transition,ease-out}");
+
+/* ── Tailwind v4 : défauts de v3 préservés (guide de migration, 10/10/2026) ──
+   `rounded-sm` valait 4 px en v3 (la config étend `borderRadius.sm`) ; en v4
+   son pendant est `rounded-xs`, qui vaudrait 2 px par défaut — on rétablit
+   l'échelle du site. Bordure par défaut en v3 = gris-200 (ici la gamme du
+   site), en v4 = currentColor ; le curseur des boutons et la marge des
+   `dialog` changent aussi. Ces défauts sont rétablis en couche `base`, donc
+   sous les utilitaires, comme en v3. */
+@theme {
+  --radius-xs: calc(var(--radius) - 4px);
+}
+
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    @apply border-gray-200;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  dialog {
+    margin: auto;
+  }
+}
+
 /* ══ CE QUI RESTE DES CINQ `kojo-pack-*.css` (28/09/2026) ═══════════════════
 
    Cinq feuilles importées ici portaient 292 lignes d'un système de design
@@ -87,9 +143,6 @@ button,
   }
 }
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
 /* ── LA POLICE DU SITE EST AUTO-HÉBERGÉE (26/09/2026) ──────────────────────
    La pile ci-dessous commençait par les polices DU SYSTÈME (`-apple-system`,

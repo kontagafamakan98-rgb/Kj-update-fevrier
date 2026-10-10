@@ -75,7 +75,7 @@ export default function TicketTracker() {
 
   return (
     // La carte à FILET du site, comme les deux cartes de /support qui la
-    // suivent : ce bloc était la dernière carte à ombre (`shadow-sm`) de la
+    // suivent : ce bloc était la dernière carte à ombre (`shadow-xs`) de la
     // page, et ses deux champs sont les seuls du site qui vivent HORS d'un
     // `<form>` — donc les seuls que le socle `form :is(input…)` ne dessine pas.
     // Ils portent maintenant le même rayon (0,5 rem) que ce socle, en clair.

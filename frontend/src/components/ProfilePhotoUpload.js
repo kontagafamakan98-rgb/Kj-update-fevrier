@@ -219,7 +219,7 @@ const ProfilePhotoUpload = ({
         <div className="space-y-4">
           {/* Aperçu de la photo */}
           <div className="flex items-start gap-4 rounded-[3px] border border-stone-200 fond-sable p-4">
-            <div className="flex-shrink-0">
+            <div className="shrink-0">
               <img
                 src={photoData.base64}
                 alt={t('preview')}

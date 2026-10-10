@@ -107,7 +107,7 @@ export default function CreateJob() {
 
   // Le dessin du champ (papier, filet, rayon) appartient à la feuille :
   // `form :is(input, select, textarea)` le pose. Seule la mesure se dit ici.
-  const inputClass = 'w-full px-4 py-3 outline-none';
+  const inputClass = 'w-full px-4 py-3 outline-hidden';
   const locationLabel = buildLocationLabel(formData.location);
   const mapUrl = buildMapEmbedUrl(formData.location);
 

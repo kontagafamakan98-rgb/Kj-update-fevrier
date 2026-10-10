@@ -203,7 +203,7 @@ export function CountrySelect({
         id={id}
         onClick={() => setIsOpen((prev) => !prev)}
         onKeyDown={handleTriggerKeyDown}
-        className="w-full flex items-center justify-between px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-left"
+        className="w-full flex items-center justify-between px-4 py-3 border border-gray-300 rounded-lg shadow-xs bg-white focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:border-transparent text-left"
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-required={required}
@@ -234,7 +234,7 @@ export function CountrySelect({
                 onKeyDown={handleSearchKeyDown}
                 placeholder={t('searchCountry')}
                 autoFocus
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               />
             </div>
           )}

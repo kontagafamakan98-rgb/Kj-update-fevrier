@@ -265,14 +265,14 @@ const PaymentVerificationPage = () => {
             </div>
 
             {geoLoading ? (
-              <div className="mb-4 p-3 bg-blue-100 border border-blue-300 rounded text-center">
+              <div className="mb-4 p-3 bg-blue-100 border border-blue-300 rounded-sm text-center">
                 <div className="flex items-center justify-center">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
                   <span className="text-sm text-blue-800">{pageT('geoDetecting')}</span>
                 </div>
               </div>
             ) : detectedCountry ? (
-              <div className="mb-4 p-3 bg-green-100 border border-green-300 rounded text-center">
+              <div className="mb-4 p-3 bg-green-100 border border-green-300 rounded-sm text-center">
                 <p className="text-sm text-green-800">
                   <MapPin className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" />
                   <span className="font-medium">{pageT('position')}:</span> <CountryDisplay countryCode={detectedCountry.code} className="inline-flex align-middle" />
@@ -280,7 +280,7 @@ const PaymentVerificationPage = () => {
                 <p className="text-xs text-green-600 mt-1">{pageT('examplesAdjusted')}</p>
               </div>
             ) : (
-              <div className="mb-4 p-3 bg-yellow-100 border border-yellow-300 rounded text-center">
+              <div className="mb-4 p-3 bg-yellow-100 border border-yellow-300 rounded-sm text-center">
                 <p className="text-xs text-yellow-700">
                   <MapPin className="inline h-3.5 w-3.5 mr-1 align-[-0.15em]" aria-hidden="true" />
                   {pageT('positionNotDetected')}
@@ -327,7 +327,7 @@ const PaymentVerificationPage = () => {
         )}
 
         {loading && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white p-6 rounded-lg shadow-lg text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto"></div>
               <div className="mt-4 text-gray-700 font-medium">{pageT('finalizing')}</div>

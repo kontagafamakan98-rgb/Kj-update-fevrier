@@ -71,7 +71,7 @@ export default function CountrySelector({ className = '' }) {
         disabled={saving}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        className="flex items-center space-x-2 px-3 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-60"
+        className="flex items-center space-x-2 px-3 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors focus:outline-hidden focus:ring-2 focus:ring-orange-500 disabled:opacity-60"
       >
         {saving ? (
           <span className="w-5 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin inline-block" />

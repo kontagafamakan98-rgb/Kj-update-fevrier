@@ -126,7 +126,7 @@ const NetworkStatus = ({ showDetails = false, className = '' }) => {
               {getNetworkMessage()}
             </p>
             {getNetworkTips() && (
-              <div className={`text-xs mt-2 ${getTextColor()} bg-white bg-opacity-50 rounded p-2`}>
+              <div className={`text-xs mt-2 ${getTextColor()} bg-white/50 rounded-sm p-2`}>
                 <strong>{t('activeOptimizations')} :</strong>
                 <pre className="whitespace-pre-wrap mt-1">{getNetworkTips()}</pre>
               </div>

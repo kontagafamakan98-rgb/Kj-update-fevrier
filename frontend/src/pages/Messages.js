@@ -188,7 +188,7 @@ export default function Messages() {
       <div className="carte-editoriale overflow-hidden h-[75vh] flex">
         {/* Liste des conversations : plein ecran sur mobile tant qu'aucune n'est ouverte,
             colonne fixe a partir de sm. */}
-        <div className={`w-full sm:w-[320px] sm:flex-shrink-0 border-r border-gray-100 flex-col ${activeConversation ? 'hidden sm:flex' : 'flex'}`}>
+        <div className={`w-full sm:w-[320px] sm:shrink-0 border-r border-gray-100 flex-col ${activeConversation ? 'hidden sm:flex' : 'flex'}`}>
           <div className="px-4 py-3 border-b border-gray-100">
             <span className="text-sm font-semibold text-gray-500 uppercase tracking-wide">{t('conversations')}</span>
           </div>
@@ -204,7 +204,7 @@ export default function Messages() {
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="h-11 w-11 flex-shrink-0 overflow-hidden rounded-full bg-gray-200 flex items-center justify-center">
+                    <div className="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-gray-200 flex items-center justify-center">
                       {conversation.other_user?.profile_photo ? (
                         <img src={conversation.other_user.profile_photo} alt={conversation.other_user_name} className="h-full w-full object-cover" />
                       ) : (
@@ -216,7 +216,7 @@ export default function Messages() {
                       <p className="text-xs text-gray-500 truncate">{stripJobMarkerFromMessage(conversation.last_message)}</p>
                     </div>
                     {Number(conversation.unread_count || 0) > 0 && (
-                      <span className="flex-shrink-0 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded bg-orange-600 text-white text-xs font-bold">
+                      <span className="shrink-0 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-sm bg-orange-600 text-white text-xs font-bold">
                         {conversation.unread_count}
                       </span>
                     )}
@@ -246,7 +246,7 @@ export default function Messages() {
                 >
                   <ArrowLeft size={20} />
                 </button>
-                <div className="h-9 w-9 flex-shrink-0 overflow-hidden rounded-full bg-gray-200 flex items-center justify-center">
+                <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-gray-200 flex items-center justify-center">
                   {activeConversationData?.other_user?.profile_photo ? (
                     <img src={activeConversationData.other_user.profile_photo} alt={getOtherPersonName()} className="h-full w-full object-cover" />
                   ) : (
@@ -320,13 +320,13 @@ export default function Messages() {
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     placeholder={pageT('placeholder')}
-                    className="flex-1 rounded-lg border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    className="flex-1 rounded-lg border border-gray-200 px-4 py-2.5 text-sm focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   />
                   <button
                     aria-label={pageT('sendMessageAria')}
                     type="submit"
                     disabled={!newMessage.trim()}
-                    className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-50"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-50"
                   >
                     <Send size={17} />
                   </button>

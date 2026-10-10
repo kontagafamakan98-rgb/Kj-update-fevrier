@@ -202,7 +202,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // que le HTML pré-rendu n'ait pas deux boutons morts avant l'hydratation.
     // MESURÉ le 07/10/2026 : c'est exactement ce `<div>` que rendait
     // `document.elementFromPoint` au centre des deux boutons.
-    `<div class="absolute inset-0 bg-black bg-opacity-5 pointer-events-none"></div>`,
+    `<div class="absolute inset-0 bg-black/5 pointer-events-none"></div>`,
     `<div class="${heroGrilleClass}">`,
     `<div class="${heroCopieClass}">`,
     `<span class="${heroKickerClass} mb-6">`,
@@ -284,7 +284,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
         // depuis toujours). Un crawler qui ne lit pas le JavaScript atteint
         // donc les offres de chaque pays sans passer par l'accueil React.
         `<a href="/jobs?country=${esc(country.code)}" class="${rubanJetonClass}">` +
-        svgDuDrapeau(drapeau, classeDuDrapeau('h-4 w-6 rounded-sm')) +
+        svgDuDrapeau(drapeau, classeDuDrapeau('h-4 w-6 rounded-xs')) +
         `${esc(country.name)}` +
         `</a>`
       )

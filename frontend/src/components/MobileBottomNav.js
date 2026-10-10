@@ -182,12 +182,12 @@ export default function MobileBottomNav() {
   // dans une case de 76,8 px.
   const caseDeNav =
     'flex min-h-[72px] flex-col items-center justify-center rounded-2xl px-1 py-2 text-[11px] font-medium transition-colors';
-  const caseDeCloche = `${caseDeNav} w-full text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500`;
+  const caseDeCloche = `${caseDeNav} w-full text-gray-500 focus:outline-hidden focus:ring-2 focus:ring-orange-500`;
 
   return (
     <div
       data-mobile-bottom-nav="true"
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85 pb-[max(env(safe-area-inset-bottom),0.5rem)] md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white/95 backdrop-blur-sm supports-[backdrop-filter]:bg-white/85 pb-[max(env(safe-area-inset-bottom),0.5rem)] md:hidden"
     >
       <div className={`grid ${user ? 'grid-cols-5' : 'grid-cols-4'} gap-1 px-2 pt-2`}>
         {navItems.map((item) => {

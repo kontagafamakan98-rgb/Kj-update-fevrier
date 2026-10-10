@@ -169,7 +169,7 @@ export const CLASSES_PROPRES_AUX_COQUILLES = [
   },
   {
     publiee:
-      'w-full flex items-center justify-between px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-white text-left',
+      'w-full flex items-center justify-between px-4 py-3 border border-gray-300 rounded-lg shadow-xs bg-white text-left',
     module: 'vite-plugins/prerender/shells-routes.js',
     motif:
       "sélecteur de pays de l'aperçu : React publie un composant à état (ouverture, sélection), la coquille une barre inerte",
@@ -186,7 +186,7 @@ export const CLASSES_PROPRES_AUX_COQUILLES = [
     motif: "chevron du sélecteur d'aperçu (rotation à l'ouverture, état React)",
   },
   {
-    publiee: 'block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm',
+    publiee: 'block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-xs',
     module: 'vite-plugins/prerender/shells-routes.js',
     motif:
       "champ d'aperçu de /register (plusieurs occurrences : nom, e-mail, mot de passe) — React peint chaque champ avec ses utilitaires d'état",
@@ -208,7 +208,7 @@ export const CLASSES_PROPRES_AUX_COQUILLES = [
     motif: "boîte du même emplacement différé (le cadre en pointillés de l'uploader)",
   },
   {
-    publiee: 'mt-1 h-4 w-4 rounded border-gray-300 text-orange-600',
+    publiee: 'mt-1 h-4 w-4 rounded-sm border-gray-300 text-orange-600',
     module: 'vite-plugins/prerender/shells-routes.js',
     motif: "case à cocher de l'aperçu (les utilitaires de formulaire de React ne sont pas écrits en clair)",
   },
@@ -219,7 +219,7 @@ export const CLASSES_PROPRES_AUX_COQUILLES = [
     motif: "bouton d'envoi de l'aperçu de /register (même raison que celui de /login, avec son pas propre)",
   },
   {
-    publiee: 'bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center',
+    publiee: 'bg-white rounded-2xl shadow-xs border border-gray-200 p-8 text-center',
     module: 'vite-plugins/prerender/shells-routes.js',
     motif:
       "carte du message d'état vide (un état que React atteint par sa logique, jamais au premier rendu)",

@@ -712,11 +712,11 @@ export const PAGE_SECTIONS = {
     formClass: 'mt-8 space-y-6',
     champsClass: 'space-y-4',
     labelClass: 'block text-sm font-medium text-gray-700',
-    champClass: 'mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm',
+    champClass: 'mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-hidden focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm',
     ligneMotDePasseClass: 'flex items-center justify-between',
     lienMotDePasseClass: 'text-sm font-medium text-orange-600 hover:text-orange-500',
-    champMotDePasseClass: 'appearance-none relative block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm',
-    boutonClass: 'group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50',
+    champMotDePasseClass: 'appearance-none relative block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-hidden focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm',
+    boutonClass: 'group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50',
     encadreLegalClass: 'rounded-lg border border-orange-200 bg-orange-50 p-4 space-y-2',
     legalNoticeClass: 'text-sm font-semibold text-orange-900',
     legalLienClass: 'inline-flex items-center text-sm font-medium text-orange-700 hover:text-orange-800 underline',
@@ -854,7 +854,7 @@ export const PAGE_SECTIONS = {
     etapeAttenteClass: 'text-stone-500',
     formClass: 'space-y-5',
     labelClass: 'block text-sm font-medium text-gray-700',
-    champClass: 'mt-1 block w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-orange-500',
+    champClass: 'mt-1 block w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-hidden focus:ring-orange-500',
     aideClass: 'text-xs text-gray-500',
     boutonClass: 'relative w-full rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-700',
     retourClass: 'text-center',
@@ -931,7 +931,7 @@ export const PAGE_SECTIONS = {
     suiviTitreClass: 'titre-entree mb-1',
     suiviSousTitreClass: 'text-sm text-stone-500 mb-4',
     suiviRangeeClass: 'flex flex-col sm:flex-row gap-2',
-    suiviChampClass: 'flex-1 rounded-lg border border-stone-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500',
+    suiviChampClass: 'flex-1 rounded-lg border border-stone-300 px-4 py-2.5 text-sm focus:outline-hidden focus:ring-2 focus:ring-orange-500',
     suiviBoutonClass: 'rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-black disabled:opacity-50',
     // La carte de contact publie le titre du mode « contact direct » — même
     // texte, donc même clé (elle était écrite deux fois dans le dictionnaire).
@@ -951,7 +951,7 @@ export const PAGE_SECTIONS = {
     // ── Le vocabulaire éditorial de la page, déclaré UNE fois ──────────────
     // Les deux cartes de choix, la carte de contact et les quatre lignes de
     // contact lisent ces cinq chaînes. Le 28/09/2026, elles portaient encore
-    // une ombre (`shadow-sm`), un coin `rounded-2xl` et une pastille de teinte
+    // une ombre (`shadow-xs`), un coin `rounded-2xl` et une pastille de teinte
     // EMPRUNTÉE (`bg-blue-100` pour le courriel, `bg-emerald-100` pour le
     // téléphone) : c'étaient les deux seules teintes du site qui
     // n'appartenaient à personne. La pastille ronde, elle, prend le sable et

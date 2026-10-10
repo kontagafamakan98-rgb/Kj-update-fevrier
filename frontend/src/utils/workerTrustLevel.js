@@ -65,7 +65,7 @@ export const WorkerTrustBadge = ({ person, className = '' }) => {
   const label = t(level.key);
   return (
     <span
-      className={`inline-flex items-center rounded border px-2 py-0.5 text-[11px] font-semibold ${level.badgeClass} ${className}`}
+      className={`inline-flex items-center rounded-sm border px-2 py-0.5 text-[11px] font-semibold ${level.badgeClass} ${className}`}
       title={t('trustLevelTitle').replace('{level}', label)}
     >
       {label}
@@ -78,7 +78,7 @@ export const VerifiedBadge = ({ verified, className = '' }) => {
   if (!verified) return null;
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded border border-orange-200 bg-orange-50 px-2 py-0.5 text-[11px] font-semibold text-orange-700 ${className}`}
+      className={`inline-flex items-center gap-1 rounded-sm border border-orange-200 bg-orange-50 px-2 py-0.5 text-[11px] font-semibold text-orange-700 ${className}`}
       title={t('verifiedBadgeTitle')}
     >
       {/* Le repère du badge est DESSINÉ (`check`) : c'était un caractère `✓`,

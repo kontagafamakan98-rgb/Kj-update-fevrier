@@ -58,7 +58,7 @@ export default function NotificationBell({
   const { t } = useLanguage();
 
   const habillage = buttonClassName
-    || 'relative p-2 rounded-[3px] text-stone-700 hover:text-orange-700 hover:bg-orange-50 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors';
+    || 'relative p-2 rounded-[3px] text-stone-700 hover:text-orange-700 hover:bg-orange-50 focus:outline-hidden focus:ring-2 focus:ring-orange-500 transition-colors';
 
   return (
     <div ref={conteneurRef} className={`relative ${className}`}>

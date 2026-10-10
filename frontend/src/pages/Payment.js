@@ -256,7 +256,7 @@ const Payment = () => {
   return (
     <div className={pagePlan.frameClass}>
       <div className={pagePlan.corpsClass}>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-2xl shadow-xs border border-gray-200 p-6">
           <h1 className={pagePlan.titleClass}>{t(pagePlan.titleKey)}</h1>
           <p className="text-gray-600">{t(pagePlan.subtitleKey)}</p>
           {jobPaymentContext && (
@@ -332,7 +332,7 @@ const Payment = () => {
                     setCheckoutError('');
                     setForm((prev) => ({ ...prev, amount: Number(e.target.value) || 0 }));
                   }}
-                  className={`mt-2 w-full rounded-xl border ${form.amount > 0 && form.amount < 200 ? 'border-red-400 ring-1 ring-red-400' : 'border-gray-300'} px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500 ${jobPaymentContext?.amount ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                  className={`mt-2 w-full rounded-xl border ${form.amount > 0 && form.amount < 200 ? 'border-red-400 ring-1 ring-red-400' : 'border-gray-300'} px-4 py-3 focus:outline-hidden focus:ring-2 focus:ring-orange-500 ${jobPaymentContext?.amount ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 />
                 {form.amount > 0 && form.amount < 200 && (
                   <p className="mt-1 text-sm text-red-600">
@@ -349,7 +349,7 @@ const Payment = () => {
                   autoComplete="off"
                   value={form.country}
                   onChange={(e) => setForm((prev) => ({ ...prev, country: e.target.value }))}
-                  className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                 >
                   {PAYABLE_COUNTRIES.map((value) => (
                     <option key={value} value={value}>{t(value)}</option>
@@ -365,7 +365,7 @@ const Payment = () => {
                   autoComplete="off"
                   value={form.method}
                   onChange={(e) => setForm((prev) => ({ ...prev, method: e.target.value }))}
-                  className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                 >
                   {Object.entries(PAYMENT_METHOD_KEYS).map(([value, key]) => (
                     <option key={value} value={value}>{t(key)}</option>

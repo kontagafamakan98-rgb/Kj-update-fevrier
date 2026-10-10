@@ -451,7 +451,7 @@ export default function Register() {
                 <span className="text-xs text-blue-700">{t('detectingLocation')}</span>
               </div>
             ) : detectedCountry ? (
-              <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded text-center">
+              <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded-sm text-center">
                 <p className="text-sm text-green-800">
                   <span className="font-medium"><MapPin className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {pageT('positionDetected')}:</span> <CountryDisplay countryCode={detectedCountry.code} className="inline-flex align-middle" />
                 </p>
@@ -460,7 +460,7 @@ export default function Register() {
                 </p>
               </div>
             ) : (
-              <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-center">
+              <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded-sm text-center">
                 <p className="text-xs text-yellow-700">
                   <MapPin className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {pageT('positionNotDetected')}
                 </p>
@@ -621,13 +621,13 @@ export default function Register() {
                 <label htmlFor="country" className="block text-sm font-medium text-gray-700">
                   {t('country')}
                   {detectedCountry && (
-                    <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                    <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded-sm">
                       <MapPin className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {t('detectedAutomatically')}
                     </span>
                   )}
                 </label>
                 {activeCountry && (
-                  <span className={`inline-flex items-center gap-2 px-3 py-1 rounded border text-xs font-medium whitespace-nowrap ${
+                  <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-sm border text-xs font-medium whitespace-nowrap ${
                     detectedCountry ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-700'
                   }`}>
                     <CountryDisplay countryCode={activeCountry.code} className="inline-flex align-middle" />
@@ -664,7 +664,7 @@ export default function Register() {
                   type="text"
                   autoComplete="given-name"
                   required
-                  className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                   placeholder={`${t('firstName')}...`}
                   value={formData.first_name}
                   onChange={handleChange}
@@ -681,7 +681,7 @@ export default function Register() {
                   type="text"
                   autoComplete="family-name"
                   required
-                  className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                   placeholder={`${t('lastName')}...`}
                   value={formData.last_name}
                   onChange={handleChange}
@@ -699,7 +699,7 @@ export default function Register() {
                 type="email"
                 autoComplete="email"
                 required
-                className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                 placeholder={pageT('emailPlaceholder')}
                 value={formData.email}
                 onChange={handleChange}
@@ -724,7 +724,7 @@ export default function Register() {
               <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
                 {t('phone')}
               </label>
-              <div className="flex rounded-lg shadow-sm">
+              <div className="flex rounded-lg shadow-xs">
                 <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
                   {activePhonePrefix || PHONE_PREFIX_FALLBACK}
                 </span>
@@ -734,7 +734,7 @@ export default function Register() {
                   type="tel"
                   autoComplete="tel"
                   required
-                  className="flex-1 block w-full px-4 py-3 border border-gray-300 rounded-r-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  className="flex-1 block w-full px-4 py-3 border border-gray-300 rounded-r-lg focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                   placeholder={activePhoneExample}
                   value={stripPhonePrefix(formData.phone, activePhonePrefix)}
                   onChange={(e) => {
@@ -760,7 +760,7 @@ export default function Register() {
                 type="password"
                 autoComplete="new-password"
                 required
-                className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                 placeholder={t('passwordMasked')}
                 value={formData.password}
                 onChange={handleChange}
@@ -778,7 +778,7 @@ export default function Register() {
                 type="password"
                 autoComplete="new-password"
                 required
-                className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                 placeholder={t('passwordMasked')}
                 value={formData.confirmPassword}
                 onChange={handleChange}
@@ -800,7 +800,7 @@ export default function Register() {
                   type="text"
                   autoComplete="off"
                   maxLength="40"
-                  className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                   placeholder={pageT('referralCodePlaceholder')}
                   value={formData.referral_code || ''}
                   onChange={handleChange}
@@ -857,7 +857,7 @@ export default function Register() {
                 type="checkbox"
                 checked={formData.legal_documents_accepted}
                 onChange={handleChange}
-                className="mt-1 h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                className="mt-1 h-4 w-4 rounded-sm border-gray-300 text-orange-600 focus:ring-orange-500"
               />
               <span className="text-sm text-gray-700">{pageT('legalConsentLabel')}</span>
             </label>
@@ -868,7 +868,7 @@ export default function Register() {
             <LoadingButton
               type="submit"
               loading={loading}
-              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-orange-600 hover:bg-orange-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {pageT('continueButton')}
             </LoadingButton>

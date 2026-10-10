@@ -61,7 +61,6 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { createRequire } from 'node:module';
 import postcss from 'postcss';
 import {
   MIN_FICHIERS_CORPUS,
@@ -78,12 +77,20 @@ import {
 } from './css-selecteurs-morts.js';
 
 // Les noms que le site a DÉCIDÉ de ne plus générer vivent dans le propriétaire de
-// la configuration de Tailwind — pas dans une copie tenue ici, qui divergerait.
-// `tailwind.config.cjs` est en CommonJS (le paquet `frontend` est en ESM) : on le
-// charge par `createRequire`, ce qui évite d'ajouter une seconde source de
-// vérité.
-const require = createRequire(import.meta.url);
-const CONFIG_TAILWIND = require('../tailwind.config.cjs');
+// la configuration de Tailwind v4 — pas dans une copie tenue ici, qui divergerait :
+// la directive `@source not inline("{…}")` de `src/index.css`. Elle remplace la
+// `blocklist` de v3, que v4 ne lit plus.
+const FEUILLE_TAILWIND = new URL('../src/index.css', import.meta.url);
+
+/** Les noms de `@source not inline("{…}")`. Refuse de conclure si la directive manque. */
+function lireNomsNonGeneres() {
+  const css = fs.readFileSync(FEUILLE_TAILWIND, 'utf8');
+  const trouve = css.match(/@source not inline\("\{([^}"]*)\}"\);/);
+  if (!trouve) {
+    throw new Error('@source not inline("{…}") introuvable dans src/index.css : la liste des noms non générés n\'est plus lisible');
+  }
+  return trouve[1].split(',').map((nom) => nom.trim()).filter(Boolean);
+}
 
 const valeur = (nom, defaut) => {
   const index = process.argv.indexOf(`--${nom}`);
@@ -187,7 +194,7 @@ function main() {
   // `blocklist` retire un nom de la feuille servie. Le revers de cette décision
   // est mesuré ici : un nom bloqué mais POSÉ par le livré est une classe dont la
   // règle n'existe plus — l'autre moitié du même mensonge que ce garde combat.
-  const nomsNonGeneres = Array.isArray(CONFIG_TAILWIND.blocklist) ? CONFIG_TAILWIND.blocklist : [];
+  const nomsNonGeneres = lireNomsNonGeneres();
   const nomsNonGeneresPoses = nomsNonGeneres.filter((nom) => nomPose(nom, corpus.jetons, corpus.texte));
 
   console.log(

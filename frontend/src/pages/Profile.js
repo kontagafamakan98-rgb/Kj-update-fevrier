@@ -419,7 +419,7 @@ export default function Profile() {
                 value={deleteConfirm}
                 onChange={(e) => setDeleteConfirm(e.target.value)}
                 placeholder={t('deleteAccountConfirmHint') || 'Tapez SUPPRIMER pour confirmer'}
-                className="w-full max-w-sm rounded-lg border border-red-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 mb-3"
+                className="w-full max-w-sm rounded-lg border border-red-300 px-4 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-red-400 mb-3"
               />
             )}
             <button
@@ -582,7 +582,7 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {success && <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative">{success}</div>}
+      {success && <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-sm relative">{success}</div>}
 
       <div className="mb-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">{pageT('photoTitle')}</h3>
@@ -598,12 +598,12 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label htmlFor="first_name" className="block text-sm font-medium text-gray-700">{pageT('firstName')}</label>
-          <input type="text" id="first_name" name="first_name" autoComplete="given-name" value={formData.first_name} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
+          <input type="text" id="first_name" name="first_name" autoComplete="given-name" value={formData.first_name} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-orange-500 focus:border-orange-500" />
         </div>
 
         <div>
           <label htmlFor="last_name" className="block text-sm font-medium text-gray-700">{pageT('lastName')}</label>
-          <input type="text" id="last_name" name="last_name" autoComplete="family-name" value={formData.last_name} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
+          <input type="text" id="last_name" name="last_name" autoComplete="family-name" value={formData.last_name} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-orange-500 focus:border-orange-500" />
         </div>
 
         <div>
@@ -623,7 +623,7 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
                 updateFormData('phone', `${prefix} ${e.target.value.replace(/[^\d\s]/g, '')}`);
               }}
               placeholder={pageT('phonePlaceholder')}
-              className="flex-1 block w-full px-3 py-2 border border-gray-300 rounded-r-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
+              className="flex-1 block w-full px-3 py-2 border border-gray-300 rounded-r-md shadow-xs focus:outline-hidden focus:ring-orange-500 focus:border-orange-500"
             />
           </div>
           <p className="mt-1 text-sm text-gray-500">{t('phoneFormat')}: {getPhonePrefixByCountry(formData.country.toLowerCase())} {PHONE_NUMBER_MASK}</p>
@@ -631,7 +631,7 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
 
         <div>
           <label htmlFor="preferred_language" className="block text-sm font-medium text-gray-700">{t('preferredLanguage')}</label>
-          <select id="preferred_language" name="preferred_language" autoComplete="off" value={formData.preferred_language} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500">
+          <select id="preferred_language" name="preferred_language" autoComplete="off" value={formData.preferred_language} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-orange-500 focus:border-orange-500">
             {getAvailableLanguagesForCountry(formData.country).map(lang => (
               <option key={lang} value={lang}>{getLanguageLabel(lang, t)}</option>
             ))}
@@ -657,7 +657,7 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
           <h3 className="text-lg font-medium text-gray-900">{pageT('professionalInfo')}</h3>
           <div>
             <label htmlFor="bio" className="block text-sm font-medium text-gray-700">{pageT('bio')}</label>
-            <textarea id="bio" name="bio" autoComplete="off" rows={4} value={formData.bio} onChange={handleChange} placeholder={pageT('bioPlaceholder')} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
+            <textarea id="bio" name="bio" autoComplete="off" rows={4} value={formData.bio} onChange={handleChange} placeholder={pageT('bioPlaceholder')} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-orange-500 focus:border-orange-500" />
             <p className="mt-1 text-sm text-gray-500">{pageT('bioHelp')}</p>
           </div>
 
@@ -762,16 +762,16 @@ function WorkerProfileCreate({ onCreate, pageT }) {
 
         <div>
           <label htmlFor="experience_years" className="block text-sm font-medium text-gray-700">{pageT('yearsExperience')}</label>
-          <input type="number" id="experience_years" name="experience_years" autoComplete="off" min="0" required value={formData.experience_years} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
+          <input type="number" id="experience_years" name="experience_years" autoComplete="off" min="0" required value={formData.experience_years} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-orange-500 focus:border-orange-500" />
         </div>
 
         <div>
           <label htmlFor="description" className="block text-sm font-medium text-gray-700">{pageT('descriptionOptional')}</label>
-          <textarea id="description" name="description" autoComplete="off" rows={3} value={formData.description} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={pageT('descriptionPlaceholder')} />
+          <textarea id="description" name="description" autoComplete="off" rows={3} value={formData.description} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-orange-500 focus:border-orange-500" placeholder={pageT('descriptionPlaceholder')} />
         </div>
 
         <div className="flex items-center">
-          <input type="checkbox" id="availability" name="availability" autoComplete="off" checked={formData.availability} onChange={handleChange} className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded" />
+          <input type="checkbox" id="availability" name="availability" autoComplete="off" checked={formData.availability} onChange={handleChange} className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded-sm" />
           <label htmlFor="availability" className="ml-2 text-sm text-gray-700">{pageT('availableForProjects')}</label>
         </div>
 
@@ -1000,7 +1000,7 @@ function FilleulsCard({ filleuls, t }) {
       <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
         <Users className="h-4 w-4 mr-2" aria-hidden="true" />
         {t('filleulsTitle')}
-        <span className="ml-2 rounded bg-orange-100 text-orange-700 px-2 py-0.5 text-xs font-semibold">
+        <span className="ml-2 rounded-sm bg-orange-100 text-orange-700 px-2 py-0.5 text-xs font-semibold">
           {filleuls.length}
         </span>
       </h3>

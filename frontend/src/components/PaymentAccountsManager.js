@@ -254,9 +254,9 @@ const PaymentAccountsManager = ({ onSuccess }) => {
     return (
       <div className="bg-white rounded-lg shadow-md p-6">
         <div className="animate-pulse">
-          <div className="h-4 bg-gray-200 rounded w-1/4 mb-4"></div>
-          <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
-          <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+          <div className="h-4 bg-gray-200 rounded-sm w-1/4 mb-4"></div>
+          <div className="h-4 bg-gray-200 rounded-sm w-full mb-2"></div>
+          <div className="h-4 bg-gray-200 rounded-sm w-3/4"></div>
         </div>
       </div>
     );
@@ -329,7 +329,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                 value={accounts.orange_money}
                 onChange={(e) => setAccounts({...accounts, orange_money: e.target.value})}
                 placeholder={`${t('examplePrefix')} ${phoneExample}`}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                className={`w-full px-3 py-2 border rounded-md focus:outline-hidden focus:ring-2 focus:ring-orange-500 ${
                   validationErrors.orange_money ? 'border-red-500' : 'border-gray-300'
                 }`}
               />
@@ -375,7 +375,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                 value={accounts.wave}
                 onChange={(e) => setAccounts({...accounts, wave: e.target.value})}
                 placeholder={`${t('examplePrefix')} ${phoneExample}`}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                className={`w-full px-3 py-2 border rounded-md focus:outline-hidden focus:ring-2 focus:ring-blue-500 ${
                   validationErrors.wave ? 'border-red-500' : 'border-gray-300'
                 }`}
               />
@@ -423,7 +423,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                     bank_account: {...accounts.bank_account, account_number: e.target.value}
                   })}
                   placeholder="123456789012"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-2 focus:ring-gray-500"
                 />
               </div>
               
@@ -440,7 +440,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                     ...accounts, 
                     bank_account: {...accounts.bank_account, bank_name: e.target.value}
                   })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-2 focus:ring-gray-500"
                 >
                   <option value="">{t('selectBank')}</option>
                   {popularBanks.map((bank, index) => (
@@ -465,7 +465,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                     bank_account: {...accounts.bank_account, account_holder: e.target.value}
                   })}
                   placeholder={t('fullHolderName')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-2 focus:ring-gray-500"
                 />
               </div>
               
@@ -485,7 +485,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                       bank_account: {...accounts.bank_account, bank_code: e.target.value}
                     })}
                     placeholder={t('bankCodeOptional')}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-2 focus:ring-gray-500"
                   />
                 </div>
                 
@@ -504,7 +504,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                       bank_account: {...accounts.bank_account, branch: e.target.value}
                     })}
                     placeholder={t('branchLabel')}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-2 focus:ring-gray-500"
                   />
                 </div>
               </div>

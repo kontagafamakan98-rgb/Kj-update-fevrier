@@ -269,7 +269,7 @@ export default function Jobs() {
             </button>
           </div>
           {user?.user_type === 'client' && (
-            <button onClick={() => setShowCreateModal(true)} className="rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white shadow-sm transition-colors hover:bg-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2">
+            <button onClick={() => setShowCreateModal(true)} className="rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white shadow-xs transition-colors hover:bg-orange-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2">
               {jobUi.createJob}
             </button>
           )}
@@ -366,7 +366,7 @@ export default function Jobs() {
               // `type="search"` allume le clavier de recherche sur mobile ;
               // WebKit y ajoute AUSSI sa propre croix d'effacement, qui ferait
               // doublon avec celle ci-dessus — elle est donc masquée.
-              className="w-full rounded-lg border border-stone-200 py-3 pl-11 pr-11 outline-none transition-colors focus:border-orange-500 focus:ring-2 focus:ring-orange-100 [&::-webkit-search-cancel-button]:hidden"
+              className="w-full rounded-lg border border-stone-200 py-3 pl-11 pr-11 outline-hidden transition-colors focus:border-orange-500 focus:ring-2 focus:ring-orange-100 [&::-webkit-search-cancel-button]:hidden"
             />
             {Boolean(filters.search) && (
               <button
@@ -385,7 +385,7 @@ export default function Jobs() {
             <select
               value={filters.status}
               onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
-              className="rounded-lg border border-stone-200 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100 sm:w-56"
+              className="rounded-lg border border-stone-200 px-4 py-3 outline-hidden focus:border-orange-500 focus:ring-2 focus:ring-orange-100 sm:w-56"
             >
               {statuses.map((status) => (
                 <option key={status.value} value={status.value}>{status.label}</option>
@@ -471,7 +471,7 @@ export default function Jobs() {
               onChange={(e) => setRadiusKm(e.target.value)}
               aria-label={t('nearMe')}
               placeholder={t('radiusKmPlaceholder')}
-              className="w-32 rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+              className="w-32 rounded-lg border border-stone-200 px-3 py-2 text-sm outline-hidden focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
             />
             {/* ACTION SECONDAIRE, ET ELLE LE DIT : « utiliser ma position »
                 n'est pas ce qu'on vient faire sur cette page — c'est un

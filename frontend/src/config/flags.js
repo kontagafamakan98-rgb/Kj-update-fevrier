@@ -141,7 +141,7 @@ export function viewBoxDuDrapeau(nom) {
  * la sonde de classes calculées a trouvé que la coquille publiait la taille seule,
  * et que chaque drapeau gagnait son ombre au montage de React.
  */
-export const CADRE_DU_DRAPEAU = 'rounded shadow-sm';
+export const CADRE_DU_DRAPEAU = 'rounded-sm shadow-xs';
 
 /** La classe complète d'un drapeau : sa taille, puis le cadre partagé. */
 export function classeDuDrapeau(taille) {

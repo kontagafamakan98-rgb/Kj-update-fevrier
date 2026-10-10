@@ -65,14 +65,14 @@ function ProposalCard({ proposal, isSelected, isAccepted, onOpenDiscussion, onAc
   const workerPerson = proposal?.worker || proposal?.worker_profile || proposal;
 
   return (
-    // Le `shadow-sm` est retiré mais la CARTE à filet ne peut pas être posée ici :
+    // Le `shadow-xs` est retiré mais la CARTE à filet ne peut pas être posée ici :
     // ses deux états (sélectionné / non) se distinguent par `border-orange-300`
     // et `bg-orange-50/40`, deux utilitaires que `.carte-editoriale` ÉCRASERAIT
     // (une feuille non posée dans une couche l'emporte sur les utilitaires).
     <div className={`rounded-lg border p-4 ${isSelected ? 'border-orange-300 bg-orange-50/40' : 'border-gray-100 bg-white'}`}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-full bg-gray-200 flex items-center justify-center">
+          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gray-200 flex items-center justify-center">
             {workerPhoto ? (
               <img src={workerPhoto} alt={workerName} className="h-full w-full object-cover" />
             ) : (
@@ -712,7 +712,7 @@ export default function JobDetails() {
             {job.shared_location?.maps_url && (
               <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3">
                 <span className="text-sm text-orange-800"><MapPin className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {t('sharedPositionText')}</span>
-                <a href={job.shared_location.maps_url} target="_blank" rel="noreferrer" className="flex-shrink-0 text-sm font-semibold text-orange-700 underline underline-offset-2">
+                <a href={job.shared_location.maps_url} target="_blank" rel="noreferrer" className="shrink-0 text-sm font-semibold text-orange-700 underline underline-offset-2">
                   {t('viewOnMap')}
                 </a>
               </div>
@@ -844,7 +844,7 @@ export default function JobDetails() {
                   rows="4"
                   value={messageDraft}
                   onChange={(event) => setMessageDraft(event.target.value)}
-                  className="w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 outline-hidden focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
                   placeholder={pageT('writeMessagePlaceholder')}
                 />
                 <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">

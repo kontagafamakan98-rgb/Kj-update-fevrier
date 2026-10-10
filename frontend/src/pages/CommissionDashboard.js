@@ -320,7 +320,7 @@ function AccountCard({ title, icone, editing, primaryLabel, secondaryLabel, prim
           {editing ? (
             <input id={primaryName} name={primaryName} type="text" autoComplete="off" value={primaryValue} onChange={(e) => onPrimaryChange(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500" placeholder={primaryPlaceholder} />
           ) : (
-            <p className="font-mono text-sm bg-gray-50 p-2 rounded">{primaryValue || notConfigured}</p>
+            <p className="font-mono text-sm bg-gray-50 p-2 rounded-sm">{primaryValue || notConfigured}</p>
           )}
         </div>
         <div>
@@ -328,7 +328,7 @@ function AccountCard({ title, icone, editing, primaryLabel, secondaryLabel, prim
           {editing ? (
             <input id={secondaryName} name={secondaryName} type="text" autoComplete="off" value={secondaryValue} onChange={(e) => onSecondaryChange(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500" placeholder={secondaryPlaceholder} />
           ) : (
-            <p className="text-sm bg-gray-50 p-2 rounded">{secondaryValue || notConfigured}</p>
+            <p className="text-sm bg-gray-50 p-2 rounded-sm">{secondaryValue || notConfigured}</p>
           )}
         </div>
       </div>

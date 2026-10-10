@@ -134,7 +134,7 @@ export default function Navbar() {
             <Link
               to="/"
               aria-label="Kojo"
-              className="flex-shrink-0 flex items-center"
+              className="shrink-0 flex items-center"
               onClick={closeMobileMenu}
             >
               <MarqueKojo emplacement="barre" />
@@ -221,7 +221,7 @@ export default function Navbar() {
               aria-label={isMobileMenuOpen ? t('closeMenu') : t('openMenu')}
               aria-expanded={isMobileMenuOpen}
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="min-h-[44px] min-w-[44px] text-gray-700 hover:text-orange-600 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+              className="min-h-[44px] min-w-[44px] text-gray-700 hover:text-orange-600 p-2 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-orange-500"
             >
               {/* Le dessin vient du registre du chrome : c'est lui qui porte les
                   jointures, les bouts et `aria-hidden`. Deux tracés écrits ici

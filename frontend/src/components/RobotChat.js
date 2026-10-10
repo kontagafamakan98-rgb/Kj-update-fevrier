@@ -119,7 +119,7 @@ export default function RobotChat({ onBack }) {
 
   if (submitted) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-xs p-8 text-center">
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
           <CheckCircle size={28} />
         </div>
@@ -139,7 +139,7 @@ export default function RobotChat({ onBack }) {
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-xs p-6">
       <div className="flex items-center gap-2 mb-5">
         <button onClick={onBack} className="text-gray-400 hover:text-gray-600" aria-label={t('supportBack')}>
           <ArrowLeft size={18} />
@@ -188,7 +188,7 @@ export default function RobotChat({ onBack }) {
             onChange={(e) => setInputValue(e.target.value)}
             placeholder={currentStep.placeholder}
             rows={3}
-            className="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+            className="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm focus:outline-hidden focus:ring-2 focus:ring-orange-500"
           />
         ) : (
           <input
@@ -197,13 +197,13 @@ export default function RobotChat({ onBack }) {
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') handleNext(); }}
             placeholder={currentStep.placeholder}
-            className="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+            className="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm focus:outline-hidden focus:ring-2 focus:ring-orange-500"
           />
         )}
         <button
           onClick={handleNext}
           disabled={submitting}
-          className="flex h-[46px] w-[46px] flex-shrink-0 items-center justify-center rounded-xl bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-60"
+          className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-xl bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-60"
           aria-label="Send"
         >
           <Send size={18} />

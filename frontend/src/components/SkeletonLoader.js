@@ -111,7 +111,7 @@ export const ProfileCardSkeleton = () => {
 export const MessageSkeleton = () => {
   return (
     <div className="flex items-start space-x-3 p-4 hover:bg-stone-50">
-      <Skeleton className="h-12 w-12 rounded-full flex-shrink-0" />
+      <Skeleton className="h-12 w-12 rounded-full shrink-0" />
       <div className="flex-1 space-y-2">
         <div className="flex items-center justify-between">
           <Skeleton className="h-4 w-32" />
@@ -713,7 +713,7 @@ export const MessagesSkeleton = () => {
 
       <div className="carte-editoriale overflow-hidden h-[75vh] flex">
         {/* Colonne des conversations (pleine largeur sur mobile) */}
-        <div className="w-full sm:w-[320px] sm:flex-shrink-0 border-r border-gray-100 flex flex-col">
+        <div className="w-full sm:w-[320px] sm:shrink-0 border-r border-gray-100 flex flex-col">
           <div className="px-4 py-3 border-b border-gray-100">
             <Skeleton className="h-4 w-28" />
           </div>

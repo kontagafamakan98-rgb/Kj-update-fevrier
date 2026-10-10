@@ -27,7 +27,7 @@ export default function FlagIcon({ country, className = 'w-12 h-8' }) {
 
   if (!nom) {
     return (
-      <div className={`${className} bg-gray-200 rounded flex items-center justify-center`}>
+      <div className={`${className} bg-gray-200 rounded-sm flex items-center justify-center`}>
         <Flag className="h-4 w-4 text-gray-400" aria-hidden="true" />
       </div>
     );
