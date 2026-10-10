@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 import kojo_job_effects as effets
+from kojo_business_events import enregistrer_evenement
 from kojo_core import db, get_current_user
 from kojo_models import (
     Job, JobProposal, JobStatus, Message, NotificationType, ProposalCreate, User, UserType,
@@ -190,6 +191,13 @@ async def accept_job_proposal(
     await db.job_proposals.update_one(
         {**identifiant_query(proposal_id)},
         {"$set": {"status": "accepted"}}
+    )
+    await enregistrer_evenement(
+        "proposal_accepted",
+        f"proposal_accepted:{proposal_id}",
+        user_id=current_user.id,
+        job_id=job_id,
+        proposal_id=proposal_id,
     )
     # Rejeter les AUTRES propositions du même job. La négation se fait sur `_id`,
     # la seule clé unique par construction : la règle d'identifiant accepte

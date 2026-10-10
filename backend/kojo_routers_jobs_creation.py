@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import ValidationError
 
 import kojo_job_effects as effets
+from kojo_business_events import enregistrer_evenement
 from kojo_core import db, get_current_user
 from kojo_job_categories import _CATEGORY_GROUPS, _normalize_job_category
 from kojo_models import Job, JobCreate, NotificationType, User, UserType
@@ -225,6 +226,9 @@ async def create_job(
             raise HTTPException(status_code=500, detail="Failed to create job")
 
         logger.info(f"✅ Job created successfully: {job.id} by user {current_user.id}")
+        await enregistrer_evenement(
+            "mission_created", f"mission_created:{job.id}", user_id=current_user.id, job_id=job.id
+        )
 
         # Alertes push de matching (fire-and-forget : ne bloque jamais la réponse)
         try:

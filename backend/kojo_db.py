@@ -107,6 +107,12 @@ async def create_database_indexes():
         await db.job_proposals.create_index("job_id")
         await db.job_proposals.create_index("worker_id")
         await db.job_proposals.create_index([("job_id", 1), ("worker_id", 1)])
+
+        # Journal des événements métier (kojo_business_events) : `cle` unique
+        # absorbe une écriture répétée d'un même jalon.
+        await db.business_events.create_index("cle", unique=True)
+        await db.business_events.create_index("job_id")
+        await db.business_events.create_index("user_id")
         
         # Messages collection indexes
         # NOTE: les index précédents portaient sur "job_id" et "created_at",

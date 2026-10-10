@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 
 import kojo_job_effects as effets
+from kojo_business_events import enregistrer_evenement
 from kojo_core import db, get_current_user
 from kojo_models import Job, JobStatus, Message, NotificationType, User
 from kojo_payments import (
@@ -25,6 +26,14 @@ from kojo_settings import (
 from kojo_identifiants import dump_stable, identifiant_query, identifiant_job_query
 
 router = APIRouter()
+
+async def _marquer_terminee(job_id: str, client_id: str) -> None:
+    """Clôt la mission et journalise sa fin. Idempotent : clé `mission_completed:<job_id>`."""
+    await db.jobs.update_one({**identifiant_job_query(job_id)}, {"$set": {"status": JobStatus.COMPLETED.value}})
+    await enregistrer_evenement(
+        "mission_completed", f"mission_completed:{job_id}", user_id=client_id, job_id=job_id
+    )
+
 
 async def _maybe_award_first_job_referral_reward(worker_id: str, job_id: str, job_title: str) -> None:
     """Crédite la récompense de parrainage quand le filleul termine sa PREMIÈRE
@@ -162,7 +171,7 @@ async def complete_job_and_release_payment(
     current_payout_status = payment_record.get("payout_status") or "held"
     if current_payout_status == "released":
         # Deja verse : on se contente de cloturer le job si ce n'est pas fait
-        await db.jobs.update_one({**identifiant_job_query(job_id)}, {"$set": {"status": JobStatus.COMPLETED.value}})
+        await _marquer_terminee(job_id, job.get("client_id"))
         await _maybe_award_first_job_referral_reward(worker_id, job_id, job.get("title", ""))
         updated_job = await db.jobs.find_one({**identifiant_job_query(job_id)})
         return {"message": "Mission déjà clôturée et paiement déjà versé", "job": dump_stable(Job, updated_job), "payout_status": "released"}
@@ -199,7 +208,7 @@ async def complete_job_and_release_payment(
             {**identifiant_query(payment_record["id"])},
             effets.maj_sequestre("release_failed", {"payout_failure_reason": reason, "updated_at": datetime.now(timezone.utc).isoformat()})
         )
-        await db.jobs.update_one({**identifiant_job_query(job_id)}, {"$set": {"status": JobStatus.COMPLETED.value}})
+        await _marquer_terminee(job_id, job.get("client_id"))
         await _maybe_award_first_job_referral_reward(worker_id, job_id, job.get("title", ""))
 
     if not payout_method or not payout_phone:
@@ -295,7 +304,7 @@ async def complete_job_and_release_payment(
 
         await db.payments.update_one({**identifiant_query(payment_record["id"])}, effets.maj_sequestre(final_payout_status))
 
-    await db.jobs.update_one({**identifiant_job_query(job_id)}, {"$set": {"status": JobStatus.COMPLETED.value}})
+    await _marquer_terminee(job_id, job.get("client_id"))
     await _maybe_award_first_job_referral_reward(worker_id, job_id, job.get("title", ""))
 
     # Notifier le travailleur et confirmer au client via le chat (canal
