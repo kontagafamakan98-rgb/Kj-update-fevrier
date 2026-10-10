@@ -1,12 +1,13 @@
 name: SEO production probe (daily)
 
-# ─── Pourquoi une sonde PÉRIODIQUE en plus de l'étape de ci.yml ──────────────
-# L'étape de `ci.yml` lit la production en mode INFORMATIF : elle publie un
-# `::notice` par intégration absente et ne fait jamais échouer le job. C'est
-# précisément ce qui a laissé F9 ouvert — des intégrations (GA4, meta Search
-# Console, liens sociaux, domaines GA de la CSP) absentes de la production, la
-# CI verte, et AUCUN run rouge nulle part. Un rapport que personne ne lit et qui
-# ne peut pas échouer n'est pas une vérification.
+# ─── Pourquoi cette sonde est la SEULE lecture de la production ──────────────
+# Elle remplace l'étape informative de `ci.yml` (job `lighthouse-ci`), RETIRÉE le
+# 10/10/2026 : cette étape publiait un `::notice` par intégration absente et ne
+# faisait jamais échouer le job. C'est précisément ce qui a laissé F9 ouvert —
+# des intégrations (GA4, meta Search Console, liens sociaux, domaines GA de la
+# CSP) absentes de la production, la CI verte, et AUCUN run rouge nulle part. Un
+# rapport que personne ne lit et qui ne peut pas échouer n'est pas une
+# vérification.
 #
 # Cette sonde-ci est STRICTE (`--strict`) : une intégration absente, ou une
 # sonde qui ne peut pas conclure, fait échouer le run. Elle tourne une fois par
