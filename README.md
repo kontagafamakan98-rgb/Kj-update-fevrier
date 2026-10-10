@@ -48,7 +48,7 @@ backend/
 ├── kojo_payments.py       # Intégration PayDunya (factures, statuts, décaissements)
 ├── kojo_routers_*.py      # Endpoints HTTP par domaine (auth, users, jobs,
 │                          #   messages, payments, notifications, geo, owner, support)
-└── tests/                 # 69 tests pytest
+└── tests/                 # suite pytest (compte exact : pytest --collect-only -q)
 ```
 
 ### Frontend
@@ -94,6 +94,14 @@ cd frontend && npm test
   passent SPF, DKIM et DMARC — verdicts lus sur un message réellement reçu, pas
   supposés depuis le DNS (`backend/DEPLOY_FLYIO.md`).
 - Guide pas à pas complet : `backend/DEPLOY_FLYIO.md`.
+- L'ancien hébergement Render (`kojo-backend-03az`) a été **retiré** ; ne pas le réutiliser.
+- Start command : `uvicorn server:app --host 0.0.0.0 --port $PORT` (via le
+  Dockerfile — cf. `backend/Dockerfile`).
+- Les secrets (JWT_SECRET, EMAIL_OTP_SECRET, clés PayDunya…) se configurent
+  dans les **variables d'environnement Fly** (`flyctl secrets set`).
+- Garde-fou au démarrage : tout import manquant dans un module découpé
+  (`kojo_*`) crashe le boot. Vérification par l'étape pyflakes de la CI
+  (« undefined name » → build rouge).
 
 | Variable | Obligatoire ? | Notes |
 |---|---|---|
@@ -127,19 +135,6 @@ cd frontend && npm test
   pour surveiller la mémoire via `flyctl ssh console`, lire `/proc/meminfo`
   et `/proc/<pid>/status` (le console `-C` exécute sans shell — envelopper
   dans `sh -c` pour les globs/pipes).
-
-### Backend — Fly.io (hébergement actuel)
-
-- Le backend est déployé sur **Fly.io** (`kojo-backend` — voir `backend/fly.toml`
-  et la section « Déploiement » ci-dessus). L'ancien hébergement Render
-  (`kojo-backend-03az`) a été **retiré** ; ne pas le réutiliser.
-- Start command : `uvicorn server:app --host 0.0.0.0 --port $PORT` (via le
-  Dockerfile — cf. `backend/Dockerfile`).
-- Les secrets (JWT_SECRET, EMAIL_OTP_SECRET, clés PayDunya…) se configurent
-  dans les **variables d'environnement Fly** (`flyctl secrets set`).
-- Garde-fou au démarrage : tout import manquant dans un module découpé
-  (`kojo_*`) crashe le boot. Vérification par l'étape pyflakes de la CI
-  (« undefined name » → build rouge).
 
 ### Frontend — Vercel
 

@@ -233,7 +233,7 @@ def routes_declarees(nom_module: str) -> set:
     routes = set()
     for variable in porteurs().get(nom_module, []):
         routeur_ = getattr(module, variable, None)
-        for route in getattr(routeur_, "routes", []) or []:
+        for route in _aplatir(getattr(routeur_, "routes", []) or []):
             if (getattr(route.endpoint, "__module__", "") or "") != nom_module:
                 continue
             for methode in getattr(route, "methods", None) or []:
@@ -244,11 +244,34 @@ def routes_declarees(nom_module: str) -> set:
 # ── La surface réellement montée, découpée en familles ────────────────────────
 
 
+def _aplatir(routes) -> list:
+    """Les APIRoute d'une liste de routes FastAPI, à plat, dans l'ordre.
+
+    FastAPI 0.143 ne recopie plus les routes d'un routeur inclus dans
+    `app.routes` : il les garde derrière une entrée `_IncludedRouter`, résolue
+    à la demande par `effective_route_contexts()` — qui donne le chemin COMPLET
+    monté et l'endpoint de chaque route. Lire `app.routes` sans cette étape ne
+    voyait que les 7 routes déclarées directement sur l'application sur 103 :
+    la surface paraissait réduite à une famille et le contrat ne mesurait plus
+    rien (c'est le minimum de familles de `test_route_surface` qui l'a révélé).
+
+    Détection par duck-typing (et non par import d'un symbole privé de FastAPI) :
+    une version qui n'a pas la méthode garde son comportement d'avant.
+    """
+    a_plat = []
+    for route in routes:
+        if hasattr(route, "effective_route_contexts"):
+            a_plat.extend(route.effective_route_contexts())
+        elif isinstance(route, APIRoute):
+            a_plat.append(route)
+    return a_plat
+
+
 def _routes_de_l_application() -> list:
-    """Les APIRoute de `server.app`, dans l'ordre d'enregistrement."""
+    """Les routes de `server.app`, à plat, dans l'ordre d'enregistrement."""
     from server import app
 
-    return [route for route in app.routes if isinstance(route, APIRoute)]
+    return _aplatir(app.routes)
 
 
 def _decrire(route) -> dict:

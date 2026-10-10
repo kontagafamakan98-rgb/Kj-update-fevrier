@@ -440,6 +440,11 @@ class FakeDbDuplicateKey(ValueError):
     refusés ici comme en production.
     """
 
+    # Même code que pymongo (`WriteError.code` d'un E11000) : le code qui décide
+    # de la prise d'un bail (kojo_scheduler.acquerir_bail) est le même en test
+    # et en production.
+    code = 11000
+
 
 # Opérateurs de requête et d'écriture que cette FakeDB APPLIQUE. Ce qui n'est
 # pas ici lève, au lieu d'être ignoré (voir FakeDbUnsupportedOperator).

@@ -144,15 +144,35 @@ def noms_mentionnes() -> set[str]:
     return mentions
 
 
+_ADRESSE_MEMOIRE = re.compile(r" object at 0x[0-9a-fA-F]+")
+# FastAPI rend un même `Depends(HTTPBearer)` tantôt sous sa forme courte, tantôt
+# sous sa forme détaillée `Depends(dependency=<fastapi.….HTTPBearer>, use_cache=True,
+# scope=None)` : le rendu varie d'un processus à l'autre. On ramène les deux au
+# même nom court, sans quoi la référence serait instable.
+_DEPENDS = re.compile(r"Depends\((?:dependency=)?<?([\w.]+)[^)]*\)")
+
+
+def _signature(valeur) -> str:
+    """La signature telle qu'un importeur la lit, SANS l'adresse mémoire ni
+    le rendu variable de `Depends`.
+
+    L'adresse change à chaque processus ; la forme de `Depends` change d'une
+    version ou d'un appel à l'autre. Noms, annotations et défauts restent
+    comparés tels quels.
+    """
+    brut = _ADRESSE_MEMOIRE.sub("", str(inspect.signature(valeur)))
+    return _DEPENDS.sub(lambda m: "Depends(%s)" % m.group(1).split(".")[-1], brut)
+
+
 def nature(valeur) -> dict:
     """Nature + signature d'un nom, telles qu'un importeur les voit."""
     if inspect.iscoroutinefunction(valeur):
-        return {"nature": "coroutine", "signature": str(inspect.signature(valeur))}
+        return {"nature": "coroutine", "signature": _signature(valeur)}
     if inspect.isfunction(valeur):
-        return {"nature": "fonction", "signature": str(inspect.signature(valeur))}
+        return {"nature": "fonction", "signature": _signature(valeur)}
     if inspect.isclass(valeur):
         try:
-            return {"nature": "classe", "signature": str(inspect.signature(valeur))}
+            return {"nature": "classe", "signature": _signature(valeur)}
         except (TypeError, ValueError):
             return {"nature": "classe", "signature": "(classe sans signature lisible)"}
     if inspect.ismodule(valeur):
