@@ -1940,7 +1940,9 @@ jobs:
   #   • les dépendances de PRODUCTION du frontend (celles qu'un visiteur
   #     télécharge) SONT un gate : 0 avis au 20/09/2026, donc exiger « aucun
   #     avis haut/critique » ne relève pas un seuil, il constate un état ;
-  #   • les dépendances de DÉVELOPPEMENT (frontend) et les paquets Python ne le
+  #   • les dépendances de DÉVELOPPEMENT (frontend) SONT un gate depuis le
+  #     10/10/2026 : l'audit complet (dev incluses) relève 0 avis après la
+  #     migration Tailwind 4 et les overrides LHCI. Les paquets Python ne le
   #     sont pas ENCORE : pip-audit rapporte des avis réels au 20/09/2026
   #     (starlette, pillow, pytest, black — versions épinglées du dépôt), et les
   #     corriger est une mise à jour de dépendances avec ses propres risques de
@@ -1962,9 +1964,9 @@ jobs:
 
       # Depuis le LOCKFILE : aucun `npm ci` n'est nécessaire pour interroger le
       # registre, et le job reste à quelques secondes.
-      - name: Avis sur les dépendances de production (frontend) — BLOQUANT
+      - name: Avis sur les dépendances frontend, dev incluses — BLOQUANT
         working-directory: frontend
-        run: npm audit --omit=dev --audit-level=high
+        run: npm audit --audit-level=high
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
