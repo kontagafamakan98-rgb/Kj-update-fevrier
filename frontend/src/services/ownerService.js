@@ -62,6 +62,17 @@ class OwnerService {
     }
   }
 
+  /** @returns {Promise<object>} Journal métier d'une mission (propriétaire uniquement). */
+  async getMissionBusinessEvents(jobId) {
+    try {
+      const data = await api.get(`/owner/missions/${encodeURIComponent(jobId)}/evenements`);
+      return data;
+    } catch (error) {
+      safeLog.error('❌ Erreur journal de mission:', error);
+      throw this._translateOwnerError(error, `Erreur serveur: ${error?.response?.status || 'inconnu'}`);
+    }
+  }
+
   /** @returns {Promise<object>} Infos de debug (propriétaire uniquement). */
   async getDebugInfo() {
     try {

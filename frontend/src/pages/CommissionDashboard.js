@@ -7,6 +7,7 @@ import { useToast } from '../contexts/ToastContext';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/commissionDashboard';
 import { devLog, safeLog } from '../utils/env';
 import { Banknote, BarChart3, Hash, CalendarDays, Ban, Briefcase, Wallet, Waves, CreditCard } from 'lucide-react';
+import OwnerMissionEvents from '../components/OwnerMissionEvents';
 
 const CommissionDashboard = () => {
   const { user } = useAuth();
@@ -238,6 +239,8 @@ const CommissionDashboard = () => {
             />
           </div>
         </div>
+
+        <OwnerMissionEvents />
 
         <div className="carte-editoriale p-6">
           <div className="flex justify-between items-center mb-6 gap-4 flex-wrap">
