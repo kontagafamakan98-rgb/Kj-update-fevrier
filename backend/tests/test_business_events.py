@@ -128,3 +128,64 @@ def test_fin_de_mission_passe_par_un_seul_helper_qui_journalise():
     ecritures_brutes = re.findall(r'"\$set": \{"status": JobStatus\.COMPLETED\.value\}', source)
     assert len(ecritures_brutes) == 1, "seule la définition de _marquer_terminee écrit le statut"
     assert source.count('await _marquer_terminee(job_id, job.get("client_id"))') == 3
+
+
+# ── Vue propriétaire : journal d'une mission (GET /owner/missions/{id}/evenements) ──
+
+from datetime import datetime, timedelta, timezone  # noqa: E402
+from unittest.mock import patch  # noqa: E402
+
+from tests.conftest import BASE_USER, db_insert, register_and_login  # noqa: E402
+
+
+def _evenement(job_id: str, type_evenement: str, decalage_min: int, **extra) -> dict:
+    instant = datetime(2026, 10, 1, tzinfo=timezone.utc) + timedelta(minutes=decalage_min)
+    return {
+        "id": f"evt-{job_id}-{type_evenement}",
+        "type": type_evenement,
+        "cle": f"{type_evenement}:{job_id}",
+        "user_id": extra.pop("user_id", "client-1"),
+        "job_id": job_id,
+        "proposal_id": None,
+        "payment_id": None,
+        "created_at": instant.isoformat(),
+        "secret_fournisseur": "ne-doit-pas-sortir",
+        **extra,
+    }
+
+
+@pytest.mark.asyncio
+async def test_owner_voit_le_journal_d_une_mission_dans_l_ordre(client):
+    owner = await register_and_login(client, BASE_USER)
+    headers = {"Authorization": f"Bearer {owner['access_token']}"}
+
+    # Deux événements pour la mission visée, insérés dans le désordre, et un pour une autre mission.
+    await db_insert("business_events", _evenement("job-vue", "proposal_accepted", 20))
+    await db_insert("business_events", _evenement("job-vue", "mission_created", 0))
+    await db_insert("business_events", _evenement("job-autre", "mission_created", 5))
+
+    with patch("kojo_owner.OWNER_EMAIL", owner["user"]["email"]), \
+         patch("kojo_owner.OWNER_USER_ID", owner["user"]["id"]):
+        resp = await client.get("/api/owner/missions/job-vue/evenements", headers=headers)
+
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["job_id"] == "job-vue"
+    assert data["count"] == 2
+    # Ordre chronologique, et seulement les événements de cette mission.
+    assert [e["type"] for e in data["evenements"]] == ["mission_created", "proposal_accepted"]
+    # Allowlist : aucun champ hors du journal, pas de _id Mongo.
+    for evenement in data["evenements"]:
+        assert set(evenement) == CHAMPS_ATTENDUS
+        assert evenement["job_id"] == "job-vue"
+
+
+@pytest.mark.asyncio
+async def test_non_owner_ne_lit_pas_le_journal(client):
+    user = await register_and_login(client, BASE_USER)
+    headers = {"Authorization": f"Bearer {user['access_token']}"}
+    await db_insert("business_events", _evenement("job-prive", "mission_created", 0))
+
+    resp = await client.get("/api/owner/missions/job-prive/evenements", headers=headers)
+
+    assert resp.status_code == 403, resp.text

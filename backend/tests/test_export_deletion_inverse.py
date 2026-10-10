@@ -81,6 +81,9 @@ SORTS = {
     ("notifications", "user_id"): EFFACE,
     ("support_tickets", "user_id"): EFFACE,
     ("push_tokens", "user_id"): EFFACE,
+    # Journal des jalons : il décrit missions et paiements, conservés pour la
+    # comptabilité. Le lien au compte suit celui du job (`jobs.client_id`).
+    ("business_events", "user_id"): CONSERVE,
     ("email_otps", USER_DATA_BY_EMAIL_FIELD): CONSERVE,
 }
 
@@ -203,6 +206,9 @@ def _documents_a_semer(user_id: str, email: str):
          {"id": "ticket-1", "user_id": user_id, "message": "Question"}),
         (("push_tokens", "user_id"), "push_tokens",
          {"id": "jeton-1", "user_id": user_id, "push_token": "jeton-de-test"}),
+        (("business_events", "user_id"), "business_events",
+         {"id": "evenement-1", "user_id": user_id, "type": "mission_created",
+          "cle": "mission_created:job-1", "job_id": "job-1"}),
         (("email_otps", USER_DATA_BY_EMAIL_FIELD), "email_otps",
          {"id": "code-1", "email": email, "otp_hash": "condense"}),
     ]
