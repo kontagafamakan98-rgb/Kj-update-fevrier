@@ -422,6 +422,12 @@ async def get_mission_business_events(job_id: str, owner_user = Depends(verify_o
     PROPRIÉTAIRE UNIQUEMENT, lecture seule. Ce sont les quatre jalons de
     `kojo_business_events` : mission créée, proposition acceptée, paiement
     confirmé, mission terminée. Une mission sans événement renvoie une liste vide.
+
+    Returns:
+        Dict à trois clés : `job_id` (mission demandée), `count` (nombre de jalons
+        rendus) et `evenements` (liste des jalons, du plus ancien au plus récent),
+        chaque entrée réduite à l'allowlist des champs publiés — jamais le
+        document brut.
     """
     evenements = await db.business_events.find(
         {"job_id": job_id}, {"_id": 0}

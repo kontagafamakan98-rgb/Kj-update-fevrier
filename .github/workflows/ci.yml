@@ -1964,10 +1964,12 @@ jobs:
             echo "Pip-audit a échoué sans verdict de tableau (voir les lignes en erreur du log)." >> "$GITHUB_STEP_SUMMARY"
             echo "::error title=pip-audit sans verdict::$(tail -n 3 /tmp/pip-audit.txt | tr '\n' ' ')"
           else
-            echo "Avis CONSTATÉS (bloquant) :" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            printf '%s\n' "$LIGNES" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            {
+              echo "Avis CONSTATÉS (bloquant) :"
+              echo '```'
+              printf '%s\n' "$LIGNES"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
             printf '%s\n' "$LIGNES" | while read -r paquet version avis corrige; do
               echo "::error title=Avis Python::$paquet $version — $avis (corrigé en $corrige)"
             done
