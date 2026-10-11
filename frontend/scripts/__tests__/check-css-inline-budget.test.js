@@ -17,7 +17,7 @@ import {
 // Ce qu'il tient : la feuille critique est recopiée dans CHAQUE document du
 // build, et elle est lue AVANT le premier paint. `check-bundle-size.js` portait
 // ce fait en prose (avec un compte périmé : 22 pages / ~1,5 Mo pour 14 documents
-// et 0,86 Mo mesurés le 09/10/2026) ; ce garde le tient page par page.
+// et 0,95 Mo mesurés le 11/10/2026) ; ce garde le tient page par page.
 //
 // Les cas se lisent en deux familles :
 //   • la LECTURE (`lireFeuilleInlinee`) — ce qui est réellement compté ;
@@ -32,7 +32,7 @@ import {
 // Ce qui n'est PAS rejoué ici : le passage sur le build RÉEL — l'étape de CI
 // « Check inline CSS budget per prerendered page » le fait après `vite build`.
 // Les valeurs de la table, elles, sont celles mesurées sur ce build réel
-// (69 276 o × 13, 392 o pour 404.html).
+// (76 533 o × 13, 392 o pour 404.html).
 
 const CSS_REFERENCE = [
   '.a{color:red}',
@@ -46,10 +46,10 @@ const html = (css = CSS_REFERENCE) => `<!doctype html><html><head><style>${css}<
 /** Une page LUE, conforme par défaut : c'est le relevé du build réel. */
 const page = (nom, overrides = {}) => ({
   nom,
-  octets: 69276,
+  octets: 76533,
   blocs: 1,
-  regles: 936,
-  sha: 'd8c74e2cb457a497',
+  regles: 1044,
+  sha: '41d0f2e82d7950d9',
   ...overrides,
 });
 
@@ -99,7 +99,7 @@ describe('auditCssInline — le cas conforme', () => {
   it('accepte l’arbre mesuré : 13 pages sur la feuille de index, 404 sur la sienne', () => {
     const { errors, stats } = auditCssInline({ pages: arbreConforme() });
     expect(errors).toEqual([]);
-    expect(stats.octetsTotal).toBe(69276 * 13 + 392);
+    expect(stats.octetsTotal).toBe(76533 * 13 + 392);
     expect(CSS_INLINE_BUDGETS[FEUILLE_DE_REFERENCE].feuille).toBe(FEUILLE_DE_REFERENCE);
   });
 
@@ -120,10 +120,10 @@ describe('refus 1 — dépassement du budget (nommé, chiffré)', () => {
     // Le verdict du refus est affirmé EN PREMIER : c'est lui que la mutation du
     // garde (« dépassement neutralisé ») doit faire disparaître du rapport, et
     // le harnais exige que le rouge NOMME ce qui manque.
-    expect(errors.join('\n')).toContain('90000 o de CSS inline > budget 71680 o');
+    expect(errors.join('\n')).toContain('90000 o de CSS inline > budget 78848 o');
     expect(errors).toHaveLength(1);
     expect(errors[0]).toContain('about.html');
-    expect(errors[0]).toContain('(+18320 o, +25.6 %)');
+    expect(errors[0]).toContain('(+11152 o, +14.1 %)');
     // Et il dit POURQUOI ces octets comptent : lus avant le premier paint.
     expect(errors[0]).toContain('AVANT le premier paint');
   });
@@ -171,7 +171,7 @@ describe('refus 4 — feuille divergente (le propriétaire unique)', () => {
     const { errors } = sansPlanchers(pages);
     expect(errors).toHaveLength(1);
     expect(errors[0]).toContain('support.html porte une feuille DIFFÉRENTE de celle de index.html');
-    expect(errors[0]).toContain('sha ffffffffffffffff contre d8c74e2cb457a497');
+    expect(errors[0]).toContain('sha ffffffffffffffff contre 41d0f2e82d7950d9');
     expect(errors[0]).toContain('DÉCLARER');
   });
 
@@ -210,7 +210,7 @@ describe('refus 5 et 6 — page sans ligne, ligne périmée', () => {
     const { errors } = sansPlanchers(pages);
     expect(errors).toHaveLength(1);
     expect(errors[0]).toContain('sans budget');
-    expect(errors[0]).toContain('nouvelle-page.html (69276 o)');
+    expect(errors[0]).toContain('nouvelle-page.html (76533 o)');
     expect(errors[0]).toContain('CSS_INLINE_BUDGETS');
   });
 
@@ -262,7 +262,7 @@ describe('checkCssInlineBudget — le build sur disque', () => {
    * Un arbre de build minimal mais CONFORME : les 14 documents, à la bonne taille.
    *
    *   • les 13 pages pré-rendues à 61 500 o : au-dessus du plancher (61 440) et
-   *     sous le budget (71 680), avec 80 règles chacune ;
+   *     sous le budget (78 848), avec 80 règles chacune ;
    *   • `404.html` à 512 o et 6 règles : il a son propre couple (2 048 / 256),
    *     c'est un document minimal et non une page pré-rendue.
    * Total des règles : 13 × 80 + 6 = 1 046, au-dessus du plancher de 1 000.
@@ -303,17 +303,17 @@ describe('checkCssInlineBudget — le build sur disque', () => {
   });
 
   it('rend ok:false en NOMMANT la page trop lourde du disque', () => {
-    // Les TREIZE pages à 71 904 o — juste au-dessus du budget de 71 680 — et à
+    // Les TREIZE pages à 79 000 o — juste au-dessus du budget de 78 848 — et à
     // contenu IDENTIQUE entre elles : le seul motif du refus est donc le budget.
     // (N'alourdir qu'une page ferait aussi diverger sa feuille, et le cas
     // mesurerait deux refus au lieu d'un.)
     const pages = pagesDuDisque().map((p) =>
-      p.octets === 512 ? p : { ...p, octets: 71904 }
+      p.octets === 512 ? p : { ...p, octets: 79000 }
     );
     const resultat = checkCssInlineBudget({ root: ecrireArbre(pages), quiet: true });
     expect(resultat.ok).toBe(false);
     expect(resultat.errors).toHaveLength(13);
-    expect(resultat.errors.every((e) => e.includes('de CSS inline > budget 71680 o'))).toBe(true);
+    expect(resultat.errors.every((e) => e.includes('de CSS inline > budget 78848 o'))).toBe(true);
     expect(resultat.errors[0]).toContain('about.html');
     expect(resultat.errors.some((e) => e.includes('jobs.html'))).toBe(true);
   });

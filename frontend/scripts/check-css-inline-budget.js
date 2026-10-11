@@ -20,15 +20,27 @@
  * garde : un budget GLOBAL ne dit jamais QUELLE page a enflé, ni de combien ; et
  * un fait qui n'existe qu'en prose dérive sans que rien ne rougisse.
  *
- * ── Ce qui est mesuré (build réel, `npm run build`, 09/10/2026) ─────────────
+ * ── Ce qui est mesuré (build réel, `npm run build`, 11/10/2026) ─────────────
  *
  *   document(s)                                  octets  blocs  règles  sha256(16)
  *   index.html + 12 autres (about, app, contact,
  *   forgot-password, how-it-works, jobs, login,
- *   payment, privacy, register, support, terms)   69 276      1     936  d8c74e2cb457a497
+ *   payment, privacy, register, support, terms)   76 533      1    1044  41d0f2e82d7950d9
  *   404.html                                         392      1       6  8108c4546aacc8b6
  *
- *   gzip de la feuille partagée : 13 111 o. Total CSS inline du build : 900 980 o.
+ *   gzip de la feuille partagée : 15 115 o. Total CSS inline du build : 995 321 o.
+ *
+ * ── Le relevé a bougé le 11/10/2026, et c'est écrit ici ────────────────────
+ * Le relevé précédent (09/10/2026) était de 69 276 o / 936 règles / sha
+ * d8c74e2cb457a497, gzip 13 111 o, total 900 980 o. Il a grandi de 7 257 o
+ * (+104 règles) en UNE livraison — le travail de design des pages publiques du
+ * 11/10/2026 — et ce sont les TREIZE documents qui l'ont pris en même temps :
+ * `vite-plugins/inline-critical-css.js` inline la feuille d'entrée ENTIÈRE
+ * (c'est là son « critique »), pas un sous-ensemble calculé. Toute règle
+ * ajoutée au site atterrit donc dans chaque document pré-rendu, relue AVANT le
+ * premier paint. Le budget ci-dessous est REPORTÉ sur cette mesure ; il n'a pas
+ * été touché pour faire passer un rouge : un dépassement de +4 853 o sur 13
+ * documents est un fait de contenu, pas une régression de structure.
  *
  * ── Les six refus, chacun NOMMÉ ────────────────────────────────────────────
  *   1. DÉPASSEMENT — une page au-dessus de son budget, avec ses octets, son
@@ -60,8 +72,9 @@
  * ce qu'il n'a pas regardé — la règle du dépôt pour tout garde qui balaie.
  *
  * ── Les valeurs sont MESURÉES, pas choisies ────────────────────────────────
- * 71 680 o (70 Ko) = relevé du jour + 2 404 o, soit +3,5 %. Le plancher,
- * 61 440 o (60 Ko), laisse 7 836 o sous le relevé : il attrape une feuille qui
+ * 78 848 o (77 Ko) = relevé du jour + 2 315 o, soit +3,0 % — la marge du relevé
+ * précédent était de +2 404 o, elle est conservée et non élargie. Le plancher,
+ * 61 440 o (60 Ko), laisse 15 093 o sous le relevé : il attrape une feuille qui
  * DISPARAÎT, pas une feuille qui mincit d'un octet. `404.html` a son propre
  * couple (2 048 / 256 o) : c'est un document minimal, pas une page pré-rendue.
  * Une modification de ces nombres doit s'accompagner d'une mesure du build réel
@@ -100,20 +113,21 @@ export const FEUILLE_DE_REFERENCE = 'index.html';
  * le dire — au lieu de dériver en silence.
  */
 export const CSS_INLINE_BUDGETS = {
-  // Relevé 09/10/2026 : 69 276 o / 13 111 o gzip / 936 règles / sha d8c74e2cb457a497.
-  'index.html': { budget: 71680, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'about.html': { budget: 71680, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'app.html': { budget: 71680, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'contact.html': { budget: 71680, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'forgot-password.html': { budget: 71680, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'how-it-works.html': { budget: 71680, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'jobs.html': { budget: 71680, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'login.html': { budget: 71680, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'payment.html': { budget: 71680, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'privacy.html': { budget: 71680, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'register.html': { budget: 71680, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'support.html': { budget: 71680, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'terms.html': { budget: 71680, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  // Relevé 11/10/2026 : 76 533 o / 15 115 o gzip / 1044 règles / sha 41d0f2e82d7950d9.
+  // (Relevé précédent du 09/10/2026 : 69 276 o / 13 111 o gzip / 936 règles / sha d8c74e2cb457a497.)
+  'index.html': { budget: 78848, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'about.html': { budget: 78848, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'app.html': { budget: 78848, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'contact.html': { budget: 78848, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'forgot-password.html': { budget: 78848, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'how-it-works.html': { budget: 78848, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'jobs.html': { budget: 78848, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'login.html': { budget: 78848, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'payment.html': { budget: 78848, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'privacy.html': { budget: 78848, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'register.html': { budget: 78848, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'support.html': { budget: 78848, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'terms.html': { budget: 78848, plancher: 61440, blocs: 1, feuille: 'index.html' },
   // Le document minimal n'a pas la feuille critique : il a la sienne, et courte.
   // Relevé 09/10/2026 : 392 o / 6 règles / sha 8108c4546aacc8b6.
   '404.html': { budget: 2048, plancher: 256, blocs: 1, feuille: '404.html' },

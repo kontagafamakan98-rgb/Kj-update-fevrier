@@ -18,12 +18,13 @@
  *      ce chunk à 87 044 o / 29 538 o gzip (−82 %), et son initialisation est
  *      désormais différée après interaction (voir src/utils/sentry.js).
  *   2. PLUS GROS CHUNK — mesure : vendor-leaflet 47,5 Ko gzip.
- *   3. BUILD TOTAL (brut, tous fichiers) — mesure du 08/10/2026 : 5,05 Mo,
+ *   3. BUILD TOTAL (brut, tous fichiers) — mesure du 11/10/2026 : 5,08 Mo,
  *      dont ~1,3 Mo d'IMAGES DE CONTENU (la famille du héros — les six JPEG,
  *      561 Ko, et leurs 24 variantes AVIF et WebP, 712 Ko — et les quatre photos
  *      de la galerie, 452 Ko) et la MÊME feuille de styles pré-rendue recopiée
- *      dans chaque document — 900 980 o = 0,86 Mo mesurés le 09/10/2026 (14
- *      documents, dont 13 portant la feuille identique : 69 276 o, sha
+ *      dans chaque document — 995 321 o = 0,95 Mo mesurés le 11/10/2026 (14
+ *      documents, dont 13 portant la feuille identique : 76 533 o, sha
+ *      41d0f2e82d7950d9 ; le 09/10/2026 : 900 980 o, 69 276 o, sha
  *      d8c74e2cb457a497) : le total est donc un budget de CONTENU autant que de
  *      code, et il suit une page ou une photo ajoutée.
  *

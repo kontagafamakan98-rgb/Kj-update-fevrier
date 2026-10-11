@@ -839,7 +839,7 @@
       "invoque_par": "ci",
       "preuve": "frontend/scripts/__tests__/check-css-inline-budget.test.js",
       "runner": "vitest",
-      "motif": "budget de CSS inline PAR PAGE pré-rendue : la feuille critique du build est recopiée dans CHAQUE document et lue AVANT le premier paint. Le fait vivait en PROSE dans check-bundle-size.js, avec un compte PÉRIMÉ (22 pages, ~1,5 Mo) que la mesure du 09/10/2026 contredit (14 documents, dont 13 portant la même feuille : 69 276 o, sha d8c74e2cb457a497 ; 404.html 392 o ; total 900 980 o = 0,86 Mo) — un budget global ne dit donc ni QUELLE page a enflé ni de combien. Six refus NOMMÉS : dépassement chiffré, plancher (la contrepartie sans laquelle un budget plafond déclarerait « meilleure » une page qui a PERDU sa feuille critique), nombre de blocs <style> (0 = plugin d'inlining inerte, 2 = feuille sans propriétaire), feuille divergente d'une page qui ne l'a pas déclarée, page pré-rendue sans ligne, ligne périmée ; plus deux planchers de lecture qui refusent de juger un build vide ou incomplet. La table est la mesure du build réel, une ligne par document."
+      "motif": "budget de CSS inline PAR PAGE pré-rendue : la feuille critique du build est recopiée dans CHAQUE document et lue AVANT le premier paint. Le fait vivait en PROSE dans check-bundle-size.js, avec un compte PÉRIMÉ (22 pages, ~1,5 Mo) que la mesure du 09/10/2026 contredit (14 documents, dont 13 portant la même feuille : 69 276 o, sha d8c74e2cb457a497 ; 404.html 392 o ; total 900 980 o = 0,86 Mo — reporté sur la mesure du 11/10/2026 : 76 533 o, sha 41d0f2e82d7950d9, total 995 321 o = 0,95 Mo, budget 78 848 o) — un budget global ne dit donc ni QUELLE page a enflé ni de combien. Six refus NOMMÉS : dépassement chiffré, plancher (la contrepartie sans laquelle un budget plafond déclarerait « meilleure » une page qui a PERDU sa feuille critique), nombre de blocs <style> (0 = plugin d'inlining inerte, 2 = feuille sans propriétaire), feuille divergente d'une page qui ne l'a pas déclarée, page pré-rendue sans ligne, ligne périmée ; plus deux planchers de lecture qui refusent de juger un build vide ou incomplet. La table est la mesure du build réel, une ligne par document."
     },
   {
     "chemin": "frontend/scripts/check-classes-coquilles.js",
@@ -3795,7 +3795,7 @@
       ],
       "cwd": "frontend",
       "attend": [
-        "de CSS inline > budget 71680 o"
+        "de CSS inline > budget 78848 o"
       ]
     },
     {

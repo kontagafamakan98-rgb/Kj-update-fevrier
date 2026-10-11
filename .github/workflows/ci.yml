@@ -559,7 +559,8 @@ jobs:
       # large (le build total) : il ne disait donc ni QUELLE page avait enflé ni
       # de combien — et son compte écrit à la main avait dérivé (annoncé
       # « 69 Ko × 22 pages », mesuré le 09/10/2026 : 14 documents, dont 13
-      # portant la même feuille, 900 980 o = 0,86 Mo). Ce garde tient la
+      # portant la même feuille, 900 980 o = 0,86 Mo — reporté sur la mesure du
+      # 11/10/2026 : 995 321 o = 0,95 Mo, budget 78 848 o). Ce garde tient la
       # grandeur PAGE PAR PAGE : dépassement chiffré, plancher (une page qui a
       # PERDU sa feuille est plus légère, donc un plafond seul la déclarerait
       # « meilleure »), nombre de blocs `<style>`, feuille divergente d'une page
