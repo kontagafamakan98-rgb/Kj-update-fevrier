@@ -42,7 +42,7 @@ const OwnerMissionEvents = () => {
 
   return (
     <section className="carte-editoriale p-6 mb-8" aria-labelledby="titre-journal-mission">
-      <h2 id="titre-journal-mission" className="titre-entree mb-4">Journal d'une mission</h2>
+      <h2 id="titre-journal-mission" className="titre-entree mb-4">Journal d’une mission</h2>
 
       <form onSubmit={charger} className="flex gap-3 flex-wrap mb-4">
         <label htmlFor="identifiant-mission" className="sr-only">Identifiant de la mission</label>
