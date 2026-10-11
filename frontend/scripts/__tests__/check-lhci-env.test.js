@@ -185,11 +185,43 @@ describe('lighthouserc — sélection des pages auditées', () => {
     expect(urlsFor(undefined)).toEqual(['http://localhost:4173/']);
   });
 
-  it('applique au repli local un plafond TBT PLUS LARGE qu’au déploiement réel', () => {
+  it('SÉPARE les deux hôtes pour le TBT : plafond DÉRIVÉ sur la pile locale, RETRAIT sur le déploiement', () => {
+    // Ce cas disait « le repli local a un plafond PLUS LARGE qu'au déploiement »,
+    // et il lisait pour cela un littéral `targetIsLocal ? N : M` dans cette
+    // config. Les deux moitiés de cette phrase ont changé le 07/10/2026 (angle
+    // mort 19(b) de CI-COVERAGE.md), et l'assertion suit la décision au lieu de
+    // la contredire :
+    //   • le socle est DÉRIVÉ de la table mesurée (`socleMobile(hote)`,
+    //     `scripts/lhci-cls-budgets.cjs`) — plus un seul littéral ici ;
+    //   • le TBT du DÉPLOIEMENT est RETIRÉ — 1 200 ms pour un pire meilleur-run
+    //     de 10 ms sur 39 runs (12 pages), soit 120× : un plafond qu'AUCUNE
+    //     mesure de l'artefact n'adossait, et qui ne pouvait rougir que sur une
+    //     famine d'hôte (le défaut d'origine). Il n'y a donc plus de « plus
+    //     large » à comparer : il y a un hôte qui a une mesure et un hôte qui
+    //     n'en a pas.
     const source = readConfig();
-    const m = /maxNumericValue:\s*targetIsLocal \? (\d+) : (\d+)/.exec(source);
-    expect(m).not.toBeNull();
-    expect(Number(m[1])).toBeGreaterThan(Number(m[2]));
+    expect(source).toMatch(/socleMobile\(targetIsLocal \? 'pile-locale' : 'deploiement'\)/);
+    // Un littéral qui reviendrait ici serait refusé par `check-juges-de-temps`
+    // (la déclaration de cette surface est VIDE) ; ce cas le refuse aussi.
+    expect(source).not.toMatch(/maxNumericValue:\s*targetIsLocal/);
+
+    const budgets = require('../lhci-cls-budgets.cjs');
+    // Le plafond de la pile locale est DÉRIVÉ de sa mesure, pas recopié.
+    expect(budgets.socleMobile('pile-locale')['total-blocking-time']).toEqual([
+      'error',
+      {
+        maxNumericValue: budgets.plafondDe(
+          budgets.TBT_MOBILE['pile-locale'].pire,
+          budgets.TBT_MOBILE['pile-locale'].marge
+        ),
+      },
+    ]);
+    // Le déploiement n'en a AUCUN, et cette absence est ÉCRITE avec sa mesure.
+    expect(budgets.socleMobile('deploiement')['total-blocking-time']).toBeUndefined();
+    expect(Object.keys(budgets.TBT_MOBILE)).toEqual(['pile-locale']);
+    expect(budgets.RETRAITS['total-blocking-time@deploiement']).toMatch(/1200 ms/);
+    // Et un troisième hôte ne peut pas hériter du plafond d'un autre.
+    expect(() => budgets.socleMobile('preview-vercel')).toThrow(/hôte inconnu/);
   });
 
   it('ne déclare plus AUCUN plafond CLS ici : il appartient à sa table par route', () => {

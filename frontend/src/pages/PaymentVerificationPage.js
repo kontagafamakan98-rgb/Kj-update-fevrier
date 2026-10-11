@@ -265,14 +265,14 @@ const PaymentVerificationPage = () => {
             </div>
 
             {geoLoading ? (
-              <div className="mb-4 p-3 bg-blue-100 border border-blue-300 rounded text-center">
+              <div className="mb-4 p-3 bg-blue-100 border border-blue-300 rounded-sm text-center">
                 <div className="flex items-center justify-center">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
                   <span className="text-sm text-blue-800">{pageT('geoDetecting')}</span>
                 </div>
               </div>
             ) : detectedCountry ? (
-              <div className="mb-4 p-3 bg-green-100 border border-green-300 rounded text-center">
+              <div className="mb-4 p-3 bg-green-100 border border-green-300 rounded-sm text-center">
                 <p className="text-sm text-green-800">
                   <MapPin className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" />
                   <span className="font-medium">{pageT('position')}:</span> <CountryDisplay countryCode={detectedCountry.code} className="inline-flex align-middle" />
@@ -280,7 +280,7 @@ const PaymentVerificationPage = () => {
                 <p className="text-xs text-green-600 mt-1">{pageT('examplesAdjusted')}</p>
               </div>
             ) : (
-              <div className="mb-4 p-3 bg-yellow-100 border border-yellow-300 rounded text-center">
+              <div className="mb-4 p-3 bg-yellow-100 border border-yellow-300 rounded-sm text-center">
                 <p className="text-xs text-yellow-700">
                   <MapPin className="inline h-3.5 w-3.5 mr-1 align-[-0.15em]" aria-hidden="true" />
                   {pageT('positionNotDetected')}
@@ -306,11 +306,11 @@ const PaymentVerificationPage = () => {
 
         <div className="mb-8">
           <div className="flex items-center justify-center space-x-4">
-            <StepDot number="✓" label={pageT('stepPersonal')} bg="bg-green-500" text="text-green-600" />
+            <StepDot number="✓" label={pageT('stepPersonal')} classeFond="bg-green-500" classeTexte="text-green-600" />
             <div className="w-16 h-1 bg-green-200"></div>
-            <StepDot number="✓" label={pageT('stepAccess')} bg="bg-green-500" text="text-green-600" />
+            <StepDot number="✓" label={pageT('stepAccess')} classeFond="bg-green-500" classeTexte="text-green-600" />
             <div className="w-16 h-1 bg-orange-200"></div>
-            <StepDot number="3" label={pageT('stepPayments')} bg="bg-orange-500" text="text-orange-600" />
+            <StepDot number="3" label={pageT('stepPayments')} classeFond="bg-orange-500" classeTexte="text-orange-600" />
           </div>
         </div>
 
@@ -327,7 +327,7 @@ const PaymentVerificationPage = () => {
         )}
 
         {loading && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white p-6 rounded-lg shadow-lg text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto"></div>
               <div className="mt-4 text-gray-700 font-medium">{pageT('finalizing')}</div>
@@ -374,13 +374,18 @@ const PaymentVerificationPage = () => {
   );
 };
 
-function StepDot({ number, label, bg, text, textColor = 'text-white' }) {
+// Les props portent des CLASSES, et elles le disent depuis le 07/10/2026 : elles
+// s'appelaient `bg`, `text`, `textColor`, et le verdict de la feuille LIVRÉE les
+// déclarait MORTES (`bg-green-500`, `text-green-600`) — le nom ne disait pas ce
+// que la valeur était. `classe*` est la convention que lit
+// `scripts/css-selecteurs-morts.js` (cf. `EST_UNE_CLE_DE_CLASSE`).
+function StepDot({ number, label, classeFond, classeTexte, classeNombre = 'text-white' }) {
   return (
     <div className="flex items-center">
-      <div className={`w-8 h-8 ${bg} ${textColor} rounded-full flex items-center justify-center text-sm font-medium`}>
+      <div className={`w-8 h-8 ${classeFond} ${classeNombre} rounded-full flex items-center justify-center text-sm font-medium`}>
         {number}
       </div>
-      <span className={`ml-2 text-sm font-medium ${text}`}>{label}</span>
+      <span className={`ml-2 text-sm font-medium ${classeTexte}`}>{label}</span>
     </div>
   );
 }

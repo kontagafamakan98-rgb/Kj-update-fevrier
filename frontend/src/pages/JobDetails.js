@@ -16,6 +16,9 @@ import { formatBudgetRange, formatJobDate, formatJobStatus, isOwnedByCurrentUser
 import { normalizeJobRecord } from '../utils/jobDisplayBridge';
 import JobReviews from '../components/JobReviews';
 import { JobDetailsSkeleton } from '../components/SkeletonLoader';
+// Le cadre de page est DÉCLARÉ (src/config/app-cadres.js, clé `/jobs/:id`) : la
+// page ne connaît ni sa largeur ni sa gouttière, elle délègue.
+import CadrePage from '../components/CadrePage';
 import { MapPin, ShieldCheck } from 'lucide-react';
 import { VerifiedBadge, WorkerTrustBadge } from '../utils/workerTrustLevel';
 import { usePageTitle, usePageOpenGraph, absoluteUrl } from '../utils/seo';
@@ -62,14 +65,14 @@ function ProposalCard({ proposal, isSelected, isAccepted, onOpenDiscussion, onAc
   const workerPerson = proposal?.worker || proposal?.worker_profile || proposal;
 
   return (
-    // Le `shadow-sm` est retiré mais la CARTE à filet ne peut pas être posée ici :
+    // Le `shadow-xs` est retiré mais la CARTE à filet ne peut pas être posée ici :
     // ses deux états (sélectionné / non) se distinguent par `border-orange-300`
     // et `bg-orange-50/40`, deux utilitaires que `.carte-editoriale` ÉCRASERAIT
     // (une feuille non posée dans une couche l'emporte sur les utilitaires).
     <div className={`rounded-lg border p-4 ${isSelected ? 'border-orange-300 bg-orange-50/40' : 'border-gray-100 bg-white'}`}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-full bg-gray-200 flex items-center justify-center">
+          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gray-200 flex items-center justify-center">
             {workerPhoto ? (
               <img src={workerPhoto} alt={workerName} className="h-full w-full object-cover" />
             ) : (
@@ -530,11 +533,11 @@ export default function JobDetails() {
 
   if (error || !job) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <CadrePage chemin="/jobs/:id" classeCorps="">
         <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">
           {error || pageT('notFound') || t('jobNotFound')}
         </div>
-      </div>
+      </CadrePage>
     );
   }
 
@@ -543,14 +546,16 @@ export default function JobDetails() {
   const assignedToCurrentWorker = Boolean(assignedWorkerId) && currentUserIds.has(assignedWorkerId);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <button onClick={() => navigate(-1)} className="mb-6 flex items-center text-orange-600 hover:text-orange-700 font-medium">
+    // `titre={null}` : le titre de la mission vit DANS sa carte, pas sous la
+    // barre — la page n'a donc pas d'en-tête de cadre.
+    <CadrePage chemin="/jobs/:id" classeCorps="">
+      <button onClick={() => navigate(-1)} className="bloc-app flex items-center text-orange-600 hover:text-orange-700 font-medium">
         ← {pageT('back') || 'Retour'}
       </button>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <div className="carte-editoriale p-6">
+          <div className="carte-editoriale carte-publique">
             <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
               <div>
                 <h1 className="titre-page mb-2">{job.title}</h1>
@@ -707,7 +712,7 @@ export default function JobDetails() {
             {job.shared_location?.maps_url && (
               <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3">
                 <span className="text-sm text-orange-800"><MapPin className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {t('sharedPositionText')}</span>
-                <a href={job.shared_location.maps_url} target="_blank" rel="noreferrer" className="flex-shrink-0 text-sm font-semibold text-orange-700 underline underline-offset-2">
+                <a href={job.shared_location.maps_url} target="_blank" rel="noreferrer" className="shrink-0 text-sm font-semibold text-orange-700 underline underline-offset-2">
                   {t('viewOnMap')}
                 </a>
               </div>
@@ -738,13 +743,13 @@ export default function JobDetails() {
             </div>
           </div>
 
-          <div className="carte-editoriale p-6">
+          <div className="carte-editoriale carte-publique">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('jobUiDescription')}</h2>
             <p className="text-gray-700 whitespace-pre-line">{job.description}</p>
           </div>
 
           {isJobOwner && (
-            <div className="carte-editoriale p-6">
+            <div className="carte-editoriale carte-publique">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('jobUiReceivedProposals')}</h2>
               {proposals.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-gray-300 px-4 py-6 text-sm text-gray-500">
@@ -773,7 +778,7 @@ export default function JobDetails() {
           )}
 
           {discussionTarget?.id && (
-            <div id="job-discussion" ref={discussionSectionRef} className="carte-editoriale p-6 space-y-4">
+            <div id="job-discussion" ref={discussionSectionRef} className="carte-editoriale carte-publique space-y-4">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-semibold text-gray-900">
@@ -839,7 +844,7 @@ export default function JobDetails() {
                   rows="4"
                   value={messageDraft}
                   onChange={(event) => setMessageDraft(event.target.value)}
-                  className="w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 outline-hidden focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
                   placeholder={pageT('writeMessagePlaceholder')}
                 />
                 <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
@@ -857,7 +862,7 @@ export default function JobDetails() {
         </div>
 
         <div className="space-y-6">
-          <div className="carte-editoriale p-6">
+          <div className="carte-editoriale carte-publique">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('jobUiInformation')}</h2>
             <div className="space-y-3 text-gray-700">
               <div>{job.location_text}</div>
@@ -866,7 +871,7 @@ export default function JobDetails() {
             </div>
           </div>
 
-          <div className="carte-editoriale p-6">
+          <div className="carte-editoriale carte-publique">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('jobUiClient')}</h2>              <div className="flex items-center gap-3">
               <div className="pastille-rond pastille-rond-large font-bold">
                 {String(job.client_name || 'C').charAt(0).toUpperCase()}
@@ -882,7 +887,7 @@ export default function JobDetails() {
           </div>
 
           {!isJobOwner && currentUserProposal && (
-            <div className="carte-editoriale p-6">
+            <div className="carte-editoriale carte-publique">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">{pageT('yourProposal')}</h2>
               <div className="space-y-2 text-sm text-gray-700">
                 {currentUserProposal?.proposed_amount && <div><span className="font-semibold">{pageT('amountLabel')}</span> {formatBudgetRange(currentUserProposal.proposed_amount, null)}</div>}
@@ -937,6 +942,6 @@ export default function JobDetails() {
         }}
         onCancel={() => setConfirmCompleteOpen(false)}
       />
-    </div>
+    </CadrePage>
   );
 }

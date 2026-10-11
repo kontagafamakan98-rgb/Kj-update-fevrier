@@ -1,3 +1,4 @@
+import { IconePage } from '../config/page-icons';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -8,7 +9,6 @@ import FlagIcon from './FlagIcon';
 // empêche un pays d'exister pour React et pas pour un crawler sans JavaScript.
 import { COUNTRIES as COUNTRY_LIST } from '../config/countries';
 import { COUNTRY_PLACEHOLDER } from '../config/country-placeholder';
-import { IconePage, CLASSES_ICONE } from '../config/page-icons';
 
 // Carte indexée par code canonique : `getCountry()` normalise un code (alias,
 // ISO, ancien nom) puis cherche ici. DÉRIVÉE de la liste partagée, jamais une
@@ -203,18 +203,18 @@ export function CountrySelect({
         id={id}
         onClick={() => setIsOpen((prev) => !prev)}
         onKeyDown={handleTriggerKeyDown}
-        className="w-full flex items-center justify-between px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-left"
+        className="w-full flex items-center justify-between px-4 py-3 border border-gray-300 rounded-lg shadow-xs bg-white focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:border-transparent text-left"
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-required={required}
       >
         <span className="flex items-center gap-3 min-w-0">
-          {activeCountry ? <FlagIcon country={activeCountry.code} className="w-6 h-4" /> : <span className="text-lg leading-none"><IconePage nom={iconeGlobe} classe={CLASSES_ICONE.paysGlobe} /></span>}
+          {activeCountry ? <FlagIcon country={activeCountry.code} className="w-6 h-4" /> : <span className="text-lg leading-none"><IconePage nom={iconeGlobe} role="paysGlobe" /></span>}
           <span className={`truncate ${activeCountry ? 'text-gray-900' : 'text-gray-400'}`}>
             {activeCountry ? getTranslatedCountryName(activeCountry, t) : resolvedPlaceholder}
           </span>
         </span>
-        <span className={`text-xs text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}><IconePage nom={iconeChevron} classe={CLASSES_ICONE.paysChevron} /></span>
+        <span className={`text-xs text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}><IconePage nom={iconeChevron} role="paysChevron" /></span>
       </button>
 
       <input type="hidden" name={name} value={value || ''} required={required} />
@@ -234,7 +234,7 @@ export function CountrySelect({
                 onKeyDown={handleSearchKeyDown}
                 placeholder={t('searchCountry')}
                 autoFocus
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               />
             </div>
           )}

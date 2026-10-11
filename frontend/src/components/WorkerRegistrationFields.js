@@ -195,7 +195,7 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors }) => {
                   value={newSkill}
                   onChange={(e) => setNewSkill(e.target.value)}
                   placeholder={t('customSkillPlaceholder')}
-                  className="flex-1 px-3 py-2 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="flex-1 px-3 py-2 border border-blue-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                   onKeyDown={(e) => e.key === 'Enter' && handleAddCustomSkill()}
                 />
                 <button type="button" onClick={handleAddCustomSkill} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">{t('add')}</button>
@@ -232,7 +232,7 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors }) => {
                 worker_experience_years: nextValue === '' ? null : parseInt(nextValue, 10)
               }));
             }}
-            className={`block w-full px-4 py-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.worker_experience_years ? 'border-red-300 focus:border-red-500' : 'border-blue-300 focus:border-blue-500'}`}
+            className={`block w-full px-4 py-3 border rounded-lg shadow-xs focus:outline-hidden focus:ring-2 focus:ring-blue-500 ${errors.worker_experience_years ? 'border-red-300 focus:border-red-500' : 'border-blue-300 focus:border-blue-500'}`}
           >
             <option value="">{t('selectExperience')}</option>
             <option value="0">{t('beginner')}</option>

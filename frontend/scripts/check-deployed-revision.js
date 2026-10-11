@@ -74,6 +74,31 @@ export const REVISIONS_ABSENTES = new Set(['', 'inconnue', 'unknown', 'none', 'n
 const PROBE_HEADERS = { 'user-agent': 'kojo-deployed-revision/1.0' };
 
 /**
+ * Les en-têtes qui DATENT le déploiement, rendus avec le corps de la réponse.
+ *
+ * `Last-Modified` porte l'instant où l'artefact SERVI a été construit — mesuré
+ * sur la production le 08/10/2026 : `Thu, 08 Oct 2026 05:05:03 GMT` pour un
+ * commit de fusion daté de 05:04:12, soit 51 s de build Vercel — et `Date`
+ * l'horloge de l'edge, seule référence d'âge immunisée contre la dérive de
+ * l'horloge locale.
+ *
+ * Ils voyagent avec le corps parce qu'un SECOND lecteur en a besoin :
+ * `scripts/check-retard-main.js` publie l'ancienneté du dernier déploiement.
+ * Deux requêtes pour une seule réponse seraient deux occasions de diverger — la
+ * même raison qui a mis l'origine du site dans `site-meta.js`.
+ *
+ * @param {Response} réponse Réponse de production.
+ * @returns {Object<string, string>} En-têtes en minuscules (chaîne vide si absents).
+ */
+export function entetesDatants(réponse) {
+  const lire = (nom) => {
+    const valeur = réponse?.headers?.get?.(nom);
+    return typeof valeur === 'string' ? valeur : '';
+  };
+  return { 'last-modified': lire('last-modified'), date: lire('date') };
+}
+
+/**
  * La valeur est-elle une RÉVISION ? Vide et « inconnue » ne le sont pas.
  *
  * Une seule fonction pour les deux côtés de la comparaison : sans ça, une
@@ -161,7 +186,9 @@ export function comparer(servie, attendues = []) {
  * @param {object} [options]
  * @param {Function} [options.fetchImpl] `fetch` injectable (tests).
  * @param {number} [options.timeout] Délai maximal de la requête, en ms.
- * @returns {Promise<{html: string|null, erreur: string|null}>} Jamais d'exception.
+ * @returns {Promise<{html: string|null, erreur: string|null, entetes: Object<string, string>}>}
+ *   Jamais d'exception. `entetes` : les en-têtes datants, pour
+ *   `check-retard-main.js` (cf. `entetesDatants`).
  */
 export async function interroger(base, { fetchImpl = fetch, timeout = 15000 } = {}) {
   let réponse;
@@ -172,8 +199,10 @@ export async function interroger(base, { fetchImpl = fetch, timeout = 15000 } = 
       signal: AbortSignal.timeout(timeout),
     });
   } catch (error) {
-    return { html: null, erreur: `${error.name || 'Error'}: ${error.message}` };
+    return { html: null, erreur: `${error.name || 'Error'}: ${error.message}`, entetes: {} };
   }
+
+  const entetes = entetesDatants(réponse);
 
   if (!réponse.ok) {
     // Le défi de l'edge Vercel a déjà produit des rouges au hasard sur `main`
@@ -181,14 +210,14 @@ export async function interroger(base, { fetchImpl = fetch, timeout = 15000 } = 
     // ici évite qu'il se lise comme « frontend en retard ».
     const mitigation = réponse.headers?.get?.('x-vercel-mitigated') || '';
     const suffixe = mitigation ? ` — défi de sécurité du CDN Vercel (X-Vercel-Mitigated: ${mitigation})` : '';
-    return { html: null, erreur: `HTTP ${réponse.status}${suffixe}` };
+    return { html: null, erreur: `HTTP ${réponse.status}${suffixe}`, entetes };
   }
 
   const corps = await réponse.text();
   if (!/<html[\s>]/i.test(corps)) {
-    return { html: null, erreur: "la réponse n'est pas du HTML (le site ne sert pas sa page d'accueil)" };
+    return { html: null, erreur: "la réponse n'est pas du HTML (le site ne sert pas sa page d'accueil)", entetes };
   }
-  return { html: corps, erreur: null };
+  return { html: corps, erreur: null, entetes };
 }
 
 /**

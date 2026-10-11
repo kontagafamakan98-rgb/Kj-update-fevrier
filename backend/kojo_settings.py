@@ -260,6 +260,22 @@ REFERRAL_WELCOME_FILLEUL_REWARD = float(os.environ.get('REFERRAL_WELCOME_FILLEUL
 # localhost), SameSite=Lax suffit et fonctionne en HTTP.
 _IS_PROD_ENV = APP_ENV in ("production", "prod")
 
+# --- Rate-limiter partagé : Redis obligatoire dès qu'il y a plusieurs workers ---
+# Sans Redis, le rate-limit vit dans la mémoire de chaque process : avec
+# WEB_CONCURRENCY > 1 (Dockerfile : `uvicorn --workers`), chaque limite est
+# multipliée par N et n'est jamais partagée. Une limite fausse est une garantie
+# fausse, donc en production on refuse de démarrer plutôt que de la servir.
+# Hors prod, le fallback mémoire reste le comportement de développement.
+WEB_CONCURRENCY = int((os.environ.get('WEB_CONCURRENCY', '1') or '1').strip())
+
+if _IS_PROD_ENV and WEB_CONCURRENCY > 1 and not os.environ.get('REDIS_URL', '').strip():
+    raise RuntimeError(
+        f"WEB_CONCURRENCY={WEB_CONCURRENCY} sans REDIS_URL en production : le "
+        "rate-limiting serait en mémoire par process, donc multiplié par "
+        "WEB_CONCURRENCY et non partagé. Définir REDIS_URL (rediss://) ou "
+        "ramener WEB_CONCURRENCY à 1, puis redéployer."
+    )
+
 AUTH_COOKIE_NAME = os.environ.get('AUTH_COOKIE_NAME', 'kojo_session').strip()
 
 CSRF_COOKIE_NAME = os.environ.get('CSRF_COOKIE_NAME', 'kojo_csrf').strip()
@@ -446,6 +462,8 @@ OWNER_EMAIL = os.environ.get('OWNER_EMAIL', '').strip()
 # routers utilisent la constante au lieu de lire os.environ directement.
 FAMAKAN_OWNER_EMAIL = os.environ.get('FAMAKAN_OWNER_EMAIL', '').strip() or OWNER_EMAIL
 
-OWNER_USER_ID = os.environ.get('OWNER_USER_ID', 'famakan_kontaga_master_2024').strip() or 'famakan_kontaga_master_2024'
+# Repli neutre : la résolution du propriétaire passe d'abord par OWNER_EMAIL.
+# Ne jamais y remettre un identifiant personnel.
+OWNER_USER_ID = os.environ.get('OWNER_USER_ID', 'kojo-owner').strip() or 'kojo-owner'
 
 OWNER_INITIAL_PASSWORD = os.environ.get('OWNER_INITIAL_PASSWORD', '').strip()

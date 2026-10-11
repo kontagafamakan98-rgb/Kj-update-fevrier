@@ -409,3 +409,35 @@ async def get_stuck_payouts(owner_user = Depends(verify_owner_access)):
             "remaining_cooldown_seconds": int(circuit["remaining_cooldown_seconds"]),
         },
     }
+
+
+# Champs du journal métier rendus au propriétaire : allowlist, jamais le document brut.
+_CHAMPS_EVENEMENT_METIER = ("id", "type", "cle", "user_id", "job_id", "proposal_id", "payment_id", "created_at")
+
+
+@router.get("/owner/missions/{job_id}/evenements")
+async def get_mission_business_events(job_id: str, owner_user = Depends(verify_owner_access)):
+    """Journal des événements métier d'une mission, par ordre chronologique.
+
+    PROPRIÉTAIRE UNIQUEMENT, lecture seule. Ce sont les quatre jalons de
+    `kojo_business_events` : mission créée, proposition acceptée, paiement
+    confirmé, mission terminée. Une mission sans événement renvoie une liste vide.
+
+    Returns:
+        Dict à trois clés : `job_id` (mission demandée), `count` (nombre de jalons
+        rendus) et `evenements` (liste des jalons, du plus ancien au plus récent),
+        chaque entrée réduite à l'allowlist des champs publiés — jamais le
+        document brut.
+    """
+    evenements = await db.business_events.find(
+        {"job_id": job_id}, {"_id": 0}
+    ).sort("created_at", 1).to_list(length=200)
+
+    return {
+        "job_id": job_id,
+        "count": len(evenements),
+        "evenements": [
+            {champ: evenement.get(champ) for champ in _CHAMPS_EVENEMENT_METIER}
+            for evenement in evenements
+        ],
+    }

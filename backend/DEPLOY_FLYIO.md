@@ -309,17 +309,15 @@ placeholders `...` ignorés).
 
 ## 5. Mettre à jour le frontend Vercel
 
-Le frontend pointe encore vers Render (`VITE_API_URL`). Le changer dans le
+Le frontend doit pointer vers Fly (`VITE_API_URL`). Vérifier la valeur dans le
 dashboard Vercel (Settings → Environment Variables) :
 
 ```
 VITE_API_URL=https://api.kojoforafrica.cc.cd/api
 ```
 
-> ⚠️ Faire la bascule **au moment voulu** : tant que Render tourne, le
-> frontend continue de l'utiliser. Les deux backends partagent le même
-> MongoDB Atlas, donc aucun risque de divergence de données — on peut même
-> tester Fly.io en parallèle avant de basculer.
+> ℹ️ Le backend Render est retiré : toute valeur `VITE_API_URL` pointant vers
+> Render est obsolète et doit être remplacée avant le prochain build Vercel.
 
 ## 6. PayDunya
 

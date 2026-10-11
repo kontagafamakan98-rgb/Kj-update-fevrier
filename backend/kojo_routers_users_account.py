@@ -394,6 +394,7 @@ USER_DATA_SOURCES = (
     ("notifications", ("user_id",)),
     ("support_tickets", ("user_id",)),
     ("push_tokens", ("user_id",)),
+    ("business_events", ("user_id",)),
 )
 
 # Collections qui portent des données d'un utilisateur mais SANS clé

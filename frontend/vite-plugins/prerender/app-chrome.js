@@ -41,6 +41,27 @@
 //   `h-16 … border-b` en faisait 64 (border-box), soit 1 px de moins que la
 //   vraie — de quoi décaler tout le contenu au montage de React.
 import { CONTACT, mailtoHref, telHref } from '../../src/config/contact.js'
+// Les CLASSES du chrome n'ont qu'un propriétaire (src/config/classes-chrome.js),
+// lu par React (src/App.js, src/components/Navbar.js) ET par ici : les recopier
+// faisait diverger les deux peintures en silence (18 listes, dont 16 jumelles
+// exactes de src/App.js, relevé du 09/10/2026). Le garde
+// `scripts/check-classes-coquilles.js` refuse qu'un champ de ce domicile soit
+// RECOPIÉ ici.
+import {
+  APP_CLASS,
+  COLONNE_CLASS,
+  CONTENEUR_CLASS,
+  MAIN_CLASS,
+  NAV_RANGEE_CLASS,
+  NAV_CLASS,
+  PIED_ADRESSE_CLASS,
+  PIED_CLASS,
+  PIED_INTERIEUR_CLASS,
+  PIED_LIEN_CLASS,
+  PIED_LIEN_LONG_CLASS,
+  PIED_NAV_CLASS,
+  PIED_NAV_LIEN_CLASS,
+} from '../../src/config/classes-chrome.js'
 
 // La page des CGU du pied de page : même valeur que src/App.js (son `<Link
 // to="/terms">`), donc aucune divergence possible entre les deux canaux. Le
@@ -49,8 +70,11 @@ import { CONTACT, mailtoHref, telHref } from '../../src/config/contact.js'
 const ROUTE_CGU = '/terms'
 
 export const NAV_PLACEHOLDER =
-  '<nav class="sticky top-0 z-50 border-b bg-white/95 shadow-sm backdrop-blur">' +
-  '<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16"></div>' +
+  `<nav class="${NAV_CLASS}">` +
+  // La MÊME structure que src/components/Navbar.js : conteneur, puis rangée de
+  // même hauteur. La rangée est vide ici (une barre sans contenu n'a rien à
+  // répartir), mais elle porte la classe qui fixe la hauteur chez React.
+  `<div class="${CONTENEUR_CLASS}"><div class="${NAV_RANGEE_CLASS}"></div></div>` +
   '</nav>'
 
 // Ouverture et fermeture du chrome, séparées pour que les GARDES puissent
@@ -58,10 +82,10 @@ export const NAV_PLACEHOLDER =
 // constantes au lieu de recopier une chaîne — même propriétaire, donc pas de
 // dérive silencieuse possible entre la fabrique et son contrôle).
 export const CHROME_OUVERTURE =
-  '<div class="App">' +
-  '<div class="min-h-screen fond-sable relative flex flex-col">' +
+  `<div class="${APP_CLASS}">` +
+  `<div class="${COLONNE_CLASS}">` +
   NAV_PLACEHOLDER +
-  '<main class="flex-1 pb-24 md:pb-0">'
+  `<main class="${MAIN_CLASS}">`
 
 // `main` se ferme ICI ; le pied de page et la fermeture des deux conteneurs
 // viennent après (voir chromeDePage). Séparé pour que les gardes puissent
@@ -106,24 +130,24 @@ export function piedDePage({ esc, T, socialLinks = [] }) {
     }
   }
   return (
-    `<footer class="border-t border-orange-100 bg-white/95 backdrop-blur-sm">` +
-    `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-3">` +
-    `<address class="not-italic flex flex-wrap items-center justify-center md:justify-end gap-x-4 gap-y-2 text-xs text-gray-600">` +
+    `<footer class="${PIED_CLASS}">` +
+    `<div class="${PIED_INTERIEUR_CLASS}">` +
+    `<address class="${PIED_ADRESSE_CLASS}">` +
     `<span>${esc(CONTACT.address)}</span>` +
-    `<a href="${esc(telHref)}" class="hover:text-orange-700 underline underline-offset-2">${esc(CONTACT.phoneDisplay)}</a>` +
-    `<a href="${esc(mailtoHref)}" class="hover:text-orange-700 underline underline-offset-2 break-all">${esc(CONTACT.email)}</a>` +
-    `<a href="${esc(CONTACT.whatsappUrl)}" target="_blank" rel="noreferrer" class="hover:text-orange-700 underline underline-offset-2">${esc(T('contactWhatsapp'))}</a>` +
-    `<a href="${esc(CONTACT.mapsUrl)}" target="_blank" rel="noreferrer" aria-label="Google Maps" title="Google Maps" class="hover:text-orange-700 underline underline-offset-2">${esc(T('footerItinerary'))}</a>` +
+    `<a href="${esc(telHref)}" class="${PIED_LIEN_CLASS}">${esc(CONTACT.phoneDisplay)}</a>` +
+    `<a href="${esc(mailtoHref)}" class="${PIED_LIEN_LONG_CLASS}">${esc(CONTACT.email)}</a>` +
+    `<a href="${esc(CONTACT.whatsappUrl)}" target="_blank" rel="noreferrer" class="${PIED_LIEN_CLASS}">${esc(T('contactWhatsapp'))}</a>` +
+    `<a href="${esc(CONTACT.mapsUrl)}" target="_blank" rel="noreferrer" aria-label="Google Maps" title="Google Maps" class="${PIED_LIEN_CLASS}">${esc(T('footerItinerary'))}</a>` +
     `</address>` +
-    `<div class="flex flex-wrap items-center justify-center md:justify-end gap-4 text-sm text-orange-700">` +
-    `<a href="/about" class="hover:text-orange-800 underline underline-offset-2">${esc(T('footerAbout'))}</a>` +
-    `<a href="/contact" class="hover:text-orange-800 underline underline-offset-2">${esc(T('contactTitle'))}</a>` +
-    `<a href="/privacy" class="hover:text-orange-800 underline underline-offset-2">${esc(T('footerPrivacy'))}</a>` +
-    `<a href="${ROUTE_CGU}" class="hover:text-orange-800 underline underline-offset-2">${esc(T('footerTerms'))}</a>` +
+    `<div class="${PIED_NAV_CLASS}">` +
+    `<a href="/about" class="${PIED_NAV_LIEN_CLASS}">${esc(T('footerAbout'))}</a>` +
+    `<a href="/contact" class="${PIED_NAV_LIEN_CLASS}">${esc(T('contactTitle'))}</a>` +
+    `<a href="/privacy" class="${PIED_NAV_LIEN_CLASS}">${esc(T('footerPrivacy'))}</a>` +
+    `<a href="${ROUTE_CGU}" class="${PIED_NAV_LIEN_CLASS}">${esc(T('footerTerms'))}</a>` +
     socialLinks
       .map(
         (social) =>
-          `<a href="${esc(social.url)}" target="_blank" rel="me noreferrer" class="hover:text-orange-800 underline underline-offset-2">${esc(social.label)}</a>`
+          `<a href="${esc(social.url)}" target="_blank" rel="me noreferrer" class="${PIED_NAV_LIEN_CLASS}">${esc(social.label)}</a>`
       )
       .join('') +
     `</div>` +

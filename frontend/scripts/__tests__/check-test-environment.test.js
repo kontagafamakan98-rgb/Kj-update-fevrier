@@ -9,16 +9,22 @@ import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import {
   CHAMPS_REF_DISTANTE,
+  ENV_TERMINAL,
   actionsDesArguments,
   checkTestEnvironment,
+  demanderAccordAuTerminal,
+  estUnHumainAuBout,
   main,
   mesurerBranches,
+  proposerLeNettoyage,
   verdictDeLaPasse,
 } from '../check-test-environment.js';
 import {
   ENV_BRANCHES_POUSEES,
   branchesPoussees,
   main as mainGitBranches,
+  nettoyerResidus,
+  planDeNettoyage,
 } from '../check-git-branches.js';
 
 const FRONTEND_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -753,4 +759,178 @@ describe('check-test-environment et check-git-branches — exécution de main()'
       await rm(fichierTemp, { force: true });
     }
   });
+});
+
+// ── Le nettoyage d'une réf distante orpheline : proposé, puis exécuté après accord ──
+// Ce qui est éprouvé ici n'est pas la phrase du remède (elle existait déjà),
+// c'est sa MISE EN ŒUVRE — et surtout ce qui ne doit jamais arriver : une
+// suppression sans accord. Les cas d'exécution prennent leur lecture en
+// paramètre (comme le reste du module) ; le dernier, lui, pousse pour de vrai.
+const UN_RESIDU = {
+  ref: 'origin/refonte',
+  distant: 'origin',
+  nom: 'refonte',
+  raison: 'son arbre est identique à origin/main (fusion par squash)',
+};
+
+/** Une lecture de git fabriquée : les commandes attendues, dans l'ordre. */
+function journalDesCommandes({ refDisparaitApres = null, erreur = '' } = {}) {
+  const lancees = [];
+  let presente = true;
+  const lire = (args) => {
+    lancees.push(args.join(' '));
+    if (args[0] === 'push') {
+      if (refDisparaitApres === 'push') presente = false;
+      return { ok: !erreur, lignes: [], erreur };
+    }
+    if (args[0] === 'remote' && args[1] === 'prune') {
+      if (refDisparaitApres === 'prune') presente = false;
+      return { ok: true, lignes: [], erreur: '' };
+    }
+    // `for-each-ref` : la seule question qui compte, « la réf est-elle là ? ».
+    return { ok: true, lignes: presente ? [args[2]] : [], erreur: '' };
+  };
+  return { lancees, lire };
+}
+
+describe('check-test-environment — nettoyage d’une réf distante orpheline', () => {
+  it('construit le plan exact, une commande par résidu, telle qu’elle sera lancée', () => {
+    const [etape] = planDeNettoyage([UN_RESIDU]);
+    expect(etape.commande).toBe('git push origin --delete refonte');
+    expect(etape.args).toEqual(['push', 'origin', '--delete', 'refonte']);
+    expect(planDeNettoyage()).toEqual([]);
+    expect(planDeNettoyage([])).toEqual([]);
+  });
+
+  it('n’exécute RIEN sans accord — une réponse qui n’est pas oui ne supprime pas', async () => {
+    const executees = [];
+    const { plan, accord, resultats } = await proposerLeNettoyage(
+      { residusDistants: [UN_RESIDU] },
+      {
+        estDemandable: () => true,
+        demander: () => 'n',
+        nettoyer: (etapes) => {
+          executees.push(...etapes.map((etape) => etape.commande));
+          return [];
+        },
+        journal: () => {},
+      },
+    );
+    expect(plan).toHaveLength(1);
+    expect(accord).toBe(false);
+    expect(executees).toEqual([]);
+    expect(resultats).toEqual([]);
+  });
+
+  it('n’exécute RIEN sans terminal : le remède reste nommé par le verdict', async () => {
+    const executees = [];
+    const { accord, resultats } = await proposerLeNettoyage(
+      { residusDistants: [UN_RESIDU] },
+      {
+        estDemandable: () => false,
+        demander: () => 'o',
+        nettoyer: () => {
+          executees.push('appelé');
+          return [];
+        },
+        journal: () => {},
+      },
+    );
+    expect(accord).toBeNull();
+    expect(resultats).toEqual([]);
+    expect(executees).toEqual([]);
+  });
+
+  it('exécute la suppression APRÈS accord, et relit pour prouver que la réf a disparu', async () => {
+    const { lancees, lire } = journalDesCommandes({ refDisparaitApres: 'push' });
+    const plan = planDeNettoyage([UN_RESIDU]);
+    const [resultat] = nettoyerResidus(plan, { lire });
+    expect(lancees[0]).toBe('push origin --delete refonte');
+    expect(lancees[1]).toContain('refs/remotes/origin/refonte');
+    expect(resultat.ok).toBe(true);
+    expect(resultat.par).toBe('git push origin --delete refonte');
+  });
+
+  it('se rabat sur l’élagage quand la réf a déjà disparu du distant', () => {
+    // `prune` sort en 0 en n'élaguant RIEN : le verdict ne peut donc pas être son
+    // code de sortie, seulement la relecture.
+    const traces = journalDesCommandes({ refDisparaitApres: 'prune', erreur: 'remote ref does not exist' });
+    traces.lancees.length = 0;
+    const [resultat] = nettoyerResidus(planDeNettoyage([UN_RESIDU]), { lire: traces.lire });
+    // L'ordre compte, et il est asserté tel quel : la suppression est TENTÉE
+    // d'abord (elle seule agit sur le distant), puis la relecture, puis
+    // l'élagage, puis la relecture qui tranche.
+    expect(traces.lancees).toEqual([
+      'push origin --delete refonte',
+      'for-each-ref --format=%(refname) refs/remotes/origin/refonte',
+      'remote prune origin',
+      'for-each-ref --format=%(refname) refs/remotes/origin/refonte',
+    ]);
+    expect(resultat.ok).toBe(true);
+    expect(resultat.par).toBe('git remote prune origin');
+  });
+
+  it('dit honnêtement qu’un nettoyage a échoué, avec l’erreur de git', () => {
+    const { lire } = journalDesCommandes({ erreur: 'Permission refusée (403)' });
+    const [resultat] = nettoyerResidus(planDeNettoyage([UN_RESIDU]), { lire });
+    expect(resultat.ok).toBe(false);
+    expect(resultat.erreur).toContain('403');
+  });
+
+  it('ne demande jamais à un runner de test : VITEST n’est pas un humain', () => {
+    expect(estUnHumainAuBout({ env: { VITEST: 'true', [ENV_TERMINAL]: '1' } })).toBe(false);
+    expect(estUnHumainAuBout({ env: { [ENV_TERMINAL]: '1' } })).toBe(true);
+    expect(estUnHumainAuBout({ env: {} })).toBe(process.stderr.isTTY === true);
+  });
+
+  it('laisse la question être posée, et rend la réponse telle qu’elle a été tapée', () => {
+    const ecrites = [];
+    const accord = demanderAccordAuTerminal('Nettoyer ? [o/N] ', {
+      ecrire: (texte) => ecrites.push(texte),
+      lireLeTerminal: () => '  O  ',
+    });
+    expect(accord).toBe('o');
+    expect(ecrites).toEqual(['Nettoyer ? [o/N] ', '\n']);
+    expect(demanderAccordAuTerminal('x', { ecrire: () => {}, lireLeTerminal: () => null })).toBeNull();
+  });
+
+  it('sur un vrai dépôt : le pré-vol nettoie après accord, et la réf a réellement disparu', async () => {
+    const { racine, travail } = await decorDeFusion('kojo-nettoyage-');
+    const origLog = console.log;
+    const origError = console.error;
+    console.log = () => {};
+    console.error = () => {};
+    try {
+      // Le résidu est en place : la branche locale disparaît, le distant garde la
+      // sienne, et son contenu vient d'arriver dans la base.
+      await git(travail, 'switch', 'main');
+      await git(travail, 'branch', '-D', 'refonte');
+      await fusionnerParSquash(travail);
+      const avant = await git(travail, 'ls-remote', '--heads', 'origin');
+      expect(avant).toContain('refs/heads/refonte');
+
+      // (1) Un refus : rien ne bouge, et le pré-vol bloque toujours.
+      const refuse = await main(['--avant-push'], {
+        cwd: travail,
+        mesurer: mesurerBranches,
+        nettoyage: { estDemandable: () => true, demander: () => 'n', journal: () => {} },
+      });
+      expect(refuse).toBe(false);
+      expect(await git(travail, 'ls-remote', '--heads', 'origin')).toContain('refs/heads/refonte');
+
+      // (2) L'accord : la suppression est exécutée pour de vrai, et la relecture
+      // du pré-vol ne trouve plus de résidu — donc le push passe.
+      const accepte = await main(['--avant-push'], {
+        cwd: travail,
+        mesurer: mesurerBranches,
+        nettoyage: { estDemandable: () => true, demander: () => 'oui', journal: () => {} },
+      });
+      expect(accepte).toBe(true);
+      expect(await git(travail, 'ls-remote', '--heads', 'origin')).not.toContain('refs/heads/refonte');
+    } finally {
+      console.log = origLog;
+      console.error = origError;
+      await nettoyer(racine);
+    }
+  }, 60_000);
 });

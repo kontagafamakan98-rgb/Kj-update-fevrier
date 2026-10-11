@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { api, handleApiError, TRANSPORT_FAILURE_MESSAGE, SERVER_FAILURE_MESSAGE } from '../api';
+import { api, getAuthToken, isNativeShell, handleApiError, TRANSPORT_FAILURE_MESSAGE, SERVER_FAILURE_MESSAGE } from '../api';
 import fr from '../../i18n/fr.json';
+
+// Le jeton ne vit en stockage que dans le shell natif (Capacitor). Les scénarios
+// de jeton ci-dessous décrivent ce mode : on l'active explicitement, et le web
+// (sans Capacitor) est couvert à part, en fin de fichier.
+const modeNatif = () => { window.Capacitor = { isNativePlatform: () => true }; };
+const sortieModeNatif = () => { delete window.Capacitor; };
 
 // api.js doit construire ses URLs via le module unique buildApiUrl : la base
 // (VITE_API_URL / REACT_APP_BACKEND_URL) peut être définie avec OU sans /api,
@@ -120,6 +126,7 @@ describe('api — session 401 (token stale vs session morte) et CSRF', () => {
 
   beforeEach(() => {
     vi.stubEnv('VITE_API_URL', 'https://stub.example');
+    modeNatif();
     localStorage.clear();
     sessionStorage.clear();
     clearSessionCookie();
@@ -129,6 +136,7 @@ describe('api — session 401 (token stale vs session morte) et CSRF', () => {
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
     clearSessionCookie();
+    sortieModeNatif();
   });
 
   it('401 avec cookie de session valide → purge le token stale, PAS de redirection', async () => {
@@ -331,9 +339,10 @@ describe('api — session 401 (token stale vs session morte) et CSRF', () => {
 // Rotation à fenêtre glissante : /auth/me renvoie X-Kojo-Token quand le jeton
 // courant approche de l'expiration — le client doit le stocker immédiatement
 // ('token' + token_expires_at) pour ne pas être déconnecté à 24 h.
-describe('api — rotation du jeton (X-Kojo-Token)', () => {
+describe('api — rotation du jeton (X-Kojo-Token), shell natif', () => {
   beforeEach(() => {
     vi.stubEnv('VITE_API_URL', 'https://stub.example');
+    modeNatif();
     localStorage.clear();
   });
 
@@ -341,6 +350,7 @@ describe('api — rotation du jeton (X-Kojo-Token)', () => {
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
     localStorage.clear();
+    sortieModeNatif();
   });
 
   it('stocke le jeton tourné + son expiration depuis l’en-tête', async () => {
@@ -462,5 +472,66 @@ describe('api — panne sans message du serveur : aucun texte technique ne passe
     const erreur = await api.get('/jobs').catch((error) => error);
     expect(erreur.name).toBe('AbortError');
     expect(erreur.hasServerMessage).toBeUndefined();
+  });
+});
+
+// Web : la session est le seul cookie httpOnly. Aucun jeton n'est lu, envoyé ni
+// stocké depuis le navigateur.
+describe('api — web : aucun jeton en stockage, aucun en-tête Authorization', () => {
+  beforeEach(() => {
+    vi.stubEnv('VITE_API_URL', 'https://stub.example');
+    sortieModeNatif();
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+    localStorage.clear();
+    sessionStorage.clear();
+    sortieModeNatif();
+  });
+
+  it('isNativeShell : faux sans Capacitor, vrai seulement dans le shell natif', () => {
+    expect(isNativeShell()).toBe(false);
+    modeNatif();
+    expect(isNativeShell()).toBe(true);
+  });
+
+  it('getAuthToken ne relit jamais un jeton laissé en stockage sur le web', () => {
+    localStorage.setItem('token', 'stale.token.abc');
+    sessionStorage.setItem('access_token', 'stale.token.def');
+    expect(getAuthToken()).toBe('');
+  });
+
+  it('n’envoie aucun en-tête Authorization, même si un jeton traîne en stockage', async () => {
+    localStorage.setItem('token', 'stale.token.abc');
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true, status: 200, text: async () => '{}', headers: { get: () => null },
+    });
+
+    await api.get('/jobs');
+    const [, options] = global.fetch.mock.calls[0];
+    expect(options.headers.Authorization).toBeUndefined();
+    expect(options.credentials).toBe('include');
+  });
+
+  it('n’écrit aucun jeton tourné (X-Kojo-Token) en stockage', async () => {
+    const payload = btoa(JSON.stringify({ exp: 1800000000 }))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+    const rotated = `header.${payload}.sig`;
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => '{}',
+      headers: { get: (name) => (name === 'X-Kojo-Token' ? rotated : null) },
+    });
+
+    await api.get('/auth/me');
+    expect(localStorage.getItem('token')).toBeNull();
+    expect(localStorage.getItem('token_expires_at')).toBeNull();
   });
 });

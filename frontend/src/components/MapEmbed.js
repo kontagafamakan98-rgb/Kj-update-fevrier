@@ -29,10 +29,10 @@ import { IconePage } from '../config/page-icons';
  *
  * @param {{
  *   src: string, title: string, href: string, label: string,
- *   icone: string, classeIcone: string, frameClass: string, controlClass: string,
+ *   icone: string, roleIcone: string, frameClass: string, controlClass: string,
  * }} props
  */
-export default function MapEmbed({ src, title, href, label, icone, classeIcone, frameClass, controlClass }) {
+export default function MapEmbed({ src, title, href, label, icone, roleIcone, frameClass, controlClass }) {
   const [afficherLaCarte, setAfficherLaCarte] = useState(false);
 
   if (afficherLaCarte) {
@@ -50,7 +50,7 @@ export default function MapEmbed({ src, title, href, label, icone, classeIcone, 
 
   return (
     <div className={frameClass}>
-      <IconePage nom={icone} classe={classeIcone} />
+      <IconePage nom={icone} role={roleIcone} />
       <a
         href={href}
         target="_blank"

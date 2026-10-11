@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 from fastapi import APIRouter, HTTPException, Response
 
 from kojo_core import db
+from kojo_balises import DesequilibreHtml, exiger_balises_equilibrees
 from kojo_job_og import escape_xml, job_og_html, job_og_html_404
 from kojo_settings import FRONTEND_APP_URL, logger
 from kojo_identifiants import identifiant_job_query
@@ -348,15 +349,27 @@ async def get_job_og_html(job_id: str):
     """
     job = await db.jobs.find_one({**identifiant_job_query(job_id), "deleted": {"$ne": True}})
     base = _site_base()
-    if not job:
-        return Response(
-            content=job_og_html_404(),
-            media_type="text/html; charset=utf-8",
-            status_code=404,
-            headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex"},
+    # Le HTML servi aux crawlers passe la MÊME règle d'équilibre que le frontend
+    # (kojo_balises.py) : un document déséquilibré n'est pas servi — il est
+    # journalisé avec la balise nommée, et la requête répond 500.
+    try:
+        if not job:
+            return Response(
+                content=exiger_balises_equilibrees(
+                    f"la page 404 de la fiche {job_id}", job_og_html_404(), origine="kojo_job_og"
+                ),
+                media_type="text/html; charset=utf-8",
+                status_code=404,
+                headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex"},
+            )
+        corps = exiger_balises_equilibrees(
+            f"la fiche mission {job_id}", job_og_html(job, base), origine="kojo_job_og"
         )
+    except DesequilibreHtml as exc:
+        logger.error("Pré-rendu HTML de la fiche %s refusé : %s", job_id, exc)
+        raise HTTPException(status_code=500, detail="Job HTML rendering failed") from exc
     return Response(
-        content=job_og_html(job, base),
+        content=corps,
         media_type="text/html; charset=utf-8",
         headers={"Cache-Control": _job_og_cache_control(job)},
     )

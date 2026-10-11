@@ -193,7 +193,7 @@ export default function ProposalModal({ job, onClose, onProposalSubmitted }) {
                 name="proposed_amount"
                 value={formData.proposed_amount}
                 onChange={handleChange}
-                className="w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 outline-hidden focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
                 placeholder="5000"
               />
             </div>
@@ -204,7 +204,7 @@ export default function ProposalModal({ job, onClose, onProposalSubmitted }) {
                 name="estimated_completion_time"
                 value={formData.estimated_completion_time}
                 onChange={handleChange}
-                className="w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 outline-hidden focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
                 placeholder={t('jobUiEstimatedCompletionPlaceholder')}
               />
             </div>
@@ -217,7 +217,7 @@ export default function ProposalModal({ job, onClose, onProposalSubmitted }) {
               rows="6"
               value={formData.message}
               onChange={handleChange}
-              className="w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+              className="w-full rounded-xl border border-gray-200 px-4 py-3 outline-hidden focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
               placeholder={t('jobUiMessagePlaceholder')}
             />
           </div>

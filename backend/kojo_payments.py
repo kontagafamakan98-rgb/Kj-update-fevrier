@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 import requests
 from fastapi import HTTPException
 
+from kojo_business_events import enregistrer_evenement
 from kojo_core import db, resolve_owner_id
 from kojo_email import send_email_via_brevo_api
 from kojo_models import NotificationType
@@ -615,6 +616,16 @@ async def sync_payment_status_with_paydunya(payment_record: Dict[str, Any]) -> D
     await db.payments.update_one(
         {'id': payment_record['id']}, document
     )
+    # Première bascule vers `completed` : le paiement est confirmé. L'IPN peut
+    # rejouer ce chemin ; la clé `payment_confirmed:<id>` le rend idempotent.
+    if local_status == 'completed' and not payment_record.get('completed_at'):
+        await enregistrer_evenement(
+            'payment_confirmed',
+            f"payment_confirmed:{payment_record['id']}",
+            user_id=payment_record.get('payer_id'),
+            job_id=payment_record.get('job_id'),
+            payment_id=payment_record['id'],
+        )
     latest = await db.payments.find_one({'id': payment_record['id']})
     return latest or payment_record
 

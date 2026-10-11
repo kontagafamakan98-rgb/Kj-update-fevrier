@@ -34,11 +34,17 @@
  *    (`MAX_JOB_PAGES`) et jugées sur les trois mêmes métadonnées ; leur carte OG
  *    et le verrou 404 après suppression restent à `check-og-job-200.js`.
  *
- * En mode INFORMATIF (celui de `ci.yml`), le script ne fait JAMAIS échouer la
- * CI : une intégration non configurée ou un écart d'adresse sont des faits
- * d'exploitation, pas des régressions de code. Il refuse de conclure sur une
- * base locale (repli des PR) — là, les variables sont absentes par construction,
- * et quatre « ABSENT » ne diraient rien de la production.
+ * En mode INFORMATIF (le défaut, pour un run de poste), le script ne fait JAMAIS
+ * échouer : une intégration non configurée ou un écart d'adresse sont des faits
+ * d'exploitation, pas des régressions de code. Ce mode n'est PLUS celui de la
+ * CI : l'étape de `ci.yml` (job `lighthouse-ci`) qui le lançait a été RETIRÉE le
+ * 10/10/2026 — un rapport qui ne peut pas échouer et que personne ne lit n'est
+ * pas une vérification, et c'est ce qui a laissé F9 ouvert. La production est
+ * désormais lue par la sonde QUOTIDIENNE
+ * (`.github/workflows/seo-production-probe.yml`, `--strict`), qui BLOQUE. Il
+ * refuse de conclure sur une base locale (repli des PR) — là, les variables sont
+ * absentes par construction, et quatre « ABSENT » ne diraient rien de la
+ * production.
  *
  * Usage : cd frontend && node scripts/check-seo-production.js [--base URL]
  */
@@ -499,13 +505,14 @@ export async function runSeoProductionReport({
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   // ── Deux modes, et pourquoi ────────────────────────────────────────────────
-  // INFORMATIF (défaut, l'étape de ci.yml sur main) : une configuration
+  // INFORMATIF (le défaut, ce que lance un run de poste) : une configuration
   // incomplète est un fait d'exploitation, pas une régression de code — un rouge
   // sur chaque PR bloquerait des fusions pour une variable que personne n'a
-  // encore obtenue.
-  // STRICT (--strict, la sonde PÉRIODIQUE) : c'est ce mode qui met fin au
-  // silence. Une intégration absente, ou une sonde qui ne peut pas conclure,
-  // ÉCHOUE bruyamment — sans bloquer une PR.
+  // encore obtenue. La CI ne le lance plus : son étape de `ci.yml` a été retirée
+  // le 10/10/2026.
+  // STRICT (--strict, la sonde QUOTIDIENNE — le seul mode de la CI) : c'est ce
+  // mode qui met fin au silence. Une intégration absente, ou une sonde qui ne
+  // peut pas conclure, ÉCHOUE bruyamment — sans bloquer une PR.
   const strict = process.argv.includes('--strict');
   const flag = process.argv.indexOf('--base');
   const result = await runSeoProductionReport(

@@ -3,7 +3,7 @@ import { useState } from 'react';
 // Classes par défaut du champ de saisie (cohérentes avec les formulaires
 // orange du projet). Surchargeables via inputClassName (ex: création de
 // mission avec ses propres styles).
-const DEFAULT_INPUT_CLASS = 'flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500';
+const DEFAULT_INPUT_CLASS = 'flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-xs focus:outline-hidden focus:ring-orange-500 focus:border-orange-500';
 
 /**
  * Éditeur de tags réutilisable (compétences, spécialités, compétences

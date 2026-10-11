@@ -117,7 +117,8 @@ export const SURFACES = [
   {
     chemin: 'frontend/lighthouserc.cjs',
     motifs: ['maxNumericValue'],
-    quoi: 'budgets Lighthouse de la coquille (poste local et CI)',
+    quoi:
+      'budgets Lighthouse de la coquille — plafonds DÉRIVÉS d’une table MESURÉE, par hôte, aucun littéral',
   },
   {
     chemin: 'frontend/lighthouserc.desktop.cjs',
@@ -167,24 +168,14 @@ export const MIN_JUSTIFICATION = 40;
  */
 export const JUGES = {
   'frontend/lighthouserc.cjs': {
-    maxNumericValue: [
-      {
-        valeur: 3500,
-        occurrences: 1,
-        classe: 'MESURE',
-        quoi: 'LCP (ms) — coquille livrée',
-        pourquoi:
-          "Métrique de laboratoire : elle mêle l'hôte et l'artefact. Compensation : l'agrégation est « optimistic » (meilleur de trois tours), le seuil a été ÉLARGI depuis la borne mesurée, et le classement se fait d'abord sur un SCORE sans unité (≥ 0,9) — jamais sur la seule milliseconde.",
-      },
-      {
-        valeur: 2500,
-        occurrences: 1,
-        classe: 'MESURE',
-        quoi: 'FCP (ms) — coquille livrée',
-        pourquoi:
-          "Même famille que le LCP : un budget en millisecondes, donc un jugement de laboratoire. Il reste asserti parce qu'il borne le premier pixel peint, la seule métrique que la coquille pré-rendue peut dégrader sans que le score bouge.",
-      },
-    ],
+    // VIDE, et c'est le résultat : les quatre littéraux qui vivaient ici (score
+    // 0,9 / LCP 3500 / TBT 1600-1200 / FCP 2500) sont désormais des plafonds
+    // DÉRIVÉS de la table mesurée de `scripts/lhci-cls-budgets.cjs`
+    // (`SOCLE_MOBILE`, `TBT_MOBILE`), lus par `socleMobile(hote)`. Il n'y a donc
+    // plus de valeur littérale à déclarer — et la déclaration vide est ce qui
+    // empêche un littéral de REVENIR en silence : une borne non déclarée est
+    // refusée, nommée par fichier, ligne et valeur.
+    maxNumericValue: [],
   },
   'frontend/lighthouserc.desktop.cjs': {
     maxNumericValue: [],
@@ -259,7 +250,7 @@ export const ANGLES_ACCEPTES = [
     motifs: ['maxNumericValue'],
     classe: 'MESURE',
     compensation:
-      "Agrégation « optimistic » (meilleur de trois tours), seuils ÉLARGIS depuis les bornes mesurées, classement d'abord sur un SCORE sans unité, et retrait des assertions que la mesure n'arbitrait pas (speed-index jamais asserti ; LCP et score de /jobs retirés car ils mesuraient l'API et non la coquille). Les budgets qui dépendent de l'hôte sont SÉPARÉS par hôte : le TBT de la coquille vaut 1600 ms sur un poste non bridé et 1200 ms en CI (`targetIsLocal ? …`), et le TBT desktop n'est plus un littéral — il est DÉRIVÉ d'une table mesurée, dont un test interdit le littéral.",
+      "Angle mort 19(b) FERMÉ : plus AUCUN littéral dans ces deux fichiers. Chaque plafond est DÉRIVÉ de sa mesure par `plafondDe(pire, marge)` (scripts/lhci-cls-budgets.cjs) — le TBT desktop depuis le 24/09/2026, le socle mobile (`SOCLE_MOBILE`, `TBT_MOBILE`) depuis le 07/10/2026 — et re-mesurer la table DÉPLACE le budget. La dérivation reproduit exactement les anciens littéraux (3 500 / 2 500 / 1 600 ms), donc aucune re-mesure n'a été changée en verdict. Les budgets qui dépendent de l'hôte sont SÉPARÉS par hôte : `socleMobile('pile-locale' | 'deploiement')` LÈVE sur un hôte inconnu au lieu de lui prêter le plafond d'un autre. Quant aux assertions que la mesure n'arbitre pas, elles sont RETIRÉES et leur retrait est ÉCRIT (table `RETRAITS`) : le SCORE (`categories:performance`, moyenne pondérée de grandeurs déjà assertées plus `speed-index` jamais asserti, dont le seul verdict documenté est un faux rouge) et le TBT du déploiement (1200 ms pour un pire meilleur-run de 10 ms sur 39 runs, soit 120×). Ce qui reste asserti l'est pour soi : FCP partout, LCP hors routes produites par une réponse d'API, TBT là où une mesure l'adosse, CLS par route.",
   },
   {
     chemins: ['frontend/vite.config.js', 'frontend/playwright.config.js'],

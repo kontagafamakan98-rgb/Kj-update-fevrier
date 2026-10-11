@@ -16,7 +16,7 @@ import { buildHomeShell } from './prerender/shells-home.js'
 // plus bas). Le domicile unique de ces faits est src/config/photos-heros.js —
 // jamais un littéral recopié dans index.html, qui ne suivrait pas un changement
 // de photo et laisserait l'image LCP hors du chemin critique, en silence.
-import { PHOTOS_HEROS } from '../src/config/photos-heros.js'
+import { PHOTO_HEROS_SIZES, srcsetHeros } from '../src/config/photos-heros.js'
 import { buildRouteShells } from './prerender/shells-routes.js'
 import { chromeDePage, piedDePage } from './prerender/app-chrome.js'
 import { makeDeclaredBodyGuard } from './prerender/declared-body.js'
@@ -273,8 +273,21 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
       // dans la MÊME trame. Même mécanisme que les deux préchargements de
       // police d'index.html, et comme eux il est posé AVANT les liens du corps
       // pour ne pas être servi après eux.
+      // ── ET DEPUIS LE 08/10/2026, IL PRÉCHARGE LA VARIANTE, PAS LE JPEG ────
+      // La photo est publiée dans un `<picture>` (AVIF, WebP, puis JPEG) :
+      // précharger le JPEG ferait télécharger un fichier que le navigateur ne
+      // choisirait PAS, donc DEUX fichiers pour une seule photo. Le
+      // préchargement est donc TYPÉ (`type="image/avif"`) et porte le MÊME
+      // `srcset` que les `<source>` du corps, lu du même module : un navigateur
+      // qui sait lire l'AVIF précharge exactement le candidat qu'il choisira
+      // (même URL, une seule requête), et un navigateur qui ne le sait pas
+      // IGNORE ce préchargement — puis découvre sa variante dans le corps, ce
+      // qui est le comportement d'avant cette passe pour lui. Ce qu'on perd, et
+      // c'est assumé : la priorité haute n'est donnée qu'aux navigateurs AVIF.
       const preloadPhoto =
-        `<link rel="preload" as="image" fetchpriority="high" href="${esc(PHOTOS_HEROS[0])}">`
+        `<link rel="preload" as="image" type="image/avif" fetchpriority="high" imagesrcset="${esc(
+          srcsetHeros(0, 'avif')
+        )}" imagesizes="${esc(PHOTO_HEROS_SIZES)}">`
       const withPreload = html.replace('<head>', `<head>\n    ${preloadPhoto}`)
       if (withPreload === html) {
         throw new Error(

@@ -78,7 +78,7 @@ export default function MobileTest() {
               <div className="text-orange-700 space-y-2">
                 <p><strong>{pageT('step1')}</strong></p>
                 <p><strong>{pageT('step2')}:</strong></p>
-                <code className="bg-gray-100 px-2 py-1 rounded text-sm block w-fit">
+                <code className="bg-gray-100 px-2 py-1 rounded-sm text-sm block w-fit">
                   cd /app/KojoMobile_FINAL && npx expo start
                 </code>
                 <p><strong>{pageT('step3')}</strong></p>

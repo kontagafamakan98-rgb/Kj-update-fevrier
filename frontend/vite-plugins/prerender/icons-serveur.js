@@ -6,7 +6,7 @@
 // 130 à 201 ko (mesuré le 26/09/2026). Ici, le balisage est composé à la main,
 // avec les MÊMES attributs et le MÊME contenu que `IconePage` — la coquille et la
 // page publient donc le même `<svg>`, sans seconde description à tenir à jour.
-import { ATTRIBUTS_SVG, contenuDeLICone } from '../../src/config/page-icons.js';
+import { ATTRIBUTS_SVG, classeDeRole, contenuDeLICone } from '../../src/config/page-icons.js';
 import {
   GRILLE_MARQUE,
   MARQUEUR_DE_LA_MARQUE,
@@ -23,7 +23,19 @@ const ATTRS = Object.entries(ATTRIBUTS_SVG)
 
 
 
-export function svgDeLIcone(nom, classe) {
+/**
+ * L'icône DESSINÉE d'un emplacement, en chaîne — la coquille dit un RÔLE, jamais
+ * une classe (09/10/2026).
+ *
+ * Le rôle est résolu par `classeDeRole`, c'est-à-dire par le domicile
+ * (`CLASSES_ICONE`, src/config/page-icons.js) : la coquille et la page lisent
+ * donc la MÊME classe par le MÊME nom, et aucune des deux ne peut en écrire une
+ * en clair. `enPlus` sert aux trois emplacements dont la classe est complétée par
+ * le plan (la flèche d'une ligne, qui ajoute sa mise en page) : la classe du
+ * domicile vient EN PREMIER, comme avant.
+ */
+export function svgDeLIcone(nom, role, enPlus = '') {
+  const classe = [classeDeRole(role), enPlus].filter(Boolean).join(' ');
   return `<svg ${ATTRS} class="${classe}" aria-hidden="true" data-icone="${nom}">${contenuDeLICone(nom)}</svg>`;
 }
 

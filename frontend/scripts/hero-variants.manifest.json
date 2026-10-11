@@ -1,0 +1,294 @@
+{
+  "genere_par": "frontend/scripts/gen-hero-images.py",
+  "encodeur": {
+    "pillow": "11.3.0"
+  },
+  "largeur_source": 720,
+  "hauteur_source": 960,
+  "largeurs": [
+    480,
+    720
+  ],
+  "reglages": {
+    "avif": {
+      "format": "AVIF",
+      "qualite": 55,
+      "psnr_min": 36.69,
+      "octets": {
+        "480": 120313,
+        "720": 213059
+      }
+    },
+    "webp": {
+      "format": "WEBP",
+      "qualite": 75,
+      "psnr_min": 35.76,
+      "octets": {
+        "480": 147994,
+        "720": 264938
+      }
+    }
+  },
+  "jpeg_total": 574211,
+  "photos": [
+    {
+      "source": "kojo-hero.jpg",
+      "octets_source": 63509,
+      "sha256_source": "e829537e4c89ff01283e197b65269365048e7593dd54fed78cec900f834ef9b9",
+      "variantes": [
+        {
+          "fichier": "kojo-hero-480.avif",
+          "format": "avif",
+          "largeur": 480,
+          "hauteur": 640,
+          "qualite": 55,
+          "octets": 11854
+        },
+        {
+          "fichier": "kojo-hero-480.webp",
+          "format": "webp",
+          "largeur": 480,
+          "hauteur": 640,
+          "qualite": 75,
+          "octets": 15578
+        },
+        {
+          "fichier": "kojo-hero.avif",
+          "format": "avif",
+          "largeur": 720,
+          "hauteur": 960,
+          "qualite": 55,
+          "octets": 19807
+        },
+        {
+          "fichier": "kojo-hero.webp",
+          "format": "webp",
+          "largeur": 720,
+          "hauteur": 960,
+          "qualite": 75,
+          "octets": 26538
+        }
+      ]
+    },
+    {
+      "source": "kojo-hero-2.jpg",
+      "octets_source": 63809,
+      "sha256_source": "a6be1cf44ddb1e40d26e4fe8500db1930a01bd4bebc200b126a9b923a99bf24b",
+      "variantes": [
+        {
+          "fichier": "kojo-hero-2-480.avif",
+          "format": "avif",
+          "largeur": 480,
+          "hauteur": 640,
+          "qualite": 55,
+          "octets": 10290
+        },
+        {
+          "fichier": "kojo-hero-2-480.webp",
+          "format": "webp",
+          "largeur": 480,
+          "hauteur": 640,
+          "qualite": 75,
+          "octets": 14212
+        },
+        {
+          "fichier": "kojo-hero-2.avif",
+          "format": "avif",
+          "largeur": 720,
+          "hauteur": 960,
+          "qualite": 55,
+          "octets": 16059
+        },
+        {
+          "fichier": "kojo-hero-2.webp",
+          "format": "webp",
+          "largeur": 720,
+          "hauteur": 960,
+          "qualite": 75,
+          "octets": 23924
+        }
+      ]
+    },
+    {
+      "source": "kojo-hero-3.jpg",
+      "octets_source": 121483,
+      "sha256_source": "478a04bc05d3a72baf259d97fe3cb01eaf08ef8cbf66dc225f0d1cddbaba6518",
+      "variantes": [
+        {
+          "fichier": "kojo-hero-3-480.avif",
+          "format": "avif",
+          "largeur": 480,
+          "hauteur": 640,
+          "qualite": 55,
+          "octets": 27061
+        },
+        {
+          "fichier": "kojo-hero-3-480.webp",
+          "format": "webp",
+          "largeur": 480,
+          "hauteur": 640,
+          "qualite": 75,
+          "octets": 31832
+        },
+        {
+          "fichier": "kojo-hero-3.avif",
+          "format": "avif",
+          "largeur": 720,
+          "hauteur": 960,
+          "qualite": 55,
+          "octets": 51653
+        },
+        {
+          "fichier": "kojo-hero-3.webp",
+          "format": "webp",
+          "largeur": 720,
+          "hauteur": 960,
+          "qualite": 75,
+          "octets": 60548
+        }
+      ]
+    },
+    {
+      "source": "kojo-hero-4.jpg",
+      "octets_source": 128670,
+      "sha256_source": "bdbe858c4a9ac7c5791585f87dd297a20c4b87f5598347fa70e3ef1d5f9393b3",
+      "variantes": [
+        {
+          "fichier": "kojo-hero-4-480.avif",
+          "format": "avif",
+          "largeur": 480,
+          "hauteur": 640,
+          "qualite": 55,
+          "octets": 32071
+        },
+        {
+          "fichier": "kojo-hero-4-480.webp",
+          "format": "webp",
+          "largeur": 480,
+          "hauteur": 640,
+          "qualite": 75,
+          "octets": 36586
+        },
+        {
+          "fichier": "kojo-hero-4.avif",
+          "format": "avif",
+          "largeur": 720,
+          "hauteur": 960,
+          "qualite": 55,
+          "octets": 58562
+        },
+        {
+          "fichier": "kojo-hero-4.webp",
+          "format": "webp",
+          "largeur": 720,
+          "hauteur": 960,
+          "qualite": 75,
+          "octets": 66474
+        }
+      ]
+    },
+    {
+      "source": "kojo-hero-5.jpg",
+      "octets_source": 104267,
+      "sha256_source": "ee94cca1e0a315d4fdc1f1510b9bb2d582766059101ff952e82760b7ec6547e4",
+      "variantes": [
+        {
+          "fichier": "kojo-hero-5-480.avif",
+          "format": "avif",
+          "largeur": 480,
+          "hauteur": 640,
+          "qualite": 55,
+          "octets": 21639
+        },
+        {
+          "fichier": "kojo-hero-5-480.webp",
+          "format": "webp",
+          "largeur": 480,
+          "hauteur": 640,
+          "qualite": 75,
+          "octets": 27018
+        },
+        {
+          "fichier": "kojo-hero-5.avif",
+          "format": "avif",
+          "largeur": 720,
+          "hauteur": 960,
+          "qualite": 55,
+          "octets": 36515
+        },
+        {
+          "fichier": "kojo-hero-5.webp",
+          "format": "webp",
+          "largeur": 720,
+          "hauteur": 960,
+          "qualite": 75,
+          "octets": 47772
+        }
+      ]
+    },
+    {
+      "source": "kojo-hero-6.jpg",
+      "octets_source": 92473,
+      "sha256_source": "100cd7b56393653ebdcd710d41ba3e893b5c52e9e87d60e2b8b98bb5a2c29602",
+      "variantes": [
+        {
+          "fichier": "kojo-hero-6-480.avif",
+          "format": "avif",
+          "largeur": 480,
+          "hauteur": 640,
+          "qualite": 55,
+          "octets": 17398
+        },
+        {
+          "fichier": "kojo-hero-6-480.webp",
+          "format": "webp",
+          "largeur": 480,
+          "hauteur": 640,
+          "qualite": 75,
+          "octets": 22768
+        },
+        {
+          "fichier": "kojo-hero-6.avif",
+          "format": "avif",
+          "largeur": 720,
+          "hauteur": 960,
+          "qualite": 55,
+          "octets": 30463
+        },
+        {
+          "fichier": "kojo-hero-6.webp",
+          "format": "webp",
+          "largeur": 720,
+          "hauteur": 960,
+          "qualite": 75,
+          "octets": 39682
+        }
+      ]
+    }
+  ],
+  "totaux": {
+    "avif": {
+      "480": 120313,
+      "720": 213059
+    },
+    "webp": {
+      "480": 147994,
+      "720": 264938
+    }
+  },
+  "jpeg_vs_variantes": {
+    "avif": {
+      "largeur": 720,
+      "octets": 213059,
+      "gain_absolu": 361152,
+      "gain_pct": 62.9
+    },
+    "webp": {
+      "largeur": 720,
+      "octets": 264938,
+      "gain_absolu": 309273,
+      "gain_pct": 53.9
+    }
+  },
+  "genere_le": "2026-10-08T16:49:57Z"
+}

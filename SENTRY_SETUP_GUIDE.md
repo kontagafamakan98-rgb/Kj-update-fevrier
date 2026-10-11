@@ -10,7 +10,7 @@ exactement comme avant.
 | Couche | Package | Init | Variables d'activation |
 |---|---|---|---|
 | Frontend (Vercel) | `@sentry/react` (déjà dans package.json) | `src/index.js` → `initSentry()` | `VITE_SENTRY_ENABLED=true` + `VITE_SENTRY_DSN` |
-| Backend (Render) | `sentry-sdk` (déjà dans requirements.txt) | `server.py` → `_init_sentry()` | `SENTRY_DSN` |
+| Backend (Fly.io) | `sentry-sdk` (déjà dans requirements.txt) | `server.py` → `_init_sentry()` | `SENTRY_DSN` |
 
 Les variables sont documentées dans `frontend/.env.example` et
 `backend/.env.example`.
@@ -50,20 +50,20 @@ Projet Vercel : `kj-update-fevrier` (répertoire racine `frontend/`).
 
 ---
 
-## Étape 3 — Backend : activer sur Render
+## Étape 3 — Backend : activer sur Fly.io
 
-Service Render : `kojo-backend` (voir `backend/.env.example`).
+App Fly.io : `kojo-backend` (voir `backend/fly.toml` et `backend/.env.example`).
 
-1. **Environment** (onglet du service) → **Add Environment Variable** :
-   - `SENTRY_DSN` = `<DSN backend>`
-2. **Deploy** (ou push sur `main`, selon la config auto-deploy).
+1. Définir le secret : `flyctl secrets set SENTRY_DSN="<DSN backend>" -a kojo-backend`
+   (Fly redéploie la machine automatiquement).
+2. Vérifier les logs : `flyctl logs -a kojo-backend`.
 
 > 🔒 Le DSN backend est un **secret** : ne jamais le mettre dans du code
 > client, un `.env` committé ou une variable `VITE_*`.
 
 ### Vérification côté backend
 
-Dans les logs Render au démarrage :
+Dans les logs Fly au démarrage :
 
 ```
 ✅ Sentry activé (backend)
@@ -84,7 +84,7 @@ ou, si le DSN est absent/invalide :
    stack trace et, après connexion, l'utilisateur (`setUser` appelé depuis
    AuthContext).
 2. Backend : appeler une route en erreur ; l'issue doit apparaître avec
-   `environment` = `production` (valeur de `APP_ENV` sur Render).
+   `environment` = `production` (valeur de `APP_ENV`, secret Fly).
 
 ---
 

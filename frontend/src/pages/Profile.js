@@ -23,8 +23,23 @@ import { makeScopedTranslator } from '../utils/pack2PageI18n/profile';
 import { devLog, safeLog } from '../utils/env';
 import { WorkerTrustBadge, VerifiedBadge } from '../utils/workerTrustLevel';
 import { usePageTitle } from '../utils/seo';
-import { Skeleton } from '../components/SkeletonLoader';
+// Le squelette de la page vient de son PROPRIÉTAIRE unique : il en existait une
+// SECONDE copie ici même (`function ProfileSkeleton` en bas de ce fichier),
+// identique au rendu et invisible à toute relecture — deux chaînes de classes à
+// tenir d'accord, dont l'une portait la hauteur minimale qui empêche le pied de
+// page de quitter l'écran pendant le chargement (cf. SkeletonLoader.js) et
+// l'autre pas. Une divergence entre les deux phases était exactement ce que la
+// règle `antiClsSkeletons` interdit ; elle a été mesurée le 07/10/2026 par
+// `e2e/cadres-app.spec.js` (CLS 0,1010 sur /profile desktop : le squelette
+// RÉELLEMENT peint était la copie locale, donc la correction du propriétaire ne
+// s'appliquait pas).
+import { ProfileSkeleton } from '../components/SkeletonLoader';
 import { PHONE_NUMBER_MASK } from '../config/phone-format';
+// Le cadre de la page : le pas, la largeur et l'en-tête sont LUS dans leur
+// déclaration (src/config/app-cadres.js), jamais recopiés ici — la gouttière de
+// cette page avait déjà divergé des autres (`py-8` d'un côté, `px-4` seul de
+// l'autre).
+import CadrePage from '../components/CadrePage';
 // La carte du profil : une carte DIFFÉRÉE (montée seulement si le bloc entre
 // dans le viewport), dont les URL viennent de leur propriétaire.
 import DeferredMap from '../components/DeferredMap';
@@ -202,11 +217,14 @@ export default function Profile() {
     }
   };
 
-  // Squelette de la carte profil : reproduit la STRUCTURE (conteneur max-w-4xl
-  // + carte blanche + header orange + sections) pour que l'arrivée des données
-  // ne déplace rien → réduit le CLS (mesuré 0.112 avant).
+  // Squelette de la carte profil : reproduit la STRUCTURE (le cadre de
+  // `src/config/app-cadres.js` + carte blanche + header orange + sections) ET
+  // réserve une hauteur minimale d'écran, pour que l'arrivée des données ne
+  // déplace rien — ni le contenu, ni le pied de page ancré. Il est PARTAGÉ avec
+  // le repli Suspense de la route (App.js) : une seule définition, donc les deux
+  // phases ne peuvent plus diverger.
   if (loading) {
-    return <ProfileSkeleton t={t} pageT={pageT} />;
+    return <ProfileSkeleton />;
   }
 
   // Sans session, cette page n'a rien à montrer : la route est protégée, mais
@@ -216,13 +234,17 @@ export default function Profile() {
   // « rien à afficher » sans texte inventé (défaut trouvé le 20/09/2026 par le
   // rendu de fumée de src/pages/__tests__/pages-render.test.jsx).
   if (!user) {
-    return <ProfileSkeleton t={t} pageT={pageT} />;
+    return <ProfileSkeleton />;
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    // `titre={null}` est VOULU : le nom du profil est le titre d'un bandeau
+    // orange, donc `.titre-heros` (crème, serif) et non `.titre-page`, dont
+    // l'encre foncée disparaîtrait sur ce fond. Le cadre n'ajoute donc pas
+    // d'en-tête — il ne pose que le pas et la largeur.
+    <CadrePage chemin="/profile" classeCorps="">
       <div className="carte-editoriale overflow-hidden">
-        <div className="bg-orange-600 px-6 py-8">
+        <div className="bg-orange-600 carte-cotes py-8">
           <div className="flex items-center">
             <ProfilePhoto
               key={photoRefreshKey}
@@ -255,7 +277,7 @@ export default function Profile() {
         {error && <div className="mx-6 mt-6 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">{error}</div>}
         {success && <div className="mx-6 mt-6 bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded-md">{success}</div>}
 
-        <div className="px-6 py-6 border-b border-gray-200">
+        <div className="carte-cotes py-6 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">{t('myReviewsTitle')}</h2>
           {reviews.length === 0 ? (
             <p className="text-sm text-gray-500">{t('noReviewsYet')}</p>
@@ -280,7 +302,7 @@ export default function Profile() {
           )}
         </div>
 
-        <div className="px-6 py-6 border-b border-gray-200">
+        <div className="carte-cotes py-6 border-b border-gray-200">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-gray-900">{t('personalInformation')}</h2>
             <button onClick={() => setIsEditing(!isEditing)} className="text-orange-600 hover:text-orange-700 font-medium">
@@ -303,7 +325,7 @@ export default function Profile() {
         </div>
 
         {user.user_type === 'worker' && (
-          <div className="px-6 py-6 border-b border-gray-200">
+          <div className="carte-cotes py-6 border-b border-gray-200">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">{pageT('workerProfileSection')}</h2>
             {workerProfile ? (
               <WorkerProfileView profile={workerProfile} pageT={pageT} t={t} />
@@ -314,7 +336,7 @@ export default function Profile() {
         )}
 
         {user.user_type === 'worker' && (
-          <div className="px-6 py-6 border-b border-gray-200">
+          <div className="carte-cotes py-6 border-b border-gray-200">
             <h2 className="text-lg font-semibold text-gray-900 mb-2">{t('portfolioTitle')}</h2>
             <p className="text-sm text-gray-500 mb-4">{t('portfolioHelp')}</p>
             <PortfolioManager
@@ -328,13 +350,13 @@ export default function Profile() {
         )}
 
         {user.user_type === 'worker' && (
-          <div className="px-6 py-6 border-b border-gray-200">
+          <div className="carte-cotes py-6 border-b border-gray-200">
             <ReferralCard referral={referral} t={t} referredBy={user?.referred_by} />
             <FilleulsCard filleuls={filleuls} t={t} />
           </div>
         )}
 
-        <div className="px-6 py-6">
+        <div className="carte-cotes py-6">
           <PaymentAccountsManager
             onSuccess={() => {
               setSuccess(t('paymentAccountsUpdated'));
@@ -349,7 +371,7 @@ export default function Profile() {
             et le parcours e2e (`e2e/carte-facade.spec.js`) refuse une carte
             qui serait montée au premier écran. */}
         {cartePays && (
-          <div className="px-6 py-6 border-t border-gray-200">
+          <div className="carte-cotes py-6 border-t border-gray-200">
             <h2 className="text-lg font-semibold text-gray-900 mb-1">{t('location')}</h2>
             <p className="mb-4 text-sm text-gray-500">
               <CountryDisplay countryCode={user.country} className="inline-flex align-middle" />
@@ -374,7 +396,7 @@ export default function Profile() {
           onCancel={() => setPortfolioRemoveIndex(null)}
         />
 
-        <div className="px-6 pb-6">
+        <div className="carte-cotes pb-6">
           <Link
             to="/support"
             className="flex items-center justify-between rounded-2xl border border-gray-100 bg-gray-50 px-4 py-4 text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
@@ -385,7 +407,7 @@ export default function Profile() {
         </div>
 
         {/* Zone dangereuse : suppression du compte (RGPD) */}
-        <div className="px-6 pb-6">
+        <div className="carte-cotes pb-6">
           <div className="rounded-2xl border border-red-200 bg-red-50/50 p-5">
             <h2 className="text-lg font-semibold text-red-800 mb-1">{t('deleteAccountTitle') || 'Supprimer mon compte'}</h2>
             <p className="text-sm text-red-700 mb-4">
@@ -397,7 +419,7 @@ export default function Profile() {
                 value={deleteConfirm}
                 onChange={(e) => setDeleteConfirm(e.target.value)}
                 placeholder={t('deleteAccountConfirmHint') || 'Tapez SUPPRIMER pour confirmer'}
-                className="w-full max-w-sm rounded-lg border border-red-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 mb-3"
+                className="w-full max-w-sm rounded-lg border border-red-300 px-4 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-red-400 mb-3"
               />
             )}
             <button
@@ -425,7 +447,7 @@ export default function Profile() {
           </div>
         </div>
       </div>
-    </div>
+    </CadrePage>
   );
 }
 
@@ -560,7 +582,7 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {success && <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative">{success}</div>}
+      {success && <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-sm relative">{success}</div>}
 
       <div className="mb-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">{pageT('photoTitle')}</h3>
@@ -576,12 +598,12 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label htmlFor="first_name" className="block text-sm font-medium text-gray-700">{pageT('firstName')}</label>
-          <input type="text" id="first_name" name="first_name" autoComplete="given-name" value={formData.first_name} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
+          <input type="text" id="first_name" name="first_name" autoComplete="given-name" value={formData.first_name} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-orange-500 focus:border-orange-500" />
         </div>
 
         <div>
           <label htmlFor="last_name" className="block text-sm font-medium text-gray-700">{pageT('lastName')}</label>
-          <input type="text" id="last_name" name="last_name" autoComplete="family-name" value={formData.last_name} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
+          <input type="text" id="last_name" name="last_name" autoComplete="family-name" value={formData.last_name} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-orange-500 focus:border-orange-500" />
         </div>
 
         <div>
@@ -601,7 +623,7 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
                 updateFormData('phone', `${prefix} ${e.target.value.replace(/[^\d\s]/g, '')}`);
               }}
               placeholder={pageT('phonePlaceholder')}
-              className="flex-1 block w-full px-3 py-2 border border-gray-300 rounded-r-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
+              className="flex-1 block w-full px-3 py-2 border border-gray-300 rounded-r-md shadow-xs focus:outline-hidden focus:ring-orange-500 focus:border-orange-500"
             />
           </div>
           <p className="mt-1 text-sm text-gray-500">{t('phoneFormat')}: {getPhonePrefixByCountry(formData.country.toLowerCase())} {PHONE_NUMBER_MASK}</p>
@@ -609,7 +631,7 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
 
         <div>
           <label htmlFor="preferred_language" className="block text-sm font-medium text-gray-700">{t('preferredLanguage')}</label>
-          <select id="preferred_language" name="preferred_language" autoComplete="off" value={formData.preferred_language} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500">
+          <select id="preferred_language" name="preferred_language" autoComplete="off" value={formData.preferred_language} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-orange-500 focus:border-orange-500">
             {getAvailableLanguagesForCountry(formData.country).map(lang => (
               <option key={lang} value={lang}>{getLanguageLabel(lang, t)}</option>
             ))}
@@ -635,7 +657,7 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
           <h3 className="text-lg font-medium text-gray-900">{pageT('professionalInfo')}</h3>
           <div>
             <label htmlFor="bio" className="block text-sm font-medium text-gray-700">{pageT('bio')}</label>
-            <textarea id="bio" name="bio" autoComplete="off" rows={4} value={formData.bio} onChange={handleChange} placeholder={pageT('bioPlaceholder')} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
+            <textarea id="bio" name="bio" autoComplete="off" rows={4} value={formData.bio} onChange={handleChange} placeholder={pageT('bioPlaceholder')} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-orange-500 focus:border-orange-500" />
             <p className="mt-1 text-sm text-gray-500">{pageT('bioHelp')}</p>
           </div>
 
@@ -740,16 +762,16 @@ function WorkerProfileCreate({ onCreate, pageT }) {
 
         <div>
           <label htmlFor="experience_years" className="block text-sm font-medium text-gray-700">{pageT('yearsExperience')}</label>
-          <input type="number" id="experience_years" name="experience_years" autoComplete="off" min="0" required value={formData.experience_years} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
+          <input type="number" id="experience_years" name="experience_years" autoComplete="off" min="0" required value={formData.experience_years} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-orange-500 focus:border-orange-500" />
         </div>
 
         <div>
           <label htmlFor="description" className="block text-sm font-medium text-gray-700">{pageT('descriptionOptional')}</label>
-          <textarea id="description" name="description" autoComplete="off" rows={3} value={formData.description} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={pageT('descriptionPlaceholder')} />
+          <textarea id="description" name="description" autoComplete="off" rows={3} value={formData.description} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-orange-500 focus:border-orange-500" placeholder={pageT('descriptionPlaceholder')} />
         </div>
 
         <div className="flex items-center">
-          <input type="checkbox" id="availability" name="availability" autoComplete="off" checked={formData.availability} onChange={handleChange} className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded" />
+          <input type="checkbox" id="availability" name="availability" autoComplete="off" checked={formData.availability} onChange={handleChange} className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded-sm" />
           <label htmlFor="availability" className="ml-2 text-sm text-gray-700">{pageT('availableForProjects')}</label>
         </div>
 
@@ -978,7 +1000,7 @@ function FilleulsCard({ filleuls, t }) {
       <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
         <Users className="h-4 w-4 mr-2" aria-hidden="true" />
         {t('filleulsTitle')}
-        <span className="ml-2 rounded bg-orange-100 text-orange-700 px-2 py-0.5 text-xs font-semibold">
+        <span className="ml-2 rounded-sm bg-orange-100 text-orange-700 px-2 py-0.5 text-xs font-semibold">
           {filleuls.length}
         </span>
       </h3>
@@ -1023,89 +1045,6 @@ function FilleulsCard({ filleuls, t }) {
           </li>
         ))}
       </ul>
-    </div>
-  );
-}
-
-// Squelette de la carte profil : reproduit la STRUCTURE exacte du profil
-// (conteneur max-w-4xl, carte blanche, header orange, sections) pour que
-// l'arrivée des données réelles ne déplace aucun élément → réduit le CLS
-// (mesuré 0.112 avant). Les données async (reviews, referral, portfolio,
-// workerProfile) remplissent des sections déjà dimensionnées.
-function ProfileSkeleton({ t, pageT }) {
-  return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="carte-editoriale overflow-hidden">
-        {/* Header orange / photo / nom */}
-        <div className="bg-orange-600 px-6 py-8">
-          <div className="flex items-center">
-            <Skeleton className="h-20 w-20 rounded-full bg-white/30 border-2 border-white" />
-            <div className="ml-6 flex-1">
-              <Skeleton className="h-7 w-56 max-w-full bg-white/30" />
-              <div className="mt-2">
-                <Skeleton className="h-4 w-40 bg-white/30" />
-              </div>
-              <div className="mt-3">
-                <Skeleton className="h-4 w-52 bg-white/30" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Section avis */}
-        <div className="px-6 py-6 border-b border-gray-200">
-          <Skeleton className="h-5 w-40" />
-          <div className="mt-4">
-            <Skeleton className="h-4 w-3/4 max-w-md" />
-          </div>
-        </div>
-
-        {/* Section informations personnelles */}
-        <div className="px-6 py-6 border-b border-gray-200">
-          <div className="flex justify-between items-center mb-4">
-            <Skeleton className="h-5 w-48" />
-            <Skeleton className="h-4 w-16" />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <Skeleton className="h-4 w-20" />
-              <div className="mt-1">
-                <Skeleton className="h-4 w-40" />
-              </div>
-            </div>
-            <div>
-              <Skeleton className="h-4 w-20" />
-              <div className="mt-1">
-                <Skeleton className="h-4 w-40" />
-              </div>
-            </div>
-            <div>
-              <Skeleton className="h-4 w-20" />
-              <div className="mt-1">
-                <Skeleton className="h-4 w-40" />
-              </div>
-            </div>
-            <div>
-              <Skeleton className="h-4 w-20" />
-              <div className="mt-1">
-                <Skeleton className="h-4 w-40" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Sections bas de carte : paiement + support */}
-        <div className="px-6 py-6 border-b border-gray-200">
-          <Skeleton className="h-5 w-40" />
-          <div className="mt-4">
-            <Skeleton className="h-10 w-full rounded-lg" />
-          </div>
-        </div>
-
-        <div className="px-6 pb-6">
-          <Skeleton className="h-14 w-full rounded-2xl" />
-        </div>
-      </div>
     </div>
   );
 }

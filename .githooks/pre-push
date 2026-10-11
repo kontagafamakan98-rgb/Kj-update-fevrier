@@ -81,6 +81,18 @@ fi
 # refuse alors une mutation qui ne trouve plus son littéral (mesuré en CI sur la
 # première poussée de cette passe). L'enfant voit la variable de toute façon,
 # l'export n'est donc pas un détour.
+# Le pré-vol PROPOSE le nettoyage d'un résidu de passe — mais seulement s'il y a
+# quelqu'un pour répondre. « Ce push vient d'un terminal » se mesure ICI, et pas
+# par le garde : l'entrée standard du hook est le tuyau qui porte les réfs, donc
+# inutilisable pour demander quoi que ce soit, et `stderr` peut être redirigé
+# (`git push > log`) — `[ -t 2 ]` est la seule mesure qui ne se trompe pas. La
+# variable est POSÉE puis EXPORTÉE, jamais préfixée : la ligne d'appel reste
+# ainsi le sujet d'une mutation déclarée, comme pour KOJO_BRANCHES_POUSEES.
+if [ -t 2 ]; then
+  KOJO_PRE_VOL_TERMINAL=1
+  export KOJO_PRE_VOL_TERMINAL
+fi
+
 KOJO_BRANCHES_POUSEES="$branches_poussees"
 export KOJO_BRANCHES_POUSEES
 

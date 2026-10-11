@@ -429,8 +429,11 @@ describe('section Pages — le sitemap servi, page par page', () => {
 
 describe('le mode STRICT — celui qui met fin au silence (F9)', () => {
   // Le mode informatif est ce qui a laissé F9 ouvert des jours : quatre
-  // intégrations absentes de la production, et aucun run rouge. Le mode strict
-  // est celui de la sonde PÉRIODIQUE (.github/workflows/seo-production-probe.yml).
+  // intégrations absentes de la production, et aucun run rouge. SON étape de
+  // `ci.yml` (job `lighthouse-ci`) a été RETIRÉE le 10/10/2026 — un rapport qui
+  // ne peut pas échouer n'est pas une vérification ; le mode strict est donc le
+  // seul que la CI exerce, par la sonde QUOTIDIENNE
+  // (.github/workflows/seo-production-probe.yml).
   it('refuse une intégration absente et nomme la variable à poser', async () => {
     const result = await runSeoProductionReport({
       base: SITE_ORIGIN,

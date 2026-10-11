@@ -15,6 +15,8 @@ répond, et escalade au propriétaire quand il ne peut pas.
 """
 
 import asyncio
+import os
+import socket
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -214,6 +216,71 @@ async def payout_stuck_sweep_once(now: Optional[datetime] = None) -> dict:
     return summary
 
 
+# ---------------------------------------------------------------------------
+# Bail de tâche partagé entre instances
+# ---------------------------------------------------------------------------
+# Chaque instance (worker, machine Fly) lance ses propres boucles de fond. Sans
+# coordination, N instances exécutent N fois le sweeper : N check-status PayDunya
+# et N alertes au propriétaire pour le même paiement. Un bail par tâche, dans
+# `scheduler_leases` (un document par tâche, `_id` = nom) : seule l'instance qui
+# l'obtient exécute le passage, les autres le sautent.
+#
+# Atomicité : la prise de bail est un update conditionnel sur UN document (bail
+# échu). Si le document n'existe pas, l'insertion avec le même `_id` échoue pour le
+# second arrivant (index `_id` unique, code 11000). Un bail échu est repris par
+# la première instance qui réveille la boucle après son échéance : une instance
+# qui meurt en cours libère donc la tâche au bout de la durée du bail.
+#
+# Échec fermé : si la base est injoignable, le passage est SAUTÉ (l'exception
+# remonte à la boucle, qui la journalise) plutôt que lancé sans bail.
+
+SCHEDULER_LEASE_COLLECTION = "scheduler_leases"
+_DUPLICATE_KEY_CODE = 11000
+
+
+def scheduler_holder_id() -> str:
+    """Identité de cette instance dans le bail : machine Fly si présente, sinon hôte:pid."""
+    return os.environ.get("FLY_MACHINE_ID", "").strip() or f"{socket.gethostname()}:{os.getpid()}"
+
+
+async def acquerir_bail(nom: str, duree: timedelta, *, holder: str, now: Optional[datetime] = None) -> bool:
+    """Tente de prendre le bail `nom` pour `duree`. Vrai si cette instance l'obtient."""
+    now = now or datetime.now(timezone.utc)
+    expire = now + duree
+    collection = db[SCHEDULER_LEASE_COLLECTION]
+    # 1) Bail existant mais échu : repris atomiquement (filtre conditionnel).
+    reprise = await collection.update_one(
+        {"_id": nom, "expires_at": {"$lte": now}},
+        {"$set": {"holder": holder, "expires_at": expire, "acquired_at": now}},
+    )
+    if reprise.matched_count:
+        return True
+    # 2) Aucun bail (premier passage), ou bail encore tenu : l'insertion gagne
+    #    seulement si le document n'existe pas ; sinon doublon sur `_id`.
+    try:
+        await collection.insert_one(
+            {"_id": nom, "holder": holder, "expires_at": expire, "acquired_at": now}
+        )
+    except Exception as exc:
+        if getattr(exc, "code", None) == _DUPLICATE_KEY_CODE:
+            return False
+        raise
+    return True
+
+
+async def executer_si_bail(nom: str, duree: timedelta, travail, *, holder: Optional[str] = None):
+    """Lance `travail()` seulement si cette instance détient le bail `nom`.
+
+    Retourne le résultat du passage, ou None quand il est sauté (une autre
+    instance l'a pris pour cette période).
+    """
+    detenteur = holder or scheduler_holder_id()
+    if not await acquerir_bail(nom, duree, holder=detenteur):
+        logger.debug(f"⏭️ Tâche '{nom}' sautée : bail tenu par une autre instance")
+        return None
+    return await travail()
+
+
 async def payout_stuck_sweeper_loop():
     """Tâche de fond : re-vérifie périodiquement les décaissements bloqués.
 
@@ -224,7 +291,11 @@ async def payout_stuck_sweeper_loop():
     while True:
         try:
             await asyncio.sleep(PAYOUT_SWEEPER_INTERVAL_MINUTES * 60)
-            await payout_stuck_sweep_once()
+            await executer_si_bail(
+                "payout_stuck_sweeper",
+                timedelta(minutes=PAYOUT_SWEEPER_INTERVAL_MINUTES),
+                payout_stuck_sweep_once,
+            )
         except asyncio.CancelledError:
             break
         except Exception as exc:
@@ -272,7 +343,11 @@ async def retention_purge_loop():
     while True:
         try:
             await asyncio.sleep(RETENTION_SWEEP_INTERVAL_MINUTES * 60)
-            await retention_purge_once()
+            await executer_si_bail(
+                "retention_purge",
+                timedelta(minutes=RETENTION_SWEEP_INTERVAL_MINUTES),
+                retention_purge_once,
+            )
         except asyncio.CancelledError:
             break
         except Exception as exc:

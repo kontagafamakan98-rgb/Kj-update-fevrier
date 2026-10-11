@@ -12,6 +12,15 @@
  *      tête n'est contenue dans aucune réf distante. Ce dernier verdict ne
  *      bloque JAMAIS — voir `verdictDeLaPasse` — mais il est nommé dans les
  *      deux modes, parce que c'est la fin de passe qui l'a demandé.
+ *   5. le NETTOYAGE d'une réf distante orpheline n'est plus seulement nommé :
+ *      il est PROPOSÉ, et exécuté après accord (`proposerLeNettoyage`).
+ *      L'accord se demande SUR LE TERMINAL — la question sur `process.stderr`,
+ *      la réponse sur `/dev/tty` —, parce que le pré-vol tourne dans un hook,
+ *      où l'entrée standard est le tuyau qui porte les réfs. Sans terminal (CI,
+ *      test, sortie redirigée) il n'y a personne à qui demander : rien n'est
+ *      supprimé, et le remède reste nommé. Un résidu nettoyé est RE-MESURÉ
+ *      avant le verdict, sinon le pré-vol refuserait le push qu'il vient de
+ *      nettoyer.
  *
  * DEUX MODES, un seul propriétaire du partage (`verdictDeLaPasse`) :
  *   * fin de passe — tout compte, on remet tout à zéro ;
@@ -20,6 +29,7 @@
  *     et ses limites sont mesurés, pas supposés.
  */
 import { connect } from 'node:net';
+import { closeSync, openSync, readSync } from 'node:fs';
 import { get as getHttp } from 'node:http';
 import { get as getHttps } from 'node:https';
 import { pathToFileURL } from 'node:url';
@@ -28,10 +38,152 @@ import {
   CHAMPS_REF_DISTANTE,
   lireGit,
   mesurerBranches,
+  nettoyerResidus,
+  planDeNettoyage,
 } from './check-git-branches.js';
 
 // Ré-exporté pour que les consommateurs et fixtures existants continuent de fonctionner
-export { CHAMPS_REF_DISTANTE, lireGit, mesurerBranches };
+export { CHAMPS_REF_DISTANTE, lireGit, mesurerBranches, nettoyerResidus, planDeNettoyage };
+
+// ── Le nettoyage d'un résidu, PROPOSÉ puis exécuté après accord ─────────────
+
+// Ce qui vaut accord, et rien d'autre : le silence, une ligne vide, un « n » ou
+// une réponse qu'on n'a pas demandée ne suppriment jamais rien. Un défaut
+// d'interface qui EXÉCUTE par défaut n'est pas un confort, c'est une perte.
+export const MOTS_D_ACCORD = ['o', 'oui', 'y', 'yes'];
+
+// Refuser la question elle-même, pour qui veut le pré-vol sans cette étape.
+export const ENV_SANS_NETTOYAGE = 'KOJO_SANS_NETTOYAGE_RESIDUS';
+
+// Posée par `.githooks/pre-push` quand le push vient d'un terminal (voir là-bas
+// pourquoi c'est le SHELL qui le mesure).
+export const ENV_TERMINAL = 'KOJO_PRE_VOL_TERMINAL';
+
+/**
+ * Y a-t-il quelqu'un pour répondre ?
+ *
+ * Deux mesures, et une exclusion. Le hook sait qu'il a un terminal (le shell
+ * teste `[ -t 2 ]` à l'instant où l'humain a lancé son push) et le dit par
+ * `KOJO_PRE_VOL_TERMINAL` ; une invocation DIRECTE depuis un terminal se
+ * reconnaît à `stderr` en TTY. L'exclusion, elle, n'est pas un confort : une
+ * suite de tests lancée dans un terminal a bien un TTY, mais aucun humain en
+ * face — sans elle, elle resterait en attente d'une réponse qui ne viendra
+ * jamais, et poser une question qu'on ne peut pas entendre est exactement ce
+ * que ce module existe pour éviter.
+ */
+export function estUnHumainAuBout({ env = process.env } = {}) {
+  if (env.VITEST) return false;
+  return Boolean(env[ENV_TERMINAL]) || Boolean(process.stderr.isTTY);
+}
+
+/**
+ * Une ligne lue sur le TERMINAL — et `null` quand il n'y en a pas.
+ *
+ * `/dev/tty` est le seul canal utilisable ici : dans un hook, git a déjà
+ * consommé l'entrée standard pour passer ses réfs, donc lire `stdin` ne
+ * demanderait rien à personne et lirait des octets qui n'ont pas été tapés. Un
+ * environnement sans terminal (CI, `execFile`) fait échouer l'ouverture : c'est
+ * le cas le plus important, et il doit être SILENCIEUX plutôt qu'attendre.
+ */
+export function lireUneLigneDuTerminal({ ouvrir = openSync, fermer = closeSync, lire = readSync } = {}) {
+  let fd;
+  try {
+    fd = ouvrir('/dev/tty', 'r');
+  } catch {
+    return null;
+  }
+  try {
+    const octet = Buffer.alloc(1);
+    let reponse = '';
+    for (let index = 0; index < 512; index += 1) {
+      if (lire(fd, octet, 0, 1, null) === 0) break;
+      const caractere = octet.toString('utf8');
+      if (caractere === '\n' || caractere === '\r') break;
+      reponse += caractere;
+    }
+    return reponse;
+  } catch {
+    return null;
+  } finally {
+    try {
+      fermer(fd);
+    } catch {
+      // Un descripteur qu'on n'arrive pas à fermer ne change pas la réponse.
+    }
+  }
+}
+
+/**
+ * Poser la question et rendre la réponse brute (jamais interprétée ici : c'est
+ * `proposerLeNettoyage` qui décide ce qui vaut accord). La question part sur
+ * `stderr` — le flux que le push lancé par un humain a hérité du terminal — et
+ * la réponse est lue sur `/dev/tty`.
+ */
+export function demanderAccordAuTerminal(question, {
+  ecrire = (texte) => process.stderr.write(texte),
+  lireLeTerminal = lireUneLigneDuTerminal,
+} = {}) {
+  ecrire(question);
+  const reponse = lireLeTerminal();
+  if (reponse === null) return null;
+  ecrire('\n');
+  return reponse.trim().toLowerCase();
+}
+
+/**
+ * PROPOSER le nettoyage des réfs distantes orphelines, et l'exécuter APRÈS
+ * accord — jamais avant, jamais sans.
+ *
+ * Ce que chaque refus fait, et pourquoi :
+ *   * rien à nettoyer → aucun plan, aucune question ;
+ *   * `KOJO_SANS_NETTOYAGE_RESIDUS` posée → l'utilisateur a demandé qu'on ne lui
+ *     pose pas la question, mais les commandes restent ÉCRITES (un refus qui
+ *     cacherait le remède obligerait à le rechercher) ;
+ *   * pas de terminal → personne à qui demander ; le verdict qui suit nomme le
+ *     remède, donc rien n'est perdu non plus ;
+ *   * réponse qui n'est pas un accord → RIEN n'est exécuté, et c'est dit.
+ *
+ * L'exécution rend des résultats PAR RÉFIDU (« réf encore là ? »), parce que
+ * c'est ce que l'appelant doit relire avant de conclure.
+ */
+export function proposerLeNettoyage(branches, {
+  cwd = process.cwd(),
+  nettoyer = nettoyerResidus,
+  demander = demanderAccordAuTerminal,
+  journal = (texte) => console.log(`::notice::${texte}`),
+  estDemandable = () => estUnHumainAuBout({ env }),
+  env = process.env,
+} = {}) {
+  const plan = planDeNettoyage(branches?.residusDistants ?? []);
+  if (!plan.length) return { plan, accord: null, resultats: [] };
+  if (env[ENV_SANS_NETTOYAGE]) {
+    journal(
+      `nettoyage non proposé (${ENV_SANS_NETTOYAGE} posée) : ${plan.length} réf(s) distante(s) orpheline(s) — ` +
+        plan.map((etape) => etape.commande).join(' ; '),
+    );
+    return { plan, accord: null, resultats: [] };
+  }
+  if (!estDemandable()) return { plan, accord: null, resultats: [] };
+  const question = [
+    `pré-vol : ${plan.length} résidu(s) de passe — nettoyage proposé`,
+    ...plan.map((etape) => `  · réf distante « ${etape.ref} » (${etape.raison})\n    ${etape.commande}`),
+    'Nettoyer maintenant ? [o/N] ',
+  ].join('\n');
+  const accord = demander(question);
+  if (!MOTS_D_ACCORD.includes(accord)) {
+    journal('nettoyage refusé — rien n\'a été touché ; le résidu reste nommé ci-dessous');
+    return { plan, accord: false, resultats: [] };
+  }
+  const resultats = nettoyer(plan, { cwd });
+  for (const resultat of resultats) {
+    journal(
+      resultat.ok
+        ? `résidu nettoyé — ${resultat.ref} (${resultat.par})`
+        : `nettoyage impossible — ${resultat.ref} : ${resultat.erreur || 'la réf est encore là après élagage'}`,
+    );
+  }
+  return { plan, accord: true, resultats };
+}
 
 /**
  * Charge la liste des serveurs de test de manière DYNAMIQUE.
@@ -184,7 +336,10 @@ export async function checkTestEnvironment({
   return [...occupied, ...stalePreviews, ...branches.issues].filter(Boolean);
 }
 
-export async function main(args = process.argv.slice(2), { mesurer = mesurerBranches, cwd = process.cwd() } = {}) {
+export async function main(
+  args = process.argv.slice(2),
+  { mesurer = mesurerBranches, cwd = process.cwd(), nettoyage = {} } = {},
+) {
   let avantPush;
   let previewUrls;
   try {
@@ -200,6 +355,18 @@ export async function main(args = process.argv.slice(2), { mesurer = mesurerBran
     branches = { issues: [`branches : lecture impossible (${error.message})`], examinees: 0, distantes: 0, publication: { jugees: 0, lignes: [] } };
   }
   if (avantPush) {
+    // Le résidu est proposé au nettoyage AVANT le verdict, et les réfs sont
+    // relues s'il a été nettoyé : sans cette relecture, le pré-vol refuserait le
+    // push au nom d'un résidu qu'il vient lui-même de faire disparaître.
+    const { resultats } = proposerLeNettoyage(branches, { cwd, ...nettoyage });
+    if (resultats.some((resultat) => resultat.ok)) {
+      try {
+        branches = mesurer({ cwd });
+      } catch {
+        // La relecture impossible laisse les résidus nommés : refuser reste la
+        // seule réponse honnête quand on ne peut plus lire son sujet.
+      }
+    }
     const { bloquants, rappels } = verdictDeLaPasse({ avantPush: true, branches, environnement: [] });
     afficherLesRappels(rappels);
     if (bloquants.length) {

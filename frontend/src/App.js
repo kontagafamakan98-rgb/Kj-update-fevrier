@@ -19,6 +19,21 @@ import NetworkStatus from "./components/NetworkStatus";
 import { PageSkeleton, JobsSkeleton, JobDetailsSkeleton, LoginSkeleton, ForgotPasswordSkeleton, DashboardSkeleton, ProfileSkeleton, MessagesSkeleton, PaymentSkeleton } from "./components/SkeletonLoader";
 import OwnerService from './services/ownerService';
 import { CONTACT, SOCIAL_LINKS, mailtoHref, telHref } from './config/contact';
+// Les CLASSES du chrome : UN propriétaire (src/config/classes-chrome.js), lu par
+// cette page ET par les coquilles pré-rendues (vite-plugins/prerender/app-chrome.js).
+// Les recopier des deux côtés faisait diverger les deux peintures en silence.
+import {
+  APP_CLASS,
+  COLONNE_CLASS,
+  MAIN_CLASS,
+  PIED_ADRESSE_CLASS,
+  PIED_CLASS,
+  PIED_INTERIEUR_CLASS,
+  PIED_LIEN_CLASS,
+  PIED_LIEN_LONG_CLASS,
+  PIED_NAV_CLASS,
+  PIED_NAV_LIEN_CLASS,
+} from './config/classes-chrome';
 import { isPWASupported, requestNotificationPermission } from "./utils/pwa";
 import { useNotifications } from './contexts/NotificationContext';
 
@@ -161,22 +176,22 @@ function LegalFooter() {
   // de page y était rendu SANS texte.
 
   return (
-    <footer className="border-t border-orange-100 bg-white/95 backdrop-blur-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-3">
+    <footer className={PIED_CLASS}>
+      <div className={PIED_INTERIEUR_CLASS}>
         {/* Liens cliquables tel:/mailto: + N.A.P. : ce sont eux qui rendent le
             contact possible en un appui sur mobile (un audit d'accessibilité
             et de référencement local les exige). Adresse, téléphone et e-mail
             viennent de src/config/contact.json — la même source que la page
             Support, le shell statique de l'accueil et le LocalBusiness. */}
-        <address className="not-italic flex flex-wrap items-center justify-center md:justify-end gap-x-4 gap-y-2 text-xs text-gray-600">
+        <address className={PIED_ADRESSE_CLASS}>
           <span>{CONTACT.address}</span>
-          <a href={telHref} className="hover:text-orange-700 underline underline-offset-2">
+          <a href={telHref} className={PIED_LIEN_CLASS}>
             {CONTACT.phoneDisplay}
           </a>
-          <a href={mailtoHref} className="hover:text-orange-700 underline underline-offset-2 break-all">
+          <a href={mailtoHref} className={PIED_LIEN_LONG_CLASS}>
             {CONTACT.email}
           </a>
-          <a href={CONTACT.whatsappUrl} target="_blank" rel="noreferrer" className="hover:text-orange-700 underline underline-offset-2">
+          <a href={CONTACT.whatsappUrl} target="_blank" rel="noreferrer" className={PIED_LIEN_CLASS}>
             {t('contactWhatsapp')}
           </a>
           <a
@@ -185,28 +200,28 @@ function LegalFooter() {
             rel="noreferrer"
             aria-label="Google Maps"
             title="Google Maps"
-            className="hover:text-orange-700 underline underline-offset-2"
+            className={PIED_LIEN_CLASS}
           >
             {t('footerItinerary')}
           </a>
         </address>
-        <div className="flex flex-wrap items-center justify-center md:justify-end gap-4 text-sm text-orange-700">
+        <div className={PIED_NAV_CLASS}>
           {/* Les trois pages de confiance, en LIEN INTERNE : un crawler sans
               JavaScript ne les trouve que par ici (et par le pied de page de la
               coquille statique, qui porte les mêmes liens). « Contact » menait
               au support — une page de suivi de ticket, pas une page de
               contact — et « Politique de confidentialité » à un .docx dont un
               moteur ne lisait rien. */}
-          <Link to="/about" className="hover:text-orange-800 underline underline-offset-2">
+          <Link to="/about" className={PIED_NAV_LIEN_CLASS}>
             {t('footerAbout')}
           </Link>
-          <Link to="/contact" className="hover:text-orange-800 underline underline-offset-2">
+          <Link to="/contact" className={PIED_NAV_LIEN_CLASS}>
             {t('contactTitle')}
           </Link>
-          <Link to="/privacy" className="hover:text-orange-800 underline underline-offset-2">
+          <Link to="/privacy" className={PIED_NAV_LIEN_CLASS}>
             {t('footerPrivacy')}
           </Link>
-          <Link to="/terms" className="hover:text-orange-800 underline underline-offset-2">
+          <Link to="/terms" className={PIED_NAV_LIEN_CLASS}>
             {t('footerTerms')}
           </Link>
           {SOCIAL_LINKS.map((social) => (
@@ -215,7 +230,7 @@ function LegalFooter() {
               href={social.url}
               target="_blank"
               rel="me noreferrer"
-              className="hover:text-orange-800 underline underline-offset-2"
+              className={PIED_NAV_LIEN_CLASS}
             >
               {social.label}
             </a>
@@ -302,7 +317,7 @@ function AppRoutes() {
     // d'application une autre couleur de papier que le site public. Les pages
     // pré-rendues posent leur propre fond, donc ce changement ne touche que
     // celles qui n'en posaient pas.
-    <div className="min-h-screen fond-sable relative flex flex-col">
+    <div className={COLONNE_CLASS}>
       {/* Network Status and Offline Indicator */}
       <NetworkStatus />
       <OfflineIndicator />
@@ -338,7 +353,7 @@ function AppRoutes() {
           bouge plus verticalement → élimine le CLS mesuré (0.129 volet
           Dashboard, 0.112 Profile) causé par le footer qui accompagnait la
           hauteur du contenu en chargement. */}
-      <main className="flex-1 pb-24 md:pb-0">
+      <main className={MAIN_CLASS}>
         <Suspense fallback={<PageSkeleton />}>
           <Routes>
             {/* Public routes - eagerly loaded */}
@@ -503,7 +518,7 @@ function App() {
   }, []);
 
   return (
-    <div className="App">
+    <div className={APP_CLASS}>
       <BrowserRouter>
         <LanguageProvider>
           <AuthProvider>

@@ -127,7 +127,7 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
 
   // Le dessin du champ appartient à la feuille (`form :is(input, select,
   // textarea)`) ; seule la mesure se dit ici.
-  const inputClass = 'w-full px-4 py-3 outline-none';
+  const inputClass = 'w-full px-4 py-3 outline-hidden';
   const locationLabel = buildLocationLabel(formData.location);
   const mapUrl = buildMapEmbedUrl(formData.location);
 

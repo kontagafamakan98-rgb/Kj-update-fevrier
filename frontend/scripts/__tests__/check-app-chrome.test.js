@@ -35,6 +35,18 @@ import {
   chromeDePage,
   piedDePage,
 } from '../../vite-plugins/prerender/app-chrome.js';
+import {
+  APP_CLASS,
+  COLONNE_CLASS,
+  MAIN_CLASS,
+  PIED_ADRESSE_CLASS,
+  PIED_CLASS,
+  PIED_INTERIEUR_CLASS,
+  PIED_LIEN_CLASS,
+  PIED_LIEN_LONG_CLASS,
+  PIED_NAV_CLASS,
+  PIED_NAV_LIEN_CLASS,
+} from '../../src/config/classes-chrome.js';
 
 // Un `T` et un `esc` minimaux : le pied de page est testé sur SA FORME (les
 // clés qu'il résout, l'ordre de ses liens, le refus d'une clé absente), pas
@@ -58,31 +70,52 @@ const ROUTE_META = lire('vite-plugins/prerender-route-meta.js');
 const APP_CSS_SANS_COMMENTAIRES = APP_CSS.replace(/\/\*[\s\S]*?\*\//g, '');
 
 describe('app-chrome — le chrome est la copie de celui de l’app', () => {
-  it('les conteneurs et leurs classes sortent de src/App.js, à l’identique', () => {
-    // `.App` (l'enveloppe des DEUX canaux — coquille et React), la colonne
-    // min-h-screen/flex-col et le main flex-1 : les trois existent mot pour mot
-    // dans App.js. Si l'app change son habillage, ce test rougit — et la
-    // coquille ne peut plus peindre une autre géométrie que la page.
-    for (const classes of [
-      'className="App"',
-      // 28/09/2026 : le fond de l'application prend le SABLE du site
-      // (`fond-sable`, src/index.css) au lieu du gris froid `bg-gray-50`. La
-      // chaîne reste écrite ICI en clair, comme les deux autres : c'est ce qui
-      // fait rougir ce test le jour où l'app change d'habillage sans que la
-      // coquille suive.
-      'className="min-h-screen fond-sable relative flex flex-col"',
-      'className="flex-1 pb-24 md:pb-0"',
-    ]) {
-      expect(APP, `src/App.js ne contient plus ${classes}`).toContain(classes);
+  it('les conteneurs et leurs classes viennent du DOMICILE partagé, lu par les deux', () => {
+    // Le 09/10/2026 ces trois listes étaient écrites EN CLAIR des deux côtés, et
+    // ce test les comparait littéralement — c'est-à-dire qu'il fallait les
+    // recopier pour rester vert. Elles vivent maintenant dans UN module
+    // (src/config/classes-chrome.js) que lisent la page ET la coquille : la
+    // comparaison est devenue inutile, ce qui reste à prouver est la LECTURE.
+    for (const champ of ['APP_CLASS', 'COLONNE_CLASS', 'MAIN_CLASS']) {
+      expect(APP, `src/App.js ne lit plus ${champ}`).toContain(`className={${champ}}`);
+      expect(CHROME, `le chrome de la coquille ne lit plus ${champ}`).toContain(champ);
     }
-    // Et le chrome les publie en HTML (class=, pas className=).
-    expect(CHROME_OUVERTURE).toContain('<div class="App">');
-    expect(CHROME_OUVERTURE).toContain(
-      '<div class="min-h-screen fond-sable relative flex flex-col">'
-    );
-    expect(CHROME_OUVERTURE).toContain('<main class="flex-1 pb-24 md:pb-0">');
+    // Et le chrome les publie en HTML (class=, pas className=), avec la VALEUR
+    // du domicile : les deux canaux peignent donc la même chose par
+    // construction.
+    expect(CHROME_OUVERTURE).toContain(`<div class="${APP_CLASS}">`);
+    expect(CHROME_OUVERTURE).toContain(`<div class="${COLONNE_CLASS}">`);
+    expect(CHROME_OUVERTURE).toContain(`<main class="${MAIN_CLASS}">`);
     expect(CHROME_FERMETURE).toBe('</main>');
     expect(FERMETURE_DE_L_APPLICATION).toBe('</div></div>');
+  });
+
+  it('le PIED DE PAGE est lu au même domicile que celui de src/App.js', () => {
+    // Mêmes classes de part et d'autre, et surtout : plus une seule recopie.
+    const pied = piedDePage({ esc, T, socialLinks: [] });
+    for (const valeur of [
+      PIED_CLASS,
+      PIED_INTERIEUR_CLASS,
+      PIED_ADRESSE_CLASS,
+      PIED_NAV_CLASS,
+    ]) {
+      expect(pied, `le pied de page de la coquille ne publie plus « ${valeur} »`).toContain(valeur);
+    }
+    for (const [champ, valeur] of Object.entries({
+      PIED_CLASS,
+      PIED_INTERIEUR_CLASS,
+      PIED_ADRESSE_CLASS,
+      PIED_LIEN_CLASS,
+      PIED_LIEN_LONG_CLASS,
+      PIED_NAV_CLASS,
+      PIED_NAV_LIEN_CLASS,
+    })) {
+      expect(APP, `src/App.js ne lit plus ${champ}`).toContain(`className={${champ}}`);
+      expect(
+        CHROME,
+        `le chrome de la coquille recopie la valeur de ${champ} au lieu de la lire`
+      ).not.toContain(`"${valeur}"`);
+    }
   });
 
   it('le corps passe DANS main, entre l’ouverture et la fermeture', () => {
@@ -103,7 +136,8 @@ describe('app-chrome — le chrome est la copie de celui de l’app', () => {
     // de React. La forme imbriquée est la seule qui donne 65.
     expect(NAV_PLACEHOLDER).toContain('<nav');
     expect(NAV_PLACEHOLDER).toContain('border-b');
-    expect(NAV_PLACEHOLDER).toMatch(/border-b[^>]*>\s*<div[^>]*\bh-16\b/);
+    // La rangée porte h-16, imbriquée dans le conteneur (la structure de Navbar.js).
+    expect(NAV_PLACEHOLDER).toMatch(/border-b[^>]*>\s*<div[^>]*>\s*<div[^>]*\bh-16\b/);
     expect(NAV_PLACEHOLDER).not.toMatch(/class="h-16[^"]*border-b/);
   });
 });
@@ -153,7 +187,10 @@ describe('app-chrome — le PIED DE PAGE appartient au chrome', () => {
     const ordre = ['<main', '<p>corps</p>', '</main>', '<footer class="pied">', FERMETURE_DE_L_APPLICATION];
     let precedent = -1;
     for (const marque of ordre) {
-      const position = html.indexOf(marque);
+      // La navbar contient elle-même un `</div></div>` (sa rangée imbriquée) :
+      // la fermeture des conteneurs est donc cherchée à sa DERNIÈRE occurrence.
+      const position =
+        marque === FERMETURE_DE_L_APPLICATION ? html.lastIndexOf(marque) : html.indexOf(marque);
       expect(position, `${marque} absent ou dans le désordre`).toBeGreaterThan(precedent);
       precedent = position;
     }
@@ -250,11 +287,12 @@ describe('app-chrome — l’alignement est EXPLICITE, plus hérité (refonte du
 
   it('la page et les coquilles publient la même enveloppe', () => {
     // Trois surfaces, une seule décision : le CSS la déclare, React publie la
-    // classe (`className`), les coquilles la publient (`class`). Deux qui
-    // s'accordent et une qui dérive = deux peintures différentes, donc un
-    // élément LCP ré-élu par React (le défaut que ces gardes ferment).
-    expect(APP).toContain('className="App"');
-    expect(CHROME_OUVERTURE).toContain('<div class="App">');
+    // classe (`className`), les coquilles la publient (`class`) — et depuis le
+    // 09/10/2026 la VALEUR elle-même a un seul propriétaire
+    // (src/config/classes-chrome.js), pour qu'une retouche d'un côté ne puisse
+    // plus laisser l'autre derrière elle.
+    expect(APP).toContain('className={APP_CLASS}');
+    expect(CHROME_OUVERTURE).toContain(`<div class="${APP_CLASS}">`);
   });
 
   it('les deux pages SANS `.App` s’en passent légitimement', () => {
@@ -422,6 +460,75 @@ describe('les autres reliquats du gabarit dans src/App.css, TRANCHÉS eux aussi'
         fichiers.map((f) => f.url),
         `index.html précharge ${url}, qu'aucun @font-face ne déclare : une requête pour rien, et le vif du sujet reste non préchargé`
       ).toContain(url);
+    }
+  });
+
+  it('les replis serif sont SÉPARÉS : le héros garde sa face, les titres ont la leur', () => {
+    // ── Pourquoi ce cas existe ────────────────────────────────────────────
+    // Une SEULE face servait tout le titrage, avec la constante du titre du
+    // héros (92,1 % — c'est l'élément LCP de « / », sa boîte est suivie à
+    // part). Or le rapport des LARGEURS dépend de la phrase : mesuré sur 48
+    // titres réels, la médiane du corpus vaut 94,3 %, donc la constante du
+    // héros n'était pas celle des titres de section. Les deux faces sont
+    // désormais séparées, et ce cas tient les TROIS faits qui pourraient
+    // revenir en silence : une constante écrasée, une pile qui reprend l'autre
+    // face, un sélecteur qui repasse à `--kojo-serif` (c'est exactement ce que
+    // les 24 titres de section mesurés paieraient : la sonde de police
+    // retardée a mesuré la somme des écarts d'encre à 513,1 px en mobile et
+    // 518,8 en desktop avec la face des titres, contre 724,8 et 790,6 avec
+    // celle du héros).
+    const CSS = INDEX_CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+    const face = (nom) => {
+      const bloc = (CSS.match(new RegExp(`@font-face\\s*\\{[^}]*font-family:\\s*'${nom}'[^}]*\\}`)) || [])[0];
+      expect(bloc, `la face « ${nom} » a disparu de src/index.css`).toBeTruthy();
+      return bloc;
+    };
+
+    // 1. Chaque face porte SA constante, et la boîte de Cormorant est rendue.
+    expect(face('Cormorant Garamond repli Times')).toContain('size-adjust: 92.1%');
+    const section = face('Cormorant Garamond repli Times section');
+    expect(section).toContain('size-adjust: 94.3%');
+    expect(section).toContain('ascent-override: 97.6%');
+    expect(section).toContain('descent-override: 30.8%');
+    // (97,6 + 30,8) × 0,943 = 121 % — la hauteur du dessin servi, comme les
+    // deux faces du héros (le `size-adjust` s'applique aussi aux `override`).
+    expect(Math.abs((97.6 + 30.8) * 0.943 - 121)).toBeLessThan(0.3);
+
+    // 2. Deux PILES, et chacune nomme la face qui lui correspond.
+    const pile = (variable) => (CSS.match(new RegExp(`${variable}:\\s*([^;]*);`)) || [])[1] || '';
+    expect(pile('--kojo-serif'), 'la pile du héros a changé de face de repli').toContain(
+      "'Cormorant Garamond repli Times'"
+    );
+    expect(pile('--kojo-serif')).not.toContain('repli Times section');
+    expect(pile('--kojo-serif-section'), 'la pile des titres ne nomme plus la face médiane').toContain(
+      "'Cormorant Garamond repli Times section'"
+    );
+    // Georgia n'a QU'UNE face : la re-mesure du 08/10/2026 donne, contre elle,
+    // une médiane de 76,4 % là où la face du héros vaut 76,3 % — les deux ancres
+    // coïncident, une seconde face serait une constante inventée.
+    expect(pile('--kojo-serif-section')).toContain("'Cormorant Garamond repli Georgia'");
+    expect(CSS).not.toContain("'Cormorant Garamond repli Georgia section'");
+
+    // 3. QUI EMPLOIE QUOI : le héros garde la sienne, tout le reste du titrage
+    //    serif passe à la face des titres. C'est le fait qui, défait, rendrait
+    //    la séparation inopérante sans que rien ne le dise.
+    const bloc = (selecteur) =>
+      (CSS.match(new RegExp(`${selecteur.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)) || [])[1] || '';
+    expect(bloc('.titre-heros'), 'le titre du héros a changé de pile').toContain(
+      'font-family: var(--kojo-serif)'
+    );
+    for (const selecteur of [
+      '.titre-section',
+      '.titre-page',
+      '.titre-entree',
+      '.nom-de-ligne',
+      '.galerie-legende',
+      '.fait-cta-figure',
+      '.faq-ligne > summary',
+    ]) {
+      expect(bloc(selecteur), `${selecteur} n'emploie plus la face des titres de section`).toContain(
+        'font-family: var(--kojo-serif-section)'
+      );
     }
   });
 
