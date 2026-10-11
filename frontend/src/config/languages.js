@@ -1,10 +1,9 @@
 // ── Les langues de l'interface : UNE déclaration, les deux barres ───────────
 // Les deux dispositions de la barre de navigation (`hidden md:flex` et
-// `md:hidden`) offrent le MÊME choix, par deux contrôles de formes différentes :
-//   • la barre du haut — src/components/LanguageSelector.js (un bouton + une
-//     liste, libellés FRANÇAIS et dans la langue elle-même) ;
-//   • le tiroir mobile — src/components/Navbar.js (un `<select>` natif, dont
-//     les libellés n'ont qu'une place).
+// `md:hidden`) montent le MÊME contrôle — src/components/LanguageSelector.js
+// (un bouton + une liste, libellés FRANÇAIS et dans la langue elle-même) : le
+// tiroir mobile portait auparavant son propre `<select>` natif, donc deux formes
+// de contrôle pour un seul choix et deux comportements d'appui à tenir d'accord.
 //
 // ── Ce que ce fichier supprime ──────────────────────────────────────────────
 // La liste avait TROIS propriétaires : ce `LANGUAGES` du composant, les cinq
@@ -20,9 +19,8 @@
 // seul bundle, mais il reste chargeable par tout lecteur.
 //
 // `nativeName` est le libellé que voit le visiteur (c'est la langue qui se
-// nomme elle-même, comme dans le menu de la barre du haut) ; `name` est son nom
-// français, publié en second dans cette liste et dans le `<select>` du tiroir,
-// qui n'a pas la place d'en peindre deux.
+// nomme elle-même) ; `name` est son nom français, publié en second. Les deux
+// barres publiant le même menu, les deux libellés paraissent des deux côtés.
 export const LANGUAGES = [
   { code: 'fr', name: 'Français', nativeName: 'Français' },
   { code: 'en', name: 'English', nativeName: 'English' },
