@@ -1,3 +1,22 @@
+/* ── LA COUCHE DES DÉFAUTS D'ÉLÉMENT, DÉCLARÉE AVANT L'IMPORT (11/10/2026) ────
+
+   `@import "tailwindcss"` range ses règles dans des COUCHES (`theme`, `base`,
+   `components`, `utilities`). Une règle NON couchée l'emporte sur TOUTES les
+   couches, quelle que soit sa spécificité : en v3 le bloc hérité ci-dessous
+   passait AVANT `@tailwind base`, donc les utilitaires le battaient ; en v4,
+   resté non couché, c'est lui qui les bat. MESURÉ sur le build du 11/10/2026
+   à 412×823 : `p{font-size:.98rem}` l'emportait sur `text-sm` (14 px) et
+   `text-xl` (20 px) — 15,68 px partout —, `h2{font-size:clamp(1.25rem,4vw,1.6rem)}`
+   sur `text-lg` (18 px) et `text-2xl` (24 px) — 20 px partout —, et
+   `p,label,small,li{line-height:1.6}` sur `leading-relaxed`. Deux sondes l'ont
+   nommé : sur `/how-it-works` mobile le sous-titre en `text-xl` tombait à
+   28 607 px², au niveau des notes d'étape (28 201) — l'élection LCP basculait —
+   et l'aire LCP de `/profile` mobile passait de 11 211 à 16 353 px² pour une
+   bande de 6 700–14 013. La couche est déclarée AVANT l'import pour être la plus
+   FAIBLE : les utilitaires et la couche `base` (preflight) la battent, comme ils
+   battaient ces règles en v3. */
+@layer herite;
+
 @import "tailwindcss" source(none);
 @config "../tailwind.config.cjs";
 
@@ -73,63 +92,68 @@
    Ce qui suit est ce qui, dans ces 292 lignes, était RÉELLEMENT peint : des
    déclarations sur des ÉLÉMENTS (`html`, `body`, `h1`, `p`, `input`, `button`,
    `*`), qui n'ont pas besoin d'un porteur de classe pour agir. Elles sont
-   recopiées À L'IDENTIQUE et À CETTE PLACE (avant `@tailwind base`, exactement
-   là où les `@import` étaient) : la cascade ne bouge donc pas d'un iota — une
-   déclaration d'élément déplacée plus bas l'emporterait sur des règles du site
-   qui la battaient jusqu'ici. Rien d'autre n'est repris : les règles de classes
-   mortes sont parties avec les feuilles, et c'est tout l'objet de la passe. */
+   recopiées À L'IDENTIQUE, À CETTE PLACE et dans la couche `herite` (déclarée
+   en tête de fichier) : en v3 elles passaient avant `@tailwind base`, donc les
+   utilitaires les battaient — la couche `herite`, la plus faible, reproduit ce
+   rapport de force en v4 (voir l'en-tête : sans elle, restées non couchées, ces
+   règles battaient `text-sm`, `text-lg`, `text-xl`, `text-2xl` et
+   `leading-relaxed` sur tout le site en mobile). Rien d'autre n'est repris : les
+   règles de classes mortes sont parties avec les feuilles, et c'est tout l'objet
+   de la passe. */
 
-html {
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
-  overscroll-behavior-y: contain;
-}
-
-body {
-  text-rendering: optimizeLegibility;
-  overscroll-behavior-y: contain;
-}
-
-h1,
-h2,
-h3 {
-  letter-spacing: -0.02em;
-  line-height: 1.12;
-  text-wrap: balance;
-}
-
-p,
-label,
-small,
-li {
-  line-height: 1.6;
-}
-
-input,
-select,
-textarea {
-  min-height: 48px;
-}
-
-button,
-[role="button"],
-[type="button"],
-[type="submit"] {
-  min-height: 48px;
-  padding-inline: 16px;
-}
-
-@media (display-mode: standalone) {
-  html,
-  body {
-    overscroll-behavior-y: none;
+@layer herite {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    overscroll-behavior-y: contain;
   }
-}
 
-@media (max-width: 768px) {
-  h1 { font-size: clamp(1.8rem, 5vw, 2.3rem); }
-  h2 { font-size: clamp(1.25rem, 4vw, 1.6rem); }
-  p, label, small, li { font-size: 0.98rem; }
+  body {
+    text-rendering: optimizeLegibility;
+    overscroll-behavior-y: contain;
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.02em;
+    line-height: 1.12;
+    text-wrap: balance;
+  }
+
+  p,
+  label,
+  small,
+  li {
+    line-height: 1.6;
+  }
+
+  input,
+  select,
+  textarea {
+    min-height: 48px;
+  }
+
+  button,
+  [role="button"],
+  [type="button"],
+  [type="submit"] {
+    min-height: 48px;
+    padding-inline: 16px;
+  }
+
+  @media (display-mode: standalone) {
+    html,
+    body {
+      overscroll-behavior-y: none;
+    }
+  }
+
+  @media (max-width: 768px) {
+    h1 { font-size: clamp(1.8rem, 5vw, 2.3rem); }
+    h2 { font-size: clamp(1.25rem, 4vw, 1.6rem); }
+    p, label, small, li { font-size: 0.98rem; }
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
