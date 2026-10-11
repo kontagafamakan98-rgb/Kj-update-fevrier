@@ -1,0 +1,84 @@
+name: Session reload production probe (daily)
+
+# ─── Pourquoi cette sonde est PUBLIÉE, et pas seulement écrite ───────────────
+# Toutes les sondes de production du dépôt lisent des faits de SERVEUR : le HTML
+# servi (seo-production-probe), l'état de /health (backend-health-probe), une
+# paire préflight/GET (check-cors-preflight, dans ci.yml). Aucune n'observe ce
+# que le NAVIGATEUR garde d'une session, ni ce que l'application en fait quand
+# la mémoire JavaScript a disparu — et c'est exactement là que se logent les
+# régressions : un cookie qui ne survit pas à un rechargement (périmètre,
+# SameSite, hôte) et une garde d'amorçage qui ne relit pas la session (le
+# prérequis du proxy même-origine, écrit dans AuthContext.js).
+#
+# Un rechargement ne se teste pas en HTTP : il faut un vrai navigateur, un vrai
+# formulaire servi, et une vraie page rechargée. La sonde ouvre donc Chromium,
+# se connecte avec le COMPTE CLIENT DÉDIÉ CI (les mêmes secrets
+# LHCI_CI_EMAIL/LHCI_CI_PASSWORD que le job Lighthouse), recharge, puis juge
+# séparément le justificatif (a-t-il survécu ?) et l'application (l'a-t-elle
+# restauré ?) — deux refus, deux corrections.
+#
+# Elle tourne une fois par jour au lieu de chaque push, à dessein : elle dépend
+# d'un compte réel et d'un réseau public, donc elle ne bloque aucune PR. Mais
+# elle ÉCHOUE (code 1) au lieu de publier une note, parce que ce qu'elle
+# vérifie est un invariant : si la session ne survit pas au rechargement, le
+# site est cassé pour ses utilisateurs connectés.
+#
+# Aucune écriture : la sonde LIT une session existante (aucune inscription,
+# aucun compte créé), et chaque tentative est jetée avec son contexte.
+on:
+  schedule:
+    # 06:47 UTC : après la sonde SEO (06:17) et la sonde de santé (06:30), hors
+    # des heures pleines pour ne pas concurrencer les crons d'autres dépôts.
+    - cron: '47 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Session après rechargement (production)
+    runs-on: ubuntu-latest
+    # Plafond : sans lui, une production qui ne répond plus laisserait le job
+    # patienter jusqu'à l'abandon du runner (360 min) au lieu de rougir.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Cache Playwright Chromium binaries
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+
+      - name: Install Playwright Chromium dependencies (and binary if cache miss)
+        working-directory: frontend
+        run: |
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+            npx playwright install-deps chromium
+          else
+            npx playwright install --with-deps chromium
+          fi
+
+      # La sonde refuse de conclure, en nommant les secrets, s'ils sont absents :
+      # un run rouge doit dire quelle variable poser.
+      - name: Vérifier que la session survit au rechargement (production)
+        working-directory: frontend
+        env:
+          LHCI_CI_EMAIL: ${{ secrets.LHCI_CI_EMAIL }}
+          LHCI_CI_PASSWORD: ${{ secrets.LHCI_CI_PASSWORD }}
+          LHCI_TEST_EMAIL: ${{ secrets.LHCI_TEST_EMAIL }}
+          LHCI_TEST_PASSWORD: ${{ secrets.LHCI_TEST_PASSWORD }}
+        run: node scripts/check-session-reload-production.js

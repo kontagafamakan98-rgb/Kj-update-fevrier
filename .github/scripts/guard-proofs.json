@@ -327,6 +327,14 @@
       "runner": "vitest"
     },
     {
+      "chemin": "frontend/scripts/check-session-reload-production.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-session-reload-production.test.js",
+      "runner": "vitest",
+      "motif": "la SEULE sonde du dépôt qui juge ce que le NAVIGATEUR garde d'une session : toutes les autres lisent des faits de serveur (HTML servi, /health, préflight CORS). Elle se connecte par le formulaire servi avec le compte CI, recharge la page, puis refuse séparément le justificatif qui n'a pas survécu (correction côté cookie : AUTH_COOKIE_SAMESITE / périmètre) et l'application qui ne le restaure pas (correction côté garde d'amorçage). Le relevé de persistance (jeton en stockage, cookie lisible depuis l'origine frontend) est journalisé à chaque run sans jamais devenir un verdict : c'est une autre propriété, avec une autre correction"
+    },
+    {
       "chemin": "frontend/scripts/check-spa-routes.js",
       "role": "garde",
       "invoque_par": "ci",
@@ -4111,6 +4119,26 @@
     "cwd": "frontend",
     "attend": [
       "refuse un domicile introuvable"
+    ]
+  },
+  {
+    "id": "session-reload: un justificatif disparu au rechargement tolere",
+    "garde": "frontend/scripts/check-session-reload-production.js",
+    "cible": "frontend/scripts/check-session-reload-production.js",
+    "trouve": "  if (after.status !== 200) {",
+    "remplace": "  if (false && after.status !== 200) {",
+    "runner": "node",
+    "preuve": "frontend/scripts/__tests__/check-session-reload-production.test.js",
+    "commande": [
+      "npx",
+      "vitest",
+      "run",
+      "scripts/__tests__/check-session-reload-production.test.js",
+      "--reporter=default"
+    ],
+    "cwd": "frontend",
+    "attend": [
+      "GET /api/auth/me depuis la page recharg"
     ]
   }
   ]
