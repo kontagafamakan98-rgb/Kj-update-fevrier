@@ -339,7 +339,32 @@ const readCsrfCookie = () => {
 // Détection d'une session active pour l'amorçage au montage de l'app : le
 // cookie de session est httpOnly (non lisible en JS), mais le cookie CSRF
 // associé l'est → sa présence indique qu'une session existe.
+// VRAI seulement en même-origine : en cross-origin (production, l'API est
+// appelée directement sur api.kojoforafrica.cc.cd), le navigateur range
+// kojo_session ET kojo_csrf sur l'HÔTE DE L'API, donc document.cookie de
+// l'origine frontend n'en montre aucun. C'est le seul signal que le web peut
+// lire, d'où la trace ci-dessous.
 export const hasSessionCookie = () => Boolean(readCsrfCookie());
+
+// TRACE NON SECRÈTE, pour l'amorçage cross-origin. Le profil mis en cache par
+// une connexion réussie ('user', purgé par clearToken au logout comme au 401)
+// est le seul vestige qu'un frontend d'une autre origine puisse encore lire.
+// Ce n'est PAS une preuve de session : il ne sert qu'à décider s'il vaut la
+// peine de poser la question au serveur (/auth/me). Sans lui, l'app se croyait
+// anonyme après CHAQUE rechargement alors que le cookie de session vivait
+// toujours (mesuré en production par scripts/check-session-reload-production.js :
+// « la session existe encore dans le navigateur mais la page ne la restaure
+// pas ») — et un utilisateur connecté était renvoyé vers /login au premier F5.
+// Jamais un droit d'afficher : un profil n'est montré que sur un 200 du serveur.
+export const hasSessionArtifact = () => {
+  try {
+    if (typeof localStorage === 'undefined') return false;
+    return Boolean(localStorage.getItem('user'));
+  } catch (_error) {
+    // Stockage indisponible (navigation privée) : aucune trace lisible.
+    return false;
+  }
+};
 
 const request = async (method, path, { params, data, headers, signal, skipUnauthorizedRedirect = false, skipRecovery = false } = {}) => {
   const normalizedPath = String(path || '').startsWith('/') ? path : `/${path || ''}`;

@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { authAPI, handleApiError, markSoftRedirectConsumed, getAuthToken, hasSessionCookie, isNativeShell } from '../services/api';
+import { authAPI, handleApiError, markSoftRedirectConsumed, getAuthToken, hasSessionCookie, hasSessionArtifact, isNativeShell } from '../services/api';
 import { devLog, safeLog } from '../utils/env';
 import kojoCache, { CACHE_KEYS } from '../utils/cache';
 import networkOptimizer from '../utils/networkOptimizer';
@@ -21,10 +21,12 @@ export function AuthProvider({ children }) {
   // aucun en-tête Authorization n'est envoyé depuis le web : un script ne peut
   // donc pas relire la session. Le jeton ne subsiste en stockage que dans le
   // shell natif Capacitor (isNativeShell), qui n'a pas de cookie fiable.
-  // Prérequis : le navigateur doit voir le cookie comme de première partie, donc
-  // l'API passe par le proxy même-origine (VITE_USE_SAME_ORIGIN_API=true) ; sans
-  // lui, kojo_csrf n'est pas lisible et la session n'est pas restaurée au
-  // rechargement.
+  // Le cookie étant rangé sur l'hôte de l'API quand l'API est appelée en
+  // cross-origin, RIEN de la session n'est lisible depuis l'origine frontend :
+  // l'amorçage s'appuie donc aussi sur la trace non secrète du profil en cache
+  // (hasSessionArtifact) pour oser la seule question utile, /auth/me. Le proxy
+  // même-origine (VITE_USE_SAME_ORIGIN_API=true) reste préférable — il rend le
+  // cookie lisible, donc la preuve directe — mais il n'est plus un prérequis.
 
   const clearToken = () => {
     const keys = [
@@ -199,22 +201,30 @@ export function AuthProvider({ children }) {
       // Une session ne peut vivre qu'à deux endroits : le jeton (localStorage /
       // sessionStorage, agrégé par getAuthToken) ou le cookie httpOnly (détecté
       // par son compagnon CSRF lisible, hasSessionCookie — vrai uniquement en
-      // même-origine/dev, voir la note AUTH de ownerService.js). Si les deux
-      // sont absents, il n'y a rien à récupérer côté serveur : le 401 est connu
-      // d'avance, on le court-circuite.
-      //
-      // Le cache « réseau pauvre » ci-dessous est volontairement hors de ce
-      // court-circuit : un profil en cache sans jeton est le vestige d'une
-      // session finie, et l'afficher donne un utilisateur fantôme dont tous les
-      // appels échouent — exactement ce que le handler 401 ci-dessous refuse.
-      if (!getAuthToken() && !hasSessionCookie()) {
+      // même-origine/dev, voir la note AUTH de ownerService.js). En
+      // cross-origin (production), NI l'un NI l'autre n'est lisible : le cookie
+      // est rangé sur l'hôte de l'API. Le troisième signal, hasSessionArtifact,
+      // est le profil laissé par une connexion réussie — il ne vaut pas
+      // preuve, mais il indique qu'il y a une question à poser. Sans lui,
+      // l'app se déclarait anonyme au rechargement malgré un cookie vivant et
+      // renvoyait /login à un utilisateur connecté (rouge mesuré en production
+      // par scripts/check-session-reload-production.js).
+      if (!getAuthToken() && !hasSessionCookie() && !hasSessionArtifact()) {
         setUser(null);
         return;
       }
 
+      // Le simple vestige ne prouve RIEN : il n'autorise donc pas le cache
+      // hors-ligne ci-dessous. Un profil en cache sans preuve de session est le
+      // vestige d'une session finie, et l'afficher donne un utilisateur fantôme
+      // dont tous les appels échouent — exactement ce que le handler 401
+      // ci-dessous refuse. Seul un jeton (natif) ou un cookie lisible
+      // (même-origine) ouvre ce chemin ; le vestige, lui, ne mène qu'à /auth/me.
+      const sessionProven = Boolean(getAuthToken()) || hasSessionCookie();
+
       // Use cached profile if available for faster loading
       const cachedUser = kojoCache.get(CACHE_KEYS.USER_PROFILE);
-      if (cachedUser && networkOptimizer.getQuality() === 'poor') {
+      if (sessionProven && cachedUser && networkOptimizer.getQuality() === 'poor') {
         setUser(cachedUser);
         setLoading(false);
         devLog.info('🚀 User loaded from cache (poor network)');

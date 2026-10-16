@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { api, getAuthToken, isNativeShell, handleApiError, TRANSPORT_FAILURE_MESSAGE, SERVER_FAILURE_MESSAGE } from '../api';
+import { api, getAuthToken, isNativeShell, hasSessionArtifact, handleApiError, TRANSPORT_FAILURE_MESSAGE, SERVER_FAILURE_MESSAGE } from '../api';
 import fr from '../../i18n/fr.json';
 
 // Le jeton ne vit en stockage que dans le shell natif (Capacitor). Les scénarios
@@ -503,6 +503,19 @@ describe('api — web : aucun jeton en stockage, aucun en-tête Authorization', 
     localStorage.setItem('token', 'stale.token.abc');
     sessionStorage.setItem('access_token', 'stale.token.def');
     expect(getAuthToken()).toBe('');
+  });
+
+  it('hasSessionArtifact : vrai sur le profil laissé par une connexion, faux sinon', () => {
+    // Seul signal lisible quand l'API est appelée en cross-origin : le cookie
+    // de session est alors rangé sur l'hôte de l'API. Le vestige ne vaut pas
+    // preuve (aucun jeton n'en sort, le serveur a le dernier mot) mais c'est
+    // lui qui déclenche la question /auth/me.
+    expect(hasSessionArtifact()).toBe(false);
+    localStorage.setItem('user', JSON.stringify({ id: 'user-1' }));
+    expect(hasSessionArtifact()).toBe(true);
+    // Purge de session (logout, 401) : plus aucun vestige.
+    localStorage.removeItem('user');
+    expect(hasSessionArtifact()).toBe(false);
   });
 
   it('n’envoie aucun en-tête Authorization, même si un jeton traîne en stockage', async () => {

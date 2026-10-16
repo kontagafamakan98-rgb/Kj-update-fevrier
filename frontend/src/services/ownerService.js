@@ -1,16 +1,18 @@
 import { devLog, safeLog } from '../utils/env';
-import { api, getAuthToken, hasSessionCookie } from './api';
+import { api, getAuthToken, hasSessionCookie, hasSessionArtifact } from './api';
 
 // Service pour les fonctionnalités propriétaire - ACCÈS RESTREINT
 //
 // NOTE AUTH (web) : la session est le seul cookie httpOnly ; aucun jeton n'est
 // stocké côté web. La vérification d'accès owner repose donc sur le profil
 // chargé depuis /auth/me (user_type) ET sur la présence de la session, lue via
-// hasSessionCookie (cookie CSRF lisible). Ce signal n'est visible qu'en
-// même-origine : il exige le proxy Vercel (VITE_USE_SAME_ORIGIN_API=true), sans
-// quoi le dashboard owner serait inaccessible. Tous les appels API passent par
-// le client partagé `api` (credentials: 'include' + en-tête X-CSRFToken sur
-// les mutations) — plus aucun fetch manuel.
+// hasSessionCookie (cookie CSRF lisible, vrai seulement en même-origine) ou,
+// en cross-origin, la trace non secrète du profil en cache (hasSessionArtifact)
+// — le cookie est alors rangé sur l'hôte de l'API et rien de la session n'est
+// lisible depuis le frontend, ce qui rendait sinon le dashboard owner
+// inaccessible en production. Tous les appels API passent par le client
+// partagé `api` (credentials: 'include' + en-tête X-CSRFToken sur les
+// mutations) — plus aucun fetch manuel.
 class OwnerService {
   /** @returns {object|null} Utilisateur stocké en localStorage, ou null. */
   getStoredUser() {
@@ -37,9 +39,11 @@ class OwnerService {
     // Deux conditions : le profil est bien un compte owner ET une session
     // active existe (sinon les appels /owner/* échoueraient en 401). Le jeton
     // n'existe que dans le shell natif ; sur le web, c'est le cookie de session
-    // (signal hasSessionCookie). S'il est expiré, /auth/me renverra 401 et le
-    // client purgera/redirigera — pas de blocage ici.
-    return this.isOwnerUser(userCandidate) && (Boolean(getAuthToken()) || hasSessionCookie());
+    // (signal hasSessionCookie en même-origine, hasSessionArtifact en
+    // cross-origin). S'il est expiré, /auth/me renverra 401 et le client
+    // purgera/redirigera — pas de blocage ici.
+    return this.isOwnerUser(userCandidate)
+      && (Boolean(getAuthToken()) || hasSessionCookie() || hasSessionArtifact());
   }
 
   _translateOwnerError(error, fallback) {
