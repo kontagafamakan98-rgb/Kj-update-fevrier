@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-17",
-    "motif": "Deux gardes frontend suivent desormais la source qu'ils jugent : check-prerender-shells.js lit les classes du plan (titre, bouton) au lieu de retenir bg-orange-600, et classes-coquilles.js retire six exemptions devenues des classes partagees ; la refonte de /login et /register avait fait rougir une coquille juste sur une teinte que la page avait quittee.",
+    "motif": "le garde des coquilles lit desormais les classes du bouton d'inscription dans le plan de /register au lieu d'une chaine recopiee, pour que la coquille et React ne puissent plus diverger",
     "fichiers": {
       ".githooks/pre-push": "57a57605381510b531a2653226add8b0cd3f1f5879cc2adeead186342a2b44a9",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -117,8 +117,8 @@
       "backend/server.py": "ddcb03c43c1256fb690a4da623b48e7f234b39552ba1d211a9260e9fbdb700c4",
       "backend/scripts/check_health_probe.py": "136d30b9c6461d473042782a6d0ed70e649901cd27ba7fd555d74544e39f7e4d",
       "frontend/scripts/check-css-inline-budget.js": "f2ec08e78600460fbc3ca8536b7e18f404d8190a0487ba8c41515e3ce8ad5bff",
-      "frontend/scripts/check-prerender-shells.js": "ffd6369bb81d6489226c74015c1d7aba7e567ce03151355e5ec487e4ab775e02",
-      "frontend/scripts/classes-coquilles.js": "94a2b644525375b0cabc8bfb71b5fb42e4beb90080e9f196cda01dc4ed94509d"
+      "frontend/scripts/classes-coquilles.js": "94a2b644525375b0cabc8bfb71b5fb42e4beb90080e9f196cda01dc4ed94509d",
+      "frontend/scripts/check-prerender-shells.js": "2ea6bf7d3635b045f0413b6a35e9105845960d46a5ecf4184c2bd5ee2f611077"
     }
   },
   "hors_perimetre": [
