@@ -431,6 +431,31 @@ class TestEnregistrement:
         retenue = await adresse_supprimee("destinataire@example.com")
         assert retenue["faits"] == 1
 
+    @staticmethod
+    def _journal_qui_refuse(erreur):
+        """Un `db` dont la seule collection rendue refuse l'ÉCRITURE.
+
+        On remplace `suppressions.db` ENTIER, pas la collection rendue par
+        `db[...]` : contre un vrai MongoDB, chaque `db[nom]` rend un objet
+        NEUF, donc patcher l'instance de la lecture ne touche pas celle que
+        `enregistrer_fait` rouvre — le patch ne s'appliquait qu'au FakeDB, et
+        ces deux cas passaient en local puis rougissaient en CI contre
+        MongoDB (mesuré le 17/10/2026). Remplacer la table les couvre tous les
+        deux, et la lecture préalable rend `None` comme un journal vide.
+        """
+
+        class _Journal:
+            def __getitem__(self, nom):
+                return self
+
+            async def find_one(self, *args, **kwargs):
+                return None
+
+            async def insert_one(self, *args, **kwargs):
+                raise erreur
+
+        return _Journal()
+
     @pytest.mark.asyncio
     async def test_course_avec_l_index_unique_absorbe_le_doublon(self):
         """L'index unique est la garantie, la lecture préalable le confort :
@@ -440,9 +465,7 @@ class TestEnregistrement:
         class Doublon(Exception):
             code = 11000
 
-        with patch.object(
-            suppressions.db["email_delivery_events"], "insert_one", AsyncMock(side_effect=Doublon())
-        ):
+        with patch.object(suppressions, "db", self._journal_qui_refuse(Doublon())):
             bilan = await enregistrer_fait(fait, id_evenement="evt-course")
 
         assert bilan["nouveau"] is False
@@ -454,9 +477,7 @@ class TestEnregistrement:
         déjà traité ferait perdre silencieusement le fait."""
         fait = _fait("email.complained")
 
-        with patch.object(
-            suppressions.db["email_delivery_events"], "insert_one", AsyncMock(side_effect=RuntimeError("mongo down"))
-        ):
+        with patch.object(suppressions, "db", self._journal_qui_refuse(RuntimeError("mongo down"))):
             with pytest.raises(RuntimeError):
                 await enregistrer_fait(fait, id_evenement="evt-panne")
 

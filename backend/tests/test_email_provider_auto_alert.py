@@ -67,6 +67,21 @@ async def _etat():
     return await db_find_one(COLLECTION, {"_id": SUJET})
 
 
+def _utc(valeur):
+    """L'INSTANT d'une date lue en base, quel que soit le stockage.
+
+    MongoDB rend les dates NAÏVES (il ne conserve pas le fuseau, seulement
+    l'instant UTC) ; le FakeDB des tests locaux les rend conscientes. Comparer
+    `etat["panne_depuis"] == MAINTENANT` jugeait donc le drapeau `tzinfo` du
+    stockage et non le fait — le cas passait en local et rougissait en CI
+    contre un vrai MongoDB (mesuré le 17/10/2026). La valeur écrite reste UTC
+    dans les deux cas : c'est le même instant, et c'est lui qui est vérifié.
+    """
+    if valeur is None or valeur.tzinfo is not None:
+        return valeur
+    return valeur.replace(tzinfo=timezone.utc)
+
+
 async def _remise_a_zero():
     """État propre : ces cas écrivent le même document, et l'ordre d'exécution
     ne doit pas décider de leur verdict."""
@@ -135,13 +150,13 @@ class TestUneSeuleAlerteParPanne:
         etat = await _etat()
         assert etat["sante"] == "muette"
         assert etat["signature"] == "brevo:muet"
-        assert etat["panne_depuis"] == MAINTENANT
+        assert _utc(etat["panne_depuis"]) == MAINTENANT
         assert etat["alerte_envoyee"] is True
         assert etat["alerte_erreur"] == ""
         # Le second passage rafraîchit la MESURE (dernière sonde) sans toucher
         # à la date d'alerte : c'est cette date qui borne la promesse.
-        assert etat["derniere_sonde_at"] == MAINTENANT + timedelta(minutes=15)
-        assert etat["alerte_envoyee_at"] == MAINTENANT
+        assert _utc(etat["derniere_sonde_at"]) == MAINTENANT + timedelta(minutes=15)
+        assert _utc(etat["alerte_envoyee_at"]) == MAINTENANT
 
     async def test_retablissement_puis_nouvelle_panne_realerte(self):
         """Panune → sain → panne : DEUX alertes. Sans le réarmement, la seconde
@@ -173,8 +188,8 @@ class TestUneSeuleAlerteParPanne:
         assert seconde["alertes"] == 1
         assert email.await_count == 2
         etat = await _etat()
-        assert etat["retabli_at"] == MAINTENANT + timedelta(minutes=15)
-        assert etat["alerte_envoyee_at"] == MAINTENANT + timedelta(minutes=30)
+        assert _utc(etat["retabli_at"]) == MAINTENANT + timedelta(minutes=15)
+        assert _utc(etat["alerte_envoyee_at"]) == MAINTENANT + timedelta(minutes=30)
 
     async def test_un_motif_qui_change_est_une_nouvelle_panne(self):
         """« muet » puis « mal-configure » : même fournisseur, panne TOUJOURS en
@@ -213,7 +228,7 @@ class TestUneSeuleAlerteParPanne:
         assert etat["signature"] == "resend:mal-configure"
         # Le motif a changé EN RESTANT muet : `panne_depuis` reste la date de
         # DÉBUT de la panne, pas celle du changement de motif.
-        assert etat["panne_depuis"] == MAINTENANT
+        assert _utc(etat["panne_depuis"]) == MAINTENANT
 
 
 @pytest.mark.asyncio
