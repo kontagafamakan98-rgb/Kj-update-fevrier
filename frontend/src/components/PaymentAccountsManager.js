@@ -290,9 +290,12 @@ const PaymentAccountsManager = ({ onSuccess }) => {
           </div>
           
           {!isEditing && (
+            // L'action d'entrée du bloc, au vocabulaire de bouton du site :
+            // elle ouvre la paire Annuler/Enregistrer ci-dessous, et une
+            // pastille `rounded-md` à côté d'elles peindrait deux boutons.
             <button
               onClick={() => setIsEditing(true)}
-              className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+              className="bouton bouton-encre"
             >
               {t('modify')}
             </button>
@@ -545,22 +548,22 @@ const PaymentAccountsManager = ({ onSuccess }) => {
       </div>
 
       {isEditing && (
-        <div className="flex justify-end space-x-4 mt-6 pt-6 border-t">
+        <div className="mt-6 flex flex-wrap justify-end gap-3 border-t pt-6">
           <button
             onClick={handleCancel}
             disabled={saving}
-            className="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors disabled:opacity-50"
+            className="bouton bouton-clair disabled:cursor-not-allowed disabled:opacity-50"
           >
             {t('cancel')}
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            className="bouton bouton-encre disabled:cursor-not-allowed disabled:opacity-50"
           >
             {saving ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-white" aria-hidden="true"></div>
                 {t('loading')}
               </>
             ) : (

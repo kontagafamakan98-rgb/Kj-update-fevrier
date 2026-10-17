@@ -40,8 +40,18 @@
 /* Les NOMS QUE LE SITE A DÉCIDÉ DE NE PLUS GÉNÉRER (ex-`blocklist` de v3, qui n'existe
    plus en v4). Ce sont de vrais utilitaires que la prose ou une variable font
    détecter. `check-css-selecteurs-morts.js` lit CETTE liste, et refuse qu'un de
-   ces noms soit posé par le livré. */
-@source not inline("{container,visible,static,table,resize,blur,filter,transition,ease-out}");
+   ces noms soit posé par le livré.
+
+   `z-10` (17/10/2026) : la surface plein écran qui le portait a été retirée
+   (les deux sélecteurs de pays et de langue écoutent désormais un `mousedown`
+   testé par `contains`, cf. `appuis-exterieurs.test.jsx`). Il n'en restait que
+   des COMMENTAIRES qui racontent cette suppression et deux fixtures de test —
+   Tailwind lit les uns et les autres, donc la feuille servie portait une règle
+   `.z-10` que plus aucun nœud livré ne pose, et le garde des sélecteurs la
+   refusait. Cesser de la générer est le remède écrit par le garde lui-même ;
+   le jour où un composant posera à nouveau `z-10`, le garde le refusera, et
+   c'est voulu. */
+@source not inline("{container,visible,static,table,resize,blur,filter,transition,ease-out,z-10}");
 
 /* ── Tailwind v4 : défauts de v3 préservés (guide de migration, 10/10/2026) ──
    `rounded-sm` valait 4 px en v3 (la config étend `borderRadius.sm`) ; en v4
