@@ -345,6 +345,13 @@ async def compter_rebonds_consecutifs(email: str) -> int:
     postérieurs à la dernière `delivered`. Une livraison qui réussit remet donc
     le compteur à zéro par construction, et rien n'a besoin d'être remis à zéro
     à la main (un compteur à réinitialiser finit par ne plus l'être).
+
+    La borne est STRICTE, et la limite qu'elle porte est nommée : MongoDB ne
+    conserve une date qu'à la MILLISECONDE, donc deux faits de la même
+    milliseconde ne sont plus ordonnables (mesuré : deux instants à 400 µs
+    d'écart relus identiques). Un rebond qui partage la milliseconde de la
+    dernière livraison n'est alors pas compté — l'erreur va dans le sens sûr,
+    une alerte retardée d'un rebond plutôt que déclenchée à tort.
     """
     adresse = adresse_boite(email)
     journal = db[COLLECTION_JOURNAL]
