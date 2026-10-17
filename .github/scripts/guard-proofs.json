@@ -4370,8 +4370,8 @@
       "id": "session-cookie: hote du cookie suppose au lieu d'etre lu",
       "garde": "frontend/scripts/check-session-reload-production.js",
       "cible": "frontend/scripts/check-session-reload-production.js",
-      "trouve": "  const hote = cookies.length === 1 && cookies[0].domain",
-      "remplace": "  const hote = false && cookies.length === 1 && cookies[0].domain",
+      "trouve": "  const porteur = cookies.length === 1 ? origineDuCookie(cookies[0], originesConnues) : '';",
+      "remplace": "  const porteur = '';",
       "runner": "node",
       "preuve": "frontend/scripts/__tests__/check-session-reload-production.test.js",
       "commande": [

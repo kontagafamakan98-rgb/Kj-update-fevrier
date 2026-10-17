@@ -30,6 +30,7 @@ import {
   RENVOI_EXPOSITION,
   contextOptions,
   libelleSonde,
+  origineDuCookie,
   runSessionReloadProbe,
   parseArgs,
 } from '../check-session-reload-production.js';
@@ -247,6 +248,32 @@ describe('check-session-reload-production — attributs du cookie servi', () => 
     ]);
     expect(result.checked.join('\n')).toContain('topologie lue : le cookie de session est rangé sur https://api.kojo-sonde.test');
     expect(JSON.stringify(result)).not.toContain(COOKIE.value);
+  });
+
+  it('garde le SCHÉMA et le PORT de l’origine connue, pas le seul domaine du cookie', () => {
+    // Le rouge de la pile locale (e2e/session-proxy.spec.js) : `domain` ne
+    // porte ni schéma ni port, donc refaire l'URL à partir de lui seul donnait
+    // `https://127.0.0.2` pour une page servie en `http://127.0.0.2:45235` —
+    // port 443, HTTP 0. L'hôte est donc rapproché des origines CONNUES.
+    expect(origineDuCookie(
+      { domain: '127.0.0.2' }, ['http://127.0.0.2:45235']
+    )).toBe('http://127.0.0.2:45235');
+    // Le cross-site local : le cookie est chez l'API, qui a son propre port.
+    expect(origineDuCookie(
+      { domain: '127.0.0.1' }, ['http://127.0.0.2:33979', 'https://127.0.0.1:45213']
+    )).toBe('https://127.0.0.1:45213');
+    // Production : l'hôte de l'API n'est AUCUNE des origines fournies (--base
+    // seul, sans --api), et elle est sur le port par défaut.
+    expect(origineDuCookie(
+      { domain: 'api.kojo-sonde.test' }, ['https://kojo-sonde.test']
+    )).toBe('https://api.kojo-sonde.test');
+    // Cookie de DOMAINE PARENT : il couvre l'hôte de la page.
+    expect(origineDuCookie(
+      { domain: '.kojo-sonde.test' }, ['https://kojo-sonde.test']
+    )).toBe('https://kojo-sonde.test');
+    // Un domaine absent ne désigne aucun hôte : la sonde retombe sur l'origine
+    // qu'elle juge, elle n'invente pas `https://`.
+    expect(origineDuCookie({}, ['https://kojo-sonde.test'])).toBe('');
   });
 
   it('refuse un cookie absent même si /auth/me répond 200', async () => {

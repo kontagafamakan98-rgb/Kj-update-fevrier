@@ -151,6 +151,41 @@ export const libelleSonde = (base, api) => `${FAMILLE} sur ${base} (API ${api}${
 export const premisse = (fait) => `${MARQUE_PREMISSE} · ${fait} ${RENVOI_EXPOSITION}`;
 
 /**
+ * L'origine COMPLÈTE de l'hôte qui porte un cookie de session.
+ *
+ * Un cookie ne porte NI schéma NI port : son `domain` seul ne refait pas l'URL
+ * jugée. L'hôte est donc rapproché des origines que la sonde CONNAÎT (la page
+ * servie, l'API) — ce sont elles qui portent le schéma et le port — et
+ * `https://<domaine>` ne sert que pour un hôte inconnu, c'est-à-dire l'API de
+ * production sur le port par défaut.
+ *
+ * Sans ce rapprochement, `https://127.0.0.2` remplaçait
+ * `http://127.0.0.2:45235` : la sonde interrogeait le port 443 et rendait
+ * HTTP 0. Mesuré par `frontend/e2e/session-proxy.spec.js` sur la pile locale.
+ *
+ * @param {object} cookie Cookie rendu par `context.cookies()`.
+ * @param {string[]} originesConnues Origines connues, la plus prioritaire d'abord.
+ * @returns {string} Origine complète, ou chaîne vide si le cookie n'en dit rien.
+ */
+export function origineDuCookie(cookie, originesConnues = []) {
+  const domaine = String(cookie?.domain || '').replace(/^\./, '').toLowerCase();
+  if (!domaine) return '';
+  const portee = originesConnues.filter(Boolean).find((origine) => {
+    let hote = '';
+    try {
+      hote = new URL(origine).hostname.toLowerCase();
+    } catch (_error) {
+      // Une origine illisible ne rapproche rien : elle n'est pas candidate.
+      return false;
+    }
+    // Égalité d'hôte, ou cookie de DOMAINE PARENT (`.kojoforafrica.cc.cd`) qui
+    // couvre l'hôte (api.kojoforafrica.cc.cd).
+    return hote === domaine || hote.endsWith(`.${domaine}`);
+  });
+  return portee || `https://${domaine}`;
+}
+
+/**
  * Lit le cookie de session que Chromium GARDE, y compris HttpOnly, et rend
  * l'URL de /auth/me sur l'hôte qui le porte — c'est là que la page envoie sa
  * session, donc là que la sonde doit juger.
@@ -159,7 +194,7 @@ export const premisse = (fait) => `${MARQUE_PREMISSE} · ${fait} ${RENVOI_EXPOSI
  * @returns {Promise<{attributes: object|null, url: string}>} Attributs observés
  *   (null si le cookie manque ou est ambigu) et l'URL jugée.
  */
-async function checkSessionCookie(context, origineParDefaut, stage, errors, checked) {
+async function checkSessionCookie(context, originesConnues, stage, errors, checked) {
   // LA TOPOLOGIE SE LIT, ELLE NE SE SUPPOSE PAS. `context.cookies()` sans URL
   // rend ce que le navigateur GARDE, domaine compris : le proxy même-origine
   // range kojo_session sur l'origine de la page, une production cross-site
@@ -170,11 +205,11 @@ async function checkSessionCookie(context, origineParDefaut, stage, errors, chec
   const cookies = (await context.cookies())
     .filter((cookie) => cookie.name === SESSION_COOKIE_NAME);
   // L'hôte qui porte le cookie EST l'API que la page interroge : c'est lui qui
-  // reçoit la session, donc lui que la sonde doit questionner ensuite.
-  const hote = cookies.length === 1 && cookies[0].domain
-    ? `https://${String(cookies[0].domain).replace(/^\./, '')}`
-    : origineParDefaut;
-  const url = `${hote}${AUTH_ME_PATH}`;
+  // reçoit la session, donc lui que la sonde doit questionner ensuite. Son
+  // origine COMPLÈTE (schéma, port) vient des origines connues, jamais du seul
+  // `domain` du cookie.
+  const porteur = cookies.length === 1 ? origineDuCookie(cookies[0], originesConnues) : '';
+  const url = `${porteur || originesConnues.filter(Boolean)[0] || ''}${AUTH_ME_PATH}`;
   const label = `après ${stage} : cookie ${SESSION_COOKIE_NAME}`;
   if (cookies.length !== 1) {
     errors.push(`${label} : ${cookies.length} cookie(s) ${SESSION_COOKIE_NAME} dans le contexte, 1 attendu`);
@@ -388,8 +423,10 @@ async function oneAttempt({
 
     // L'hôte lu REMPLACE l'hypothèse : la sonde juge ensuite l'API que la
     // page interroge réellement (proxy même-origine ou API directe).
+    // Origines CONNUES, l'API jugée d'abord : c'est elle que la sonde
+    // interroge, et la page n'est qu'une candidate (proxy même-origine).
     const connexion = await checkSessionCookie(
-      context, new URL(authMeUrl).origin, 'connexion', errors, checked
+      context, [api, base], 'connexion', errors, checked
     );
     if (connexion.url !== authMeUrl) {
       checked.push(
@@ -428,7 +465,7 @@ async function oneAttempt({
     const observed = await appCall;
     const after = await pageState(page, authMeUrl);
     verdicts.sessionCookies.afterReload = (
-      await checkSessionCookie(context, new URL(authMeUrl).origin, 'rechargement', errors, checked)
+      await checkSessionCookie(context, [api, base], 'rechargement', errors, checked)
     ).attributes;
     const landedOnLogin = String(page.url()).includes(LOGIN_PATH);
     verdicts.afterReload = {
