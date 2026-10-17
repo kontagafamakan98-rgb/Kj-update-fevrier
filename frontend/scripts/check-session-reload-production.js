@@ -80,19 +80,25 @@
  *     envoyé à CHAQUE requête du contexte (sous-ressources comprises) ; il
  *     vient de l'environnement, JAMAIS d'une entrée de workflow — une entrée de
  *     dispatch est publiée dans les journaux du run ;
- *   • `--cross-site <origine API>`, parce que sur un déploiement Vercel le
- *     bundle utilise le proxy `/api` même-origine (production COMME preview) :
- *     ce drapeau pose `window.__KOJO_USE_SAME_ORIGIN_API__ = false` avant le
+ *   • `--cross-site <origine API>`, qui FORCE la topologie cross-site : ce
+ *     drapeau pose `window.__KOJO_USE_SAME_ORIGIN_API__ = false` avant le
  *     premier rendu (le levier d'exécution de src/utils/backendUrl.js) pour que
- *     la page interroge VRAIMENT l'API cross-site. Sans lui, `--api` jugerait
- *     une page qui appelle le proxy : verdict (B) « aucun appel authentifié »,
- *     c'est-à-dire un faux rouge qui enverrait corriger le frontend.
+ *     la page interroge VRAIMENT l'API distante, quel que soit le build.
+ *
+ * ─── La topologie de PRODUCTION se LIT, elle ne se suppose pas ──────────────
+ * `--api` et `--cross-site` ne servent qu'à forcer une surface. Sans eux, la
+ * sonde lit l'hôte où Chromium a RANGÉ kojo_session (`context.cookies()`), et
+ * c'est LUI qu'elle juge ensuite : le proxy même-origine range le cookie sur
+ * l'origine de la page, un build `VITE_USE_SAME_ORIGIN_API=false` (la
+ * production de ce projet) le range sur l'hôte de l'API. Supposer le premier
+ * faisait refuser le second sur une prémisse (« 0 cookie(s) ») le 17/10/2026,
+ * alors que la session vivait : la sonde accusait sa propre hypothèse.
  *
  * Usage :
  *   cd frontend && node scripts/check-session-reload-production.js
  * Optionnel :
  *   --base https://kojoforafrica.cc.cd   (défaut : SITE_ORIGIN)
- *   --api  https://api.kojoforafrica.cc.cd (origine du PROXY jugée ; défaut : --base)
+ *   --api  https://api.kojoforafrica.cc.cd (origine jugée SI aucun cookie n'est lisible ; défaut : --base)
  *   --cross-site https://api.kojoforafrica.cc.cd (API directe + drapeau même-origine désactivé)
  *   --tentatives 3 --delai 15
  * En préproduction :
@@ -145,16 +151,34 @@ export const libelleSonde = (base, api) => `${FAMILLE} sur ${base} (API ${api}${
 export const premisse = (fait) => `${MARQUE_PREMISSE} · ${fait} ${RENVOI_EXPOSITION}`;
 
 /**
- * Lit le cookie APPLICABLE à /auth/me dans Chromium, y compris HttpOnly.
+ * Lit le cookie de session que Chromium GARDE, y compris HttpOnly, et rend
+ * l'URL de /auth/me sur l'hôte qui le porte — c'est là que la page envoie sa
+ * session, donc là que la sonde doit juger.
  * Ne renvoie et ne journalise jamais sa valeur, même lors d'un refus.
+ *
+ * @returns {Promise<{attributes: object|null, url: string}>} Attributs observés
+ *   (null si le cookie manque ou est ambigu) et l'URL jugée.
  */
-async function checkSessionCookie(context, authMeUrl, stage, errors, checked) {
-  const cookies = (await context.cookies(authMeUrl))
+async function checkSessionCookie(context, origineParDefaut, stage, errors, checked) {
+  // LA TOPOLOGIE SE LIT, ELLE NE SE SUPPOSE PAS. `context.cookies()` sans URL
+  // rend ce que le navigateur GARDE, domaine compris : le proxy même-origine
+  // range kojo_session sur l'origine de la page, une production cross-site
+  // (`VITE_USE_SAME_ORIGIN_API=false`, le cas de ce projet) la range sur l'hôte
+  // de l'API. Supposer le premier faisait refuser le second sur une PRÉMISSE
+  // fausse (« 0 cookie(s) », le 17/10/2026) alors que la session vivait — un
+  // rouge qui n'accusait pas la production.
+  const cookies = (await context.cookies())
     .filter((cookie) => cookie.name === SESSION_COOKIE_NAME);
+  // L'hôte qui porte le cookie EST l'API que la page interroge : c'est lui qui
+  // reçoit la session, donc lui que la sonde doit questionner ensuite.
+  const hote = cookies.length === 1 && cookies[0].domain
+    ? `https://${String(cookies[0].domain).replace(/^\./, '')}`
+    : origineParDefaut;
+  const url = `${hote}${AUTH_ME_PATH}`;
   const label = `après ${stage} : cookie ${SESSION_COOKIE_NAME}`;
   if (cookies.length !== 1) {
-    errors.push(`${label} : ${cookies.length} cookie(s) applicable(s), 1 attendu`);
-    return null;
+    errors.push(`${label} : ${cookies.length} cookie(s) ${SESSION_COOKIE_NAME} dans le contexte, 1 attendu`);
+    return { attributes: null, url };
   }
   const { httpOnly, secure, sameSite } = cookies[0];
   const attributes = { httpOnly, secure, sameSite };
@@ -167,7 +191,7 @@ async function checkSessionCookie(context, authMeUrl, stage, errors, checked) {
   if (Object.entries(SESSION_COOKIE_ATTRIBUTES).every(([key, expected]) => attributes[key] === expected)) {
     checked.push(`${label} : HttpOnly=${httpOnly}, Secure=${secure}, SameSite=${sameSite}`);
   }
-  return attributes;
+  return { attributes, url };
 }
 
 /** Route de connexion : la quitter est le premier signe d'une session ouverte. */
@@ -304,7 +328,7 @@ async function oneAttempt({
   const notices = [];
   const checked = [];
   const verdicts = emptyVerdicts();
-  const authMeUrl = `${api}${AUTH_ME_PATH}`;
+  let authMeUrl = `${api}${AUTH_ME_PATH}`;
 
   const browser = await launch();
   try {
@@ -362,10 +386,19 @@ async function oneAttempt({
       return { ok: false, errors, notices, checked, verdicts };
     }
 
-    verdicts.sessionCookies = {
-      afterLogin: await checkSessionCookie(context, authMeUrl, 'connexion', errors, checked),
-      afterReload: null,
-    };
+    // L'hôte lu REMPLACE l'hypothèse : la sonde juge ensuite l'API que la
+    // page interroge réellement (proxy même-origine ou API directe).
+    const connexion = await checkSessionCookie(
+      context, new URL(authMeUrl).origin, 'connexion', errors, checked
+    );
+    if (connexion.url !== authMeUrl) {
+      checked.push(
+        `topologie lue : le cookie de session est rangé sur ${new URL(connexion.url).origin} ` +
+          '— les appels de la page partent de là (aucun hôte supposé)'
+      );
+    }
+    authMeUrl = connexion.url;
+    verdicts.sessionCookies = { afterLogin: connexion.attributes, afterReload: null };
     const opened = await pageState(page, authMeUrl);
     verdicts.beforeReload = opened.status;
     if (opened.status !== 200) {
@@ -394,9 +427,9 @@ async function oneAttempt({
 
     const observed = await appCall;
     const after = await pageState(page, authMeUrl);
-    verdicts.sessionCookies.afterReload = await checkSessionCookie(
-      context, authMeUrl, 'rechargement', errors, checked
-    );
+    verdicts.sessionCookies.afterReload = (
+      await checkSessionCookie(context, new URL(authMeUrl).origin, 'rechargement', errors, checked)
+    ).attributes;
     const landedOnLogin = String(page.url()).includes(LOGIN_PATH);
     verdicts.afterReload = {
       cookie: after.status,

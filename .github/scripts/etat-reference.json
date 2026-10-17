@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-17",
-    "motif": "le garde des coquilles lit desormais les classes du bouton d'inscription dans le plan de /register au lieu d'une chaine recopiee, pour que la coquille et React ne puissent plus diverger",
+    "motif": "la sonde de session lit desormais l'hote ou Chromium a range kojo_session au lieu de supposer le proxy meme-origine, pour ne plus refuser une production cross-site sur une premisse fausse",
     "fichiers": {
       ".githooks/pre-push": "57a57605381510b531a2653226add8b0cd3f1f5879cc2adeead186342a2b44a9",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -98,7 +98,6 @@
       "frontend/scripts/check-retard-main.js": "b9c98e4c23382b24d1ce361acc7ea5d0cc6dc166d83ab288402f76436d205e61",
       "frontend/scripts/check-script-deps.js": "cf8bf0065da33c9e22343025176b0f74434a93d85760c2d56f94f53ef8b04af6",
       "frontend/scripts/check-seo-production.js": "670ff721139154e94372f48c5cbd95cefcce85f9e8df9df078069c9df3f84484",
-      "frontend/scripts/check-session-reload-production.js": "2efb4ef95ae7512dfe6d572a38e9a6cbdf644b71c56197ba2bd3cd2c07cca9c4",
       "frontend/scripts/check-shell-remote-resources.js": "892f772d7c2ab1a41b03b0dc05d29b470d7c0c9bc6ce0355599b5a8c020d2822",
       "frontend/scripts/check-shell-text-provenance.js": "eedaecfb08a9586588fa1bbf94285b807898ca49e2f98c3090dcaed921747fc6",
       "frontend/scripts/check-spa-routes.js": "5beaa42d2616c3c568817f06312b12a7b2887dbddd2b37d1dca1d6d8e06efe1e",
@@ -118,7 +117,8 @@
       "backend/scripts/check_health_probe.py": "136d30b9c6461d473042782a6d0ed70e649901cd27ba7fd555d74544e39f7e4d",
       "frontend/scripts/check-css-inline-budget.js": "f2ec08e78600460fbc3ca8536b7e18f404d8190a0487ba8c41515e3ce8ad5bff",
       "frontend/scripts/classes-coquilles.js": "94a2b644525375b0cabc8bfb71b5fb42e4beb90080e9f196cda01dc4ed94509d",
-      "frontend/scripts/check-prerender-shells.js": "2ea6bf7d3635b045f0413b6a35e9105845960d46a5ecf4184c2bd5ee2f611077"
+      "frontend/scripts/check-prerender-shells.js": "2ea6bf7d3635b045f0413b6a35e9105845960d46a5ecf4184c2bd5ee2f611077",
+      "frontend/scripts/check-session-reload-production.js": "03297b4c10ba93a1e8713be7978a41ee21c36f2feee78f71b7071e49946a761f"
     }
   },
   "hors_perimetre": [
