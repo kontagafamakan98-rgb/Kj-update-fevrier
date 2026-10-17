@@ -120,10 +120,10 @@ describe('refus 1 — dépassement du budget (nommé, chiffré)', () => {
     // Le verdict du refus est affirmé EN PREMIER : c'est lui que la mutation du
     // garde (« dépassement neutralisé ») doit faire disparaître du rapport, et
     // le harnais exige que le rouge NOMME ce qui manque.
-    expect(errors.join('\n')).toContain('90000 o de CSS inline > budget 78848 o');
+    expect(errors.join('\n')).toContain('90000 o de CSS inline > budget 82944 o');
     expect(errors).toHaveLength(1);
     expect(errors[0]).toContain('about.html');
-    expect(errors[0]).toContain('(+11152 o, +14.1 %)');
+    expect(errors[0]).toContain('(+7056 o, +8.5 %)');
     // Et il dit POURQUOI ces octets comptent : lus avant le premier paint.
     expect(errors[0]).toContain('AVANT le premier paint');
   });
@@ -303,17 +303,17 @@ describe('checkCssInlineBudget — le build sur disque', () => {
   });
 
   it('rend ok:false en NOMMANT la page trop lourde du disque', () => {
-    // Les TREIZE pages à 79 000 o — juste au-dessus du budget de 78 848 — et à
+    // Les TREIZE pages à 84 000 o — juste au-dessus du budget de 82 944 — et à
     // contenu IDENTIQUE entre elles : le seul motif du refus est donc le budget.
     // (N'alourdir qu'une page ferait aussi diverger sa feuille, et le cas
     // mesurerait deux refus au lieu d'un.)
     const pages = pagesDuDisque().map((p) =>
-      p.octets === 512 ? p : { ...p, octets: 79000 }
+      p.octets === 512 ? p : { ...p, octets: 84000 }
     );
     const resultat = checkCssInlineBudget({ root: ecrireArbre(pages), quiet: true });
     expect(resultat.ok).toBe(false);
     expect(resultat.errors).toHaveLength(13);
-    expect(resultat.errors.every((e) => e.includes('de CSS inline > budget 78848 o'))).toBe(true);
+    expect(resultat.errors.every((e) => e.includes('de CSS inline > budget 82944 o'))).toBe(true);
     expect(resultat.errors[0]).toContain('about.html');
     expect(resultat.errors.some((e) => e.includes('jobs.html'))).toBe(true);
   });

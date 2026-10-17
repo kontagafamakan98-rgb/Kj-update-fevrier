@@ -40,13 +40,22 @@ from kojo_core import (
     is_database_available,
     request_counts,
 )
-from kojo_email import brevo_health_probe, generate_email_otp_code, hash_email_otp
+from kojo_email import (
+    active_email_provider_health_probe,
+    brevo_health_probe,
+    generate_email_otp_code,
+    hash_email_otp,
+)
 from kojo_payments import (
     init_paydunya_circuit,
     paydunya_circuit_state,
     refresh_paydunya_circuit_from_db,
 )
-from kojo_scheduler import payout_stuck_sweeper_loop, retention_purge_loop
+from kojo_scheduler import (
+    email_provider_alert_loop,
+    payout_stuck_sweeper_loop,
+    retention_purge_loop,
+)
 from kojo_settings import APP_ENV, APP_REVISION, APP_VERSION, FRONTEND_APP_URL, logger
 
 
@@ -75,6 +84,10 @@ _init_sentry()
 
 # Routers par domaine (chacun exporte `router`)
 from kojo_routers_auth import router as auth_router
+# Webhooks email du fournisseur (rebonds, plaintes) : famille « email », une
+# route publique non authentifiée dont la seule preuve d'identité est la
+# signature de la requête.
+from kojo_routers_email import router as email_router
 from kojo_routers_geo import router as geo_router
 from kojo_routers_jobs import router as jobs_router
 from kojo_routers_messages import router as messages_router
@@ -160,6 +173,7 @@ async def health_check():
 
 # Inclusion des routers par domaine
 api_router.include_router(auth_router)
+api_router.include_router(email_router)
 api_router.include_router(users_router)
 api_router.include_router(support_router)
 api_router.include_router(notifications_router)
@@ -252,7 +266,8 @@ async def monitor_paydunya():
 
 async def _external_provider_monitor(probe, service: str):
     """Contrat commun /monitor/<service> pour les fournisseurs externes
-    (Brevo, Cloudinary) : 200 quand le service répond, 503 sinon.
+    (Brevo, Cloudinary, fournisseur email actif) : 200 quand le service
+    répond, 503 sinon.
 
     Les sondes sont SYNC (requests / SDK cloudinary) et potentiellement
     lentes en cas de panne → exécutées dans un thread (asyncio.to_thread)
@@ -261,13 +276,20 @@ async def _external_provider_monitor(probe, service: str):
     martèlent pas le fournisseur.
     """
     result = await asyncio.to_thread(probe)
-    payload = {
-        "service": service,
+    payload = {"service": service}
+    # Le fournisseur email est le seul dont l'identité dépend d'une variable :
+    # sans `provider`, un vert ne dit pas QUI a été jugé — et un moniteur qui
+    # croit surveiller Resend pendant que Brevo envoie ne mesure rien.
+    if result.get("provider"):
+        payload["provider"] = result["provider"]
+    if result.get("provider_note"):
+        payload["provider_note"] = result["provider_note"]
+    payload.update({
         "circuit": "ok" if result.get("ok") else "down",
         "configured": result.get("configured", True),
         "detail": result.get("detail", ""),
         "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
+    })
     if not result.get("ok"):
         return JSONResponse(status_code=503, content=payload)
     return payload
@@ -287,6 +309,24 @@ async def monitor_brevo():
     return await _external_provider_monitor(brevo_health_probe, "brevo")
 
 
+# Sonde du fournisseur email ACTIF (EMAIL_PROVIDER) : 200 si sa clé répond et
+# que l'expéditeur est réellement utilisable, 503 sinon. `/monitor/brevo` juge
+# Brevo — qui n'est peut-être plus celui qui envoie ; un nom de fournisseur
+# inconnu retombant sur Brevo, la sonde le nomme dans `provider_note`.
+@app.api_route("/monitor/email", methods=["GET", "HEAD"])
+async def monitor_email():
+    """Sonde email du fournisseur ACTIF : 200 si sa clé répond et que
+    l'expéditeur peut écrire à un vrai destinataire, 503 sinon (config
+    manquante, transport, clé refusée, expéditeur inutilisable).
+
+    Returns:
+        dict: {service, provider, circuit, configured, detail, timestamp}
+        (+ provider_note quand le nom configuré est retombé sur Brevo) — 503
+        quand circuit == "down".
+    """
+    return await _external_provider_monitor(active_email_provider_health_probe, "email")
+
+
 # Sonde Cloudinary (photos de profil, portfolio) : 200 si l'Admin API répond
 # au ping officiel, 503 sinon (config manquante, transport).
 @app.api_route("/monitor/cloudinary", methods=["GET", "HEAD"])
@@ -302,13 +342,21 @@ async def monitor_cloudinary():
 
 
 async def _composite_monitor_payload() -> tuple[dict, list]:
-    """Sonde les 3 fournisseurs externes (PayDunya, Brevo, Cloudinary) en
+    """Sonde les fournisseurs externes (PayDunya, email, Brevo, Cloudinary) en
     parallèle et consolide leur état pour l'alerte AGRÉGÉE.
 
     Chaque fournisseur est évalué avec son contrat habituel :
     - PayDunya   : "down" si le circuit est OPEN (half_open = sonde autorisée),
+    - email      : "down" si le fournisseur ACTIF échoue (config manquante,
+      transport, clé refusée, expéditeur inutilisable),
     - Brevo/Cloudinary : "down" si la sonde échoue (transport, HTTP erreur,
       config manquante).
+
+    L'entrée `brevo` DISPARAÎT quand Brevo est le fournisseur actif : l'entrée
+    `email` le juge alors déjà (et plus finement, jusqu'à l'expéditeur). La
+    garder compterait la même panne deux fois, et une panne Brevo isolée
+    déclencherait seule le 503 — ce que le seuil existe précisément pour
+    éviter.
 
     Les sondes sync (requests / SDK cloudinary) tournent dans des threads via
     asyncio.gather + to_thread : l'event loop n'est jamais bloqué, et les
@@ -320,9 +368,10 @@ async def _composite_monitor_payload() -> tuple[dict, list]:
         threshold, providers, timestamp} + liste des fournisseurs down.
     """
     paydunya_payload, paydunya_state = await _paydunya_monitor_payload()
-    brevo_result, cloudinary_result = await asyncio.gather(
+    brevo_result, cloudinary_result, email_result = await asyncio.gather(
         asyncio.to_thread(brevo_health_probe),
         asyncio.to_thread(cloudinary_health_probe),
+        asyncio.to_thread(active_email_provider_health_probe),
     )
     providers = {
         "paydunya": {
@@ -330,16 +379,26 @@ async def _composite_monitor_payload() -> tuple[dict, list]:
             "configured": True,
             "detail": f"circuit {paydunya_state}",
         },
-        "brevo": {
+        "email": {
+            "circuit": "ok" if email_result.get("ok") else "down",
+            "configured": email_result.get("configured", True),
+            "detail": email_result.get("detail", ""),
+            "provider": email_result.get("provider", ""),
+        },
+    }
+    # Pas de double comptage : quand Brevo EST le fournisseur actif, l'entrée
+    # `email` le couvre déjà. Une même panne comptée deux fois ferait pager une
+    # panne isolée, alors que le seuil est fait pour l'ignorer.
+    if email_result.get("provider") != "brevo":
+        providers["brevo"] = {
             "circuit": "ok" if brevo_result.get("ok") else "down",
             "configured": brevo_result.get("configured", True),
             "detail": brevo_result.get("detail", ""),
-        },
-        "cloudinary": {
-            "circuit": "ok" if cloudinary_result.get("ok") else "down",
-            "configured": cloudinary_result.get("configured", True),
-            "detail": cloudinary_result.get("detail", ""),
-        },
+        }
+    providers["cloudinary"] = {
+        "circuit": "ok" if cloudinary_result.get("ok") else "down",
+        "configured": cloudinary_result.get("configured", True),
+        "detail": cloudinary_result.get("detail", ""),
     }
     down = [name for name, info in providers.items() if info["circuit"] != "ok"]
     payload = {
@@ -356,17 +415,20 @@ async def _composite_monitor_payload() -> tuple[dict, list]:
 
 
 # Healthcheck composite pour l'alerte AGRÉGÉE : 503 si AU MOINS `threshold`
-# fournisseurs externes sont down (défaut 2 sur 3). UptimeRobot/Render
-# pointent cette sonde : un fournisseur isolé qui flappe n'alerte pas, mais
-# une panne multi-fournisseurs (ou générale) déclenche immédiatement.
+# fournisseurs externes sont down (défaut 2). UptimeRobot/Render pointent
+# cette sonde : un fournisseur isolé qui flappe n'alerte pas, mais une panne
+# multi-fournisseurs (ou générale) déclenche immédiatement. Le nombre de
+# fournisseurs dépend de la config : l'entrée `brevo` s'efface quand Brevo est
+# le fournisseur email ACTIF (l'entrée `email` le couvre), donc `total` vaut 3
+# ou 4 et le seuil reste un NOMBRE de pannes, pas une fraction.
 @app.api_route("/monitor", methods=["GET", "HEAD"])
 async def monitor_composite(
-    threshold: int = Query(default=2, ge=1, le=3, description="Nombre de fournisseurs down déclenchant le 503"),
+    threshold: int = Query(default=2, ge=1, le=4, description="Nombre de fournisseurs down déclenchant le 503"),
 ):
-    """Healthcheck composite des 3 fournisseurs externes (PayDunya, Brevo,
-    Cloudinary) : 503 si AU MOINS `threshold` d'entre eux sont down
+    """Healthcheck composite des fournisseurs externes (PayDunya, email actif,
+    Brevo, Cloudinary) : 503 si AU MOINS `threshold` d'entre eux sont down
     (défaut 2), 200 sinon. Payload consolidé listant l'état de chaque
-    fournisseur.
+    fournisseur — `email` porte le nom du fournisseur réellement jugé.
 
     Returns:
         dict: {service, circuit, total, down, threshold, providers,
@@ -552,6 +614,10 @@ async def lifespan(application: FastAPI):
     # document de compte supprimé, ticket support, message. L'index TTL reste la
     # garantie de fond ; ce passage est l'étage observable et testable.
     retention_task = asyncio.create_task(retention_purge_loop())
+    # AUTO-ALERTE du fournisseur email ACTIF : le backend juge lui-même, avec la
+    # sonde de /monitor/email, et prévient le propriétaire UNE FOIS PAR PANNE.
+    # La sonde externe du dépôt reste un second témoin, jamais le seul.
+    email_alert_task = asyncio.create_task(email_provider_alert_loop())
     logger.info("✅ API Kojo prête!")
 
     yield  # l'application tourne ici
@@ -560,8 +626,11 @@ async def lifespan(application: FastAPI):
     rate_limit_task.cancel()
     payout_sweeper_task.cancel()
     retention_task.cancel()
+    email_alert_task.cancel()
     try:
-        await asyncio.gather(rate_limit_task, payout_sweeper_task, retention_task)
+        await asyncio.gather(
+            rate_limit_task, payout_sweeper_task, retention_task, email_alert_task
+        )
     except asyncio.CancelledError:
         pass
     client.close()

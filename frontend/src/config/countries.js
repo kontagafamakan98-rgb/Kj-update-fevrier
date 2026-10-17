@@ -13,30 +13,41 @@
 // dire surveillait la copie au lieu de la supprimer.
 //
 // Aucun rendu ici : pas d'import React, pas de JSX. C'est ce qui rend le module
-// chargeable par Node (vite.config.js) autant que par le bundle. `color` est
-// l'identité de LA CARTE (une pastille par pays), pas la mise en page de
+// chargeable par Node (vite.config.js) autant que par le bundle. `classeCarte`
+// est l'identité de LA CARTE (une pastille par pays), pas la mise en page de
 // l'accueil : les deux canaux peignent donc la même carte.
+//
+// ── Pourquoi `classeCarte` et non `color` (17/10/2026) ──────────────────────
+// Tailwind lit le TEXTE des sources : la valeur ci-dessous GÉNÈRE une règle
+// livrée, qu'elle soit posée ou non. Or `scripts/check-css-selecteurs-morts.js`
+// ne reconnaît un porteur de classe que dans une POSITION de classe (JSX) ou
+// sous un nom `classe*` : un champ nommé `color` était donc invisible pour lui,
+// et ses quatre teintes n'étaient vivantes que par le `className` qui les
+// interpellait ailleurs. Le jour où ce `className` a changé de dessin (la page
+// d'inscription a cessé de peindre un pavé jaune), `bg-yellow-100` est devenue
+// une règle sans porteur aux yeux du garde — un rouge juste, qui accusait le
+// NOM du champ et non la teinte. Renommé, il est lu comme ce qu'il est.
 export const COUNTRIES = [
   {
     code: 'mali',
     name: 'Mali',
     fullName: 'Mali',
     iso: 'ML',
-    color: 'bg-green-100',
+    classeCarte: 'bg-green-100',
   },
   {
     code: 'senegal',
     name: 'Sénégal',
     fullName: 'Sénégal',
     iso: 'SN',
-    color: 'bg-yellow-100',
+    classeCarte: 'bg-yellow-100',
   },
   {
     code: 'burkina_faso',
     name: 'Burkina Faso',
     fullName: 'Burkina Faso',
     iso: 'BF',
-    color: 'bg-red-100',
+    classeCarte: 'bg-red-100',
   },
   {
     code: 'ivory_coast',
@@ -47,6 +58,6 @@ export const COUNTRIES = [
     name: 'Côte d’Ivoire',
     fullName: 'Côte d’Ivoire',
     iso: 'CI',
-    color: 'bg-orange-100',
+    classeCarte: 'bg-orange-100',
   },
 ];

@@ -23,7 +23,8 @@ import {
   Crown,
   Smartphone,
   Rocket,
-  Camera
+  Camera,
+  ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -104,17 +105,20 @@ export default function Dashboard() {
     { label: t('totalEarnings'), value: `${stats.totalEarnings.toLocaleString(locale)} XOF`, icon: CircleDollarSign }
   ];
 
+  // Le dessin d'une action (fond, glyphe, levée) appartient à `.tuile-action`
+  // (src/index.css) : ces objets ne portent donc plus de teinte ni de classe,
+  // seulement ce qu'ils DÉSIGNENT. La première entrée est l'action principale.
   const quickActions = (() => {
     const baseActions = user?.user_type === 'client'
       ? [
-          { to: '/create-job', label: t('postJob'), icon: PlusCircle, iconClass: 'text-orange-600 bg-orange-100' },
-          { to: '/jobs', label: t('myJobs'), icon: Briefcase, iconClass: 'text-orange-700 bg-orange-100' },
-          { to: '/messages', label: t('messages'), icon: MessageSquare, iconClass: 'text-orange-700 bg-orange-100' }
+          { to: '/create-job', label: t('postJob'), icon: PlusCircle },
+          { to: '/jobs', label: t('myJobs'), icon: Briefcase },
+          { to: '/messages', label: t('messages'), icon: MessageSquare }
         ]
       : [
-          { to: '/jobs', label: `${t('searchJobs')} ${t('jobs')}`, icon: Briefcase, iconClass: 'text-orange-600 bg-orange-100' },
-          { to: '/profile', label: t('workerProfile'), icon: Wrench, iconClass: 'text-orange-700 bg-orange-100' },
-          { to: '/messages', label: t('messages'), icon: MessageSquare, iconClass: 'text-orange-700 bg-orange-100' }
+          { to: '/jobs', label: `${t('searchJobs')} ${t('jobs')}`, icon: Briefcase },
+          { to: '/profile', label: t('workerProfile'), icon: Wrench },
+          { to: '/messages', label: t('messages'), icon: MessageSquare }
         ];
 
     if (isFamakan) {
@@ -122,16 +126,13 @@ export default function Dashboard() {
         to: '/payment',
         label: t('languagesPayments'),
         subtitle: t('publicFeature'),
-        icon: Monitor,
-        iconClass: 'text-orange-700 bg-orange-100',
-        cardClass: 'bg-gradient-to-r from-orange-50 to-yellow-50'
+        icon: Monitor
       });
       baseActions.push({
         to: '/support-admin',
         label: t('supportRequestsTitle'),
         subtitle: t('supportAdminSubtitle'),
-        icon: LifeBuoy,
-        iconClass: 'text-orange-600 bg-orange-100',
+        icon: LifeBuoy
       });
     }
 
@@ -167,38 +168,80 @@ export default function Dashboard() {
 
   return (
     <CadrePage chemin="/dashboard" classeCorps="">
-      <div className="tete-app">
-        {/* Le titre de page prend l'échelle serif du site (`.titre-page`,
-            src/index.css) : c'est la même page d'arrivée que l'accueil pour un
-            utilisateur connecté, elle ne peut pas être typographiée comme un
-            gabarit d'administration. */}
-        <h1 className="titre-page">
-          {t('welcomeUser')} {user?.first_name || 'User'}!
-        </h1>
-        <p className="text-gray-600 mt-1">
-          {user?.user_type === 'client' ? t('manageProjectsClient') : t('discoverOpportunitiesWorker')}
-        </p>
-      </div>
+      {/* LE BANDEAU D'ACCUEIL — ce que l'utilisateur lit en premier, et qui doit
+          dire « vous êtes ici » avant de dire quoi que ce soit. Le titre garde
+          `.titre-page` (l'échelle serif du site) : c'est la page d'arrivée d'un
+          utilisateur connecté, elle ne peut pas être typographiée comme un
+          gabarit d'administration. */}
+      <section className="bande-app bloc-app">
+        <div>
+          <p className="sur-titre">{t('dashboard')}</p>
+          <h1 className="titre-page mt-3">
+            {t('welcomeUser')} {user?.first_name || 'User'}!
+          </h1>
+          {/* La phrase de tête reste sur UNE ligne à 412 px : le bandeau lui
+              retire la gouttière qu'elle avait avant (2 × `--rythme-carte`), et
+              la même phrase passait de une à deux lignes — c'est-à-dire que
+              l'ÉLÉMENT LCP de la route changeait de main (h1 → paragraphe,
+              8 626 → 12 188 px², mesuré par `e2e/lcp-app.spec.js`). Le corps
+              plus petit sur téléphone la ramène sur une ligne, et la mesure du
+              bandeau d'aire reste donc celle du titre. */}
+          <p className="mt-2 text-sm text-stone-600 sm:max-w-2xl sm:text-base">
+            {user?.user_type === 'client' ? t('manageProjectsClient') : t('discoverOpportunitiesWorker')}
+          </p>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 bloc-app">
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            {/* L'étiquette dit le RÔLE du compte ; elle ne peint aucun ÉTAT de
+                mission (c'est `.pastille-statut[data-statut]`, un seul
+                propriétaire). */}
+            <span className="etiquette-app etiquette-app-orange">
+              {user?.user_type === 'client' ? t('client') : t('worker')}
+            </span>
+            {user?.is_verified && (
+              <span className="etiquette-app etiquette-app-vert">
+                <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                {t('verified')}
+              </span>
+            )}
+            {isFamakan && (
+              <span className="etiquette-app">
+                <Crown className="h-3.5 w-3.5" aria-hidden="true" />
+                {t('famakanAccess')}
+              </span>
+            )}
+          </div>
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              to={user?.user_type === 'client' ? '/create-job' : '/jobs'}
+              className="bouton bouton-encre"
+            >
+              {user?.user_type === 'client' ? t('postJob') : `${t('searchJobs')} ${t('jobs')}`}
+            </Link>
+            <Link to="/messages" className="bouton bouton-clair">
+              <MessageSquare className="h-4 w-4" aria-hidden="true" />
+              {t('messages')}
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* LES QUATRE MESURES — une tuile dit un chiffre, pas une carte : le
+          libellé en petites capitales, le chiffre en serif tabulaire, et rien
+          d'autre. Le glyphe du bloc au-dessus rappelle à quoi la mesure se
+          rapporte, il ne décore pas le chiffre. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 bloc-app">
         {statCards.map((item) => {
           const Icon = item.icon;
-          // La carte à FILET du site, et la pastille ronde qui porte le glyphe :
-          // le même couple que les cartes de /about et que les lignes de
-          // l'accueil. `pastille-rond-large` fait 48 px, soit EXACTEMENT la
-          // boîte `p-3` + icône 24 px qu'elle remplace — le squelette ci-dessous
-          // garde donc la même hauteur (pas de CLS).
           return (
-            <div key={item.label} className="carte-editoriale carte-publique">
+            <div key={item.label} className="tuile-mesure">
               <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">{item.label}</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{item.value}</p>
-                </div>
+                <p className="tuile-mesure-libelle">{item.label}</p>
                 <div className="pastille-rond pastille-rond-large">
-                  <Icon className="w-6 h-6" />
+                  <Icon className="w-6 h-6" aria-hidden="true" />
                 </div>
               </div>
+              <p className="tuile-mesure-chiffre">{item.value}</p>
             </div>
           );
         })}
@@ -256,94 +299,102 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="carte-editoriale bloc-app">
-        <div className="carte-cotes py-4 border-b border-gray-200">
-          <h2 className="text-lg font-medium text-gray-900">{t('quickActions')}</h2>
+      {/* LES ACTIONS — des tuiles, pas une carte qui contient trois cartes.
+          La première est l'action PRINCIPALE de l'écran (fond de marque) :
+          elle répond à la question que l'utilisateur se pose en arrivant, et
+          elle le fait sans qu'aucune phrase n'ait à la désigner. */}
+      <section className="bloc-app">
+        <div className="mb-4">
+          <h2 className="titre-carte-app">{t('quickActions')}</h2>
         </div>
-        <div className="carte-publique">
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-            {quickActions.map((action) => {
-              const Icon = action.icon;
-              return (
-                <Link
-                  key={action.to + action.label}
-                  to={action.to}
-                  className={`flex items-center gap-4 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors ${action.cardClass || ''}`}
-                >
-                  <div className={`shrink-0 rounded-xl p-3 ${action.iconClass}`}>
-                    <Icon className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-900 block">{action.label}</span>
-                    {action.subtitle ? <p className="text-xs text-gray-500 mt-1">{action.subtitle}</p> : null}
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {quickActions.map((action, index) => {
+            const Icon = action.icon;
+            return (
+              <Link
+                key={action.to + action.label}
+                to={action.to}
+                className={`tuile-action ${index === 0 ? 'tuile-action-principale' : ''}`}
+              >
+                <span className="tuile-action-icone">
+                  <Icon className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <span>
+                  <span className="block text-base font-semibold">{action.label}</span>
+                  {action.subtitle ? (
+                    <span className={`mt-1 block text-xs ${index === 0 ? 'text-orange-100' : 'text-stone-500'}`}>
+                      {action.subtitle}
+                    </span>
+                  ) : null}
+                </span>
+              </Link>
+            );
+          })}
         </div>
-      </div>
+      </section>
 
-      <div className="carte-editoriale bloc-app">
-        <div className="carte-cotes py-4 border-b border-gray-200">
-          <h2 className="text-lg font-medium text-gray-900">{t('popularCategories')}</h2>
+      {/* LES CATÉGORIES : les puces de FILTRE du site (`./jobs?category=…`),
+          donc le même contrôle que la page qu'elles ouvrent. Le glyphe reste
+          devant le mot — c'est ce qui rend la rangée balayable sans la lire. */}
+      <section className="bloc-app">
+        <div className="mb-4">
+          <h2 className="titre-carte-app">{t('popularCategories')}</h2>
         </div>
-        <div className="carte-publique">
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-            {popularCategories.map((category) => {
-              const Icon = category.icon;
-              return (
-                <Link key={category.key} to={`/jobs?category=${category.key}`} className="flex flex-col items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors group">
-                  <div className="mb-3 rounded-xl bg-orange-50 p-3 text-orange-600 group-hover:bg-orange-100">
-                    <Icon className="w-5 h-5" />
-                  </div>
-                  <span className="text-sm font-medium text-gray-900 text-center">{t(category.key)}</span>
-                </Link>
-              );
-            })}
-          </div>
+        <div className="flex flex-wrap gap-2">
+          {popularCategories.map((category) => {
+            const Icon = category.icon;
+            return (
+              <Link
+                key={category.key}
+                to={`/jobs?category=${category.key}`}
+                className="puce-filtre inline-flex items-center gap-2"
+              >
+                <Icon className="h-4 w-4 text-orange-600" aria-hidden="true" />
+                {t(category.key)}
+              </Link>
+            );
+          })}
         </div>
-      </div>
+      </section>
 
-      <div className="bg-white rounded-lg shadow-sm">
-        <div className="carte-cotes py-4 border-b border-gray-200">
-          <h2 className="text-lg font-medium text-gray-900">
+      {/* LES MISSIONS RÉCENTES : une liste qui se lit ligne à ligne, dans la
+          carte à filet du site. La gouttière de chaque ligne est portée par
+          `.ligne-app` — la page n'écrit plus ni rembourrage ni fond de survol,
+          donc les trois gouttières différentes du même écran disparaissent. */}
+      <div className="carte-editoriale overflow-hidden">
+        <div className="carte-cotes border-b border-stone-200 py-4">
+          <h2 className="titre-carte-app">
             {user?.user_type === 'client' ? t('myRecentJobs') : t('availableJobs')}
           </h2>
         </div>
-        <div className="divide-y divide-gray-200">
+        <div className="divide-y divide-stone-100">
           {recentJobs.length > 0 ? (
             recentJobs.map((job) => (
-              <Link key={job.id} to={`/jobs/${job.id}`} className="block carte-publique hover:bg-gray-50 transition-colors">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <h3 className="text-sm font-medium text-gray-900">{job.title}</h3>
-                    <p className="text-sm text-gray-600 mt-1">{job.description}</p>
-                    <div className="flex items-center mt-2 space-x-4 flex-wrap">
-                      <span className="text-xs text-gray-500">{translateCategory(job.category)}</span>
-                      <span className="text-xs text-gray-500">{pageT('recentBudget', { min: job.budget_min, max: job.budget_max })}</span>
-                      {/* Le badge d'ÉTAT est carré : le site a retiré la forme
-                          pilule de tous ses badges, et une pastille de statut
-                          reste une étiquette. */}
-                      <span className={`px-2 py-1 text-xs rounded-lg ${
-                        job.status === 'open'
-                          ? 'bg-green-100 text-green-800'
-                          : job.status === 'in_progress'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {translateStatus(job.status)}
-                      </span>
-                    </div>
+              <Link key={job.id} to={`/jobs/${job.id}`} className="ligne-app">
+                <div className="min-w-0 flex-1">
+                  <h3 className="truncate text-sm font-semibold text-stone-900">{job.title}</h3>
+                  <p className="mt-1 line-clamp-2 text-sm text-stone-600">{job.description}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+                    <span className="text-xs text-stone-500">{translateCategory(job.category)}</span>
+                    <span className="text-xs text-stone-500">
+                      {pageT('recentBudget', { min: job.budget_min, max: job.budget_max })}
+                    </span>
+                    {/* Le STATUT garde son propriétaire unique : une couleur
+                        d'état lit `data-statut`, jamais une classe par cas. */}
+                    <span
+                      className="pastille-statut inline-flex items-center gap-1.5 rounded-sm border px-2 py-1 text-xs font-semibold"
+                      data-statut={job.status}
+                    >
+                      <span className="pastille-statut-point h-1.5 w-1.5 rounded-full" aria-hidden="true" />
+                      {translateStatus(job.status)}
+                    </span>
                   </div>
-                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
-                  </svg>
                 </div>
+                <span className="text-stone-400" aria-hidden="true">→</span>
               </Link>
             ))
           ) : (
-            <div className="carte-publique text-center text-gray-500">
+            <div className="carte-cotes py-8 text-center text-stone-500">
               {user?.user_type === 'client' ? t('noJobsPosted') : t('noJobsAvailable')}
             </div>
           )}

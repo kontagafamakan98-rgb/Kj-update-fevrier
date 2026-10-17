@@ -398,17 +398,23 @@ USER_DATA_SOURCES = (
 )
 
 # Collections qui portent des données d'un utilisateur mais SANS clé
-# d'identifiant : elles se lisent autrement que par `USER_DATA_SOURCES`. Ici les
-# codes OTP, indexés par EMAIL — l'endpoint les rend donc avec l'adresse du
-# compte, sans quoi un code encore valide pour cette personne manquerait à son
-# export alors qu'il est conservé sur elle.
-USER_DATA_BY_EMAIL = ("email_otps",)
+# d'identifiant : elles se lisent autrement que par `USER_DATA_SOURCES`, et
+# elles se lisent toutes par l'ADRESSE — les codes OTP, le journal des faits de
+# livraison (rebonds, plaintes) et la liste des adresses injoignables. Sans
+# elles, un code encore valide, un rebond reçu ou une adresse retenue pour
+# cette personne manqueraient à son export alors qu'ils sont conservés sur elle.
+USER_DATA_BY_EMAIL = ("email_otps", "email_delivery_events", "email_suppressions")
 
 # Le champ par lequel ces collections se lisent : elles ne portent pas
 # d'identifiant de compte, elles sont indexées par l'ADRESSE. Nommé ici pour que
-# le test qui confronte l'export et la suppression n'ait pas à recopier ce champ
-# (la suppression ne les touche pas : elles périment par leur propre règle de
-# conservation, kojo_retention).
+# le test qui confronte l'export et la suppression n'ait pas à recopier ce champ.
+#
+# La suppression de compte ne les touche PAS, et leur sort est déclaré, couple
+# par couple (SORTS de backend/tests/test_export_deletion_inverse.py) : les codes
+# OTP et le journal des faits de livraison périment par leur règle de
+# conservation (kojo_retention), tandis que la liste des adresses injoignables
+# est conservée sans terme — elle n'existe que pour ne pas écrire dans le vide,
+# et c'est le propriétaire qui la lève (PRIVACY.md §1).
 USER_DATA_BY_EMAIL_FIELD = "email"
 
 # Collections qui ne portent AUCUNE donnée d'un utilisateur. Elles sont listées
@@ -493,16 +499,47 @@ async def export_my_data(current_user: User = Depends(get_current_user)):
             "documents": [_without_secrets(name, doc) for doc in documents],
         }
 
-    # Les collections de USER_DATA_BY_EMAIL (codes OTP) sont indexées par EMAIL.
-    otp_query = {USER_DATA_BY_EMAIL_FIELD: user_email}
-    otp_total = await db.email_otps.count_documents(otp_query)
-    otp_documents = await db.email_otps.find(otp_query).to_list(
+    # Les collections de USER_DATA_BY_EMAIL sont toutes indexées par l'ADRESSE,
+    # donc lues par la même clause — les codes OTP, le journal des faits de
+    # livraison et la liste des adresses injoignables.
+    adresse_query = {USER_DATA_BY_EMAIL_FIELD: user_email}
+    otp_total = await db.email_otps.count_documents(adresse_query)
+    otp_documents = await db.email_otps.find(adresse_query).to_list(
         length=EXPORT_LIMIT_PER_COLLECTION
     )
     collections["email_otps"] = {
         "count": otp_total,
         "truncated": otp_total > len(otp_documents),
         "documents": [_without_secrets("email_otps", doc) for doc in otp_documents],
+    }
+
+    # Le journal des faits de livraison et la liste des adresses injoignables se
+    # lisent avec la même adresse. Rendus EXPLICITEMENT, un bloc par collection —
+    # c'est ce que `test_data_export` confronte au classement, et une boucle
+    # générique ferait disparaître de son scan les collections qu'elle prétend
+    # rendre.
+    livraison_total = await db.email_delivery_events.count_documents(adresse_query)
+    livraison_documents = await db.email_delivery_events.find(adresse_query).to_list(
+        length=EXPORT_LIMIT_PER_COLLECTION
+    )
+    collections["email_delivery_events"] = {
+        "count": livraison_total,
+        "truncated": livraison_total > len(livraison_documents),
+        "documents": [
+            _without_secrets("email_delivery_events", doc) for doc in livraison_documents
+        ],
+    }
+
+    suppressions_total = await db.email_suppressions.count_documents(adresse_query)
+    suppressions_documents = await db.email_suppressions.find(adresse_query).to_list(
+        length=EXPORT_LIMIT_PER_COLLECTION
+    )
+    collections["email_suppressions"] = {
+        "count": suppressions_total,
+        "truncated": suppressions_total > len(suppressions_documents),
+        "documents": [
+            _without_secrets("email_suppressions", doc) for doc in suppressions_documents
+        ],
     }
 
     # Le compte lui-même sort sous `account` : c'est le document que la personne

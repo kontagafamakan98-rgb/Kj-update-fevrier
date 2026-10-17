@@ -287,6 +287,25 @@ describe('vercel-rewrite-server — service réel (HTTP sur boucle locale)', () 
     expect(sitemap.status).toBe(404);
   });
 
+  it('transmet séparément les cookies session et CSRF à travers le proxy', async () => {
+    const cookies = [
+      'kojo_session=session-test; Path=/; HttpOnly; SameSite=Lax',
+      'kojo_csrf=csrf-test; Path=/; SameSite=Lax',
+    ];
+    const { base } = await start({
+      fetchImpl: async () => {
+        const headers = new Headers({ 'content-type': 'application/json' });
+        cookies.forEach((cookie) => headers.append('set-cookie', cookie));
+        return new Response('{}', { headers });
+      },
+    });
+    const response = await fetch(`${base}/api/auth/login`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+    });
+
+    expect(response.headers.getSetCookie()).toEqual(cookies);
+  });
+
   it('répond 404 (et sert 404.html) pour une URL inconnue : aucun catch-all SPA', async () => {
     const { base } = await start();
     const res = await fetch(`${base}/une-url-inexistante`);

@@ -63,6 +63,15 @@
  * DELETE /api/jobs/:id exige d'être la cliente propriétaire : le compte CI est
  * un client vérifié, donc les deux passent.
  *
+ * ── Quand le cycle ne peut pas tourner, il le DÉCLARE (12/10/2026) ─────────
+ * Un cycle ignoré sortait en 0 en le disant à voix basse : « chemin 200 exercé
+ * ailleurs », lu comme un vert. La surface « cycle complet de /jobs/:id » est
+ * désormais DÉCLARÉE comme aveugle dans scripts/corpus-missions.js (corpus
+ * « missions vivantes », vide en production le 12/10/2026) : chaque sortie
+ * anticipée publie un `::warning` nommant la surface, son motif et son remède —
+ * et REFUSE (sortie 1) si la surface n'est plus déclarée, parce qu'un vert qui
+ * n'a rien mesuré est le silence que F9 a coûté.
+ *
  * GARANTIE DE NETTOYAGE : l'identifiant supprimé est UNIQUEMENT celui renvoyé
  * par la création (aucune liste, aucun balayage) — le script ne peut pas
  * toucher une mission existante. En cas d'échec de la suppression, il ÉCHOUE
@@ -91,6 +100,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { runOgImageCheck, baseServesJobOgRoute } from './check-og-images.js';
+import { SURFACE_OG_JOB_200_CYCLE, verdictDeSurfaceVide } from './corpus-missions.js';
 import { API_ORIGIN, SITE_ORIGIN, declaresNoIndex, isLoopbackUrl } from './site-meta.js';
 
 export const DEFAULT_BASE = SITE_ORIGIN;
@@ -343,7 +353,7 @@ export async function assertDeletedJobUnreachable({
  * @param {string} [options.stamp]  Suffixe du titre (tests : déterministe).
  * @param {string} [options.cacheBust] Valeur anti-cache CDN (défaut : horodatage).
  * @returns {Promise<{ok: boolean, skipped: boolean, errors: string[],
- *   notices: string[], checked: string[], jobId: string, jobTitle: string,
+ *   notices: string[], checked: string[], avertissements: string[], jobId: string, jobTitle: string,
  *   created: boolean, verified: boolean, deleted: boolean,
  *   jobRoute: {serves: boolean, status: number, url: string, detail: string},
  *   postDelete: {detail: boolean, noindex: boolean, card: boolean, sitemap: boolean}}>}
@@ -366,6 +376,8 @@ export async function runOgJob200Cycle({
 
   const errors = [];
   const notices = [];
+  // Les surfaces aveugles DÉCLARÉES : publiées en `::warning` par l'appelant.
+  const avertissements = [];
   const checked = [];
   const log = (...args) => {
     if (!quiet) console.log(...args);
@@ -380,6 +392,7 @@ export async function runOgJob200Cycle({
     errors,
     notices,
     checked,
+    avertissements,
     jobId: '',
     jobTitle: '',
     created: false,
@@ -409,6 +422,18 @@ export async function runOgJob200Cycle({
       `scripts/check-spa-routes.js ; ce script reste celui qui prouve le déploiement réel.)`;
     notices.push(notice);
     log(`  ⚠️ ${notice}`);
+    const verdict = verdictDeSurfaceVide({
+      cle: SURFACE_OG_JOB_200_CYCLE,
+      detail:
+        `la base auditée ${BASE} ne sert pas la route backend /jobs/:id ` +
+        `(sonde ${jobRoute.url} → ${jobRoute.detail})`,
+    });
+    if (verdict.erreur) {
+      errors.push(verdict.erreur);
+      result.ok = false;
+    } else {
+      avertissements.push(verdict.avertissement);
+    }
     return result;
   }
 
@@ -428,6 +453,17 @@ export async function runOgJob200Cycle({
       `ici, seule la lecture (check-og-images.js sur la base auditée) a lieu.`;
     notices.push(notice);
     log(`  ⚠️ ${notice}`);
+    const verdict = verdictDeSurfaceVide({
+      cle: SURFACE_OG_JOB_200_CYCLE,
+      detail: `le backend ${BACKEND} n'est pas une adresse contrôlée par ce job (loopback) : ` +
+        'le cycle ÉCRIT et la CI n’écrit pas chez le client',
+    });
+    if (verdict.erreur) {
+      errors.push(verdict.erreur);
+      result.ok = false;
+    } else {
+      avertissements.push(verdict.avertissement);
+    }
     return result;
   }
 
@@ -582,6 +618,9 @@ if (isDirectRun) {
 
   console.log('\nCycle /jobs/:id (création → carte OG → suppression) :');
   console.log(result.checked.length ? result.checked.join('\n') : '  (rien à vérifier)');
+  for (const avertissement of result.avertissements) {
+    console.log(`::warning title=Surface aveugle (corpus vide)::${avertissement}`);
+  }
   for (const notice of result.notices) console.log(`::notice title=Chemin 200 — détail::${notice}`);
 
   if (result.ok) {

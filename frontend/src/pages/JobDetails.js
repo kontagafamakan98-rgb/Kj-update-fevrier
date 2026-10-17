@@ -65,42 +65,50 @@ function ProposalCard({ proposal, isSelected, isAccepted, onOpenDiscussion, onAc
   const workerPerson = proposal?.worker || proposal?.worker_profile || proposal;
 
   return (
-    // Le `shadow-xs` est retiré mais la CARTE à filet ne peut pas être posée ici :
-    // ses deux états (sélectionné / non) se distinguent par `border-orange-300`
-    // et `bg-orange-50/40`, deux utilitaires que `.carte-editoriale` ÉCRASERAIT
-    // (une feuille non posée dans une couche l'emporte sur les utilitaires).
-    <div className={`rounded-lg border p-4 ${isSelected ? 'border-orange-300 bg-orange-50/40' : 'border-gray-100 bg-white'}`}>
+    // La CARTE À FILET porte l'état. La proposition choisie n'est plus peinte par
+    // deux utilitaires de teinte : `.carte-editoriale` est écrite HORS COUCHE,
+    // donc elle l'emporterait sur eux et la proposition choisie reviendrait au
+    // filet neutre sans que rien ne le signale. La variante
+    // `.carte-editoriale-selectionnee` vit dans src/index.css, à côté de la carte
+    // qu'elle modifie — et les noms d'utilitaires ne sont pas écrits ici, même en
+    // commentaire : Tailwind lit le texte des sources.
+    // `data-section` est le repère DÉCLARÉ que lit la sonde navigateur : elle juge
+    // des couleurs CALCULÉES, jamais les classes de présentation.
+    <div
+      data-section="proposition"
+      className={isSelected ? 'carte-editoriale carte-editoriale-selectionnee p-4' : 'carte-editoriale p-4'}
+    >
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gray-200 flex items-center justify-center">
+          <div className="avatar-app">
             {workerPhoto ? (
               <img src={workerPhoto} alt={workerName} className="h-full w-full object-cover" />
             ) : (
-              <span className="text-sm font-semibold text-gray-500">{workerName.charAt(0).toUpperCase()}</span>
+              <span>{workerName.charAt(0).toUpperCase()}</span>
             )}
           </div>
           <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="font-semibold text-gray-900">{workerName}</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="font-semibold text-stone-900">{workerName}</div>
               <VerifiedBadge verified={workerPerson?.is_verified} />
               <WorkerTrustBadge person={workerPerson} />
             </div>
-            <div className="text-sm text-gray-500">{formatJobDate(proposal.created_at)}</div>
+            <div className="text-sm text-stone-500">{formatJobDate(proposal.created_at)}</div>
           </div>
         </div>
         <div className="text-right">
-          <div className="text-lg font-bold text-orange-600">{formatBudgetRange(amount, null)}</div>
-          <div className="text-xs text-gray-500">{isAccepted ? t('jobUiAttributed') : formatJobStatus(proposal.status || 'pending', t)}</div>
+          <div className="text-lg font-bold tabular-nums text-orange-600">{formatBudgetRange(amount, null)}</div>
+          <div className="text-xs text-stone-500">{isAccepted ? t('jobUiAttributed') : formatJobStatus(proposal.status || 'pending', t)}</div>
         </div>
       </div>
-      {message && <p className="mt-3 text-sm text-gray-700 whitespace-pre-line">{message}</p>}
+      {message && <p className="mt-3 whitespace-pre-line text-sm text-stone-700">{message}</p>}
 
       <div className="mt-4 flex flex-wrap gap-3">
-        <button onClick={onOpenDiscussion} className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+        <button onClick={onOpenDiscussion} className="rounded-[3px] border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50">
           {isSelected ? t('jobUiDiscussionOpen') : t('jobUiOpenDiscussion')}
         </button>
         {canAccept && (
-          <button onClick={onAccept} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
+          <button onClick={onAccept} className="rounded-[3px] bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
             {isAccepted ? t('jobUiAttributed') : t('jobUiAcceptWorker')}
           </button>
         )}
@@ -112,12 +120,15 @@ function ProposalCard({ proposal, isSelected, isAccepted, onOpenDiscussion, onAc
 function MessageBubble({ message, isCurrentUser, authorName }) {
   return (
     <div className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
-      <div className={`max-w-[85%] rounded-lg px-4 py-3 text-sm ${isCurrentUser ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-800'}`}>
-        <div className={`mb-1 text-xs font-semibold ${isCurrentUser ? 'text-orange-100' : 'text-gray-500'}`}>
+      {/* LES DEUX BULLES DU VOCABULAIRE : elles ne portent que le fond et
+          l'encre, et laissent le rayon à la conversation — une bulle est un
+          coin cassé du côté de son auteur, et ce coin appartient à la page. */}
+      <div className={`max-w-[85%] rounded-lg px-4 py-3 text-sm ${isCurrentUser ? 'bulle-ecrite' : 'bulle-recue'}`}>
+        <div className={`mb-1 text-xs font-semibold ${isCurrentUser ? 'text-orange-100' : 'text-stone-500'}`}>
           {authorName}
         </div>
         <div className="whitespace-pre-line">{message?.content || message?.message || ''}</div>
-        <div className={`mt-2 text-[11px] ${isCurrentUser ? 'text-orange-100' : 'text-gray-500'}`}>
+        <div className={`mt-2 text-[11px] ${isCurrentUser ? 'text-orange-100' : 'text-stone-500'}`}>
           {formatJobDate(message?.created_at || message?.updated_at)}
         </div>
       </div>
@@ -534,7 +545,7 @@ export default function JobDetails() {
   if (error || !job) {
     return (
       <CadrePage chemin="/jobs/:id" classeCorps="">
-        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">
+        <div className="rounded-[3px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error || pageT('notFound') || t('jobNotFound')}
         </div>
       </CadrePage>
@@ -549,7 +560,7 @@ export default function JobDetails() {
     // `titre={null}` : le titre de la mission vit DANS sa carte, pas sous la
     // barre — la page n'a donc pas d'en-tête de cadre.
     <CadrePage chemin="/jobs/:id" classeCorps="">
-      <button onClick={() => navigate(-1)} className="bloc-app flex items-center text-orange-600 hover:text-orange-700 font-medium">
+      <button onClick={() => navigate(-1)} className="bloc-app flex items-center font-medium text-orange-700 hover:underline">
         ← {pageT('back') || 'Retour'}
       </button>
 
@@ -559,52 +570,62 @@ export default function JobDetails() {
             <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
               <div>
                 <h1 className="titre-page mb-2">{job.title}</h1>
-                <div className="flex items-center gap-4 flex-wrap">
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* L'ÉTAT DE LA MISSION lit `.pastille-statut[data-statut]` —
+                      un seul propriétaire des couleurs d'état sur le site. La
+                      pastille ne dit pas la même chose que le statut BRUT :
+                      une mission `in_progress` n'est « attribuée » qu'une fois
+                      un travailleur accepté, donc c'est ce fait-là qui est
+                      publié, et les autres cas gardent leur statut. */}
                   {(() => {
                     const isCompleted = job.status === 'completed';
                     const isInProgress = job.status === 'in_progress' && assignedWorkerId;
                     const label = isCompleted ? pageT('missionDone') : isInProgress ? pageT('attributed') : formatJobStatus(job.status, t);
-                    const badgeClass = isCompleted
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : isInProgress
-                        ? 'bg-orange-50 text-orange-700 border-orange-200'
-                        : 'bg-gray-50 text-gray-700 border-gray-200';
+                    const statut = isCompleted ? 'completed' : isInProgress ? 'in_progress' : (job.status || 'pending');
                     return (
-                      <span className={`px-3 py-1 rounded-lg text-sm font-medium border ${badgeClass}`}>
+                      <span
+                        className="pastille-statut inline-flex items-center gap-1.5 rounded-sm border px-2.5 py-1 text-xs font-semibold"
+                        data-statut={statut}
+                      >
+                        <span className="pastille-statut-point h-1.5 w-1.5 rounded-full" aria-hidden="true" />
                         {label}
                       </span>
                     );
                   })()}
-                  <span className="text-sm text-gray-500">{t('jobUiPublishedOnPrefix')} {publishedLabel}</span>
+                  <span className="text-sm text-stone-500">{t('jobUiPublishedOnPrefix')} {publishedLabel}</span>
                   {hasApplied && !isJobOwner && (
-                    <span className="px-3 py-1 rounded-lg text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span className="etiquette-app etiquette-app-vert">
                       {pageT('proposalSentBadge')}
                     </span>
                   )}
                   {assignedToCurrentWorker && (
-                    <span className="px-3 py-1 rounded-lg text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span className="etiquette-app etiquette-app-vert">
                       {pageT('youAreAssigned')}
                     </span>
                   )}
                 </div>
               </div>
+              {/* LE PRIX EST UNE MESURE : chiffre serif à chiffres tabulaires
+                  (`.tuile-mesure-chiffre`), pour qu'il s'aligne avec les
+                  montants des propositions plus bas. */}
               <div className="text-left lg:text-right">
-                <div className="text-3xl font-bold text-orange-600">{formatBudgetRange(job.budget_min, job.budget_max)}</div>
-                {job.estimated_duration && <div className="text-sm text-gray-500 mt-1">{job.estimated_duration}</div>}
+                <p className="tuile-mesure-libelle">{t('budget')}</p>
+                <p className="tuile-mesure-chiffre mt-1">{formatBudgetRange(job.budget_min, job.budget_max)}</p>
+                {job.estimated_duration && <p className="mt-1 text-sm text-stone-500">{job.estimated_duration}</p>}
               </div>
             </div>
 
             <div className="mt-6 flex flex-wrap gap-3">
               {isJobOwner && (
                 <>
-                  <button onClick={() => navigate('/jobs')} className="rounded-xl border border-gray-200 px-4 py-3 font-semibold text-gray-700 hover:bg-gray-50">
+                  <button onClick={() => navigate('/jobs')} className="rounded-[3px] border border-stone-200 px-4 py-3 font-semibold text-stone-700 hover:bg-stone-50">
                     {t('jobUiMyJobs')}
                   </button>
-                  <button onClick={() => setConfirmDeleteOpen(true)} disabled={deleting} className="rounded-xl bg-red-600 px-4 py-3 font-semibold text-white hover:bg-red-700 disabled:opacity-60">
+                  <button onClick={() => setConfirmDeleteOpen(true)} disabled={deleting} className="rounded-[3px] bg-rose-600 px-4 py-3 font-semibold text-white hover:bg-rose-700 disabled:opacity-60">
                     {deleting ? t('jobUiDeleting') : t('jobUiDeleteJob')}
                   </button>
                   {job.status === 'in_progress' && assignedWorkerId && paymentStatus?.payment_status === 'completed' && (
-                    <button onClick={() => setConfirmCompleteOpen(true)} disabled={completingJob} className="rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">
+                    <button onClick={() => setConfirmCompleteOpen(true)} disabled={completingJob} className="rounded-[3px] bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">
                       {completingJob ? pageT('closing') : pageT('workDone')}
                     </button>
                   )}
@@ -612,7 +633,7 @@ export default function JobDetails() {
               )}
 
               {canApply && (
-                <button onClick={() => setShowProposalModal(true)} className="rounded-xl bg-orange-600 px-4 py-3 font-semibold text-white hover:bg-orange-700">
+                <button onClick={() => setShowProposalModal(true)} className="rounded-[3px] bg-orange-600 px-4 py-3 font-semibold text-white hover:bg-orange-700">
                   {t('jobUiApply')}
                 </button>
               )}
@@ -621,14 +642,14 @@ export default function JobDetails() {
                   connecter pour postuler — les mutations restent réservées
                   aux comptes authentifiés. */}
               {!user && (job?.status === 'open' || !job?.status) && !assignedWorkerId && (
-                <button onClick={() => navigate('/login')} className="rounded-xl bg-orange-600 px-4 py-3 font-semibold text-white hover:bg-orange-700">
+                <button onClick={() => navigate('/login')} className="rounded-[3px] bg-orange-600 px-4 py-3 font-semibold text-white hover:bg-orange-700">
                   {pageT('loginToApply') || t('jobUiApply')}
                 </button>
               )}
             </div>
 
             {!canApply && hasApplied && !isJobOwner && (
-              <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-800">
+              <div className="mt-4 rounded-[3px] border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-800">
                 {pageT('proposalAlreadySent')}
               </div>
             )}
@@ -650,7 +671,7 @@ export default function JobDetails() {
 
               let statusBadge;
               if (paymentState === 'none') {
-                statusBadge = { text: t('payStatusNone'), className: 'bg-gray-100 text-gray-600 border-gray-200' };
+                statusBadge = { text: t('payStatusNone'), className: 'bg-stone-100 text-stone-600 border-stone-200' };
               } else if (paymentState === 'pending') {
                 statusBadge = { text: t('payStatusPending'), className: 'bg-amber-50 text-amber-700 border-amber-200' };
               } else if (paymentState === 'failed' || paymentState === 'cancelled') {
@@ -660,28 +681,28 @@ export default function JobDetails() {
               } else if (paymentDone) {
                 statusBadge = { text: t('payStatusEscrowed'), className: 'bg-orange-50 text-orange-700 border-orange-200' };
               } else {
-                statusBadge = { text: t('payStatusNone'), className: 'bg-gray-100 text-gray-600 border-gray-200' };
+                statusBadge = { text: t('payStatusNone'), className: 'bg-stone-100 text-stone-600 border-stone-200' };
               }
 
               return (
-                <div className="mt-6 border-t border-gray-100 pt-5">
+                <div className="mt-6 border-t border-stone-200 pt-5">
                   <div className="flex items-center">
                     {steps.map((step, idx) => (
                       <Fragment key={step.key}>
                         <div className="flex flex-col items-center gap-1 text-center w-24">
-                          <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${step.done ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                          <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${step.done ? 'bg-emerald-600 text-white' : 'bg-stone-100 text-stone-500'}`}>
                             {step.done ? '✓' : idx + 1}
                           </div>
-                          <span className={`text-xs leading-tight ${step.done ? 'text-gray-900 font-medium' : 'text-gray-500'}`}>{step.label}</span>
+                          <span className={`text-xs leading-tight ${step.done ? 'text-stone-900 font-medium' : 'text-stone-500'}`}>{step.label}</span>
                         </div>
                         {idx < steps.length - 1 && (
-                          <div className={`h-0.5 flex-1 ${steps[idx + 1].done ? 'bg-emerald-600' : 'bg-gray-200'}`} />
+                          <div className={`h-0.5 flex-1 ${steps[idx + 1].done ? 'bg-emerald-600' : 'bg-stone-200'}`} />
                         )}
                       </Fragment>
                     ))}
                   </div>
 
-                  <div className={`mt-4 inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium ${statusBadge.className}`}>
+                  <div className={`mt-4 inline-flex items-center gap-2 rounded-[3px] border px-3 py-1.5 text-sm font-medium ${statusBadge.className}`}>
                     {paymentStatusLoading ? t('payStatusChecking') : statusBadge.text}
                   </div>
 
@@ -699,7 +720,7 @@ export default function JobDetails() {
                           });
                           navigate(`/payment?${paymentParams.toString()}`);
                         }}
-                        className="rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
+                        className="rounded-[3px] bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
                       >
                         {t('payNow')}
                       </button>
@@ -710,7 +731,7 @@ export default function JobDetails() {
             })()}
 
             {job.shared_location?.maps_url && (
-              <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3">
+              <div className="mt-4 flex items-center justify-between gap-3 rounded-[3px] border border-orange-200 bg-orange-50 px-4 py-3">
                 <span className="text-sm text-orange-800"><MapPin className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {t('sharedPositionText')}</span>
                 <a href={job.shared_location.maps_url} target="_blank" rel="noreferrer" className="shrink-0 text-sm font-semibold text-orange-700 underline underline-offset-2">
                   {t('viewOnMap')}
@@ -744,15 +765,15 @@ export default function JobDetails() {
           </div>
 
           <div className="carte-editoriale carte-publique">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('jobUiDescription')}</h2>
-            <p className="text-gray-700 whitespace-pre-line">{job.description}</p>
+            <h2 className="titre-carte-app mb-4">{t('jobUiDescription')}</h2>
+            <p className="whitespace-pre-line text-stone-700">{job.description}</p>
           </div>
 
           {isJobOwner && (
             <div className="carte-editoriale carte-publique">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('jobUiReceivedProposals')}</h2>
+              <h2 className="titre-carte-app mb-4">{t('jobUiReceivedProposals')}</h2>
               {proposals.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-gray-300 px-4 py-6 text-sm text-gray-500">
+                <div className="rounded-lg border border-dashed border-stone-300 px-4 py-6 text-sm text-stone-500">
                   {t('jobUiNoProposals')}
                 </div>
               ) : (
@@ -781,17 +802,17 @@ export default function JobDetails() {
             <div id="job-discussion" ref={discussionSectionRef} className="carte-editoriale carte-publique space-y-4">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
                 <div>
-                  <h2 className="text-xl font-semibold text-gray-900">
+                  <h2 className="titre-carte-app">
                     {pageT('discussionWith', { name: discussionTarget.name || (isJobOwner ? t('worker') : t('client')) })}
                   </h2>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-stone-500">
                     {isJobOwner ? pageT('discussionOwnerHint') : pageT('discussionWorkerHint')}
                   </p>
                 </div>
                 {proposalAccepted && (
-                  <div className="inline-flex rounded-lg bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
+                  <span className="etiquette-app etiquette-app-vert">
                     {pageT('proposalAssigned')}
-                  </div>
+                  </span>
                 )}
                 <button
                   type="button"
@@ -803,17 +824,17 @@ export default function JobDetails() {
               </div>
 
               {messageError && (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{messageError}</div>
+                <div className="rounded-[3px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{messageError}</div>
               )}
               {messageSuccess && (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{messageSuccess}</div>
+                <div className="rounded-[3px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{messageSuccess}</div>
               )}
 
               <div className="carte-editoriale p-4 min-h-[180px] space-y-3">
                 {messagesLoading ? (
-                  <div className="text-sm text-gray-500">{pageT('loadingDiscussion')}</div>
+                  <div className="text-sm text-stone-500">{pageT('loadingDiscussion')}</div>
                 ) : visibleMessages.length === 0 ? (
-                  <div className="text-sm text-gray-500">
+                  <div className="text-sm text-stone-500">
                     {pageT('noMessagesInDiscussion')}
                   </div>
                 ) : (
@@ -844,11 +865,11 @@ export default function JobDetails() {
                   rows="4"
                   value={messageDraft}
                   onChange={(event) => setMessageDraft(event.target.value)}
-                  className="w-full rounded-xl border border-gray-200 px-4 py-3 outline-hidden focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+                  className="w-full rounded-lg border border-stone-200 px-4 py-3 outline-hidden focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
                   placeholder={pageT('writeMessagePlaceholder')}
                 />
                 <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
-                  <button onClick={handleSendMessage} disabled={sendingMessage} className="rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white hover:bg-orange-700 disabled:opacity-60">
+                  <button onClick={handleSendMessage} disabled={sendingMessage} className="rounded-[3px] bg-orange-600 px-5 py-3 font-semibold text-white hover:bg-orange-700 disabled:opacity-60">
                     {sendingMessage ? pageT('sending') : pageT('sendMessage')}
                   </button>
                 </div>
@@ -863,33 +884,50 @@ export default function JobDetails() {
 
         <div className="space-y-6">
           <div className="carte-editoriale carte-publique">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('jobUiInformation')}</h2>
-            <div className="space-y-3 text-gray-700">
-              <div>{job.location_text}</div>
-              {job.location_precision && <div className="text-sm text-gray-500">{job.location_precision}</div>}
-              {job.category && <div className="text-sm text-gray-500">{pageT('categoryLabel', { value: job.category })}</div>}
+            <h2 className="titre-carte-app mb-4">{t('jobUiInformation')}</h2>
+            {/* DES TUILES D'INFORMATION, comme le profil : le lieu et la
+                catégorie ne sont pas une phrase à lire mais deux faits à
+                balayer — et le lieu est la première question d'un artisan. */}
+            <div className="space-y-3">
+              <div className="rounded-[3px] border border-stone-200 fond-sable px-4 py-3">
+                <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-stone-500">{t('location')}</span>
+                <p className="mt-1.5 text-sm font-medium text-stone-900">{job.location_text}</p>
+                {job.location_precision && <p className="mt-1 text-xs text-stone-500">{job.location_precision}</p>}
+              </div>
+              {job.category && (
+                <div className="rounded-[3px] border border-stone-200 fond-sable px-4 py-3">
+                  <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-stone-500">{t('category')}</span>
+                  {/* Le libellé de la tuile dit DÉJS « catégorie » : la valeur
+                      ne le répète pas (elle affichait « Catégorie : electrical »
+                      sous une étiquette CATÉGORIE). La clé de catégorie est
+                      celle du filtre de la liste, donc le même mot des deux
+                      côtés. */}
+                  <p className="mt-1.5 text-sm font-medium text-stone-900">{t(job.category) || job.category}</p>
+                </div>
+              )}
             </div>
           </div>
 
           <div className="carte-editoriale carte-publique">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('jobUiClient')}</h2>              <div className="flex items-center gap-3">
+            <h2 className="titre-carte-app mb-4">{t('jobUiClient')}</h2>
+            <div className="flex items-center gap-3">
               <div className="pastille-rond pastille-rond-large font-bold">
                 {String(job.client_name || 'C').charAt(0).toUpperCase()}
               </div>
               <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <div className="font-medium text-gray-900">{job.client_name}</div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="font-medium text-stone-900">{job.client_name}</div>
                   <VerifiedBadge verified={job?.client_is_verified || job?.client?.is_verified} />
                 </div>
-                <div className="text-sm text-gray-500">{job.client_email || t('clientProfile')}</div>
+                <div className="text-sm text-stone-500">{job.client_email || t('clientProfile')}</div>
               </div>
             </div>
           </div>
 
           {!isJobOwner && currentUserProposal && (
             <div className="carte-editoriale carte-publique">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">{pageT('yourProposal')}</h2>
-              <div className="space-y-2 text-sm text-gray-700">
+              <h2 className="titre-carte-app mb-4">{pageT('yourProposal')}</h2>
+              <div className="space-y-2 text-sm text-stone-700">
                 {currentUserProposal?.proposed_amount && <div><span className="font-semibold">{pageT('amountLabel')}</span> {formatBudgetRange(currentUserProposal.proposed_amount, null)}</div>}
                 {currentUserProposal?.estimated_completion_time && <div><span className="font-semibold">{pageT('deadlineLabel')}</span> {currentUserProposal.estimated_completion_time}</div>}
                 {extractProposalMessage(currentUserProposal) && <div className="whitespace-pre-line"><span className="font-semibold">{pageT('messageLabel')}</span> {extractProposalMessage(currentUserProposal)}</div>}

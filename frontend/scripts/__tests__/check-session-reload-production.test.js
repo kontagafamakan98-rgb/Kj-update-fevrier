@@ -25,7 +25,11 @@ import {
   PASSWORD_SELECTOR,
   BYPASS_ENV,
   BYPASS_HEADER,
+  FAMILLE,
+  MARQUE_PREMISSE,
+  RENVOI_EXPOSITION,
   contextOptions,
+  libelleSonde,
   runSessionReloadProbe,
   parseArgs,
 } from '../check-session-reload-production.js';
@@ -276,7 +280,7 @@ describe('check-session-reload-production — refus nommés', () => {
 
     expect(result.ok).toBe(false);
     expect(result.errors.join('\n')).toContain(`renvoie l'utilisateur vers ${LOGIN_PATH}`);
-    expect(result.errors.join('\n')).toContain('hasSessionCookie');
+    expect(result.errors.join('\n')).toContain('hasSessionTrace');
   });
 
   it('refuse une application muette après le rechargement', async () => {
@@ -337,6 +341,50 @@ describe('check-session-reload-production — refus nommés', () => {
     expect(result.attempts).toBe(0);
     expect(result.errors.join('\n')).toContain('LHCI_CI_EMAIL');
     expect(launch).not.toHaveBeenCalled();
+  });
+});
+
+// ─── La DISTINCTION d'avec la sonde d'exposition du jeton ────────────────────
+//
+// Les deux sondes de production ouvrent le même formulaire servi et rechargent
+// la même page. Ce test-là fixe la moitié qui appartient à CETTE sonde : ce
+// qu'elle relève d'un jeton rangé côté web ne rougit pas ici (cas ci-dessus),
+// et chacun de ses refus de prémisse dit sa famille et nomme la sonde à qui
+// appartient le fait « un jeton est exposé ».
+
+describe('check-session-reload-production — ce refus n’est pas celui de l’exposition', () => {
+  it('marque ses PRÉMISSES et renvoie l’exposition à sa sonde, dans le MESSAGE', async () => {
+    const libelle = libelleSonde(BASE, API);
+    // Les quatre refus qui précèdent tout jugement — dont la prémisse partagée
+    // avec l'autre sonde (le compte CI manque).
+    const cas = {
+      'compte CI absent': await runSessionReloadProbe({
+        base: BASE,
+        api: API,
+        email: '',
+        password: '',
+        attempts: 1,
+        quiet: true,
+      }),
+      'contexte non vierge': (await sonder({ states: [etat(200)] })).result,
+      'connexion impossible': (
+        await sonder({ states: [etat(401), etat(401)], waitForUrl: 'timeout' })
+      ).result,
+      'session non ouverte': (await sonder({ states: [etat(401), etat(401)] })).result,
+    };
+
+    for (const [nom, result] of Object.entries(cas)) {
+      const messages = result.errors.join('\n');
+      expect(result.ok, nom).toBe(false);
+      // La FAMILLE est dans le message, pas seulement dans le titre de l'annotation.
+      expect(messages, nom).toContain(libelle);
+      // Le refus se DÉCLARE prémisse : il n'a rien jugé.
+      expect(result.errors[0].startsWith(`${libelle} : ${MARQUE_PREMISSE}`), nom).toBe(true);
+      // …et il nomme le fait qui appartient à l'autre sonde.
+      expect(messages, nom).toContain(RENVOI_EXPOSITION);
+      expect(messages, nom).toContain('check-token-exposure-production.js');
+      expect(FAMILLE, nom).toBe('session au rechargement');
+    }
   });
 });
 

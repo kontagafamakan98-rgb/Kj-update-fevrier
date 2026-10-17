@@ -280,6 +280,13 @@ export const reviewsAPI = reviewAPI;
 export const supportAPI = {
   /** @returns {Promise<object>} {ticket} ticket créé. */
   createTicket: (payload) => api.post('/support/tickets', payload),
+  /**
+   * Assistant IA de /support : la réponse vient du gateway du backend, jamais
+   * du navigateur (le jeton du modèle n'y descend pas). Le texte rendu est
+   * déjà nettoyé du marqueur interne de demande de support.
+   * @returns {Promise<object>} {reply, ticket_suggested, model} réponse de l'assistant.
+   */
+  robotChat: (payload) => api.post('/support/robot/chat', payload),
   /** @returns {Promise<object>} {ticket, status...} statut du ticket. */
   getTicketStatus: (ticketId, email) => api.post('/support/tickets/status', { ticket_id: ticketId, email }),
   /** @returns {Promise<object>} {tickets} liste des tickets. */

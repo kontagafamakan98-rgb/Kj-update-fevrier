@@ -158,6 +158,10 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
     // rend la même structure.
     login: `<div class="${loginPlan.frameClass}">`
       + `<div class="${loginPlan.colonneClass}">`
+      // La CARTE du formulaire (17/10/2026), lue dans le plan : la page rend
+      // la même enveloppe, donc la bascule coquille → React ne déplace ni le
+      // filet ni le fond (voir src/pages/Login.js).
+      + `<div class="${loginPlan.carteClass}">`
       + `<div>`
       // La marque : le tracé partagé, pas la lettre `brandMark` du dictionnaire
       // — `svgDeLaMarque` lit la MÊME déclaration que le composant React
@@ -178,7 +182,11 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + (googleAuth
         ? `<div class="relative">`
           + `<div class="absolute inset-0 flex items-center"><div class="w-full border-t border-gray-200"></div></div>`
-          + `<div class="relative flex justify-center text-sm"><span class="fond-sable px-3 text-gray-400">${esc(T('orSeparator'))}</span></div>`
+          // La teinte du séparateur est celle de la CARTE qui le traverse
+          // (17/10/2026) : ce bloc vit sous condition Google, donc sa chaîne
+          // ne peut pas être déclarée dans le plan (elle devrait y être
+          // toujours publiée) — elle est écrite ici et dans src/pages/Login.js.
+          + `<div class="relative flex justify-center text-sm"><span class="bg-white px-3 text-sm text-stone-400">${esc(T('orSeparator'))}</span></div>`
           + `</div>`
         : '')
       + `<div class="${loginPlan.champsClass}">`
@@ -215,7 +223,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<span class="${loginPlan.noAccountTexteClass}">${esc(T(loginPlan.noAccountKey))} <span class="${loginPlan.lienInscriptionClass}">${esc(T(loginPlan.registerKey))}</span></span>`
       + `</div>`
       + `</form>`
-      + `</div></div>`,
+      + `</div></div></div>`,
     // Register : réplique la PAGE COMPLÈTE (mode client par défaut —
     // ce que voit un visiteur sans ?ref/type) avec les MÊMES classes
     // et les MÊMES états initiaux (détection géo + langue en cours,
@@ -226,13 +234,17 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
     // readonly (inertes jusqu'au boot) et TOUS les libellés sont résolus
     // par registerT(T) : le scope de la page, donc la même source que
     // src/pages/Register.js.
-    register: `<div class="min-h-full flex items-center justify-center fond-sable py-12 px-4 sm:px-6 lg:px-8">`
-      + `<div class="max-w-md w-full space-y-8">`
+    register: `<div class="min-h-full flex items-center justify-center fond-sable cadre-page px-4 sm:px-6">`
+      + `<div class="max-w-md w-full">`
+      // La CARTE du formulaire (17/10/2026) — la même enveloppe que
+      // src/pages/Register.js, sinon le rembourrage de la carte n'existerait
+      // que côté React et tout le formulaire se déplacerait au montage.
+      + `<div class="carte-editoriale carte-publique">`
       + `<div class="text-center mb-8">`
       // La marque de /register : 64 px, même déclaration que React.
       + svgDeLaMarque('enregistrement')
       + `<h1 class="mt-6 text-center text-3xl font-bold text-stone-900">${esc(registerT('title'))}</h1>`
-      + `<p class="mt-2 text-sm text-gray-600">${esc(registerT('subtitle'))}</p>`
+      + `<p class="mt-2 text-sm text-stone-600">${esc(registerT('subtitle'))}</p>`
       + `<div class="mt-6 bg-orange-50 border border-orange-200 rounded-lg p-4">`
       // La MÊME boîte que les états finaux de src/pages/Register.js (classe LUE
       // dans le plan) : elle réserve la hauteur du plus haut des trois états, si
@@ -246,17 +258,15 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<span class="text-xs text-blue-700">${esc(T('detectingLocation'))}</span>`
       + `</div>`
       + `</div>`
-      + `<div class="flex items-center gap-3 overflow-x-auto pb-1 text-xs sm:text-sm sm:justify-center sm:space-x-4">`
+      + `<div class="flex flex-wrap items-center justify-center gap-3 pb-1 text-xs sm:text-sm">`
       + `<div class="flex items-center">`
       + `<div class="w-6 h-6 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-medium">${esc(registerT(registerPlan.step1NumberKey))}</div>`
       + `<span class="ml-2 text-orange-600 font-medium whitespace-nowrap">${esc(registerT('personalInformation'))}</span>`
       + `</div>`
-      + `<div class="w-12 h-1 bg-gray-200"></div>`
       + `<div class="flex items-center">`
       + `<div class="w-6 h-6 bg-stone-300 text-stone-600 rounded-full flex items-center justify-center text-xs font-medium">${esc(registerT(registerPlan.step2NumberKey))}</div>`
       + `<span class="ml-2 text-gray-500 font-medium whitespace-nowrap">${esc(registerT('stepEmail'))}</span>`
       + `</div>`
-      + `<div class="w-12 h-1 bg-gray-200"></div>`
       + `<div class="flex items-center">`
       + `<div class="w-6 h-6 bg-stone-300 text-stone-600 rounded-full flex items-center justify-center text-xs font-medium">${esc(registerT(registerPlan.step3NumberKey))}</div>`
       + `<span class="ml-2 text-gray-500 font-medium whitespace-nowrap">${esc(registerT('stepPayments'))}</span>`
@@ -272,7 +282,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<p id="inscription-notice" class="${registerPlan.stepNoticeClass}">${svgDeLIcone(registerPlan.stepNoticeIcon, 'noticePetite')} ${esc(registerT('clientStepNotice'))}</p>`
       + `</div>`
       + `</div>`
-      + `<form class="mt-8 space-y-6 bg-white p-4 sm:p-8 rounded-xl shadow-md">`
+      + `<form class="mt-8 space-y-6">`
       + (googleAuth ? boutonGoogle({ esc, label: registerT('googleSignup') }) : '')
       + (googleAuth
         ? `<div class="relative">`
@@ -281,7 +291,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
           + `</div>`
         : '')
       + `<fieldset>`
-      + `<legend class="block text-sm font-medium text-gray-700 mb-3">${esc(registerT('userType'))}</legend>`
+      + `<legend class="block text-sm font-semibold text-stone-800 mb-3">${esc(registerT('userType'))}</legend>`
       + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">`
       // Les deux cartes sont des `<label>` — l'ÉLÉMENT de React, pas un
       // `<div>` — et portent leur `<input class="sr-only">` :
@@ -308,14 +318,14 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       // la largeur et son texte se centrait (héritage de `.App`), mesuré à
       // 159,88 px du libellé de React.
       + `<div class="flex items-center justify-between gap-3 mb-2">`
-      + `<label for="country" class="block text-sm font-medium text-gray-700">${esc(registerT('country'))}</label>`
+      + `<label for="country" class="block text-sm font-semibold text-stone-800">${esc(registerT('country'))}</label>`
       + `</div>`
       // Le contrôle de pays est celui de React (src/components/CountryDisplay.js),
       // pas un `<select>` : mêmes classes, mêmes glyphes, même input caché.
       // Un `<select>` de substitution mesurait 1 px de moins — mesuré, les 47
       // textes du bas du formulaire étaient 1 px trop haut.
       + `<div class="relative mt-1">`
-      + `<button type="button" id="country" class="w-full flex items-center justify-between px-4 py-3 border border-gray-300 rounded-lg shadow-xs bg-white text-left" aria-haspopup="listbox" aria-expanded="false" aria-required="true">`
+      + `<button type="button" id="country" class="${registerPlan.selecteurPaysClass}" aria-haspopup="listbox" aria-expanded="false" aria-required="true">`
       + `<span class="flex items-center gap-3 min-w-0">`
       + `<span class="text-lg leading-none">${svgDeLIcone(registerPlan.countryGlobeIcon, 'paysGlobe')}</span>`
       + `<span class="truncate text-gray-400">${esc(COUNTRY_PLACEHOLDER(registerT('country')))}</span>`
@@ -326,20 +336,20 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `</div>`
       + `</div>`
       + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">`
-      + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('firstName'))}</label><input readonly placeholder="${esc(registerT('firstName'))}..." class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-xs" /></div>`
-      + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('lastName'))}</label><input readonly placeholder="${esc(registerT('lastName'))}..." class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-xs" /></div>`
+      + `<div><label class="block text-sm font-semibold text-stone-800 mb-2">${esc(registerT('firstName'))}</label><input readonly placeholder="${esc(registerT('firstName'))}..." class="${registerPlan.champClass}" /></div>`
+      + `<div><label class="block text-sm font-semibold text-stone-800 mb-2">${esc(registerT('lastName'))}</label><input readonly placeholder="${esc(registerT('lastName'))}..." class="${registerPlan.champClass}" /></div>`
       + `</div>`
-      + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('email'))}</label><input readonly type="email" placeholder="${esc(registerT('emailPlaceholder'))}" class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-xs" /></div>`
+      + `<div><label class="block text-sm font-semibold text-stone-800 mb-2">${esc(registerT('email'))}</label><input readonly type="email" placeholder="${esc(registerT('emailPlaceholder'))}" class="${registerPlan.champClass}" /></div>`
       + `<div>`
-      + `<label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('phone'))}</label>`
-      + `<div class="flex rounded-lg shadow-xs">`
-      + `<span class="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">${esc(PHONE_PREFIX_FALLBACK)}</span>`
-      + `<input readonly placeholder="${esc(phoneNumberExample())}" class="flex-1 block w-full px-4 py-3 border border-gray-300 rounded-r-lg" />`
+      + `<label class="block text-sm font-semibold text-stone-800 mb-2">${esc(registerT('phone'))}</label>`
+      + `<div class="flex">`
+      + `<span class="${registerPlan.champPrefixeClass}">${esc(PHONE_PREFIX_FALLBACK)}</span>`
+      + `<input readonly placeholder="${esc(phoneNumberExample())}" class="${registerPlan.champTelephoneClass}" />`
       + `</div>`
       + `<p class="mt-1 text-sm text-gray-500">${esc(registerT('phoneFormatHint'))}: ${esc(phoneNumberExample())}</p>`
       + `</div>`
-      + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('password'))}</label><input readonly type="password" class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-xs" /><p class="mt-1 text-xs text-gray-500">${esc(registerT('passwordTooShort'))}</p></div>`
-      + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('confirmPassword'))}</label><input readonly type="password" class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-xs" /></div>`
+      + `<div><label class="block text-sm font-semibold text-stone-800 mb-2">${esc(registerT('password'))}</label><input readonly type="password" class="${registerPlan.champClass}" /><p class="mt-1 text-xs text-gray-500">${esc(registerT('passwordTooShort'))}</p></div>`
+      + `<div><label class="block text-sm font-semibold text-stone-800 mb-2">${esc(registerT('confirmPassword'))}</label><input readonly type="password" class="${registerPlan.champClass}" /></div>`
       + `<div class="bloc-differe-photo carte-editoriale carte-publique mb-6">`
       + `<div class="mb-4 flex items-center gap-3">${svgDeLIcone(registerPlan.photoIcon, 'photoTitre')}<h3 class="titre-entree">${esc(registerT('profilePhotoOptional'))}</h3></div>`
       + `<p class="mb-4 text-sm text-stone-600">${esc(registerT('profilePhotoHelps'))}</p>`
@@ -368,12 +378,12 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<div><h3 class="text-sm font-semibold text-orange-900">${svgDeLIcone(registerPlan.legalNoticeIcon, 'notice')} ${esc(registerT('legalNoticeTitle'))}</h3><p class="text-xs text-orange-800 mt-1">${esc(registerT('legalConsentHelp'))}</p></div>`
       + `<span class="inline-flex items-center text-sm font-medium text-orange-700 underline">${esc(registerT('legalConsentLink'))}</span>`
       + `<label class="flex items-start gap-3 cursor-pointer"><input type="checkbox" readonly class="mt-1 h-4 w-4 rounded-sm border-gray-300 text-orange-600" /><span class="text-sm text-gray-700">${esc(registerT('legalConsentLabel'))}</span></label>`
-      + `<p class="text-xs text-gray-600">${esc(registerT('legalContactLine'))}</p>`
+      + `<p class="text-xs text-stone-600">${esc(registerT('legalContactLine'))}</p>`
       + `</div>`
-      + `<div class="bloc-differe-envoi"><button type="submit" class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-orange-600">${esc(registerT('continueButton'))}</button></div>`
-      + `<div class="bloc-differe-lien text-center"><span class="text-sm text-gray-600">${esc(registerT('signInPrompt'))} <span class="font-medium text-orange-600">${esc(T('signIn'))}</span></span></div>`
+      + `<div class="bloc-differe-envoi"><button type="submit" class="bouton bouton-encre w-full">${esc(registerT('continueButton'))}</button></div>`
+      + `<div class="bloc-differe-lien text-center"><span class="text-sm text-stone-600">${esc(registerT('signInPrompt'))} <span class="font-semibold text-orange-700 underline underline-offset-2 hover:text-orange-600 transition-colors">${esc(T('signIn'))}</span></span></div>`
       + `</form>`
-      + `</div></div>`,
+      + `</div></div></div>`,
     // ForgotPassword : réplique l'ÉTAPE EMAIL (par défaut) — la page
     // est centrée verticalement (items-center), donc une hauteur
     // statique différente décalerait tout le bloc au montage React
@@ -414,18 +424,22 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
     // de centrage vertical) → pas de décalage au montage React ; les
     // états dynamiques (skeleton de chargement, répartition, paiements)
     // apparaissent après le boot comme sur la page réelle.
+    // Le VOCABULAIRE D'ÉCRAN (17/10/2026) : la bande d'identité et la carte à
+    // filet sont publiées depuis le PLAN (`bandeClass`, `carteClass`,
+    // `carteTitreClass`, `ctaClass`) — la page et sa coquille lisent donc les
+    // mêmes cinq chaînes, et aucune des deux ne peut dériver sur le dessin.
     payment: `<div class="${paymentPlan.frameClass}">`
       + `<div class="${paymentPlan.corpsClass}">`
-      + `<div class="bg-white rounded-2xl shadow-xs border border-gray-200 p-6">`
+      + `<section class="${paymentPlan.bandeClass}">`
       + `<h1 class="${paymentPlan.titleClass}">${esc(T(paymentPlan.titleKey))}</h1>`
-      + `<p class="text-gray-600">${esc(T(paymentPlan.subtitleKey))}</p>`
-      + `</div>`
-      + `<div class="bg-white rounded-2xl shadow-xs border border-gray-200 p-8 text-center">`
-      + `<div class="text-4xl mb-3">${svgDeLIcone(paymentPlan.noJobIcon, 'carteVide')}</div>`
-      + `<h2 class="text-xl font-semibold text-gray-900 mb-2">${esc(T(paymentPlan.noJobTitleKey))}</h2>`
-      + `<p class="text-gray-600 max-w-lg mx-auto mb-5">${esc(T(paymentPlan.noJobTextKey))}</p>`
-      + `<div class="inline-flex items-center rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white">${esc(T(paymentPlan.noJobCtaKey))}</div>`
-      + `</div>`
+      + `<p class="${paymentPlan.subtitleClass}">${esc(T(paymentPlan.subtitleKey))}</p>`
+      + `</section>`
+      + `<section class="${paymentPlan.carteClass} text-center">`
+      + `<div class="mb-3 text-4xl">${svgDeLIcone(paymentPlan.noJobIcon, 'carteVide')}</div>`
+      + `<h2 class="${paymentPlan.carteTitreClass} mb-2">${esc(T(paymentPlan.noJobTitleKey))}</h2>`
+      + `<p class="${paymentPlan.noJobTextClass}">${esc(T(paymentPlan.noJobTextKey))}</p>`
+      + `<div class="${paymentPlan.ctaClass}">${esc(T(paymentPlan.noJobCtaKey))}</div>`
+      + `</section>`
       + `</div></div>`,
     // HowItWorks : page PUBLIQUE de contenu, servie jusqu'ici par
     // app.html — le gabarit NU (titre « Kojo », aucun h1, aucun

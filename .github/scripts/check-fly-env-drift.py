@@ -90,9 +90,13 @@ FLY_INJECTED = {
 SENSITIVE_KEYS = {
     "JWT_SECRET", "EMAIL_OTP_SECRET", "MONGO_URL", "OWNER_INITIAL_PASSWORD",
     "PAYDUNYA_MASTER_KEY", "PAYDUNYA_PRIVATE_KEY", "PAYDUNYA_TOKEN",
-    "BREVO_API_KEY", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN",
+    "BREVO_API_KEY", "RESEND_API_KEY", "RESEND_WEBHOOK_SECRET",
+    "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN",
     "CLOUDINARY_API_SECRET", "VAPID_PRIVATE_KEY", "REDIS_URL",
     "GOOGLE_CLIENT_SECRET", "SENTRY_DSN",
+    # Jeton du gateway IA (Neon) : porteur d'accès aux modèles, donc une clé
+    # à rotater sans alerte de stabilité.
+    "NEON_AI_GATEWAY_TOKEN",
 }
 
 # Clés OPTIONNELLES : leur absence sur Fly n'est PAS une divergence — soit le
@@ -109,9 +113,28 @@ OPTIONAL_KEYS = {
     "EMAIL_OTP_RESEND_COOLDOWN_SECONDS", "EMAIL_VERIFICATION_TOKEN_MINUTES",
     "GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN",
     "GMAIL_SENDER_EMAIL", "GMAIL_SENDER_NAME",
+    # Resend : fournisseur ALTERNATIF — sans ces variables le backend démarre
+    # et envoie par EMAIL_PROVIDER (brevo par défaut, 'none' pour les tests),
+    # donc leur absence sur Fly n'est pas une divergence doc↔prod.
+    "RESEND_API_KEY", "RESEND_SENDER_EMAIL", "RESEND_SENDER_NAME",
+    "RESEND_REPLY_TO_EMAIL",
+    # Webhook Resend (rebonds, plaintes) : sans `RESEND_WEBHOOK_SECRET`
+    # l'ingestion est DÉSACTIVÉE (la route refuse au lieu de juger un appelant
+    # qu'elle ne peut pas authentifier) et le backend démarre ; les deux seuils
+    # ont un défaut de repli dans kojo_settings (300 s, 3 rebonds). Leur absence
+    # sur Fly n'est donc pas une divergence doc↔prod — mais leur PRÉSENCE est ce
+    # qui rend la suppression d'adresses effective.
+    "RESEND_WEBHOOK_SECRET", "EMAIL_WEBHOOK_TOLERANCE_SECONDS",
+    "EMAIL_SOFT_BOUNCE_ALERT_THRESHOLD",
     "FAMAKAN_OWNER_EMAIL", "PASSWORD_RESET_FROM_EMAIL",
     "REFERRAL_FILLEUL_REWARD", "REFERRAL_SPONSOR_REWARD",
     "REFERRAL_WELCOME_FILLEUL_REWARD", "REFERRAL_WELCOME_SPONSOR_REWARD",
+    # Assistant IA de /support : sans ces variables la fonctionnalité est
+    # DÉSACTIVÉE (is_configured() est faux, la route répond 503 et la page
+    # retombe sur le questionnaire) — le backend démarre sans elles, donc leur
+    # absence sur Fly n'est pas une divergence.
+    "NEON_AI_GATEWAY_BASE_URL", "NEON_AI_GATEWAY_TOKEN",
+    "NEON_AI_GATEWAY_MODEL", "NEON_AI_GATEWAY_TIMEOUT_SECONDS",
 }
 
 # Keys connues mais NON sensibles (valeur vérifiable côté doc). Leur digest
@@ -251,16 +274,12 @@ def required_secrets_from_deploy_doc():
             if keys:
                 return keys
     # Repli : variables lues par le code (forward-compatible si la doc manque).
-    refs = set()
-    if SETTINGS.exists():
-        text = SETTINGS.read_text(encoding="utf-8")
-        for name in re.findall(r"os\.environ\.get\(['\"]([A-Z0-9_]+)['\"]", text):
-            if not has_nonempty_default(name):
-                refs.add(name)
-        for name in re.findall(r"getenv\(['\"]([A-Z0-9_]+)['\"]", text):
-            if not has_nonempty_default(name):
-                refs.add(name)
-    return refs
+    # La lecture des NOMS appartient à `_settings_referenced_keys()` (mise en
+    # cache, même extraction) : recopier ses deux expressions ici donnerait deux
+    # lectures du même fichier à tenir synchronisées, donc deux façons de nommer
+    # les clés que le code lit — et un orphelin détecté d'un côté, pas de
+    # l'autre. Seul le FILTRE (défaut de repli) distingue ce repli.
+    return {k for k in _settings_referenced_keys() if not has_nonempty_default(k)}
 
 
 def list_fly_secrets(token):
@@ -425,7 +444,49 @@ SECRET_FORMAT_CHECKS = {
 }
 
 
-def check_deployed_formats(public_env, secret_values, label_prefix="format"):
+def _controler_format(key, value, spec, prefixe, contexte, avant=(), apres=()):
+    """Le contrôle de format d'UNE valeur — écrit UNE fois, pour ses trois
+    appelants : les variables publiques DÉPLOYÉES, les secrets DÉPLOYÉS (valeurs
+    masquées) et les RÉFÉRENCES du dépôt.
+
+    Ce qui est partagé, c'est la RÈGLE et sa sortie : l'appel au validateur, le
+    masquage d'une valeur fautive AVANT qu'elle n'atteigne un log de CI public,
+    le verdict sur une valeur non normalisée, la ligne conforme. Ce que chaque
+    appelant garde, ce sont ses mentions : `avant`/`apres` encadrent la
+    description du format attendu dans le verdict conforme (la source pour une
+    référence, le masque pour un secret) et `contexte` NOMME la valeur dans une
+    divergence.
+
+    Le corps était recopié trois fois (deux boucles déployées, un `_check` de
+    références) : un enrichissement ajouté à une seule copie — `_sanitize_error`,
+    la phrase « le runtime ne normalise pas » — laissait les deux autres
+    fuiter une valeur dans un log public, ou taire une normalisation.
+
+    `spec` : (validateur, description, accepte_label, renvoie_la_valeur), la
+    forme des tables ci-dessus ; `renvoie_la_valeur` = le validateur NORMALISE
+    la valeur (slash final, espaces externes), donc une valeur rendue différente
+    de l'entrée est non canonique — et le runtime, qui ne normalise pas,
+    l'emploierait telle quelle (callbacks IPN cassés silencieusement).
+
+    Retourne True quand la valeur est conforme, False quand elle ne l'est pas.
+    """
+    validator, desc, has_label, returns_value = spec
+    try:
+        result = validator(value, key) if has_label else validator(value)
+    except (ValueError, TypeError) as exc:
+        errors.append(f"[{prefixe} {key}] {_sanitize_error(str(exc), value)} — {contexte}")
+        return False
+    if returns_value and result != value:
+        errors.append(
+            f"[{prefixe} {key}] NON normalisée : {_mask(value)} → attendu "
+            f"{_mask(result)} — {contexte}"
+        )
+        return False
+    checked.append(f"  {OK} {key} {prefixe} OK ({', '.join([*avant, desc, *apres])})")
+    return True
+
+
+def check_deployed_formats(public_env, secret_values):
     """Valide le FORMAT des valeurs DÉPLOYÉES : les variables publiques [env]
     (lues via l'API) et les secrets (lus via SSH, valeurs masquées).
 
@@ -436,39 +497,23 @@ def check_deployed_formats(public_env, secret_values, label_prefix="format"):
     Détecte une valeur déployée mal formée — le pire cas d'erreur de
     config : le code démarre, mais CORS/URLs/VAPID sont cassés silencieusement
     (ex. slash final sur BACKEND_PUBLIC_URL, espace après mailto:).
-    """
-    for key, (validator, desc, has_label, returns_value) in sorted(PUBLIC_FORMAT_CHECKS.items()):
-        value = public_env.get(key, "")
-        try:
-            result = validator(value, key) if has_label else validator(value)
-            checked.append(f"  {OK} {key} format OK ({desc})")
-        except (ValueError, TypeError) as exc:
-            errors.append(f"[format {key}] {_sanitize_error(str(exc), value)} — valeur déployée={_mask(value)}")
-            continue
-        # Un validateur qui NORMALISE la valeur (slash final, espaces externes)
-        # renvoie une valeur ≠ entrée : la valeur déployée brute est donc non
-        # canonique (le runtime ne normalise pas → callbacks cassés silencieusement).
-        if returns_value and result != value:
-            errors.append(
-                f"[format {key}] valeur déployée NON normalisée : {_mask(value)} "
-                f"→ attendu {_mask(result)} (le runtime ne normalise pas)"
-            )
 
-    for key, (validator, desc, has_label, returns_value) in sorted(SECRET_FORMAT_CHECKS.items()):
+    Une clé [env] ABSENTE du runtime passe quand même par le validateur (vide) :
+    c'est `check_public_env` qui dit « absente du runtime », et ce contrôle-ci ne
+    s'y substitue pas.
+    """
+    for key, spec in sorted(PUBLIC_FORMAT_CHECKS.items()):
+        value = public_env.get(key, "")
+        _controler_format(key, value, spec, "format", f"valeur déployée={_mask(value)}")
+
+    for key, spec in sorted(SECRET_FORMAT_CHECKS.items()):
         if key not in secret_values:
             continue
         value = secret_values[key]
-        try:
-            result = validator(value, key) if has_label else validator(value)
-            checked.append(f"  {OK} {key} format OK ({desc}, {_mask(value)})")
-        except (ValueError, TypeError) as exc:
-            errors.append(f"[format {key}] {_sanitize_error(str(exc), value)} — valeur déployée={_mask(value)}")
-            continue
-        if returns_value and result != value:
-            errors.append(
-                f"[format {key}] valeur déployée NON normalisée : {_mask(value)} "
-                f"→ attendu {_mask(result)}"
-            )
+        _controler_format(
+            key, value, spec, "format", f"valeur déployée={_mask(value)}",
+            apres=[_mask(value)],
+        )
 
 
 # Clés CRITIQUES dont le format est contrôlé dans les RÉFÉRENCES du dépôt
@@ -505,22 +550,14 @@ def check_reference_formats():
     def _check(key, value, source):
         if key not in REFERENCE_FORMAT_CHECKS:
             return
-        validator, desc, has_label, returns_value = REFERENCE_FORMAT_CHECKS[key]
         if not value:
             return  # vide = template dev / clé absente : rien à valider
-        try:
-            result = validator(value, key) if has_label else validator(value)
-            checked.append(f"  {OK} {key} référence OK ({source}, {desc})")
-        except (ValueError, TypeError) as exc:
-            errors.append(
-                f"[référence {key}] {_sanitize_error(str(exc), value)} — source={source}"
-            )
-            return
-        if returns_value and result != value:
-            errors.append(
-                f"[référence {key}] NON normalisée ({source}) : {_mask(value)} "
-                f"→ attendu {_mask(result)}"
-            )
+        # La source PRÉCÈDE la description dans le verdict : c'est elle qui dit
+        # d'où vient la valeur auditée (fly.toml [env], .env.example, doc).
+        _controler_format(
+            key, value, REFERENCE_FORMAT_CHECKS[key], "référence",
+            f"source={source}", avant=[source],
+        )
 
     # 1) fly.toml [env] — config de prod commitée
     if FLY_TOML.exists():
@@ -549,6 +586,46 @@ def check_reference_formats():
             if value.startswith("...") or "..." in value:
                 continue  # placeholder doc (« ... »)
             _check(key, value, "DEPLOY_FLYIO.md")
+
+
+def _auditer_references():
+    """L'audit des RÉFÉRENCES du dépôt, gardé par la disponibilité des
+    validateurs : appelé par le mode `--refs-only` ET par le check complet — les
+    références s'auditent sans Fly, donc c'est le seul contrôle qui tourne sur un
+    run sans jeton (une PR sans secret).
+
+    Une seule implémentation de cette garde : deux copies divergeraient sur ce
+    qu'est « validateurs indisponibles », et celle qui ne remplirait pas `errors`
+    rendrait un vert VIDE au lieu d'un refus — le garde aurait l'air de vérifier
+    ce qu'il n'a pas lu.
+    """
+    if _VALIDATORS_OK:
+        check_reference_formats()
+    else:
+        errors.append(f"Validateurs indisponibles : {_VALIDATORS_ERR}")
+
+
+def _rapport(entete, cesure, message_ok):
+    """Le rapport d'une passe et son CODE DE SORTIE — une seule implémentation
+    pour les deux modes (`--refs-only` et complet).
+
+    `entete` nomme le périmètre LU, `cesure` nomme le refus quand la liste des
+    divergences n'est pas vide, `message_ok` est la phrase du vert.
+
+    Recopier cet épilogue, c'était deux façons de compter les divergences et
+    deux façons de rendre 0 — la copie qu'on ne retouche pas le jour où la
+    sortie change rendrait vert un rapport non vide.
+    """
+    print(entete)
+    for line in checked:
+        print(line)
+    if errors:
+        print(f"\n{BAD} {len(errors)} {cesure} :")
+        for e in errors:
+            print("  " + e)
+        return 1
+    print(f"\n{message_ok}")
+    return 0
 
 
 def read_secrets_via_ssh(keys):
@@ -644,20 +721,12 @@ def main(argv=None):
         # Mode références seules : déterministe, aucun accès Fly requis.
         # Utile en CI (chaque push) et en local pour auditer les fichiers
         # de référence SANS token ni réseau.
-        if _VALIDATORS_OK:
-            check_reference_formats()
-        else:
-            errors.append(f"Validateurs indisponibles : {_VALIDATORS_ERR}")
-        print(f"Audit des RÉFÉRENCES du dépôt (mode --refs-only, app={FLY_APP}) :")
-        for line in checked:
-            print(line)
-        if errors:
-            print(f"\n{BAD} {len(errors)} divergence(s) de format dans les références :")
-            for e in errors:
-                print("  " + e)
-            return 1
-        print("\n[OK] formats des références du dépôt conformes.")
-        return 0
+        _auditer_references()
+        return _rapport(
+            f"Audit des RÉFÉRENCES du dépôt (mode --refs-only, app={FLY_APP}) :",
+            "divergence(s) de format dans les références",
+            "[OK] formats des références du dépôt conformes.",
+        )
 
     if not API_TOKEN:
         print("FLY_API_TOKEN manquant — impossible d'interroger Fly "
@@ -723,26 +792,40 @@ def main(argv=None):
         errors.append(str(exc))
 
     # 5) FORMAT : références du dépôt (déterministe) PUIS valeurs déployées
+    _auditer_references()
     if _VALIDATORS_OK:
-        check_reference_formats()
         secret_keys = sorted(set(SECRET_FORMAT_CHECKS) & set(fly_secrets))
         secret_values = read_secrets_via_ssh(secret_keys) if secret_keys else {}
+        # ── CE CONTRÔLE DIT S'IL A EU LIEU, dans les DEUX cas ──────────────────
+        # Les formats des secrets DÉPLOYÉS se lisent via SSH, indisponible dans
+        # la CI (pas de clé) : le contrôle peut donc ne rien vérifier. Jusqu'ici
+        # le journal ne l'écrivait QUE dans le cas d'exception (`[WARN]`), et
+        # jamais quand `flyctl ssh` rendait une sortie vide sans erreur — les
+        # trois derniers pushs de `main` (relevés le 12/10/2026) ne portent ni
+        # `[OK]` ni `[WARN]` à ce sujet, donc un lecteur du run ne pouvait pas
+        # distinguer « vérifié » de « sauté ». Un contrôle dont on ne peut pas
+        # savoir s'il a eu lieu n'est pas un contrôle : les deux issues sont
+        # maintenant nommées, et l'absence de verdict se lit comme telle.
+        # (Angle mort assumé F4 de CI-COVERAGE.md : ce n'est toujours pas un
+        # gate — le rendre bloquant exigerait une clé SSH sur le runner.)
+        if secret_keys and not secret_values:
+            checked.append(
+                f"  [AUCUN VERDICT] formats des {len(secret_keys)} secret(s) déployés NON "
+                "vérifiés (SSH indisponible) — ce contrôle n'a pas eu lieu"
+            )
+        elif secret_values:
+            checked.append(
+                f"  [OK] formats des {len(secret_values)} secret(s) déployés vérifiés "
+                "(valeurs masquées)"
+            )
         check_deployed_formats(live_env, secret_values)
-    else:
-        errors.append(f"Validateurs indisponibles : {_VALIDATORS_ERR}")
 
     # 6) Rapport
-    print(f"Check doc<->prod Fly (app={FLY_APP}) :")
-    for line in checked:
-        print(line)
-
-    if errors:
-        print(f"\n{BAD} {len(errors)} divergence(s) :")
-        for e in errors:
-            print("  " + e)
-        return 1
-    print("\n[OK] fly.toml et secrets Fly synchronises avec les references du depot.")
-    return 0
+    return _rapport(
+        f"Check doc<->prod Fly (app={FLY_APP}) :",
+        "divergence(s)",
+        "[OK] fly.toml et secrets Fly synchronises avec les references du depot.",
+    )
 
 
 if __name__ == "__main__":

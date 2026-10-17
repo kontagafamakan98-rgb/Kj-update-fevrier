@@ -325,9 +325,13 @@ export function createRewriteServer({ root, config, backendUrl = DEFAULT_BACKEND
       }
       const headers = {};
       upstream.headers.forEach((value, key) => {
-        if (['content-encoding', 'transfer-encoding', 'connection', 'content-length'].includes(key)) return;
+        if (['content-encoding', 'transfer-encoding', 'connection', 'content-length', 'set-cookie'].includes(key)) return;
         headers[key] = value;
       });
+      // Set-Cookie n'est pas une liste séparée par des virgules : chaque cookie
+      // doit garder son en-tête, sinon session et CSRF se remplacent au proxy.
+      const cookies = upstream.headers.getSetCookie?.() || [];
+      if (cookies.length) headers['set-cookie'] = cookies;
       sendHeaders(upstream.status, headers);
       const body = Buffer.from(await upstream.arrayBuffer());
       res.end(req.method === 'HEAD' ? undefined : body);

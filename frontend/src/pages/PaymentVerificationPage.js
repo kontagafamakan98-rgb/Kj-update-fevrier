@@ -12,7 +12,7 @@ import { mapPaymentAccountErrorToField } from '../utils/paymentAccountErrors';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/paymentVerification';
 import { clearRegistrationFlow, loadRegistrationFlow, mergeRegistrationFlow } from '../utils/registrationFlowStorage';
 import { devLog, safeLog } from '../utils/env';
-import { Hand, Target, Mail, XCircle, Lock, MapPin } from 'lucide-react';
+import { Target, Mail, XCircle, Lock, MapPin } from 'lucide-react';
 
 const PaymentVerificationPage = () => {
   const navigate = useNavigate();
@@ -247,91 +247,103 @@ const PaymentVerificationPage = () => {
     );
   }
 
-  return (      <div className="min-h-full bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">{t('paymentVerification')}</h1>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 max-w-2xl mx-auto">
-            <div className="flex items-center justify-center mb-4">
-              <Hand className="h-9 w-9 mr-4 text-blue-600" aria-hidden="true" />
-              <div className="text-left">
-                <p className="text-lg font-semibold text-blue-900">
-                  {pageT('welcome', { firstName: effectiveUser.first_name, lastName: effectiveUser.last_name })}
-                </p>
-                <p className="text-blue-700">
-                  {pageT('accountType')}: <span className="font-medium">{getUserTypeLabel(effectiveUser.user_type)}</span>
-                </p>
-              </div>
-            </div>
+  return (
+    <div className="min-h-full bg-gray-50 cadre-page max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="space-y-6">
+        {/* LE BANDEAU D'ÉCRAN (17/10/2026) : la carte bleue ombrée disait un état
+            d'alerte là où la page accueille. Elle appartenait à une gamme froide
+            qu'aucun autre écran du site n'emploie, et isolait ses trois
+            informations dans trois pavés de couleur. Le bandeau porte maintenant
+            la crème du site, les états sont des ÉTIQUETTES carrées
+            (`.etiquette-app`, la verte et l'orange étant les seules à dire un
+            état), et les phrases sont du texte de lecture.
 
+            Aucun nom d'utilitaire n'est écrit plus haut, même pour mémoire :
+            Tailwind lit le TEXTE des sources, et une règle générée qu'aucun
+            porteur ne pose est refusée par `check-css-selecteurs-morts.js`. */}
+        <section className="bande-app" data-section="bande-inscription">
+          <h1 className="titre-page">{t('paymentVerification')}</h1>
+          <p className="mt-2 text-sm text-stone-600 sm:max-w-2xl sm:text-base">
+            {pageT('welcome', { firstName: effectiveUser.first_name, lastName: effectiveUser.last_name })}
+          </p>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="etiquette-app">
+              {pageT('accountType')} · {getUserTypeLabel(effectiveUser.user_type)}
+            </span>
             {geoLoading ? (
-              <div className="mb-4 p-3 bg-blue-100 border border-blue-300 rounded-sm text-center">
-                <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
-                  <span className="text-sm text-blue-800">{pageT('geoDetecting')}</span>
-                </div>
-              </div>
+              <span className="etiquette-app">
+                <span className="h-3 w-3 animate-spin rounded-full border-b-2 border-orange-500" aria-hidden="true"></span>
+                {pageT('geoDetecting')}
+              </span>
             ) : detectedCountry ? (
-              <div className="mb-4 p-3 bg-green-100 border border-green-300 rounded-sm text-center">
-                <p className="text-sm text-green-800">
-                  <MapPin className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" />
-                  <span className="font-medium">{pageT('position')}:</span> <CountryDisplay countryCode={detectedCountry.code} className="inline-flex align-middle" />
-                </p>
-                <p className="text-xs text-green-600 mt-1">{pageT('examplesAdjusted')}</p>
-              </div>
+              <span className="etiquette-app etiquette-app-vert">
+                <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
+                {pageT('position')} :{' '}
+                <CountryDisplay countryCode={detectedCountry.code} className="inline-flex align-middle" />
+              </span>
             ) : (
-              <div className="mb-4 p-3 bg-yellow-100 border border-yellow-300 rounded-sm text-center">
-                <p className="text-xs text-yellow-700">
-                  <MapPin className="inline h-3.5 w-3.5 mr-1 align-[-0.15em]" aria-hidden="true" />
-                  {pageT('positionNotDetected')}
-                </p>
-              </div>
+              <span className="etiquette-app etiquette-app-orange">
+                <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
+                {pageT('positionNotDetected')}
+              </span>
             )}
-
-            <div className="text-sm text-blue-800 space-y-2">
-              <p>
-                <strong>{t('lastStep')}:</strong> {isAccountCompletionMode ? t('completePaymentSetupToUnlock') : t('linkAccountsToComplete')}
-              </p>
-              <p>
-                <Target className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {effectiveUser.user_type === 'worker' ? t('workerPaymentRequirement') : t('clientPaymentRequirement')}
-              </p>
-              {!isAccountCompletionMode && (
-                <p>
-                  <Mail className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {pageT('emailStepNotice')}
-                </p>
-              )}
-            </div>
           </div>
-        </div>
+          {detectedCountry && (
+            <p className="mt-2 text-sm text-stone-600">{pageT('examplesAdjusted')}</p>
+          )}
 
-        <div className="mb-8">
-          <div className="flex items-center justify-center space-x-4">
-            <StepDot number="✓" label={pageT('stepPersonal')} classeFond="bg-green-500" classeTexte="text-green-600" />
-            <div className="w-16 h-1 bg-green-200"></div>
-            <StepDot number="✓" label={pageT('stepAccess')} classeFond="bg-green-500" classeTexte="text-green-600" />
-            <div className="w-16 h-1 bg-orange-200"></div>
-            <StepDot number="3" label={pageT('stepPayments')} classeFond="bg-orange-500" classeTexte="text-orange-600" />
+          <div className="mt-4 space-y-2 text-sm text-stone-600">
+            <p>
+              <strong className="font-semibold text-stone-900">{t('lastStep')} :</strong>{' '}
+              {isAccountCompletionMode ? t('completePaymentSetupToUnlock') : t('linkAccountsToComplete')}
+            </p>
+            <p className="flex items-start gap-2">
+              <Target className="mt-0.5 h-4 w-4 flex-none text-orange-600" aria-hidden="true" />
+              {effectiveUser.user_type === 'worker' ? t('workerPaymentRequirement') : t('clientPaymentRequirement')}
+            </p>
+            {!isAccountCompletionMode && (
+              <p className="flex items-start gap-2">
+                <Mail className="mt-0.5 h-4 w-4 flex-none text-orange-600" aria-hidden="true" />
+                {pageT('emailStepNotice')}
+              </p>
+            )}
           </div>
-        </div>
+        </section>
+
+        {/* LES TROIS ÉTAPES : les pastilles colorées (vert/orange) et leurs
+            traits de liaison peignaient l'AVANCEMENT en couleur d'état, alors
+            que la page n'a qu'un état — l'étape 3. Deux étiquettes vertes et une
+            orange disent la même chose, avec le vocabulaire du site. */}
+        <ol className="flex flex-wrap items-center gap-2" data-section="etapes-inscription">
+          {[pageT('stepPersonal'), pageT('stepAccess'), pageT('stepPayments')].map((etape, index) => (
+            <li
+              key={etape}
+              className={`etiquette-app ${index < 2 ? 'etiquette-app-vert' : 'etiquette-app-orange'}`}
+            >
+              <span aria-hidden="true">{index < 2 ? '✓' : '3'}</span> {etape}
+            </li>
+          ))}
+        </ol>
 
         {displayedError && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <div className="flex items-center">
-              <XCircle className="h-5 w-5 text-red-500 mr-3" aria-hidden="true" />
+          <div className="carte-editoriale carte-publique" data-section="erreur-inscription">
+            <div className="flex items-start gap-3">
+              <XCircle className="mt-0.5 h-5 w-5 flex-none text-rose-600" aria-hidden="true" />
               <div>
-                <h3 className="font-semibold text-red-800">{pageT('registrationErrorTitle')}</h3>
-                <p className="text-red-700 text-sm">{displayedError}</p>
+                <h2 className="titre-carte-app">{pageT('registrationErrorTitle')}</h2>
+                <p className="mt-2 text-sm text-stone-600">{displayedError}</p>
               </div>
             </div>
           </div>
         )}
 
         {loading && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-lg shadow-lg text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto"></div>
-              <div className="mt-4 text-gray-700 font-medium">{pageT('finalizing')}</div>
-              <div className="text-sm text-gray-500 mt-2">{pageT('checkingAccounts')}</div>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/50">
+            <div className="carte-editoriale carte-publique text-center">
+              <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-orange-500"></div>
+              <div className="mt-4 font-semibold text-stone-900">{pageT('finalizing')}</div>
+              <div className="mt-2 text-sm text-stone-600">{pageT('checkingAccounts')}</div>
             </div>
           </div>
         )}
@@ -345,49 +357,34 @@ const PaymentVerificationPage = () => {
         />
 
         {isRegistrationFlow && (
-          <div className="mt-8 text-center">
+          <div className="text-center">
             <button
+              type="button"
               onClick={() => navigate('/email-verification', { state: { userData: routedUserData, paymentAccounts: prefilledPaymentAccounts, emailVerificationToken } })}
               disabled={loading}
-              className="text-orange-600 hover:text-orange-700 text-sm font-medium disabled:opacity-50"
+              className="bouton bouton-clair disabled:opacity-50"
             >
               {pageT('backToRegister')}
             </button>
           </div>
         )}
 
-        <div className="mt-12 bg-gray-50 border border-gray-200 rounded-lg p-6">
-          <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
-            <Lock className="h-5 w-5 mr-2" aria-hidden="true" />
+        <section className="carte-editoriale carte-publique" data-section="securite-inscription">
+          <h2 className="titre-carte-app flex items-center gap-2">
+            <Lock className="h-5 w-5 flex-none text-orange-600" aria-hidden="true" />
             {pageT('securityTitle')}
-          </h3>
-          <div className="text-sm text-gray-700 space-y-2">
-            <p>{pageT('security1')}</p>
-            <p>{pageT('security2')}</p>
-            <p>{pageT('security3')}</p>
-            <p>{pageT('security4')}</p>
-            <p>{pageT('security5')}</p>
-          </div>
-        </div>
+          </h2>
+          <ul className="mt-3 space-y-2 text-sm text-stone-600">
+            <li>{pageT('security1')}</li>
+            <li>{pageT('security2')}</li>
+            <li>{pageT('security3')}</li>
+            <li>{pageT('security4')}</li>
+            <li>{pageT('security5')}</li>
+          </ul>
+        </section>
       </div>
     </div>
   );
 };
-
-// Les props portent des CLASSES, et elles le disent depuis le 07/10/2026 : elles
-// s'appelaient `bg`, `text`, `textColor`, et le verdict de la feuille LIVRÉE les
-// déclarait MORTES (`bg-green-500`, `text-green-600`) — le nom ne disait pas ce
-// que la valeur était. `classe*` est la convention que lit
-// `scripts/css-selecteurs-morts.js` (cf. `EST_UNE_CLE_DE_CLASSE`).
-function StepDot({ number, label, classeFond, classeTexte, classeNombre = 'text-white' }) {
-  return (
-    <div className="flex items-center">
-      <div className={`w-8 h-8 ${classeFond} ${classeNombre} rounded-full flex items-center justify-center text-sm font-medium`}>
-        {number}
-      </div>
-      <span className={`ml-2 text-sm font-medium ${classeTexte}`}>{label}</span>
-    </div>
-  );
-}
 
 export default PaymentVerificationPage;

@@ -1,16 +1,17 @@
 import { devLog, safeLog } from '../utils/env';
-import { api, getAuthToken, hasSessionCookie, hasSessionArtifact } from './api';
+import { api, hasSessionTrace } from './api';
 
 // Service pour les fonctionnalités propriétaire - ACCÈS RESTREINT
 //
 // NOTE AUTH (web) : la session est le seul cookie httpOnly ; aucun jeton n'est
 // stocké côté web. La vérification d'accès owner repose donc sur le profil
 // chargé depuis /auth/me (user_type) ET sur la présence de la session, lue via
-// hasSessionCookie (cookie CSRF lisible, vrai seulement en même-origine) ou,
-// en cross-origin, la trace non secrète du profil en cache (hasSessionArtifact)
-// — le cookie est alors rangé sur l'hôte de l'API et rien de la session n'est
-// lisible depuis le frontend, ce qui rendait sinon le dashboard owner
-// inaccessible en production. Tous les appels API passent par le client
+// hasSessionTrace (services/api.js) : le jeton du shell natif ou la trace de
+// profil — jamais la lisibilité d'un cookie, le cookie de session étant
+// httpOnly et son compagnon CSRF n'étant lisible que sur l'hôte qui l'a posé
+// (en cross-site, c'est l'hôte de l'API : rien n'en est lisible depuis le
+// frontend), ce qui rendait sinon le dashboard owner inaccessible en
+// production. Tous les appels API passent par le client
 // partagé `api` (credentials: 'include' + en-tête X-CSRFToken sur les
 // mutations) — plus aucun fetch manuel.
 class OwnerService {
@@ -34,16 +35,17 @@ class OwnerService {
     );
   }
 
-  /** @returns {boolean} true si profil owner ET session active (token). */
+  /** @returns {boolean} true si profil owner ET session active (trace de session). */
   isOwnerSessionValid(userCandidate = null) {
     // Deux conditions : le profil est bien un compte owner ET une session
     // active existe (sinon les appels /owner/* échoueraient en 401). Le jeton
-    // n'existe que dans le shell natif ; sur le web, c'est le cookie de session
-    // (signal hasSessionCookie en même-origine, hasSessionArtifact en
-    // cross-origin). S'il est expiré, /auth/me renverra 401 et le client
-    // purgera/redirigera — pas de blocage ici.
-    return this.isOwnerUser(userCandidate)
-      && (Boolean(getAuthToken()) || hasSessionCookie() || hasSessionArtifact());
+    // n'existe que dans le shell natif ; sur le web, la session est le cookie
+    // httpOnly, dont ni lui ni son compagnon CSRF ne sont lisibles depuis
+    // l'origine frontend en cross-site. Le juge est donc hasSessionTrace
+    // (jeton natif ou trace de profil), jamais la lisibilité d'un cookie.
+    // S'il est expiré, /auth/me renverra 401 et le client purgera/redirigera —
+    // pas de blocage ici.
+    return this.isOwnerUser(userCandidate) && hasSessionTrace();
   }
 
   _translateOwnerError(error, fallback) {

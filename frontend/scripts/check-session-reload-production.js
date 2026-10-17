@@ -53,6 +53,17 @@
  * relevé montrait un jeton en localStorage côté web : la sonde le dit à chaque
  * run, sans le compter comme un échec de rechargement.
  *
+ * Ce fait-là a sa propre sonde, et la réciprocité est écrite des deux côtés :
+ * `check-token-exposure-production.js` juge l'EXPOSITION d'un jeton sur le
+ * domaine web servi (`::error title=Exposition jeton production::`) et publie, à
+ * l'inverse, qu'un rechargement non restauré ne rougit pas chez elle. Ici, la
+ * symétrie est portée par `MARQUE_PREMISSE` (les refus de prémisse : compte CI
+ * absent, contexte non vierge, connexion impossible, session non ouverte — la
+ * sonde n'a pas pu juger) et par `RENVOI_EXPOSITION` (le fait jugé par l'autre
+ * sonde, nommé). Chaque refus porte donc sa famille dans le message lui-même,
+ * pas seulement dans le titre de l'annotation. Garde :
+ * `frontend/scripts/__tests__/check-sondes-production-distinctes.test.js`.
+ *
  * ─── Aucune écriture, aucun état partagé ───────────────────────────────────
  * La connexion LIT une session existante (aucune inscription, aucun compte
  * créé), le contexte est jeté à la fin de chaque tentative, et rien n'est
@@ -104,6 +115,34 @@ export const SESSION_COOKIE_ATTRIBUTES = Object.freeze({
   secure: true,
   sameSite: 'None',
 });
+
+/**
+ * La FAMILLE de cette sonde — ce qu'un rouge prononcé ici veut dire. Elle est
+ * écrite DANS chaque refus, en plus du titre de l'annotation : la sonde
+ * d'exposition du jeton ouvre le même formulaire servi et recharge la même page,
+ * donc un refus sans famille se lirait comme un refus de l'autre.
+ */
+export const FAMILLE = 'session au rechargement';
+
+/** Marque des refus de PRÉMISSE : la sonde n'a pas pu juger — elle ne juge pas. */
+export const MARQUE_PREMISSE = 'prémisse (aucun verdict rendu ici)';
+
+/**
+ * Renvoi de famille : le refus qui suit n'est PAS celui de la sonde d'exposition
+ * du jeton. Ce que la page PERSISTE (clé de stockage, cookie lisible, URL) est
+ * RELEVÉ ici, jamais jugé : le fait « un jeton est lisible sur le domaine web »
+ * appartient à l'autre sonde, avec sa propre correction.
+ */
+export const RENVOI_EXPOSITION =
+  "ce n'est pas le refus de la sonde d'exposition du jeton " +
+  '(check-token-exposure-production.js, ::error title=Exposition jeton production::) : ce que la page ' +
+  'PERSISTE est relevé ici, jamais jugé, et un jeton en stockage ne rougit pas cette sonde.';
+
+/** Libellé du run : la famille, la page jugée, puis l'origine de l'API jugée. */
+export const libelleSonde = (base, api) => `${FAMILLE} sur ${base} (API ${api}${AUTH_ME_PATH})`;
+
+/** Compose un refus de prémisse : la marque, le fait, puis le renvoi de famille. */
+export const premisse = (fait) => `${MARQUE_PREMISSE} · ${fait} ${RENVOI_EXPOSITION}`;
 
 /**
  * Lit le cookie APPLICABLE à /auth/me dans Chromium, y compris HttpOnly.
@@ -291,8 +330,10 @@ async function oneAttempt({
     verdicts.anonymous = start.status;
     if (start.status !== 401) {
       errors.push(
-        `contexte de sonde non vierge : GET ${AUTH_ME_PATH} répond HTTP ${start.status} AVANT toute ` +
-          'connexion (401 attendu). Tant que ce contexte porte une session, un rechargement ne prouve rien.'
+        premisse(
+          `contexte de sonde non vierge : GET ${AUTH_ME_PATH} répond HTTP ${start.status} AVANT toute ` +
+            'connexion (401 attendu). Tant que ce contexte porte une session, un rechargement ne prouve rien.'
+        )
       );
       return { ok: false, errors, notices, checked, verdicts };
     }
@@ -312,9 +353,11 @@ async function oneAttempt({
     } catch (_error) {
       const seen = await pageState(page, authMeUrl);
       errors.push(
-        `connexion du compte CI impossible : la page est restée sur ${LOGIN_PATH} ` +
-          `(GET ${AUTH_ME_PATH} → HTTP ${seen.status}). Vérifier LHCI_CI_EMAIL / LHCI_CI_PASSWORD ` +
-          '(repli LHCI_TEST_*).'
+        premisse(
+          `connexion du compte CI impossible : la page est restée sur ${LOGIN_PATH} ` +
+            `(GET ${AUTH_ME_PATH} → HTTP ${seen.status}). Vérifier LHCI_CI_EMAIL / LHCI_CI_PASSWORD ` +
+            '(repli LHCI_TEST_*).'
+        )
       );
       return { ok: false, errors, notices, checked, verdicts };
     }
@@ -327,8 +370,10 @@ async function oneAttempt({
     verdicts.beforeReload = opened.status;
     if (opened.status !== 200) {
       errors.push(
-        `session non ouverte après la connexion : GET ${AUTH_ME_PATH} → HTTP ${opened.status} (200 attendu). ` +
-          'Un rechargement ne peut pas être jugé sur une session déjà absente.'
+        premisse(
+          `session non ouverte après la connexion : GET ${AUTH_ME_PATH} → HTTP ${opened.status} (200 attendu). ` +
+            'Un rechargement ne peut pas être jugé sur une session déjà absente.'
+        )
       );
       return { ok: false, errors, notices, checked, verdicts };
     }
@@ -391,11 +436,11 @@ async function oneAttempt({
         errors.push(
           `l'application renvoie l'utilisateur vers ${LOGIN_PATH} après le rechargement : la session existe ` +
             'encore dans le navigateur (200 depuis la page) mais la page ne la restaure pas. La garde ' +
-            "d'amorçage (AuthContext.loadUser) juge TROIS signaux : le jeton (getAuthToken, shell natif), le " +
-            'cookie CSRF lisible (hasSessionCookie — impossible en cross-origin, où les cookies vivent sur ' +
-            "l'hôte de l'API) et le profil en cache (hasSessionArtifact, la trace cross-origin). Vérifier " +
-            'que le build web utilise le proxy /api même-origine, que le rewrite transmet les deux ' +
-            'Set-Cookie et que la garde déclenche /auth/me.'
+            "d'amorçage (AuthContext.loadUser) juge UNE SEULE trace locale : hasSessionTrace — le jeton du " +
+            "shell natif ou le profil en cache (hasSessionArtifact). Jamais la lisibilité d'un cookie : " +
+            "elle dépend de l'hôte qui l'a posé et n'existe pas en cross-site. Vérifier que le build web a " +
+            "laissé cette trace (le profil est écrit au login), que la garde déclenche bien /auth/me au " +
+            'rechargement, et que le rewrite /api transmet les deux Set-Cookie.'
         );
       } else if (!observed || observed.status !== 200) {
         errors.push(
@@ -466,12 +511,16 @@ export async function runSessionReloadProbe({
   // lancer un navigateur, et en nommant les secrets — un run rouge doit dire
   // quelle variable poser, pas seulement qu'il a échoué.
   if (!email || !password) {
+    // Le libellé est posé ICI AUSSI : ce refus ne passe pas par la boucle, donc
+    // pas par le préfixe des tentatives — sans lui, il serait le seul message de
+    // la sonde à ne pas nommer sa famille, et il est justement celui que les deux
+    // sondes prononcent avec les mêmes mots (le compte CI manque).
+    const fait =
+      'compte CI absent : LHCI_CI_EMAIL / LHCI_CI_PASSWORD (repli LHCI_TEST_*) ne sont pas définis — ' +
+      'sans session ouverte, aucun rechargement ne peut être jugé.';
     return {
       ok: false,
-      errors: [
-        'compte CI absent : LHCI_CI_EMAIL / LHCI_CI_PASSWORD (repli LHCI_TEST_*) ne sont pas définis — ' +
-          'sans session ouverte, aucun rechargement ne peut être jugé.',
-      ],
+      errors: [`${libelleSonde(cleanBase, cleanApi)} : ${premisse(fait)}`],
       notices: [],
       checked: [],
       attempts: 0,
@@ -516,7 +565,7 @@ export async function runSessionReloadProbe({
     }
   }
 
-  const label = `session au rechargement sur ${cleanBase} (API ${cleanApi}${AUTH_ME_PATH})`;
+  const label = libelleSonde(cleanBase, cleanApi);
   if (last.ok) {
     last.notices.push(`${label} : session restaurée après rechargement (${used} tentative(s)).`);
   } else {

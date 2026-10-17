@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { api, getAuthToken, isNativeShell, hasSessionArtifact, handleApiError, TRANSPORT_FAILURE_MESSAGE, SERVER_FAILURE_MESSAGE } from '../api';
+import { api, getAuthToken, isNativeShell, hasSessionArtifact, hasSessionTrace, handleApiError, TRANSPORT_FAILURE_MESSAGE, SERVER_FAILURE_MESSAGE } from '../api';
 import fr from '../../i18n/fr.json';
 
 // Le jeton ne vit en stockage que dans le shell natif (Capacitor). Les scénarios
@@ -7,6 +7,27 @@ import fr from '../../i18n/fr.json';
 // (sans Capacitor) est couvert à part, en fin de fichier.
 const modeNatif = () => { window.Capacitor = { isNativePlatform: () => true }; };
 const sortieModeNatif = () => { delete window.Capacitor; };
+
+// jsdom ne sait pas naviguer : on remplace window.location par un objet dont le
+// setter href enregistre la cible PUIS lève (comme le ferait jsdom réel). api.js
+// attrape cette exception et réinitialise son garde-fou anti-boucle, ce qui garde
+// les tests suivants herméétiques. Défini au niveau du MODULE : le web et le
+// shell natif doivent pouvoir juger la même navigation, sans en avoir chacun une
+// copie qui pourrait diverger.
+const fakeLocation = () => {
+  let target = '';
+  const location = {};
+  Object.defineProperty(location, 'pathname', { value: '/jobs', writable: true });
+  Object.defineProperty(location, 'href', {
+    get: () => target,
+    set: (value) => {
+      target = String(value);
+      throw new Error('jsdom navigation not implemented');
+    },
+  });
+  Object.defineProperty(window, 'location', { value: location, writable: true, configurable: true });
+  return { getRedirectTarget: () => target };
+};
 
 // api.js doit construire ses URLs via le module unique buildApiUrl : la base
 // (VITE_API_URL / REACT_APP_BACKEND_URL) peut être définie avec OU sans /api,
@@ -97,25 +118,6 @@ describe('api — session 401 (token stale vs session morte) et CSRF', () => {
     document.cookie = 'kojo_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
   };
 
-  // jsdom ne sait pas naviguer : on remplace window.location par un objet
-  // dont le setter href enregistre la cible PUIS lève (comme le ferait
-  // jsdom réel). api.js attrape cette exception et réinitialise son garde-
-  // fou anti-boucle, ce qui garde les tests suivants herméétiques.
-  const fakeLocation = () => {
-    let target = '';
-    const location = {};
-    Object.defineProperty(location, 'pathname', { value: '/jobs', writable: true });
-    Object.defineProperty(location, 'href', {
-      get: () => target,
-      set: (value) => {
-        target = String(value);
-        throw new Error('jsdom navigation not implemented');
-      },
-    });
-    Object.defineProperty(window, 'location', { value: location, writable: true, configurable: true });
-    return { getRedirectTarget: () => target };
-  };
-
   const mock401 = () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: false,
@@ -139,29 +141,42 @@ describe('api — session 401 (token stale vs session morte) et CSRF', () => {
     sortieModeNatif();
   });
 
-  it('401 avec cookie de session valide → purge le token stale, PAS de redirection', async () => {
-    setSessionCookie();
-    localStorage.setItem('token', 'stale.token.abc');
-    const location = fakeLocation();
-    mock401();
+  it('le verdict du 401 ne dépend PAS de la lisibilité du cookie CSRF', async () => {
+    // Deux exécutions, un seul verdict attendu : c'est le contrat du correctif.
+    // La lisibilité du cookie CSRF dépend de l'hôte qui l'a posé (même-origine
+    // ou hôte de l'API) — elle ne doit décider de RIEN.
+    for (const cookieLisible of [false, true]) {
+      if (cookieLisible) setSessionCookie(); else clearSessionCookie();
+      const location = fakeLocation();
+      mock401();
 
-    await expect(api.get('/users/payment-accounts')).rejects.toThrow('Invalid token');
+      await expect(api.get('/users/payment-accounts')).rejects.toThrow('Invalid token');
 
-    // Auto-guérison : le token stale est purgé, la session cookie intacte
-    // (pas de redirection vers /login — l'utilisateur est toujours connecté).
-    expect(localStorage.getItem('token')).toBeNull();
-    expect(location.getRedirectTarget()).toBe('');
+      // Aucun jeton en stockage (web) : le serveur a refusé la requête
+      // elle-même, la session est morte → purge ET redirection.
+      expect(location.getRedirectTarget()).toBe('/login');
+    }
+
+    // Avec un jeton périmé, le verdict est aussi indépendant du cookie : purge,
+    // pas de navigation (le jeton peut être la seule cause du refus).
+    for (const cookieLisible of [false, true]) {
+      if (cookieLisible) setSessionCookie(); else clearSessionCookie();
+      localStorage.setItem('token', 'stale.token.abc');
+      const location = fakeLocation();
+      mock401();
+
+      await expect(api.get('/users/payment-accounts')).rejects.toThrow('Invalid token');
+
+      expect(localStorage.getItem('token')).toBeNull();
+      expect(location.getRedirectTarget()).toBe('');
+    }
   });
 
-  it('401 sans cookie de session → purge ET redirige vers /login', async () => {
-    localStorage.setItem('token', 'stale.token.abc');
-    const location = fakeLocation();
-    mock401();
-
-    await expect(api.get('/users/payment-accounts')).rejects.toThrow('Invalid token');
-
-    expect(localStorage.getItem('token')).toBeNull();
-    expect(location.getRedirectTarget()).toBe('/login');
+  it('hasSessionTrace : un jeton natif suffit, sans aucun cookie', () => {
+    clearSessionCookie();
+    expect(hasSessionTrace()).toBe(false);
+    localStorage.setItem('token', 'jeton-natif');
+    expect(hasSessionTrace()).toBe(true);
   });
 
   it('401 sur un endpoint métier (login) ne redirige pas', async () => {
@@ -220,7 +235,7 @@ describe('api — session 401 (token stale vs session morte) et CSRF', () => {
     expect(location.getRedirectTarget()).toBe('');
   });
 
-  it('401 sur session réellement morte → purge + redirige (la sonde échoue aussi)', async () => {
+  it('401 sur session réellement morte → purge, puis l’appel suivant (sans jeton) redirige', async () => {
     localStorage.setItem('token', 'expired.token.abc');
     const location = fakeLocation();
     // TOUTES les réponses sont des 401 (mutation + sonde /auth/me).
@@ -230,7 +245,14 @@ describe('api — session 401 (token stale vs session morte) et CSRF', () => {
 
     await expect(api.get('/users/payment-accounts')).rejects.toThrow('Invalid token');
 
+    // Le jeton envoyé peut être la SEULE cause du 401 (un en-tête expiré est
+    // refusé même quand le cookie de session vit encore) : on purge, on ne
+    // navigue pas, et l'appel suivant repart sans en-tête. C'est là que la
+    // session est jugée — par le serveur, pas par un cookie lisible.
     expect(localStorage.getItem('token')).toBeNull();
+    expect(location.getRedirectTarget()).toBe('');
+
+    await expect(api.get('/users/payment-accounts')).rejects.toThrow('Invalid token');
     expect(location.getRedirectTarget()).toBe('/login');
   });
 
@@ -505,6 +527,21 @@ describe('api — web : aucun jeton en stockage, aucun en-tête Authorization', 
     expect(getAuthToken()).toBe('');
   });
 
+  it('hasSessionTrace : un cookie CSRF lisible ne vaut PAS une session', () => {
+    // Le cookie CSRF est lisible en même-origine et invisible en cross-site :
+    // s'en servir comme signal d'amorçage donnait deux verdicts pour un même
+    // état serveur. La trace est locale (profil ou jeton natif), point.
+    document.cookie = 'kojo_csrf=csrf-visible; path=/';
+    expect(hasSessionTrace()).toBe(false);
+    localStorage.setItem('user', JSON.stringify({ id: 'user-1' }));
+    expect(hasSessionTrace()).toBe(true);
+    localStorage.removeItem('user');
+    // Web : un jeton laissé en stockage n'est jamais relu (getAuthToken).
+    localStorage.setItem('token', 'jeton-herite');
+    expect(hasSessionTrace()).toBe(false);
+    document.cookie = 'kojo_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+  });
+
   it('hasSessionArtifact : vrai sur le profil laissé par une connexion, faux sinon', () => {
     // Seul signal lisible quand l'API est appelée en cross-origin : le cookie
     // de session est alors rangé sur l'hôte de l'API. Le vestige ne vaut pas
@@ -546,5 +583,74 @@ describe('api — web : aucun jeton en stockage, aucun en-tête Authorization', 
     await api.get('/auth/me');
     expect(localStorage.getItem('token')).toBeNull();
     expect(localStorage.getItem('token_expires_at')).toBeNull();
+  });
+
+  it('403 CSRF sans COOKIE LISIBLE ni jeton : la session restaurée reste utilisable', async () => {
+    // La topologie cross-site, telle que la production la connaît : les deux
+    // cookies vivent sur l'hôte de l'API, donc `document.cookie` de l'origine
+    // frontend n'en montre AUCUN — et il n'y a aucun jeton en stockage par
+    // construction. Sans la récupération par la sonde, la première écriture
+    // après un rechargement restait en 403 et la session restaurée ne servait à
+    // rien ; la seule issue aurait été de LIRE kojo_csrf, ce que cette topologie
+    // interdit.
+    // Aucun cookie lisible sur l'origine frontend : les deux cookies vivent sur
+    // l'hôte de l'API (ce describe ne les nettoie pas, on l'établit ici).
+    document.cookie = 'kojo_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+    expect(document.cookie).not.toContain('kojo_csrf');
+    expect(getAuthToken()).toBe('');
+    const location = fakeLocation();
+    global.fetch = vi.fn()
+      // L'écriture part sans en-tête CSRF (rien de lisible) et se fait refuser.
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        text: async () => '{"detail":"Validation CSRF échouée. Jeton manquant ou invalide."}',
+        headers: { get: () => null },
+      })
+      // La sonde /auth/me : GET, exempte de CSRF, elle rapporte la session et
+      // ré-échoit le jeton dans X-Kojo-CSRFToken (en-tête exposé en CORS).
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () => '{}',
+        headers: { get: (name) => (name === 'X-Kojo-CSRFToken' ? 'csrf-du-serveur' : null) },
+      })
+      .mockResolvedValueOnce({
+        ok: true, status: 200, text: async () => '{"ok":true}', headers: { get: () => null },
+      });
+
+    const result = await api.put('/users/profile', { first_name: 'X' });
+
+    expect(result).toEqual({ ok: true });
+    expect(global.fetch).toHaveBeenCalledTimes(3);
+    // La sonde est bien un GET /auth/me, sans en-tête CSRF à envoyer.
+    expect(global.fetch.mock.calls[1][0]).toContain('/api/auth/me');
+    expect(global.fetch.mock.calls[1][1].method).toBe('GET');
+    // Le rejeu porte le CSRF RÉ-ÉCHOÉ — pas celui d'un cookie, qui n'existe pas
+    // ici — et jamais un en-tête Authorization (le web n'en envoie aucun).
+    expect(global.fetch.mock.calls[2][1].headers['X-CSRFToken']).toBe('csrf-du-serveur');
+    expect(global.fetch.mock.calls[2][1].headers.Authorization).toBeUndefined();
+    // Et rien n'a été écrit en stockage pour y arriver.
+    expect(localStorage.getItem('token')).toBeNull();
+    expect(localStorage.getItem('user')).toBeNull();
+    expect(location.getRedirectTarget()).toBe('');
+  });
+
+  it('401 sans jeton (session morte sur le web) : AUCUNE sonde, la redirection suit', async () => {
+    // Un 401 n'a rien à récupérer côté web : il n'y a aucun jeton périmé à
+    // remplacer, et une session morte resterait morte. Sonder ici ajouterait un
+    // aller-retour à chaque 401 pour rien — la récupération ne s'ouvre qu'au 403
+    // CSRF, qui, lui, PROUVE que la session cookie vivait.
+    const location = fakeLocation();
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false, status: 401, text: async () => '{"detail":"Non authentifié"}', headers: { get: () => null },
+    });
+
+    await expect(api.get('/users/payment-accounts')).rejects.toThrow('Non authentifié');
+
+    // Un seul appel : aucune sonde /auth/me n'a été tentée.
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(global.fetch.mock.calls[0][0]).not.toContain('/api/auth/me');
+    expect(location.getRedirectTarget()).toBe('/login');
   });
 });

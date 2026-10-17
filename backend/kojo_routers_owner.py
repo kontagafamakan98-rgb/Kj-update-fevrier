@@ -3,11 +3,18 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 
 from kojo_core import db
+from kojo_email_suppressions import (
+    adresse_boite,
+    etat_des_suppressions,
+    lever_suppression,
+)
 from kojo_settings import (
     JWT_ALGORITHM,
     PAYOUT_ALERT_THRESHOLD_HOURS,
+    logger,
 )
 from kojo_core import (
     is_database_available, verify_owner_access,
@@ -441,3 +448,92 @@ async def get_mission_business_events(job_id: str, owner_user = Depends(verify_o
             for evenement in evenements
         ],
     }
+
+
+# ── Adresses email retenues (rebonds définitifs, plaintes) ───────────────────
+#
+# Ces deux routes sont la contrepartie de l'ingestion des webhooks : retenir
+# une adresse est irréversible du point de vue de l'apprenant, donc il faut
+# pouvoir (1) VOIR ce qui est retenu et pourquoi, et (2) le LEVER sans écrire
+# en base de production à la main — un correctif appliqué à la main ne laisse
+# aucune trace de qui l'a décidé ni de quand.
+_CHAMPS_SUPPRESSION = (
+    "email",
+    "motif",
+    "type_rebond",
+    "sous_type",
+    "message",
+    "premier_fait_le",
+    "dernier_fait_le",
+    "faits",
+    "fournisseur",
+)
+
+
+class EmailSuppressionLever(BaseModel):
+    """L'adresse à rendre joignable. Un corps JSON plutôt qu'un segment d'URL :
+    une adresse email contient `@` et `+`, que le chemin devrait encoder (et
+    qu'un encodage approximatif transformerait en une AUTRE adresse)."""
+
+    email: str = Field(min_length=3, max_length=320)
+
+
+@router.get("/owner/email-suppressions")
+async def get_email_suppressions(
+    limite: int = Query(200, ge=1, le=1000), owner_user = Depends(verify_owner_access)
+):
+    """Adresses email auxquelles le produit n'écrit plus, et pourquoi.
+
+    PROPRIÉTAIRE UNIQUEMENT. Une adresse est retenue après un rebond DÉFINITIF
+    (la boîte n'existe pas) ou une plainte (le destinataire nous a signalés
+    comme indésirables) ; les rebonds non définitifs n'y figurent pas — ils
+    alertent, mais la boîte existe.
+
+    L'adresse est rendue ENTIÈRE (et non masquée) : c'est le propriétaire, il
+    doit pouvoir décider, et il doit pouvoir la recopier pour la lever. Le
+    `message` du fournisseur l'est aussi : c'est le seul élément qui explique le
+    classement, il est borné à l'écriture, et il est déjà passé par la boîte de
+    qui reçoit ces alertes.
+
+    Returns:
+        dict: {total, count, tronque, suppressions} — `tronque` dit si la borne
+        demandée a coupé la vue (une vue bornée qui se taisait ferait croire à
+        une liste complète).
+    """
+    documents, total = await etat_des_suppressions(limite)
+
+    return {
+        "total": total,
+        "count": len(documents),
+        "tronque": total > len(documents),
+        "suppressions": [
+            {champ: document.get(champ) for champ in _CHAMPS_SUPPRESSION}
+            for document in documents
+        ],
+    }
+
+
+@router.post("/owner/email-suppressions/lever")
+async def lever_email_suppression(
+    payload: EmailSuppressionLever, owner_user = Depends(verify_owner_access)
+):
+    """Rend une adresse joignable : les emails repartent vers elle.
+
+    PROPRIÉTAIRE UNIQUEMENT, et c'est une DÉCISION : rien ne lève une
+    suppression automatiquement (une horloge qui rouvrirait une adresse morte
+    remettrait le produit à écrire dans le vide). Sert les cas réels — boîte
+    recréée, adresse changée, fait mal classé.
+
+    `levee` vaut False quand l'adresse n'était PAS retenue : c'est un FAIT, pas
+    un échec — l'objectif (« cette adresse est joignable ») est atteint, et le
+    dire vaut mieux qu'un 404 qu'on relit comme une panne.
+
+    Returns:
+        dict: {email, levee} — `email` est la forme NORMALISÉE (minuscules,
+        sans étiquette `+tag`) sur laquelle la décision a porté.
+    """
+    adresse = adresse_boite(payload.email)
+    levee = await lever_suppression(adresse)
+    if levee:
+        logger.info("✅ Adresse email rendue joignable par le propriétaire : %s", adresse)
+    return {"email": adresse, "levee": levee}

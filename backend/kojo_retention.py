@@ -50,6 +50,7 @@ from typing import Dict, Optional, Tuple
 
 from kojo_settings import (
     DELETED_ACCOUNT_RETENTION_DAYS,
+    EMAIL_DELIVERY_EVENT_RETENTION_DAYS,
     EMAIL_OTP_EXPIRY_MINUTES,
     JWT_EXPIRATION_HOURS,
     MESSAGE_RETENTION_DAYS,
@@ -194,6 +195,19 @@ RETENTION_RULES: Tuple[RegleDeConservation, ...] = (
         portee=(
             "tout message envoyé — il appartient aussi au destinataire, donc "
             "il survit à la suppression de compte, mais pas indéfiniment"
+        ),
+        date_portee_par_le_document=False,
+    ),
+    RegleDeConservation(
+        collection="email_delivery_events",
+        ttl_field="recu_le",
+        lifetime=timedelta(days=EMAIL_DELIVERY_EVENT_RETENTION_DAYS),
+        porte_par="EMAIL_DELIVERY_EVENT_RETENTION_DAYS",
+        portee=(
+            "tout fait de livraison reçu du fournisseur (rebond, plainte, "
+            "livraison réussie) — la trace qui explique pourquoi une adresse a "
+            "été retenue, et qui n'a plus à être conservée ensuite : l'état "
+            "(`email_suppressions`) lui survit et ne périme pas"
         ),
         date_portee_par_le_document=False,
     ),

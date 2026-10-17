@@ -15,6 +15,26 @@ name: SEO production probe (daily)
 # variable d'exécution, mais elle rend le silence impossible — un run rouge
 # quotidien est un fait visible, pas une note enterrée dans un log.
 #
+# ─── Le cron n'est PLUS le premier à voir un écart ──────────────────────────
+# Depuis le 12/10/2026, la MÊME sonde stricte tourne aussi juste après chaque
+# déploiement de production : dans le job `frontend-build` de `ci.yml`, sur un
+# push de `main`, immédiatement après le step qui a constaté que la production
+# sert le frontend de ce commit. Là, l'écart est constaté en minutes et reste
+# attribuable à la livraison qui l'a introduit (coût mesuré : 4,1 s).
+#
+# Les deux ne se remplacent pas. La livraison répond à « ce build a-t-il perdu
+# quelque chose ? » ; le cron répond à « la production est-elle conforme
+# MAINTENANT ? », y compris quand rien n'a été poussé : une variable `VITE_*`
+# retirée ou vidée sur Vercel, un redéploiement manuel (cf. `seo-vercel-env.yml`),
+# un jeton de vérification qui expire, ou un push qui n'a déclenché aucune
+# vérification de révision. Un seul des deux laisserait un angle mort ; c'est
+# aussi pourquoi la commande est la même des trois côtés, sans variante : le cron,
+# le step de `frontend-build`, et `npm run livrer` (`.github/scripts/livrer.py`),
+# qui la lance juste après avoir confirmé que Vercel sert la révision livrée et
+# rend le verdict dans le terminal. `.github/scripts/check-seo-probe-strict.py`
+# refuse toute invocation hors `--strict`, dans les workflows COMME dans ce
+# fichier de livraison.
+#
 # Elle n'a besoin d'AUCUN secret : elle lit du HTML public. C'est ce qui la rend
 # capable de constater un écart de configuration que le dépôt ne peut pas
 # connaître autrement (les `VITE_*` sont inlinées au build par Vercel).

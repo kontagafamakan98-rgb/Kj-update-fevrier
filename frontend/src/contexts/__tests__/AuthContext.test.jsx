@@ -17,12 +17,13 @@
  *   'token' ni 'token_expires_at' ne sont écrits (login compris) ; le shell
  *   natif Capacitor, lui, a le droit d'écrire les deux (pas de cookie fiable).
  * - CROSS-ORIGIN (production) : le cookie est rangé sur l'hôte de l'API, donc
- *   AUCUN cookie de session n'est lisible depuis l'origine frontend —
- *   hasSessionCookie() y est faux. Sans le troisième signal
- *   (hasSessionArtifact : le profil en cache), l'app se déclarait anonyme au
- *   rechargement et renvoyait /login à un utilisateur connecté (mesuré en
- *   production). Le vestige ne doit PAS, à lui seul, autoriser l'affichage du
- *   cache hors-ligne : il ne vaut pas preuve de session.
+ *   AUCUN cookie de session n'est lisible depuis l'origine frontend. Sans la
+ *   trace locale (hasSessionTrace : jeton natif ou profil en cache), l'app se
+ *   déclarait anonyme au rechargement et renvoyait /login à un utilisateur
+ *   connecté (mesuré en production). La lisibilité d'un cookie ne décide de
+ *   RIEN : deux hôtes possibles pour les cookies, un seul verdict. La trace ne
+ *   doit PAS, à elle seule, autoriser l'affichage du cache hors-ligne : elle ne
+ *   vaut pas preuve de session.
  */
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -45,18 +46,17 @@ vi.mock('../../services/api', () => ({
   // anonyme de loadUser est ainsi testé sur son vrai critère (jeton présent ou
   // non), pas sur une doublure qui répondrait toujours la même chose.
   getAuthToken: vi.fn(() => localStorage.getItem('token') || ''),
-  // Cookie CSRF lisible : absent par défaut (les tests web le posent).
-  hasSessionCookie: vi.fn(() => false),
-  // Trace cross-origin : branchée sur le stockage comme getAuthToken, pour que
-  // le troisième signal du court-circuit soit jugé sur son vrai critère (le
-  // profil est-il là ?), pas sur une doublure qui répondrait toujours non.
+  // Trace de session — le SEUL juge d'amorçage : branchée sur le stockage comme
+  // getAuthToken, pour que le court-circuit soit jugé sur son vrai critère (une
+  // trace est-elle là ?), pas sur une doublure à réponse fixe.
+  hasSessionTrace: vi.fn(() => Boolean(localStorage.getItem('token')) || Boolean(localStorage.getItem('user'))),
   hasSessionArtifact: vi.fn(() => Boolean(localStorage.getItem('user'))),
   // Les scénarios historiques modélisent une session portée par le jeton, donc
   // le shell natif. Le web (cookie seul) est couvert en fin de fichier.
   isNativeShell: vi.fn(() => true),
 }));
 
-import { markSoftRedirectConsumed, isNativeShell, hasSessionCookie, hasSessionArtifact } from '../../services/api';
+import { markSoftRedirectConsumed, isNativeShell, hasSessionTrace, hasSessionArtifact } from '../../services/api';
 
 // Réseau « bon » : loadUser doit appeler /auth/me (pas le chemin cache pauvre).
 vi.mock('../../utils/networkOptimizer', () => ({
@@ -272,12 +272,11 @@ describe('AuthContext — web : la session est le cookie httpOnly seul', () => {
     localStorage.clear();
     sessionStorage.clear();
     isNativeShell.mockReturnValue(false);
-    hasSessionCookie.mockReturnValue(false);
+    hasSessionTrace.mockClear();
   });
 
   afterEach(() => {
     isNativeShell.mockReturnValue(true);
-    hasSessionCookie.mockReturnValue(false);
     vi.restoreAllMocks();
     localStorage.clear();
     sessionStorage.clear();
@@ -297,27 +296,33 @@ describe('AuthContext — web : la session est le cookie httpOnly seul', () => {
     expect(authAPI.getProfile).not.toHaveBeenCalled();
   });
 
-  it('cookie de session présent (sans aucun jeton) → le profil est restauré au rechargement', async () => {
-    hasSessionCookie.mockReturnValue(true);
+  it('un cookie CSRF lisible ne vaut pas session : sans trace locale, aucune sonde', async () => {
+    // Le cookie CSRF est lisible ici (même-origine) et invisible en cross-site.
+    // En faire un signal d'amorçage donnait deux comportements pour un même
+    // état serveur — c'est précisément ce qui a été retiré.
+    document.cookie = 'kojo_csrf=csrf-visible; path=/';
     authAPI.getProfile.mockResolvedValue({ ...FRESH_USER });
 
     renderProvider();
 
-    await waitFor(() => expect(screen.getByTestId('country').textContent).toBe('mali'));
-    expect(authAPI.getProfile).toHaveBeenCalledTimes(1);
-    // Aucun jeton n'a été écrit pour y parvenir.
+    await waitFor(() => expect(screen.getByTestId('loading').textContent).toBe('false'));
+    expect(authAPI.getProfile).not.toHaveBeenCalled();
+    expect(screen.getByTestId('country').textContent).toBe('none');
     expect(localStorage.getItem('token')).toBeNull();
+    document.cookie = 'kojo_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
   });
 
   it('cross-origin (aucun cookie lisible sur l\'origine frontend) → la session est restaurée au rechargement', async () => {
     // Production : l'API est appelée directement sur son propre hôte, où le
     // navigateur range kojo_session ET kojo_csrf. `document.cookie` de
-    // l'origine frontend n'en montre aucun → hasSessionCookie() est faux (réel
-    // en cross-origin, ce n'est pas une doublure). Le seul vestige lisible est
-    // le profil laissé par la connexion précédente ; /auth/me a le dernier mot.
+    // l'origine frontend n'en montre aucun — réel en cross-origin, ce n'est pas
+    // une doublure, et c'est exactement pourquoi aucune décision de session ne
+    // doit lire un cookie. Le seul vestige lisible est le profil laissé par la
+    // connexion précédente ; /auth/me a le dernier mot.
     localStorage.setItem('user', JSON.stringify({ id: 'user-1', country: 'mali' }));
-    expect(hasSessionCookie()).toBe(false);
+    expect(document.cookie).not.toContain('kojo_session');
     expect(hasSessionArtifact()).toBe(true);
+    expect(hasSessionTrace()).toBe(true);
     authAPI.getProfile.mockResolvedValue({ ...FRESH_USER });
 
     renderProvider();

@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { authAPI, handleApiError, markSoftRedirectConsumed, getAuthToken, hasSessionCookie, hasSessionArtifact, isNativeShell } from '../services/api';
+import { authAPI, handleApiError, markSoftRedirectConsumed, getAuthToken, hasSessionTrace, isNativeShell } from '../services/api';
 import { devLog, safeLog } from '../utils/env';
 import kojoCache, { CACHE_KEYS } from '../utils/cache';
 import networkOptimizer from '../utils/networkOptimizer';
@@ -21,12 +21,12 @@ export function AuthProvider({ children }) {
   // aucun en-tête Authorization n'est envoyé depuis le web : un script ne peut
   // donc pas relire la session. Le jeton ne subsiste en stockage que dans le
   // shell natif Capacitor (isNativeShell), qui n'a pas de cookie fiable.
-  // Le cookie étant rangé sur l'hôte de l'API quand l'API est appelée en
-  // cross-origin, RIEN de la session n'est lisible depuis l'origine frontend :
-  // l'amorçage s'appuie donc aussi sur la trace non secrète du profil en cache
-  // (hasSessionArtifact) pour oser la seule question utile, /auth/me. Le proxy
-  // même-origine (VITE_USE_SAME_ORIGIN_API=true) reste préférable — il rend le
-  // cookie lisible, donc la preuve directe — mais il n'est plus un prérequis.
+  // Ni le cookie de session (httpOnly) ni son compagnon CSRF ne sont des
+  // signaux de session : le premier est illisible par construction, le second
+  // n'est lisible que si le navigateur l'a rangé sur l'origine de la page. Le
+  // seul juge est donc LOCAL — la trace de session (hasSessionTrace) — et le
+  // proxy même-origine (VITE_USE_SAME_ORIGIN_API=true) reste utile pour la
+  // lisibilité du cookie, mais ne décide plus de rien ici.
 
   const clearToken = () => {
     const keys = [
@@ -198,29 +198,26 @@ export function AuthProvider({ children }) {
       // non connectés, y compris les crawlers, sous forme d'un aller-retour
       // cross-origin vers Fly avant le premier rendu.
       //
-      // Une session ne peut vivre qu'à deux endroits : le jeton (localStorage /
-      // sessionStorage, agrégé par getAuthToken) ou le cookie httpOnly (détecté
-      // par son compagnon CSRF lisible, hasSessionCookie — vrai uniquement en
-      // même-origine/dev, voir la note AUTH de ownerService.js). En
-      // cross-origin (production), NI l'un NI l'autre n'est lisible : le cookie
-      // est rangé sur l'hôte de l'API. Le troisième signal, hasSessionArtifact,
-      // est le profil laissé par une connexion réussie — il ne vaut pas
-      // preuve, mais il indique qu'il y a une question à poser. Sans lui,
-      // l'app se déclarait anonyme au rechargement malgré un cookie vivant et
-      // renvoyait /login à un utilisateur connecté (rouge mesuré en production
+      // Le seul juge est hasSessionTrace (services/api.js) : le jeton du shell
+      // natif OU la trace de profil laissée par une connexion. Jamais la
+      // lisibilité d'un cookie — elle n'existe pas en cross-site, où le
+      // navigateur range les deux cookies sur l'HÔTE DE L'API, et l'app se
+      // déclarait alors anonyme au rechargement malgré un cookie vivant, en
+      // renvoyant /login à un utilisateur connecté (rouge mesuré en production
       // par scripts/check-session-reload-production.js).
-      if (!getAuthToken() && !hasSessionCookie() && !hasSessionArtifact()) {
+      if (!hasSessionTrace()) {
         setUser(null);
         return;
       }
 
-      // Le simple vestige ne prouve RIEN : il n'autorise donc pas le cache
-      // hors-ligne ci-dessous. Un profil en cache sans preuve de session est le
-      // vestige d'une session finie, et l'afficher donne un utilisateur fantôme
-      // dont tous les appels échouent — exactement ce que le handler 401
-      // ci-dessous refuse. Seul un jeton (natif) ou un cookie lisible
-      // (même-origine) ouvre ce chemin ; le vestige, lui, ne mène qu'à /auth/me.
-      const sessionProven = Boolean(getAuthToken()) || hasSessionCookie();
+      // La trace ne prouve RIEN : elle n'autorise donc pas le cache hors-ligne
+      // ci-dessous. Un profil en cache sans preuve de session est le vestige
+      // d'une session finie, et l'afficher donne un utilisateur fantôme dont
+      // tous les appels échouent — exactement ce que le handler 401 ci-dessous
+      // refuse. Sur le web, la seule preuve est un 200 de /auth/me : le cache
+      // ne s'affiche donc AVANT la réponse que dans le shell natif, dont le
+      // jeton en stockage se vérifie localement.
+      const sessionProven = Boolean(getAuthToken());
 
       // Use cached profile if available for faster loading
       const cachedUser = kojoCache.get(CACHE_KEYS.USER_PROFILE);

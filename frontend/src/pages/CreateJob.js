@@ -118,24 +118,31 @@ export default function CreateJob() {
       chapeau={ui.createJobSubtitle}
       classeCorps=""
     >
-      <form onSubmit={handleSubmit} className="carte-editoriale space-y-5 carte-publique">
-        {error && <div className="rounded-[3px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+      {/* QUATRE CARTES, ET ELLES DISENT CE QU'ELLES CONTIENNENT. Le formulaire
+          était UNE carte de quinze champs : rien n'y annonçait où finissait la
+          mission et où commençait le rendez-vous, et les titres de groupe
+          manquaient au vocabulaire des écrans d'application. Les intitulés sont
+          des CLÉS EXISTANTES (`mission`, `location`, `budget`,
+          `requiredSkills`) : une section qui n'a rien à dire de plus que son
+          titre n'a pas à en inventer un, et cinq langues sont déjà écrites. */}
+      <form onSubmit={handleSubmit}>
+        {error && <div className="bloc-app rounded-[3px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
-        <div>
-          <label className="mb-2 block text-sm font-medium">{ui.title} *</label>
-          <input name="title" value={formData.title} onChange={handleChange} className={inputClass} placeholder={ui.title} />
-        </div>
+        <section className="carte-editoriale carte-publique bloc-app space-y-5">
+          <h2 className="titre-carte-app">{t('mission')}</h2>
 
-        <div>
-          <label className="mb-2 block text-sm font-medium">{ui.description}</label>
-          <textarea name="description" rows="4" value={formData.description} onChange={handleChange} className={inputClass} placeholder={ui.optional} />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <input name="location_text" value={locationLabel} onChange={handleLocationInput} className={inputClass} placeholder={`${ui.location} *`} />
+            <label className="mb-2 block text-sm font-medium">{ui.title} *</label>
+            <input name="title" value={formData.title} onChange={handleChange} className={inputClass} placeholder={ui.title} />
           </div>
+
           <div>
+            <label className="mb-2 block text-sm font-medium">{ui.description}</label>
+            <textarea name="description" rows="4" value={formData.description} onChange={handleChange} className={inputClass} placeholder={ui.optional} />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium">{t('category')}</label>
             <select name="category" value={formData.category} onChange={handleChange} className={inputClass}>
               <option value="general">{t('general')}</option>
               <option value="plumbing">{t('plumbing')}</option>
@@ -147,61 +154,81 @@ export default function CreateJob() {
               <option value="mechanics">{t('mechanics')}</option>
             </select>
           </div>
-        </div>
+        </section>
 
-        <div className="flex flex-col sm:flex-row gap-3">
-          <button type="button" onClick={handleUseCurrentLocation} disabled={locating} className="bouton bouton-clair disabled:cursor-not-allowed disabled:opacity-60">
-            {locating ? ui.locating : ui.useCurrentLocation}
-          </button>
-          {hasCoordinates(formData.location) && (
-            <div className="flex items-center rounded-[3px] border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
-              {ui.gpsDetected}
-            </div>
-          )}
-        </div>
+        <section className="carte-editoriale carte-publique bloc-app space-y-5">
+          <h2 className="titre-carte-app">{t('location')}</h2>
 
-        {locationError && <div className="rounded-[3px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{locationError}</div>}
+          <input name="location_text" value={locationLabel} onChange={handleLocationInput} className={inputClass} placeholder={`${ui.location} *`} />
 
-        {locationLabel && (
-          <div className="carte-editoriale overflow-hidden">
-            <div className="border-b border-stone-200 fond-sable px-4 py-3 text-sm text-stone-700">
-              <div className="font-semibold">{ui.selectedAddress}</div>
-              <div>{locationLabel}</div>
-            </div>
-            {mapUrl && (                <iframe title={ui.mapPreviewTitle} src={mapUrl} className="h-72 w-full border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <button type="button" onClick={handleUseCurrentLocation} disabled={locating} className="bouton bouton-clair disabled:cursor-not-allowed disabled:opacity-60">
+              {locating ? ui.locating : ui.useCurrentLocation}
+            </button>
+            {hasCoordinates(formData.location) && (
+              <div className="flex items-center rounded-[3px] border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
+                {ui.gpsDetected}
+              </div>
             )}
           </div>
-        )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="mb-2 block text-sm font-medium">{ui.price} *</label>
-            <input type="number" min="0" name="budget_min" value={formData.budget_min} onChange={handleChange} className={inputClass} placeholder={ui.price} />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium">{ui.priceMax}</label>
-            <input type="number" min="0" name="budget_max" value={formData.budget_max} onChange={handleChange} className={inputClass} placeholder={ui.optional} />
-          </div>
-        </div>
-        <p className="text-sm text-stone-500">{ui.priceHint}</p>
+          {locationError && <div className="rounded-[3px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{locationError}</div>}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <input name="estimated_duration" value={formData.estimated_duration} onChange={handleChange} className={inputClass} placeholder={`${ui.estimatedDuration} (${ui.optional.toLowerCase?.() || ui.optional})`} />
-          <input type="datetime-local" name="deadline" value={formData.deadline} onChange={handleChange} className={inputClass} />
-        </div>
-        <TagInput
-          value={formData.required_skills}
-          onChange={(next) => setFormData((prev) => ({ ...prev, required_skills: next }))}
-          placeholder={ui.skillPlaceholder}
-          addLabel={ui.add}
-          removeAriaPrefix={t('remove')}
-          max={20}
-          inputClassName={inputClass}
-        />
-        <label className="flex items-center gap-3 rounded-[3px] border border-stone-200 px-4 py-3"><input type="checkbox" name="mechanic_must_bring_parts" checked={formData.mechanic_must_bring_parts} onChange={handleChange} /> {ui.workerBringsParts}</label>
-        <label className="flex items-center gap-3 rounded-[3px] border border-stone-200 px-4 py-3"><input type="checkbox" name="mechanic_must_bring_tools" checked={formData.mechanic_must_bring_tools} onChange={handleChange} /> {ui.workerBringsTools}</label>
-        <textarea name="parts_and_tools_notes" rows="3" value={formData.parts_and_tools_notes} onChange={handleChange} className={inputClass} placeholder={`${ui.partsNotes} (${ui.optional.toLowerCase?.() || ui.optional})`} />
-        <div className="flex gap-3">
+          {locationLabel && (
+            <div className="carte-editoriale overflow-hidden">
+              <div className="border-b border-stone-200 fond-sable px-4 py-3 text-sm text-stone-700">
+                <div className="font-semibold">{ui.selectedAddress}</div>
+                <div>{locationLabel}</div>
+              </div>
+              {mapUrl && (
+                <iframe title={ui.mapPreviewTitle} src={mapUrl} className="h-72 w-full border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
+              )}
+            </div>
+          )}
+        </section>
+
+        <section className="carte-editoriale carte-publique bloc-app space-y-5">
+          <h2 className="titre-carte-app">{t('budget')}</h2>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-sm font-medium">{ui.price} *</label>
+              <input type="number" min="0" name="budget_min" value={formData.budget_min} onChange={handleChange} className={inputClass} placeholder={ui.price} />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium">{ui.priceMax}</label>
+              <input type="number" min="0" name="budget_max" value={formData.budget_max} onChange={handleChange} className={inputClass} placeholder={ui.optional} />
+            </div>
+          </div>
+          <p className="text-sm text-stone-500">{ui.priceHint}</p>
+
+          {/* DURÉE ET ÉCHÉANCE vivent avec le budget, et c'est le même sujet :
+              ce que la mission coûte et ce qu'elle prend. Les séparer des deux
+              montants faisait deux groupes de deux champs sans titre. */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <input name="estimated_duration" value={formData.estimated_duration} onChange={handleChange} className={inputClass} placeholder={`${ui.estimatedDuration} (${ui.optional.toLowerCase?.() || ui.optional})`} />
+            <input type="datetime-local" name="deadline" value={formData.deadline} onChange={handleChange} className={inputClass} />
+          </div>
+        </section>
+
+        <section className="carte-editoriale carte-publique bloc-app space-y-5">
+          <h2 className="titre-carte-app">{t('requiredSkills')}</h2>
+
+          <TagInput
+            value={formData.required_skills}
+            onChange={(next) => setFormData((prev) => ({ ...prev, required_skills: next }))}
+            placeholder={ui.skillPlaceholder}
+            addLabel={ui.add}
+            removeAriaPrefix={t('remove')}
+            max={20}
+            inputClassName={inputClass}
+          />
+          <label className="flex items-center gap-3 rounded-[3px] border border-stone-200 px-4 py-3"><input type="checkbox" name="mechanic_must_bring_parts" checked={formData.mechanic_must_bring_parts} onChange={handleChange} /> {ui.workerBringsParts}</label>
+          <label className="flex items-center gap-3 rounded-[3px] border border-stone-200 px-4 py-3"><input type="checkbox" name="mechanic_must_bring_tools" checked={formData.mechanic_must_bring_tools} onChange={handleChange} /> {ui.workerBringsTools}</label>
+          <textarea name="parts_and_tools_notes" rows="3" value={formData.parts_and_tools_notes} onChange={handleChange} className={inputClass} placeholder={`${ui.partsNotes} (${ui.optional.toLowerCase?.() || ui.optional})`} />
+        </section>
+
+        <div className="flex flex-wrap gap-3">
           <button type="button" onClick={() => navigate('/jobs')} className="bouton bouton-clair">{ui.cancel}</button>
           <button type="submit" disabled={loading} className="bouton bouton-encre disabled:cursor-not-allowed disabled:opacity-60">{loading ? ui.publishing : ui.createJob}</button>
         </div>

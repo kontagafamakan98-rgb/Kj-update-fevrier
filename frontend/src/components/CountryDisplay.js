@@ -9,6 +9,10 @@ import FlagIcon from './FlagIcon';
 // empêche un pays d'exister pour React et pas pour un crawler sans JavaScript.
 import { COUNTRIES as COUNTRY_LIST } from '../config/countries';
 import { COUNTRY_PLACEHOLDER } from '../config/country-placeholder';
+// Le dessin du champ (filet chaud, fond papier, focus orange) a UN
+// propriétaire : src/config/classes-champ.js. Le déclencheur de cette liste
+// s'y range comme un champ — c'en est un, qui ouvre au lieu de saisir.
+import { CHAMP_SANS_MARGE, CHAMP_SELECTEUR } from '../config/classes-champ';
 
 // Carte indexée par code canonique : `getCountry()` normalise un code (alias,
 // ISO, ancien nom) puis cherche ici. DÉRIVÉE de la liste partagée, jamais une
@@ -203,7 +207,7 @@ export function CountrySelect({
         id={id}
         onClick={() => setIsOpen((prev) => !prev)}
         onKeyDown={handleTriggerKeyDown}
-        className="w-full flex items-center justify-between px-4 py-3 border border-gray-300 rounded-lg shadow-xs bg-white focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:border-transparent text-left"
+        className={CHAMP_SELECTEUR}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-required={required}
@@ -234,7 +238,7 @@ export function CountrySelect({
                 onKeyDown={handleSearchKeyDown}
                 placeholder={t('searchCountry')}
                 autoFocus
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                className={CHAMP_SANS_MARGE}
               />
             </div>
           )}

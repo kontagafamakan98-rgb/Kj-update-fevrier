@@ -371,6 +371,30 @@ class SupportTicket(BaseModel):
 class SupportTicketStatusUpdate(BaseModel):
     status: SupportTicketStatus
 
+
+class RobotChatMessage(BaseModel):
+    """Un tour de la conversation avec l'assistant de /support (assistant IA).
+
+    Deux rôles seulement : `user` (le visiteur) et `assistant` (le modèle).
+    Le rôle `system` est REFUSÉ — le prompt système appartient au serveur
+    (`kojo_routers_support.robot_system_prompt`), sinon un visiteur pourrait
+    réécrire les instructions de l'assistant, donc sa politique.
+    """
+    role: str = Field(pattern=r'^(user|assistant)$')
+    content: str = Field(min_length=1, max_length=2000)
+
+
+class RobotChatRequest(BaseModel):
+    """Question posée à l'assistant de /support, avec son historique.
+
+    Bornes basses volontairement serrées : chaque tour renvoyé est envoyé au
+    modèle, donc payé. 16 tours × 2000 caractères couvrent largement une
+    conversation de support, et refusent qu'un client transforme l'endpoint
+    public en facture illimitée.
+    """
+    messages: List[RobotChatMessage] = Field(min_length=1, max_length=16)
+    language: Language = Language.FRENCH
+
 class NotificationType(str, Enum):
     PROPOSAL_RECEIVED   = "proposal_received"    # Client : nouvelle proposition
     PROPOSAL_ACCEPTED   = "proposal_accepted"    # Worker : proposition acceptée

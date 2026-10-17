@@ -18,6 +18,7 @@ from httpx import AsyncClient
 from tests.conftest import BASE_USER, auth_headers, db_find_one, db_insert, db_upsert, register_and_login
 import kojo_cloudinary
 import kojo_owner
+import server
 
 
 def _make_payment(
@@ -183,7 +184,7 @@ class TestPayoutSweeper:
                    return_value={"status": "pending", "response_code": "00"}), \
              patch("kojo_routers_payments.notify_user_localized", AsyncMock()), \
              patch("kojo_scheduler.notify_user_localized", AsyncMock()) as alert_mock, \
-             patch("kojo_scheduler.send_email_via_brevo_api") as email_mock:
+             patch("kojo_scheduler.send_email_via_active_provider", new_callable=AsyncMock) as email_mock:
             summary = await self._run_sweep()
 
         assert summary["alerted"] == 1
@@ -569,7 +570,7 @@ class TestOwnerResolutionByEmail:
                    return_value={"status": "pending", "response_code": "00"}), \
              patch("kojo_routers_payments.notify_user_localized", AsyncMock()), \
              patch("kojo_scheduler.notify_user_localized", AsyncMock()) as alert_mock, \
-             patch("kojo_scheduler.send_email_via_brevo_api") as email_mock:
+             patch("kojo_scheduler.send_email_via_active_provider", new_callable=AsyncMock) as email_mock:
             summary = await payout_stuck_sweep_once()
 
         assert summary["alerted"] == 1
@@ -771,7 +772,7 @@ class TestPaydunyaCircuitOwnerAlert:
             ), \
                  patch("kojo_payments.OWNER_EMAIL", "famakan@kojo.sn"), \
                  patch("kojo_payments.notify_user_localized", AsyncMock()) as notify_mock, \
-                 patch("kojo_payments.send_email_via_brevo_api") as email_mock:
+                 patch("kojo_payments.send_email_via_active_provider", new_callable=AsyncMock) as email_mock:
                 await init_paydunya_circuit()
 
                 # 5 échecs → le circuit s'ouvre → UNE alerte (notif + email) :
@@ -988,21 +989,41 @@ class TestExternalProviderMonitors:
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
+def _sonde_email_saine():
+    """La sonde du fournisseur email ACTIF, jugée hors réseau.
+
+    Le composite la sonde à CHAQUE passage : sans ce remplacement, ces cas
+    mesureraient aussi l'état de la config email (`EMAIL_PROVIDER=none` en
+    test) au lieu du seul seuil qu'ils vérifient.
+    """
+    return patch(
+        "server.active_email_provider_health_probe",
+        return_value={
+            "ok": True,
+            "configured": True,
+            "detail": "sonde email de test",
+            "provider": "resend",
+        },
+    )
+
+
 class TestCompositeMonitor:
-    """Healthcheck composite : sonde les 3 fournisseurs (PayDunya, Brevo,
-    Cloudinary) en parallèle et renvoie 503 si AU MOINS `threshold` d'entre
-    eux sont down (défaut 2). Le payload consolide l'état de chaque
-    fournisseur pour identifier la panne sans requête supplémentaire."""
+    """Healthcheck composite : sonde les fournisseurs externes (PayDunya, email
+    actif, Brevo, Cloudinary) en parallèle et renvoie 503 si AU MOINS
+    `threshold` d'entre eux sont down (défaut 2). Le payload consolide l'état de
+    chaque fournisseur pour identifier la panne sans requête supplémentaire."""
 
     async def _clear_caches(self):
         import kojo_core, kojo_email
         kojo_cloudinary._cloudinary_health_cache.clear()
         kojo_email._brevo_health_cache.clear()
+        kojo_email._email_health_cache.clear()
 
     async def test_composite_all_ok_200(self, client: AsyncClient):
-        """Les 3 fournisseurs répondent → 200, down=0, circuit=ok."""
+        """Tous les fournisseurs répondent → 200, down=0, circuit=ok."""
         await self._clear_caches()
-        with patch("kojo_email.brevo_is_configured", return_value=True), \
+        with _sonde_email_saine(), \
+             patch("kojo_email.brevo_is_configured", return_value=True), \
              patch("kojo_email.requests.get") as get_mock, \
              patch("kojo_cloudinary.cloudinary.config") as cfg_mock, \
              patch("kojo_cloudinary.cloudinary.api.ping",
@@ -1017,10 +1038,15 @@ class TestCompositeMonitor:
         data = resp.json()
         assert data["service"] == "composite"
         assert data["circuit"] == "ok"
-        assert data["total"] == 3
+        # Resend actif : l'entrée `email` s'ajoute et l'entrée `brevo` reste
+        # (Brevo n'est plus le fournisseur d'envoi, il reste une dépendance
+        # surveillée) — donc 4, pas 3.
+        assert data["total"] == 4
         assert data["down"] == 0
         assert data["threshold"] == 2
         assert data["providers"]["paydunya"]["circuit"] == "ok"
+        assert data["providers"]["email"]["circuit"] == "ok"
+        assert data["providers"]["email"]["provider"] == "resend"
         assert data["providers"]["brevo"]["circuit"] == "ok"
         assert data["providers"]["cloudinary"]["circuit"] == "ok"
 
@@ -1029,7 +1055,8 @@ class TestCompositeMonitor:
         l'alerte agrégée ignore les flaps isolés d'un fournisseur."""
         await self._clear_caches()
         import requests as _requests
-        with patch("kojo_email.brevo_is_configured", return_value=True), \
+        with _sonde_email_saine(), \
+             patch("kojo_email.brevo_is_configured", return_value=True), \
              patch("kojo_email.requests.get",
                    side_effect=_requests.ConnectionError("Brevo down")), \
              patch("kojo_cloudinary.cloudinary.config") as cfg_mock, \
@@ -1043,6 +1070,7 @@ class TestCompositeMonitor:
         data = resp.json()
         assert data["down"] == 1
         assert data["providers"]["brevo"]["circuit"] == "down"
+        assert data["providers"]["email"]["circuit"] == "ok"
         assert data["providers"]["cloudinary"]["circuit"] == "ok"
 
     async def test_composite_two_down_503(self, client: AsyncClient):
@@ -1050,7 +1078,8 @@ class TestCompositeMonitor:
         alerte agrégée immédiate, payload listant les 2 pannes."""
         await self._clear_caches()
         import requests as _requests
-        with patch("kojo_email.brevo_is_configured", return_value=True), \
+        with _sonde_email_saine(), \
+             patch("kojo_email.brevo_is_configured", return_value=True), \
              patch("kojo_email.requests.get",
                    side_effect=_requests.ConnectionError("Brevo down")), \
              patch("kojo_cloudinary.cloudinary.config") as cfg_mock, \
@@ -1072,7 +1101,8 @@ class TestCompositeMonitor:
         """threshold=1 : un seul fournisseur down → 503 (mode strict)."""
         await self._clear_caches()
         import requests as _requests
-        with patch("kojo_email.brevo_is_configured", return_value=True), \
+        with _sonde_email_saine(), \
+             patch("kojo_email.brevo_is_configured", return_value=True), \
              patch("kojo_email.requests.get",
                    side_effect=_requests.ConnectionError("Brevo down")), \
              patch("kojo_cloudinary.cloudinary.config") as cfg_mock, \
@@ -1098,7 +1128,8 @@ class TestCompositeMonitor:
             "opened_at": _time.time(),
         }})
         await self._clear_caches()
-        with patch("kojo_email.brevo_is_configured", return_value=True), \
+        with _sonde_email_saine(), \
+             patch("kojo_email.brevo_is_configured", return_value=True), \
              patch("kojo_email.requests.get") as get_mock, \
              patch("kojo_cloudinary.cloudinary.config") as cfg_mock, \
              patch("kojo_cloudinary.cloudinary.api.ping",

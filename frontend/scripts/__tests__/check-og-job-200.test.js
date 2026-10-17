@@ -226,6 +226,12 @@ describe('aucune écriture hors d’un backend contrôlé par le job', () => {
     expect(result.skipReason).toBe('backend-non-controle');
     expect(result.notices.join(' | ')).toMatch(/n’écrit pas en production|n'est pas une adresse/);
     expect(result.notices.join(' | ')).toContain(PROD_BACKEND);
+    // Et le cycle NON exercé est BRUYANT : la surface est déclarée (scripts/
+    // corpus-missions.js) et publiée en `::warning` par le CLI, avec son motif
+    // et son remède. Un « ignoré » silencieux se lisait comme un vert.
+    expect(result.avertissements.join(' | ')).toContain('Surface aveugle DÉCLARÉE');
+    expect(result.avertissements.join(' | ')).toContain('cycle complet de /jobs/:id');
+    expect(result.avertissements.join(' | ')).toContain('Remède :');
   });
 
   // La RÈGLE d'adresse n'est plus éprouvée ici : elle appartient à
@@ -333,6 +339,10 @@ describe('cycle /jobs/:id — chemin 200', () => {
     expect(stub.calls[0].url).toBe(`http://localhost:4173/jobs/${PROBE_ID}`);
     expect(result.notices.join(' | ')).toMatch(/IGNORÉ/);
     expect(result.notices.join(' | ')).toMatch(/ne sert PAS la route backend/);
+    // Même règle ici : une surface non mesurée est déclarée et bruyante, que la
+    // cause soit la route non servie ou le backend non contrôlé.
+    expect(result.avertissements.join(' | ')).toContain('Surface aveugle DÉCLARÉE');
+    expect(result.avertissements.join(' | ')).toContain('la base auditée http://localhost:4173');
   });
 
   it('échoue si aucun jeton n’est disponible (chemin 200 non vérifiable)', async () => {

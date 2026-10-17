@@ -277,7 +277,12 @@ if (login) {
   // 28/09/2026 : le titre de page passe au dessin serif du site
   // (`titre-page`, src/index.css) — la chaîne d'ici suit le balisage LIVRÉ
   // (vite-plugins/prerender/shells-routes.js), jamais l'inverse.
-  if (!login.includes(`<h1 class="mt-6 text-center titre-page">${fr.login}</h1>`)) {
+  // Les DEUX chaînes sont LUES dans le plan (17/10/2026) : elles étaient
+  // recopiées ici, et la refonte de /login (carte + bouton `.bouton`) les a
+  // fait rougir sur le DESSIN alors que le shell était juste. Ce garde doit
+  // vérifier que la coquille PUBLIE ce que le plan déclare — pas retenir une
+  // teinte que la page a quittée.
+  if (!login.includes(`<h1 class="${PAGE_SECTIONS['/login'].titleClass}">${fr.login}</h1>`)) {
     errors.push('login.html : h1 « Connexion » absent du shell');
   }
   if (!login.includes('id="email"')) {
@@ -286,8 +291,8 @@ if (login) {
   // Le bouton est un `<button>` : `[type="submit"]` (l'en-tête de
   // src/index.css) porte `min-height: 48px` quand un
   // `<div>` s'arrêtait à 36-40 px — la sonde de géométrie refusait l'écart.
-  if (!new RegExp(`bg-orange-600[^"]*">${fr.login}</button>`).test(login)) {
-    errors.push('login.html : bouton Connexion (bg-orange-600) absent du shell');
+  if (!login.includes(`class="${PAGE_SECTIONS['/login'].boutonClass}">${fr.login}</button>`)) {
+    errors.push('login.html : bouton Connexion (classes du plan) absent du shell');
   }
   // Le chunk lazy de Login doit être préchargé (modulepreload) dans le HTML
   // pré-rendu : sans lui, le navigateur waterfall le chunk (entrée → vendor →
@@ -321,8 +326,12 @@ if (register) {
         '— React ne le peint pas, la coquille en peindrait un que le montage retire'
     );
   }
-  if (!register.includes(`bg-orange-600">${registerT('continueButton')}</button>`)) {
-    errors.push('register.html : bouton submit (bg-orange-600) absent du shell');
+  // Le bouton d'envoi lit `.bouton` depuis le 17/10/2026 (même dessin que le
+  // bouton de /login) : la chaîne suit le balisage LIVRÉ, comme pour le h1 —
+  // retenir `bg-orange-600` ferait rougir la coquille sur une teinte que la
+  // page a quittée.
+  if (!register.includes(`class="bouton bouton-encre w-full">${registerT('continueButton')}</button>`)) {
+    errors.push('register.html : bouton submit (classes du site) absent du shell');
   }
   // Champs du formulaire (les LCP/paint du formulaire complet avant React) :
   // prénom/nom, email, téléphone doivent être peints dans le shell statique,
@@ -419,7 +428,12 @@ if (forgot) {
 // (état par défaut, sans contexte de mission).
 const payment = read('payment.html');
 if (payment) {
-  if (!payment.includes(`<h1 class="titre-page mb-2">${fr.paymentPageTitle}</h1>`)) {
+  // La CLASSE du titre est LUE dans le plan (comme /jobs et /how-it-works
+  // ci-dessus), jamais recopiée : le port du vocabulaire d'écran l'a fait passer
+  // de `titre-page mb-2` à `titre-page` (le titre vit maintenant dans une bande
+  // qui porte son pas), et une chaîne recopiée ici aurait accusé la coquille
+  // d'un changement que le plan déclarait.
+  if (!payment.includes(`<h1 class="${PAGE_SECTIONS['/payment'].titleClass}">${fr.paymentPageTitle}</h1>`)) {
     errors.push('payment.html : h1 « KOJO Paiements réels » absent du shell');
   }
   if (!payment.includes(fr.paymentPageNoJobTitle)) {

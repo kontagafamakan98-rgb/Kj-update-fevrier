@@ -506,7 +506,11 @@
 }
 .bloc-differe-photo { contain-intrinsic-size: auto 539.8px; }
 .bloc-differe-legal { contain-intrinsic-size: auto 221px; }
-.bloc-differe-envoi { contain-intrinsic-size: auto 48px; }
+/* 52 px, la hauteur RÉELLE du bouton depuis le 17/10/2026 : /register lit
+   `.bouton` (min-height 3.25rem) comme les autres actions du site, là où son
+   ancien `py-3` mesurait 48 px. La constante suit la boîte qu'elle réserve —
+   une réserve plus courte ferait entrer ce déplacement dans le CLS. */
+.bloc-differe-envoi { contain-intrinsic-size: auto 52px; }
 .bloc-differe-lien { contain-intrinsic-size: auto 24px; }
 
 /* Au-delà de 768 px, seul le bloc photo change de hauteur de contenu : le bloc

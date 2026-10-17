@@ -86,5 +86,27 @@
       "kojo_core.verify_owner_access",
       "fastapi.security.http.HTTPBearer"
     ]
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/owner/email-suppressions",
+    "nom": "get_email_suppressions",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.verify_owner_access",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "POST",
+    "chemin": "/api/owner/email-suppressions/lever",
+    "nom": "lever_email_suppression",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.verify_owner_access",
+      "fastapi.security.http.HTTPBearer"
+    ]
   }
 ]

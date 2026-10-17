@@ -13,7 +13,15 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { INTEGRATIONS, analyzeSeoServedHtml, noticeFor, runSeoProductionReport } from '../check-seo-production.js';
+import {
+  INTEGRATIONS,
+  LIVE_JOB_STATUSES,
+  PUBLIC_JOBS_PATH,
+  analyzeSeoServedHtml,
+  noticeFor,
+  readPublicJobs,
+  runSeoProductionReport,
+} from '../check-seo-production.js';
 import { SITE_ORIGIN } from '../site-meta.js';
 
 const FRONTEND_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -65,13 +73,27 @@ const SERVED_PAGES = {
   '/how-it-works': pageFor('/how-it-works'),
 };
 
+// L'API PUBLIQUE des missions, telle que la production la sert : un tableau JSON
+// (`list[dict]`). Le 12/10/2026 elle rendait `[]` — la base ne servait aucune
+// mission vivante —, et c'est l'état par DÉFAUT des doubles : une source muette
+// est le cas normal, une source absente doit s'écrire.
+const PUBLIC_JOBS_EMPTY = '[]';
+const publicJobsBody = (...ids) =>
+  JSON.stringify(ids.map((id) => ({ id, status: 'open' })));
+
 // Double qui sert des pages ET retient les chemins demandés : la section Pages
 // ne doit pas relire l'accueil déjà lu pour les intégrations.
-const trackingFetch = (pages, sitemapXml, seen) =>
+const trackingFetch = (pages, sitemapXml, seen, jobsBody = PUBLIC_JOBS_EMPTY) =>
   async (url) => {
     const pathname = new URL(url).pathname;
     if (seen) seen.push(pathname);
-    const map = { ...pages, ...(sitemapXml ? { '/sitemap.xml': sitemapXml } : {}) };
+    const map = {
+      ...pages,
+      ...(sitemapXml ? { '/sitemap.xml': sitemapXml } : {}),
+      // `null` = l'API n'est PAS servie : le cas « les deux sources sont
+      // muettes », à ne pas confondre avec une API qui répond « aucune fiche ».
+      ...(jobsBody === null ? {} : { [PUBLIC_JOBS_PATH]: jobsBody }),
+    };
     const html = map[pathname];
     return { ok: html !== undefined, status: html === undefined ? 404 : 200, text: async () => html ?? '' };
   };
@@ -281,16 +303,29 @@ describe('section Pages — le sitemap servi, page par page', () => {
   // « au-delà de / » : la sonde lisait l'accueil puis ignorait les sept autres
   // pages que le sitemap annonce. Chaque page doit annoncer son canonical, son
   // title et sa description, et une page défaillante est NOMMÉE.
-  const run = (over = {}, sitemapXml = SITEMAP_XML, seen) =>
+  // `jobsBody` : la charge utile de l'API publique des missions (`undefined` =
+  // aucune fiche servie, `null` = API non servie). C'est la seconde source des
+  // fiches, donc elle fait partie du harnais au même titre que le sitemap.
+  const run = (over = {}, sitemapXml = SITEMAP_XML, seen, jobsBody) =>
     runSeoProductionReport({
       base: SITE_ORIGIN,
-      fetchImpl: trackingFetch({ ...SERVED_PAGES, ...over }, sitemapXml, seen),
+      fetchImpl: trackingFetch({ ...SERVED_PAGES, ...over }, sitemapXml, seen, jobsBody),
     });
 
   it('lit chaque page du sitemap et ne redemande pas l’accueil déjà lu', async () => {
     const seen = [];
     const result = await run({}, SITEMAP_XML, seen);
-    expect(seen).toEqual(['/', '/sitemap.xml', '/jobs', '/how-it-works']);
+    // L'API publique est lue UNE fois par statut vivant : c'est la seconde source
+    // des fiches, et deux lectures de plus sur un run quotidien sont le prix de
+    // la complétude (aucune n'est relue pour une autre section).
+    expect(seen).toEqual([
+      '/',
+      '/sitemap.xml',
+      PUBLIC_JOBS_PATH,
+      PUBLIC_JOBS_PATH,
+      '/jobs',
+      '/how-it-works',
+    ]);
     expect(result.pages.map(({ url }) => url)).toEqual([
       `${SITE_ORIGIN}/`,
       `${SITE_ORIGIN}/jobs`,
@@ -397,7 +432,7 @@ describe('section Pages — le sitemap servi, page par page', () => {
     // c'est une mesure impossible — sinon la sonde rougirait au hasard.
     const result = await run({}, withJobs('disparue'));
     expect(result.manquantes).toEqual([]);
-    expect(result.notices.join('\n')).toContain('1 disparue(s) depuis la lecture du sitemap');
+    expect(result.notices.join('\n')).toContain('1 disparue(s) entre la lecture et sa vérification');
   });
 
   it('borne l’échantillon à 3 fiches même si le sitemap en annonce cinq', async () => {
@@ -411,10 +446,123 @@ describe('section Pages — le sitemap servi, page par page', () => {
     expect(seen.filter((p) => /^\/jobs\/[a-e]$/.test(p))).toEqual(['/jobs/a', '/jobs/b', '/jobs/c']);
   });
 
-  it('dit l’échantillon vide quand le sitemap ne liste aucune fiche', async () => {
-    // L'état réel de la production au 20/09/2026 : 8 URL, zéro fiche.
+  it('dit l’échantillon vide quand AUCUNE des deux sources ne sert de fiche', async () => {
+    // L'état réel de la production au 12/10/2026 : 8 URL au sitemap, zéro fiche,
+    // et `[]` à l'API publique. Les deux sources CONCORDENT : « aucune fiche »
+    // est alors un fait mesuré, pas un silence.
     const result = await run();
-    expect(result.notices.join('\n')).toContain('fiches /jobs/:id : aucune dans le sitemap');
+    const log = result.notices.join('\n');
+    expect(log).toContain('les deux sources CONCORDENT');
+    expect(result.manquantes).toEqual([]);
+    // Un fait mesuré n'est pas un vert muet : le corpus vide est une surface
+    // AVEUGLE, DÉCLARÉE (scripts/corpus-missions.js) et publiée en `::warning`
+    // avec son motif et son remède. Non déclarée, elle serait un DÉFAUT — donc
+    // refusée par le mode strict.
+    expect(result.avertissements.join('\n')).toContain('Surface aveugle DÉCLARÉE');
+    expect(result.avertissements.join('\n')).toContain('fiches /jobs/:id de la sonde SEO');
+    expect(result.avertissements.join('\n')).toContain('Remède :');
+  });
+
+  it('juge une fiche VIVANTE que le sitemap n’énumère pas, et refuse son absence du sitemap', async () => {
+    // Le trou que la seconde source ferme : le sitemap est muet, l'API publique
+    // sert une mission. Sans cette lecture, la sonde publiait « aucune fiche »
+    // pendant qu'une fiche réelle était servie — et personne ne la jugeait.
+    const result = await run(
+      { '/jobs/vivante': pageFor('/jobs/vivante') },
+      SITEMAP_XML,
+      undefined,
+      publicJobsBody('vivante'),
+    );
+
+    expect(result.jobPages.map(({ url }) => url)).toEqual([`${SITE_ORIGIN}/jobs/vivante`]);
+    expect(result.jobSample.horsSitemap).toBe(1);
+    expect(result.notices.join('\n')).toContain(
+      "1 venue(s) de l'API publique (/api/jobs) (absente(s) du sitemap)",
+    );
+    // Une fiche servie mais non découvrable est un défaut, pas un silence.
+    expect(result.manquantes.join('\n')).toContain('ne figure(nt) dans AUCUN sitemap');
+  });
+
+  it('refuse une métadonnée manquante sur une fiche servie par l’API seule', async () => {
+    const result = await run(
+      { '/jobs/vivante': pageFor('/jobs/vivante').replace(/<meta name="description"[^>]*>/, '') },
+      SITEMAP_XML,
+      undefined,
+      publicJobsBody('vivante'),
+    );
+
+    expect(result.manquantes.join('\n')).toContain('/jobs/vivante : description ABSENTE');
+  });
+
+  it('refuse de conclure quand le sitemap est muet ET l’API illisible', async () => {
+    // Deux sources muettes : rien ne distingue « aucune mission vivante » d'une
+    // découverte cassée. L'échantillon vide ne doit donc pas se lire comme un vert
+    // (c'est la leçon de F9, appliquée à cette forme de page).
+    const result = await run({}, SITEMAP_XML, undefined, null);
+
+    expect(result.manquantes.join('\n')).toContain("n'a pas pu être lue");
+    expect(result.notices.join('\n')).toContain('les deux sources sont muettes');
+  });
+
+  it('nomme une API illisible sans perdre les fiches que le sitemap annonce', async () => {
+    const result = await run(
+      { '/jobs/abc123': pageFor('/jobs/abc123') },
+      withJobs('abc123'),
+      undefined,
+      null,
+    );
+
+    expect(result.jobPages.map(({ url }) => url)).toEqual([`${SITE_ORIGIN}/jobs/abc123`]);
+    const refuse = result.manquantes.join('\n');
+    expect(refuse).toContain("n'a pas pu être lue");
+    expect(refuse).toContain('vérification de complétude impossible');
+  });
+
+  it('ne lit pas deux fois une fiche présente dans les DEUX sources', async () => {
+    const seen = [];
+    const result = await run(
+      { '/jobs/abc123': pageFor('/jobs/abc123'), '/jobs/autre': pageFor('/jobs/autre') },
+      withJobs('abc123'),
+      seen,
+      publicJobsBody('abc123', 'autre'),
+    );
+
+    // Les fiches du sitemap passent en premier : ce sont celles qu'un crawler
+    // découvre. `abc123` n'est donc lue qu'une fois, et `autre` la rejoint.
+    expect(seen.filter((p) => p.startsWith('/jobs/'))).toEqual(['/jobs/abc123', '/jobs/autre']);
+    expect(result.jobSample.horsSitemap).toBe(1);
+    // Le sitemap n'est pas muet : l'absence d'une fiche n'est pas un défaut ici.
+    expect(result.manquantes).toEqual([]);
+  });
+
+  it('lit l’API publique une fois par statut vivant, et la borne à l’échantillon', async () => {
+    const seen = [];
+    const urls = [];
+    await runSeoProductionReport({
+      base: SITE_ORIGIN,
+      fetchImpl: async (url) => {
+        if (new URL(url).pathname === PUBLIC_JOBS_PATH) urls.push(url);
+        return trackingFetch(SERVED_PAGES, SITEMAP_XML, seen)(url);
+      },
+    });
+
+    expect(seen.filter((p) => p === PUBLIC_JOBS_PATH)).toHaveLength(LIVE_JOB_STATUSES.length);
+    expect(urls).toEqual(
+      LIVE_JOB_STATUSES.map(
+        (status) => `${SITE_ORIGIN}${PUBLIC_JOBS_PATH}?status=${status}&limit=3`,
+      ),
+    );
+  });
+
+  it('nomme une forme de charge utile inattendue au lieu de la lire comme « aucune fiche »', async () => {
+    const api = await readPublicJobs(SITE_ORIGIN, async () => ({
+      ok: true,
+      status: 200,
+      text: async () => '{"jobs":[]}',
+    }));
+
+    expect(api.live).toBe(0);
+    expect(api.erreurs.join(' ; ')).toContain('forme inattendue');
   });
 
   it('un sitemap illisible ne conclut rien sur les pages, sans faire tomber le reste', async () => {
@@ -424,6 +572,12 @@ describe('section Pages — le sitemap servi, page par page', () => {
     });
     expect(result.notices.join('\n')).toContain("Pages — non vérifiées : le sitemap n'est pas lisible");
     expect(result.manquantes).toEqual([]);
+    // La source des FICHES n'est pas le sitemap : l'API publique est lue quand
+    // même, et son verdict est publié.
+    expect(result.notices.join('\n')).toContain('les deux sources CONCORDENT');
+    // Et la surface aveugle est publiée, même quand c'est le sitemap qui est en
+    // panne : la déclaration suit le CORPUS vide, pas la panne qui l'a révélé.
+    expect(result.avertissements.join('\n')).toContain('Surface aveugle DÉCLARÉE');
   });
 });
 

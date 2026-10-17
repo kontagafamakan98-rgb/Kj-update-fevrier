@@ -256,69 +256,82 @@ const Payment = () => {
   return (
     <div className={pagePlan.frameClass}>
       <div className={pagePlan.corpsClass}>
-        <div className="bg-white rounded-2xl shadow-xs border border-gray-200 p-6">
+        {/* LE BANDEAU D'IDENTITÉ — le même que le tableau de bord et le profil :
+            la crème du site, le filet chaud, le titre en `.titre-page`. Il
+            remplace la carte blanche ombrée qui ouvrait la page. Il n'ajoute
+            AUCUN sur-titre : le repli de `<Suspense>` ne réserve que deux blocs
+            (titre + sous-titre), et un troisième le ferait diverger de l'état de
+            chargement qu'il doit égaler (voir `PaymentSkeleton`). */}
+        <section className={pagePlan.bandeClass} data-section="bande-paiement">
           <h1 className={pagePlan.titleClass}>{t(pagePlan.titleKey)}</h1>
-          <p className="text-gray-600">{t(pagePlan.subtitleKey)}</p>
+          <p className={pagePlan.subtitleClass}>{t(pagePlan.subtitleKey)}</p>
           {jobPaymentContext && (
-            <div className="mt-4 rounded-xl bg-orange-50 border border-orange-200 px-4 py-3 text-sm text-orange-800">
+            <p className="mt-4 text-sm text-stone-700">
               {t('paymentForMissionDetail').replace('{jobTitle}', jobPaymentContext.jobTitle ? ` « ${jobPaymentContext.jobTitle} »` : '')}
-            </div>
+            </p>
           )}
-        </div>
+        </section>
 
         {statusData && (
-          <div className="carte-editoriale p-6">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
+          // LE DERNIER STATUT : trois MESURES (ce que le client paie, la part de
+          // KOJO, celle du travailleur) et l'état en étiquette. Il n'y a plus de
+          // tuile verte ni bleue : une teinte d'état ne se lit pas dans une
+          // mesure — le vert reste aux étiquettes (payé, fournisseur configuré).
+          <section className={pagePlan.carteClass} data-section="statut-paiement">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="titre-entree">{t('paymentStatusTitle')}</h2>
-                <p className="text-sm text-gray-600 mt-1">ID: {statusData.id}</p>
+                <h2 className={pagePlan.carteTitreClass}>{t('paymentStatusTitle')}</h2>
+                <p className="mt-1 text-sm text-stone-500">ID: {statusData.id}</p>
               </div>
-              <span className="inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold bg-blue-50 text-blue-700">
+              <span className={`etiquette-app ${statusData.status === 'completed' ? 'etiquette-app-vert' : 'etiquette-app-orange'}`}>
                 {statusLabel(statusData.status)}
               </span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 text-sm">
-              <div className="bg-gray-50 rounded-xl p-4">
-                <div className="text-gray-500">{t('paymentTotalClient')}</div>
-                <div className="font-semibold text-gray-900">{Number(statusData.amount || 0).toLocaleString()} XOF</div>
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="tuile-mesure">
+                <p className="tuile-mesure-libelle">{t('paymentTotalClient')}</p>
+                <p className="tuile-mesure-chiffre">{Number(statusData.amount || 0).toLocaleString()} XOF</p>
               </div>
-              <div className="bg-gray-50 rounded-xl p-4">
-                <div className="text-gray-500">{t('paymentCommission')}</div>
-                <div className="font-semibold text-green-700">{Number(statusData.commission_amount || 0).toLocaleString()} XOF</div>
+              <div className="tuile-mesure">
+                <p className="tuile-mesure-libelle">{t('paymentCommission')}</p>
+                <p className="tuile-mesure-chiffre">{Number(statusData.commission_amount || 0).toLocaleString()} XOF</p>
               </div>
-              <div className="bg-gray-50 rounded-xl p-4">
-                <div className="text-gray-500">{t('paymentWorkerAmount')}</div>
-                <div className="font-semibold text-blue-700">{Number(statusData.worker_amount || 0).toLocaleString()} XOF</div>
+              <div className="tuile-mesure">
+                <p className="tuile-mesure-libelle">{t('paymentWorkerAmount')}</p>
+                <p className="tuile-mesure-chiffre">{Number(statusData.worker_amount || 0).toLocaleString()} XOF</p>
               </div>
             </div>
-            <button onClick={refreshStatus} className="mt-4 px-4 py-2 rounded-lg bg-gray-900 text-white hover:bg-black">
+            <button onClick={refreshStatus} className="bouton bouton-clair mt-4">
               {t('paymentRefreshStatus')}
             </button>
-          </div>
+          </section>
         )}
 
         {carteMissionRequise() ? (
-          <div className="carte-editoriale p-8 text-center">
-            <div className="text-4xl mb-3"><IconePage nom={pagePlan.noJobIcon} role="carteVide" /></div>
-            <h2 className="titre-entree mb-2">{t(pagePlan.noJobTitleKey)}</h2>
-            <p className="text-gray-600 max-w-lg mx-auto mb-5">{t(pagePlan.noJobTextKey)}</p>
-            <Link to="/jobs" className="inline-flex items-center rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white hover:bg-orange-700">
+          // LA CARTE « MISSION REQUISE » : la même carte à filet que les autres
+          // écrans, son titre d'écran, et le CTA du site. La coquille pré-rendue
+          // peint EXACTEMENT ces classes (elles sont déclarées dans le plan).
+          <section className={`${pagePlan.carteClass} text-center`} data-section="mission-requise">
+            <div className="mb-3 text-4xl"><IconePage nom={pagePlan.noJobIcon} role="carteVide" /></div>
+            <h2 className={`${pagePlan.carteTitreClass} mb-2`}>{t(pagePlan.noJobTitleKey)}</h2>
+            <p className={pagePlan.noJobTextClass}>{t(pagePlan.noJobTextKey)}</p>
+            <Link to="/jobs" className={pagePlan.ctaClass}>
               {t(pagePlan.noJobCtaKey)}
             </Link>
-          </div>
+          </section>
         ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 carte-editoriale p-6">
-            <div className="flex items-center justify-between gap-3 flex-wrap mb-5">
-              <h2 className="titre-entree">{t('automaticDistribution')}</h2>
-              <span className={`inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold ${providerConfig?.configured ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <section className={`${pagePlan.carteClass} lg:col-span-2`} data-section="formulaire-paiement">
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+              <h2 className={pagePlan.carteTitreClass}>{t('automaticDistribution')}</h2>
+              <span className={`etiquette-app ${providerConfig?.configured ? 'etiquette-app-vert' : 'etiquette-app-orange'}`}>
                 {providerConfig?.configured ? t('paymentGatewayConfigured') : t('paymentGatewayNotConfigured')}
               </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div className="block">
-                <label htmlFor="payment_amount" className="text-sm font-medium text-gray-700">{t('paymentAmount')}</label>
+                <label htmlFor="payment_amount" className="text-sm font-medium text-stone-700">{t('paymentAmount')}</label>
                 <input
                   id="payment_amount"
                   name="payment_amount"
@@ -332,7 +345,7 @@ const Payment = () => {
                     setCheckoutError('');
                     setForm((prev) => ({ ...prev, amount: Number(e.target.value) || 0 }));
                   }}
-                  className={`mt-2 w-full rounded-xl border ${form.amount > 0 && form.amount < 200 ? 'border-red-400 ring-1 ring-red-400' : 'border-gray-300'} px-4 py-3 focus:outline-hidden focus:ring-2 focus:ring-orange-500 ${jobPaymentContext?.amount ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                  className={`mt-2 w-full px-4 py-3 focus:outline-hidden focus:ring-2 focus:ring-orange-500 ${form.amount > 0 && form.amount < 200 ? 'border-red-400 ring-1 ring-red-400' : ''} ${jobPaymentContext?.amount ? 'fond-sable cursor-not-allowed' : ''}`}
                 />
                 {form.amount > 0 && form.amount < 200 && (
                   <p className="mt-1 text-sm text-red-600">
@@ -342,14 +355,14 @@ const Payment = () => {
               </div>
 
               <div className="block">
-                <label htmlFor="payment_country" className="text-sm font-medium text-gray-700">{t('country')}</label>
+                <label htmlFor="payment_country" className="text-sm font-medium text-stone-700">{t('country')}</label>
                 <select
                   id="payment_country"
                   name="payment_country"
                   autoComplete="off"
                   value={form.country}
                   onChange={(e) => setForm((prev) => ({ ...prev, country: e.target.value }))}
-                  className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 focus:outline-hidden focus:ring-2 focus:ring-orange-500"
+                  className="mt-2 w-full px-4 py-3 focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                 >
                   {PAYABLE_COUNTRIES.map((value) => (
                     <option key={value} value={value}>{t(value)}</option>
@@ -358,14 +371,14 @@ const Payment = () => {
               </div>
 
               <div className="block">
-                <label htmlFor="payment_method_select" className="text-sm font-medium text-gray-700">{t('paymentMethod')}</label>
+                <label htmlFor="payment_method_select" className="text-sm font-medium text-stone-700">{t('paymentMethod')}</label>
                 <select
                   id="payment_method_select"
                   name="payment_method_select"
                   autoComplete="off"
                   value={form.method}
                   onChange={(e) => setForm((prev) => ({ ...prev, method: e.target.value }))}
-                  className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 focus:outline-hidden focus:ring-2 focus:ring-orange-500"
+                  className="mt-2 w-full px-4 py-3 focus:outline-hidden focus:ring-2 focus:ring-orange-500"
                 >
                   {Object.entries(PAYMENT_METHOD_KEYS).map(([value, key]) => (
                     <option key={value} value={value}>{t(key)}</option>
@@ -375,26 +388,26 @@ const Payment = () => {
             </div>
 
             {quote && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                <div className="bg-gray-50 rounded-xl p-4">
-                  <div className="text-sm text-gray-500">{t('paymentTotalClient')}</div>
-                  <div className="text-xl font-bold text-gray-900 mt-1">{Number(quote.total_amount || 0).toLocaleString()} XOF</div>
+              <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3" data-section="repartition-paiement">
+                <div className="tuile-mesure">
+                  <p className="tuile-mesure-libelle">{t('paymentTotalClient')}</p>
+                  <p className="tuile-mesure-chiffre">{Number(quote.total_amount || 0).toLocaleString()} XOF</p>
                 </div>
-                <div className="bg-green-50 rounded-xl p-4">
-                  <div className="text-sm text-green-700">{t('paymentCommission')}</div>
-                  <div className="text-xl font-bold text-green-800 mt-1">{Number(quote.commission_amount || 0).toLocaleString()} XOF</div>
+                <div className="tuile-mesure">
+                  <p className="tuile-mesure-libelle">{t('paymentCommission')}</p>
+                  <p className="tuile-mesure-chiffre">{Number(quote.commission_amount || 0).toLocaleString()} XOF</p>
                 </div>
-                <div className="bg-blue-50 rounded-xl p-4">
-                  <div className="text-sm text-blue-700">{t('paymentWorkerAmount')}</div>
-                  <div className="text-xl font-bold text-blue-800 mt-1">{Number(quote.worker_amount || 0).toLocaleString()} XOF</div>
+                <div className="tuile-mesure">
+                  <p className="tuile-mesure-libelle">{t('paymentWorkerAmount')}</p>
+                  <p className="tuile-mesure-chiffre">{Number(quote.worker_amount || 0).toLocaleString()} XOF</p>
                 </div>
               </div>
             )}
 
             {!user ? (
-              <div className="mt-6 rounded-xl border border-orange-200 bg-orange-50 p-4">
-                <p className="text-orange-800 mb-3">{t('paymentLoginNeeded')}</p>
-                <Link to="/login" className="inline-flex items-center rounded-lg bg-orange-600 px-4 py-2 text-white hover:bg-orange-700">
+              <div className="bande-app mt-6">
+                <p className="text-stone-700">{t('paymentLoginNeeded')}</p>
+                <Link to="/login" className="bouton bouton-encre mt-3">
                   {t('signIn')}
                 </Link>
               </div>
@@ -402,63 +415,61 @@ const Payment = () => {
               <button
                 onClick={launchCheckout}
                 disabled={processing || !providerConfig?.configured || loading}
-                className={`mt-6 inline-flex items-center rounded-xl px-5 py-3 font-semibold text-white ${processing || !providerConfig?.configured ? 'bg-gray-400 cursor-not-allowed' : 'bg-orange-600 hover:bg-orange-700'}`}
+                className={`bouton mt-6 ${processing || !providerConfig?.configured ? 'bouton-clair cursor-not-allowed' : 'bouton-encre'}`}
               >
                 {processing ? t('paymentRedirecting') : t('payNow')}
               </button>
             )}
 
             {!providerConfig?.configured && (
-              <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-5">
+              <div className="mt-6 rounded-[3px] border border-amber-200 bg-amber-50 p-5">
                 {/* Message générique pour les utilisateurs : les noms de
                     variables d'environnement backend (PAYDUNYA_MASTER_KEY,
                     etc.) ne doivent jamais apparaître dans une UI destinée
                     aux clients/travailleurs - ça n'a de sens que pour
                     l'équipe technique, qui a de toute façon accès aux logs
                     et à la config Render directement. */}
-                <h3 className="font-semibold text-amber-900 mb-2">{t('paymentGatewayNotConfigured')}</h3>
+                <h3 className="mb-2 font-semibold text-amber-900">{t('paymentGatewayNotConfigured')}</h3>
                 <p className="text-sm text-amber-700">{t('paymentGatewayHelp')}</p>
               </div>
             )}
-          </div>
+          </section>
 
-          <div className="space-y-6">
-            <div className="carte-editoriale p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">{t('paymentMyPayments')}</h3>
-              {payments.length === 0 ? (
-                <p className="text-sm text-gray-500">{t('paymentNoPayments')}</p>
-              ) : (
-                <div className="space-y-3">
-                  {payments.slice(0, 5).map((payment) => (
-                    <div key={payment.id} className="rounded-xl border border-gray-200 p-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="font-semibold text-gray-900">{Number(payment.amount || 0).toLocaleString()} XOF</span>
-                        <span className="text-xs rounded-lg bg-gray-100 px-3 py-1 text-gray-700">{statusLabel(payment.status)}</span>
-                      </div>
-                      <div className="text-xs text-gray-500 mt-2">{payment.payment_method} • {payment.id}</div>
+          <section className={pagePlan.carteClass} data-section="paiements-recents">
+            <h2 className={pagePlan.carteTitreClass}>{t('paymentMyPayments')}</h2>
+            {payments.length === 0 ? (
+              <p className="mt-3 text-sm text-stone-500">{t('paymentNoPayments')}</p>
+            ) : (
+              <ul className="mt-3">
+                {payments.slice(0, 5).map((payment) => (
+                  <li key={payment.id} className="ligne-app justify-between border-t border-stone-100 first:border-t-0">
+                    <div className="min-w-0">
+                      <p className="font-semibold tabular-nums text-stone-900">{Number(payment.amount || 0).toLocaleString()} XOF</p>
+                      <p className="mt-1 text-xs text-stone-500">{payment.payment_method} · {payment.id}</p>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+                    <span className="etiquette-app">{statusLabel(payment.status)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         </div>
         )}
 
         {error && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-red-700">
+          <div className="rounded-[3px] border border-red-200 bg-red-50 px-5 py-4 text-red-700">
             {error}
           </div>
         )}
 
         {checkoutError && (
-          <div className="rounded-2xl border border-red-300 bg-red-100 px-5 py-4 text-red-800 font-medium">
-            <AlertTriangle className="inline h-5 w-5 mr-1 align-[-0.15em]" aria-hidden="true" /> {checkoutError}
+          <div className="rounded-[3px] border border-red-300 bg-red-100 px-5 py-4 font-medium text-red-800">
+            <AlertTriangle className="mr-1 inline h-5 w-5 align-[-0.15em]" aria-hidden="true" /> {checkoutError}
           </div>
         )}
 
-        {/* État de chargement : skeleton structuré répliquant la hauteur du
-            layout réel (carte titre + formulaire quote + carte paiements)
+        {/* État de chargement : squelette structuré répliquant la hauteur du
+            layout réel (bande d'identité + formulaire quote + carte paiements)
             pour que l'arrivée des données async (providerConfig, quote,
             payments) ne fasse pas bouger le footer — anti-CLS uniforme.
             Il n'est peint QUE dans la branche qui le montre : la carte

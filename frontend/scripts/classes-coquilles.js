@@ -148,12 +148,6 @@ export const CLASSES_PROPRES_AUX_COQUILLES = [
       'composant de lien, la coquille un texte souligné',
   },
   {
-    publiee: 'font-medium text-orange-600',
-    module: 'vite-plugins/prerender/shells-routes.js',
-    motif:
-      "mot mis en avant dans une phrase d'aperçu (« Connexion », « inscrivez-vous ») : React découpe la phrase en composants",
-  },
-  {
     publiee:
       'relative flex items-center justify-center p-4 border-2 border-orange-500 bg-orange-50 rounded-lg cursor-pointer transition-all',
     module: 'vite-plugins/prerender/shells-routes.js',
@@ -168,13 +162,6 @@ export const CLASSES_PROPRES_AUX_COQUILLES = [
       "carte de choix NON sélectionnée du même aperçu (l'autre moitié de la paire ci-dessus)",
   },
   {
-    publiee:
-      'w-full flex items-center justify-between px-4 py-3 border border-gray-300 rounded-lg shadow-xs bg-white text-left',
-    module: 'vite-plugins/prerender/shells-routes.js',
-    motif:
-      "sélecteur de pays de l'aperçu : React publie un composant à état (ouverture, sélection), la coquille une barre inerte",
-  },
-  {
     publiee: 'truncate text-gray-400',
     module: 'vite-plugins/prerender/shells-routes.js',
     motif:
@@ -184,17 +171,6 @@ export const CLASSES_PROPRES_AUX_COQUILLES = [
     publiee: 'text-xs text-gray-500 transition-transform',
     module: 'vite-plugins/prerender/shells-routes.js',
     motif: "chevron du sélecteur d'aperçu (rotation à l'ouverture, état React)",
-  },
-  {
-    publiee: 'block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-xs',
-    module: 'vite-plugins/prerender/shells-routes.js',
-    motif:
-      "champ d'aperçu de /register (plusieurs occurrences : nom, e-mail, mot de passe) — React peint chaque champ avec ses utilitaires d'état",
-  },
-  {
-    publiee: 'flex-1 block w-full px-4 py-3 border border-gray-300 rounded-r-lg',
-    module: 'vite-plugins/prerender/shells-routes.js',
-    motif: "champ collé d'un groupe (indicatif + numéro) dans l'aperçu de /register",
   },
   {
     publiee: 'bloc-differe-photo carte-editoriale carte-publique mb-6',
@@ -211,23 +187,6 @@ export const CLASSES_PROPRES_AUX_COQUILLES = [
     publiee: 'mt-1 h-4 w-4 rounded-sm border-gray-300 text-orange-600',
     module: 'vite-plugins/prerender/shells-routes.js',
     motif: "case à cocher de l'aperçu (les utilitaires de formulaire de React ne sont pas écrits en clair)",
-  },
-  {
-    publiee:
-      'group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-orange-600',
-    module: 'vite-plugins/prerender/shells-routes.js',
-    motif: "bouton d'envoi de l'aperçu de /register (même raison que celui de /login, avec son pas propre)",
-  },
-  {
-    publiee: 'bg-white rounded-2xl shadow-xs border border-gray-200 p-8 text-center',
-    module: 'vite-plugins/prerender/shells-routes.js',
-    motif:
-      "carte du message d'état vide (un état que React atteint par sa logique, jamais au premier rendu)",
-  },
-  {
-    publiee: 'inline-flex items-center rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white',
-    module: 'vite-plugins/prerender/shells-routes.js',
-    motif: "appel à l'action de cet état vide (même raison que la carte ci-dessus)",
   },
 ];
 

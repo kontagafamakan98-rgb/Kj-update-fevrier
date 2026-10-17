@@ -6,12 +6,26 @@ Enchaîne sans rupture :
   1. Pré-vol local (check-test-environment --avant-push, branches propres)
   2. Push de la branche de travail courante vers origin (sans fuite de secret)
   3. Détection ou ouverture de la Pull Request sur GitHub
-  4. Attente active de tous les checks requis de la CI sur le commit de tête
+  4. Attente active des checks du PÉRIMÈTRE DÉCLARÉ de la CI sur le commit de tête
+     (`.github/scripts/gate-perimetre.json` : exactement les checks que la
+     protection de `main` exige, ni plus ni moins)
   5. Fusion de la PR (méthode configurable : squash ou merge, défaut squash)
+
+Avant le push, un PRÉ-VOL compare le périmètre déclaré aux jobs de `ci.yml` ET
+aux checks que la protection de `main` exige réellement : une dérive du réglage
+GitHub se voit ici, attribuable à la livraison, plutôt que six semaines plus tard
+par une fusion manuelle passée sous un check rouge.
   6. Élagage et synchronisation locale (suppression de la branche de travail fusionnée)
   7. Attente et confirmation formelle des révisions servies en production :
      - Vercel (frontend) : balise meta `kojo-build-revision` sur https://kojoforafrica.cc.cd
+     - SEO (frontend)    : sonde stricte `check-seo-production.js --strict`, lancée JUSTE
+       APRÈS la confirmation de la révision servie — la MÊME commande que la CI, et son
+       verdict tombe dans le terminal (une intégration requise absente, ou une sonde qui
+       ne peut pas conclure, refuse la livraison : code 2)
      - Fly.io (backend)  : endpoint `/health` sur https://api.kojoforafrica.cc.cd/health
+
+Un refus de l'une des trois confirmations rend le code 2 (« la PR est fusionnée mais
+la production n'est pas conforme ») — jamais 0.
 
 Usage :
     python .github/scripts/livrer.py [options]
@@ -40,6 +54,20 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+
+# La règle du PÉRIMÈTRE DU GATE vit dans `.github/scripts/perimetre_gate.py`, à
+# côté : elle est partagée avec le garde `check-gate-perimetre.py`. Ce seul
+# import est ce qui garantit que la livraison et la protection de branche
+# attendent la MÊME liste, au lieu de deux définitions qui dérivent.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from perimetre_gate import (  # noqa: E402  (import après l'insertion du chemin)
+    auditer,
+    comparer_protection,
+    lire_perimetre,
+    lire_protection,
+    noms_attendus,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FRONTEND_DIR = REPO_ROOT / "frontend"
@@ -169,6 +197,60 @@ def verifier_prevol_local():
     log_succes("Pré-vol local conforme.")
 
 
+def verifier_perimetre_du_gate(jeton: str, en_ligne: bool = True) -> list[str]:
+    """Le périmètre du gate est-il le MÊME des deux côtés de la livraison ?
+
+    Deux questions, et les deux doivent être vertes pour que la livraison parte :
+
+      1. HORS LIGNE — la liste déclarée (`.github/scripts/gate-perimetre.json`)
+         et `ci.yml` disent-elles la même chose ? C'est la règle partagée avec le
+         garde `check-gate-perimetre.py` qui répond (noms de check-run exacts,
+         tout job déclaré ou exempté, planchers de lecture) : la rejouer ici
+         évite de livrer sur une déclaration cassée quand le garde n'a pas tourné.
+      2. EN LIGNE — ce que GitHub exige RÉELLEMENT sur `main` est-il exactement
+         cette liste ? C'est le fait que seul un jeton du propriétaire peut lire
+         (l'accès à la protection demande les droits admin du dépôt) : le garde
+         hors ligne ne peut donc pas le porter, tandis que la livraison, elle,
+         a le jeton — et c'est là que la dérive se voit, AVANT que la PR ne
+         fusionne sur un gate qui n'est pas celui qu'on croit.
+
+    Un refus n'est pas un avertissement : sans cette vérification, une fusion
+    peut passer par l'interface GitHub sous un check rouge (mesuré le
+    12/10/2026 : e2e et avis de sécurité hors protection, 8 checks requis pour
+    11 jobs déclarés). Un jeton qui ne peut pas lire la protection est un refus
+    NOMMÉ, jamais un vert silencieux.
+    """
+    declaration, jobs, empechement = lire_perimetre()
+    if declaration is None:
+        return [empechement]
+    refus = [empechement] if empechement else auditer(declaration, jobs)
+    attendus = noms_attendus(declaration)
+
+    if not en_ligne:
+        log(
+            "  Périmètre hors ligne vérifié (%d check(s) déclaré(s)) — la protection "
+            "de 'main' n'est PAS relue ici : elle n'est comparable qu'en ligne." % len(attendus)
+        )
+        return refus
+
+    protection, empechement_ligne = lire_protection(jeton, f"{REPO_OWNER}/{REPO_NAME}", "main")
+    if protection is None:
+        refus.append(
+            empechement_ligne
+            + " — la livraison exige que le périmètre RÉEL de 'main' soit comparable : "
+            "poser un jeton avec les droits admin du dépôt (GH_TOKEN), ou lire et corriger "
+            "le réglage à la main, puis relancer"
+        )
+        return refus
+
+    contextes = (protection.get("required_status_checks") or {}).get("contexts") or []
+    log(
+        "  Protection de 'main' : %d check(s) exigé(s), strict=%s"
+        % (len(contextes), (protection.get("required_status_checks") or {}).get("strict"))
+    )
+    return refus + comparer_protection(protection, declaration)
+
+
 def pousser_branche(branche: str, jeton: str, max_tentatives: int = 3):
     log(f"Push de la branche '{branche}' vers origin (sans persister le jeton)...")
     url_distante = f"https://x-access-token:{jeton}@github.com/{REPO_OWNER}/{REPO_NAME}.git"
@@ -251,49 +333,81 @@ def trouver_ou_creer_pr(branche: str, titre: str | None, corps: str | None, jeto
     return pr
 
 
-def attendre_checks_ci(sha: str, jeton: str, timeout_minutes: int = 25) -> bool:
+def attendre_checks_ci(sha: str, jeton: str, timeout_minutes: int = 25,
+                       attendus: list[str] | None = None) -> bool:
+    """Attend les checks du PÉRIMÈTRE DÉCLARÉ, et eux seuls.
+
+    L'ancienne version attendait TOUS les check-runs du commit de tête, y compris
+    ceux que la protection de `main` n'exige pas : c'était la moitié du décalage
+    mesuré le 12/10/2026, et cela faisait refuser une livraison sur un rapport de
+    taille (`Bundle size report (PR comment)`, qui publie un commentaire) tandis
+    qu'une fusion manuelle passait sous la suite e2e rouge. Ici les deux périmètres
+    lisent la MÊME liste (`gate-perimetre.json`), et un check-run hors liste est
+    DIT ignoré plutôt que silencieusement compté comme vert.
+
+    Une liste vide n'est pas un vert : si rien n'est déclaré, c'est la déclaration
+    qui est cassée, et cette fonction refuse.
+    """
+    noms = [str(nom) for nom in (attendus or [])]
+    if not noms:
+        log_erreur(
+            "Périmètre de gate vide : aucun check déclaré — refus d'attendre « tous les "
+            "check-runs », qui est exactement la façon dont les deux périmètres ont divergé."
+        )
+        return False
+
     log(f"Surveillance des checks CI sur le commit de tête {sha[:10]}...")
+    log(f"Périmètre déclaré ({len(noms)} check(s)) : {', '.join(noms)}")
     deadline = time.time() + (timeout_minutes * 60)
-    derniers_etats = {}
+    ignores_dits = set()
 
     while time.time() < deadline:
         data = appel_github("GET", f"commits/{sha}/check-runs?per_page=100", jeton)
         runs = data.get("check_runs", [])
+        par_nom = {r["name"]: r for r in runs if r.get("name") in noms}
+        ignores = sorted({r["name"] for r in runs} - set(noms))
+        for nom in ignores:
+            if nom not in ignores_dits:
+                ignores_dits.add(nom)
+                log(f"  check hors périmètre, ignoré : {nom}")
+
         if not runs:
             log("En attente de l'enregistrement des check-runs par GitHub...")
             time.sleep(10)
             continue
 
-        total = len(runs)
+        absents = [nom for nom in noms if nom not in par_nom]
         termines = []
         en_cours = []
         echoues = []
 
-        for r in sorted(runs, key=lambda x: x["name"]):
-            nom = r["name"]
-            statut = r["status"]
-            conclusion = r.get("conclusion")
-            derniers_etats[nom] = f"{statut} / {conclusion}"
-
+        for nom in sorted(noms):
+            run = par_nom.get(nom)
+            if run is None:
+                continue
+            statut = run["status"]
+            conclusion = run.get("conclusion")
             if statut == "completed":
                 if conclusion in ("success", "skipped", "neutral"):
                     termines.append(nom)
                 else:
-                    echoues.append((nom, conclusion, r.get("html_url")))
+                    echoues.append((nom, conclusion, run.get("html_url")))
             else:
                 en_cours.append(nom)
 
-        # Rapport de progression si changements
-        log(f"Progression CI : {len(termines)}/{total} terminés, {len(en_cours)} en cours, {len(echoues)} échec(s)")
+        log(
+            f"Progression CI : {len(termines)}/{len(noms)} terminés, {len(en_cours)} en cours, "
+            f"{len(echoues)} échec(s), {len(absents)} pas encore rapporté(s)"
+        )
 
         if echoues:
-            log_erreur(f"Un ou plusieurs checks CI ont échoué ({len(echoues)}) :")
+            log_erreur(f"Un ou plusieurs checks du périmètre ont échoué ({len(echoues)}) :")
             for nom, conc, url in echoues:
                 print(f"   - {nom} : {conc} ({url})")
             return False
 
-        if len(termines) == total and total > 0:
-            log_succes(f"Tous les {total} checks CI sont passés au vert (ou skipped attendu) !")
+        if len(termines) == len(noms):
+            log_succes(f"Les {len(noms)} checks du périmètre déclaré sont au vert (ou skipped attendu) !")
             return True
 
         time.sleep(20)
@@ -370,6 +484,44 @@ def verifier_production_frontend(sha_attendu: str, timeout_minutes: int = 10) ->
         return False
 
 
+def verifier_seo_production_strict() -> bool:
+    """La sonde SEO STRICTE de la production, verdict rendu dans le terminal.
+
+    Elle est lancée APRÈS la confirmation de la révision servie, et c'est ce qui la
+    rend lisible : la production vient d'être reconstatée comme servant ce commit,
+    donc un écart de configuration `VITE_*` (ces variables sont INLINÉES au build par
+    Vercel : une variable absente n'échoue nulle part, elle appauvrit le HTML) est
+    attribuable à la livraison qui vient d'avoir lieu. Le cron de 06:17 ne le verrait
+    que le lendemain, et le step de `frontend-build` qui lance cette MÊME commande sur
+    le push de `main` n'est pas attendu par cette livraison.
+
+    MÊME commande que la CI, sans variante : `--strict` est le seul mode qui BLOQUE
+    (une intégration requise absente, ou une sonde qui ne peut pas conclure, sort en
+    1). Le mode par défaut du script étant l'informatif, lancer celui-ci ici rendrait
+    le silence de F9 possible dans le trajet de livraison ; c'est pourquoi
+    `.github/scripts/check-seo-probe-strict.py` lit AUSSI ce fichier et refuse toute
+    invocation hors `--strict`.
+
+    La sortie est STREAMÉE (aucune capture) : le rapport du script, ses `::notice` et
+    ses `::error` nommant l'intégration à corriger, s'affichent tels quels.
+    """
+    log("Contrôle SEO de la production (sonde stricte, même commande que la CI)...")
+    res = subprocess.run(
+        ["node", "scripts/check-seo-production.js", "--strict"],
+        cwd=str(FRONTEND_DIR),
+        capture_output=False,
+    )
+    if res.returncode == 0:
+        log_succes("SEO production : sonde stricte verte.")
+        return True
+    log_erreur(
+        f"SEO production : la sonde stricte a refusé (code {res.returncode}). Corriger "
+        "l'intégration nommée ci-dessus (variable Vercel à poser, puis redéploiement) : "
+        "c'est le même verdict que le cron de 06:17 et que le step de `frontend-build`."
+    )
+    return False
+
+
 def verifier_production_backend(sha_attendu: str, timeout_minutes: int = 10) -> bool:
     log(f"Contrôle de la révision servie par FLY.IO (backend sur {URL_BACKEND_HEALTH})...")
     dernier_backend = exec_cmd(["git", "rev-list", "-1", "HEAD", "--", "backend/", ".github/workflows/ci.yml"])
@@ -443,6 +595,23 @@ def main(argv=None) -> int:
     except Exception as exc:
         return 1
 
+    # 1 bis. Pré-vol du PÉRIMÈTRE DU GATE : la livraison n'attend que les checks
+    # que la protection de 'main' exige, donc elle refuse de partir si le réglage
+    # GitHub et la liste déclarée ne disent plus la même chose. En simulation
+    # (`--dry-run`), la protection n'est pas relue (le trajet ne fusionnera rien) :
+    # seul le verdict hors ligne est rendu, et c'est DIT.
+    refus_gate = verifier_perimetre_du_gate(jeton, en_ligne=not options.dry_run)
+    if refus_gate:
+        log_erreur(f"Le périmètre du gate n'est pas aligné ({len(refus_gate)} refus) :")
+        for ligne in refus_gate:
+            print(f"   • {ligne}")
+        log_erreur(
+            "Livraison arrêtée : fusionner ici ferait passer la PR sous un gate qui n'est pas "
+            "celui que la protection de 'main' applique. Corriger .github/scripts/gate-perimetre.json "
+            "(ou le réglage GitHub), puis relancer."
+        )
+        return 1
+
     if options.dry_run:
         log("[DRY-RUN] Simulation terminée avec succès.")
         return 0
@@ -467,8 +636,9 @@ def main(argv=None) -> int:
     pr_number = pr["number"]
     pr_head_sha = pr["head"]["sha"]
 
-    # 4. Attente des checks CI
-    ok_ci = attendre_checks_ci(pr_head_sha, jeton, options.timeout_ci)
+    # 4. Attente des checks CI — ceux du périmètre déclaré, pas « tous les check-runs »
+    attendus = noms_attendus(lire_perimetre()[0] or {})
+    ok_ci = attendre_checks_ci(pr_head_sha, jeton, options.timeout_ci, attendus)
     if not ok_ci:
         log_erreur(f"La CI a échoué ou expiré sur la PR #{pr_number}. Fusion abandonnée.")
         return 1
@@ -492,15 +662,41 @@ def main(argv=None) -> int:
     time.sleep(5)
 
     ok_front = verifier_production_frontend(merge_sha, options.timeout_prod)
+
+    # La sonde SEO stricte se lance JUSTE APRÈS la révision servie : elle juge le même
+    # artefact que celle-ci vient de confirmer. Tant qu'elle n'est pas confirmée, la
+    # lancer porterait le verdict sur une AUTRE production que celle qui vient d'être
+    # livrée — on la saute donc, en le DISANT (un saut silencieux se lirait comme un vert).
+    ok_seo = verifier_seo_production_strict() if ok_front else False
+    if not ok_front:
+        log(
+            "Sonde SEO stricte NON exécutée : la révision servie n'est pas confirmée — "
+            "la sonde porterait sur une autre production que celle qui vient d'être livrée."
+        )
+
     ok_back = verifier_production_backend(merge_sha, options.timeout_prod)
 
-    if ok_front and ok_back:
+    refus = [
+        nom
+        for nom, ok in (
+            ("Vercel (révision servie)", ok_front),
+            ("SEO strict (production)", ok_seo),
+            ("Fly.io (révision servie)", ok_back),
+        )
+        if not ok
+    ]
+    if not refus:
         log_succes("Trajet de livraison COMPLET terminé avec succès !")
-        log(f"PR #{pr_number} intégrée dans main ({merge_sha[:10]}). Production Vercel et Fly.io à jour.")
+        log(
+            f"PR #{pr_number} intégrée dans main ({merge_sha[:10]}). Production Vercel et "
+            "Fly.io à jour, sonde SEO stricte verte."
+        )
         return 0
-    else:
-        log_erreur("La PR est fusionnée mais la confirmation de production a rencontré un refus ou un délai.")
-        return 2
+    log_erreur(
+        "La PR est fusionnée mais la confirmation de production a refusé ou expiré sur : "
+        f"{', '.join(refus)}."
+    )
+    return 2
 
 
 if __name__ == "__main__":

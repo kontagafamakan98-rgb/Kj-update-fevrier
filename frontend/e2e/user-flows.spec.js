@@ -70,7 +70,14 @@ test.describe('Parcours E2E — Support & Assistance', () => {
     if (await robotButton.isVisible()) {
       await robotButton.click();
 
-      // L'assistant doit afficher sa première question
+      // Le robot ouvre désormais sur l'ASSISTANT : le champ de saisie et son
+      // invitation sont là avant tout échange, sans appel au modèle (la sonde
+      // n'a pas de gateway : elle prouve la surface, pas l'inférence).
+      await expect(page.getByPlaceholder(/Écrivez votre question/)).toBeVisible({ timeout: 5000 });
+
+      // Le QUESTIONNAIRE reste joignable depuis le chat : c'est lui qui dépose
+      // la demande, et il doit rester ouvert même si l'assistant ne répond pas.
+      await page.getByRole('button', { name: /Déposer une demande/ }).first().click();
       await expect(page.locator('text=nom complet')).toBeVisible({ timeout: 5000 });
     }
   });

@@ -415,8 +415,14 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-full flex items-center justify-center fond-sable py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-full flex items-center justify-center fond-sable cadre-page px-4 sm:px-6">
+      <div className="max-w-md w-full">
+        {/* La CARTE du formulaire (17/10/2026), portée des DEUX côtés : la
+            coquille de /register peint la même enveloppe (shells-routes.js),
+            donc le rembourrage de la carte ne déplace rien à la bascule
+            coquille → React — il change seulement le fond du formulaire, qui
+            était nu sur le sable. */}
+        <div className="carte-editoriale carte-publique">
         <div className="text-center mb-8">
           {/* La marque : le même tracé partagé que /login et que la barre (voir
               src/config/marque-kojo.js) — la pastille garde sa boîte de 64 px. */}
@@ -439,7 +445,7 @@ export default function Register() {
           <h1 className="mt-6 text-center text-3xl font-bold text-stone-900">
             {pageT(pagePlan.titleKey)}
           </h1>
-          <p className="mt-2 text-sm text-gray-600">
+          <p className="mt-2 text-sm text-stone-600">
             {pageT(pagePlan.subtitleKey)}
           </p>
           
@@ -476,7 +482,7 @@ export default function Register() {
               </div>
             )}
             
-            <div className="flex items-center gap-3 overflow-x-auto pb-1 text-xs sm:text-sm sm:justify-center sm:space-x-4">
+            <div className="flex flex-wrap items-center justify-center gap-3 pb-1 text-xs sm:text-sm">
               <div className="flex items-center">
                 <div className="w-6 h-6 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-medium">
                   {t(pagePlan.step1NumberKey)}
@@ -484,16 +490,12 @@ export default function Register() {
                 <span className="ml-2 text-orange-600 font-medium whitespace-nowrap">{t(pagePlan.step1TitleKey)}</span>
               </div>
 
-              <div className="w-12 h-1 bg-gray-200"></div>
-
               <div className="flex items-center">
                 <div className="w-6 h-6 bg-stone-300 text-stone-600 rounded-full flex items-center justify-center text-xs font-medium">
                   {t(pagePlan.step2NumberKey)}
                 </div>
                 <span className="ml-2 text-gray-500 font-medium whitespace-nowrap">{pageT(pagePlan.step2TitleKey)}</span>
               </div>
-
-              <div className="w-12 h-1 bg-gray-200"></div>
 
               <div className="flex items-center">
                 <div className="w-6 h-6 bg-stone-300 text-stone-600 rounded-full flex items-center justify-center text-xs font-medium">
@@ -534,7 +536,7 @@ export default function Register() {
           </div>
         </div>
         
-        <form className="mt-8 space-y-6 bg-white p-4 sm:p-8 rounded-xl shadow-md" onSubmit={handleSubmit}>
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {displayedError && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
               {displayedError}
@@ -568,7 +570,7 @@ export default function Register() {
 
             {/* User Type */}
             <fieldset>
-              <legend className="block text-sm font-medium text-gray-700 mb-3">
+              <legend className="block text-sm font-semibold text-stone-800 mb-3">
                 {t('userType')}
               </legend>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -627,7 +629,7 @@ export default function Register() {
             {/* Country Selection */}
             <div>
               <div className="flex items-center justify-between gap-3 mb-2">
-                <label htmlFor="country" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="country" className="block text-sm font-semibold text-stone-800">
                   {t('country')}
                   {detectedCountry && (
                     <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded-sm">
@@ -664,7 +666,7 @@ export default function Register() {
             {/* Names */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="first_name" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="first_name" className="block text-sm font-semibold text-stone-800 mb-2">
                   {t('firstName')}
                 </label>
                 <input
@@ -673,7 +675,7 @@ export default function Register() {
                   type="text"
                   autoComplete="given-name"
                   required
-                  className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  className={pagePlan.champClass}
                   placeholder={`${t('firstName')}...`}
                   value={formData.first_name}
                   onChange={handleChange}
@@ -681,7 +683,7 @@ export default function Register() {
               </div>
               
               <div>
-                <label htmlFor="last_name" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="last_name" className="block text-sm font-semibold text-stone-800 mb-2">
                   {t('lastName')}
                 </label>
                 <input
@@ -690,7 +692,7 @@ export default function Register() {
                   type="text"
                   autoComplete="family-name"
                   required
-                  className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  className={pagePlan.champClass}
                   placeholder={`${t('lastName')}...`}
                   value={formData.last_name}
                   onChange={handleChange}
@@ -699,7 +701,7 @@ export default function Register() {
             </div>
             
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="email" className="block text-sm font-semibold text-stone-800 mb-2">
                 {t('email')}
               </label>
               <input
@@ -708,7 +710,7 @@ export default function Register() {
                 type="email"
                 autoComplete="email"
                 required
-                className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                className={pagePlan.champClass}
                 placeholder={pageT('emailPlaceholder')}
                 value={formData.email}
                 onChange={handleChange}
@@ -730,11 +732,11 @@ export default function Register() {
             </div>
 
             <div>
-              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="phone" className="block text-sm font-semibold text-stone-800 mb-2">
                 {t('phone')}
               </label>
-              <div className="flex rounded-lg shadow-xs">
-                <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
+              <div className="flex">
+                <span className={pagePlan.champPrefixeClass}>
                   {activePhonePrefix || PHONE_PREFIX_FALLBACK}
                 </span>
                 <input
@@ -743,7 +745,7 @@ export default function Register() {
                   type="tel"
                   autoComplete="tel"
                   required
-                  className="flex-1 block w-full px-4 py-3 border border-gray-300 rounded-r-lg focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  className={pagePlan.champTelephoneClass}
                   placeholder={activePhoneExample}
                   value={stripPhonePrefix(formData.phone, activePhonePrefix)}
                   onChange={(e) => {
@@ -760,7 +762,7 @@ export default function Register() {
             </div>
             
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="password" className="block text-sm font-semibold text-stone-800 mb-2">
                 {t('password')}
               </label>
               <input
@@ -769,7 +771,7 @@ export default function Register() {
                 type="password"
                 autoComplete="new-password"
                 required
-                className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                className={pagePlan.champClass}
                 placeholder={t('passwordMasked')}
                 value={formData.password}
                 onChange={handleChange}
@@ -778,7 +780,7 @@ export default function Register() {
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="confirmPassword" className="block text-sm font-semibold text-stone-800 mb-2">
                 {t('confirmPassword')}
               </label>
               <input
@@ -787,7 +789,7 @@ export default function Register() {
                 type="password"
                 autoComplete="new-password"
                 required
-                className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                className={pagePlan.champClass}
                 placeholder={t('passwordMasked')}
                 value={formData.confirmPassword}
                 onChange={handleChange}
@@ -800,7 +802,7 @@ export default function Register() {
                 eux de toute façon). */}
             {formData.user_type === 'worker' && (
               <div>
-                <label htmlFor="referral_code" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="referral_code" className="block text-sm font-semibold text-stone-800 mb-2">
                   <Gift className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {pageT('referralCodeLabel')}
                 </label>
                 <input
@@ -809,7 +811,7 @@ export default function Register() {
                   type="text"
                   autoComplete="off"
                   maxLength="40"
-                  className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-xs focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  className={pagePlan.champClass}
                   placeholder={pageT('referralCodePlaceholder')}
                   value={formData.referral_code || ''}
                   onChange={handleChange}
@@ -866,32 +868,33 @@ export default function Register() {
                 type="checkbox"
                 checked={formData.legal_documents_accepted}
                 onChange={handleChange}
-                className="mt-1 h-4 w-4 rounded-sm border-gray-300 text-orange-600 focus:ring-orange-500"
+                className="mt-1 h-4 w-4 rounded-sm border-stone-300 text-orange-600 focus:ring-orange-500"
               />
               <span className="text-sm text-gray-700">{pageT('legalConsentLabel')}</span>
             </label>
-            <p className="text-xs text-gray-600">{pageT('legalContactLine')}</p>
+            <p className="text-xs text-stone-600">{pageT('legalContactLine')}</p>
           </div>
 
           <div className="bloc-differe-envoi">
             <LoadingButton
               type="submit"
               loading={loading}
-              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-orange-600 hover:bg-orange-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="bouton bouton-encre w-full"
             >
               {pageT('continueButton')}
             </LoadingButton>
           </div>
 
           <div className="bloc-differe-lien text-center">
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-stone-600">
               {pageT('signInPrompt')}{' '}
-              <Link to="/login" className="font-medium text-orange-600 hover:text-orange-500 transition-colors">
+              <Link to="/login" className="font-semibold text-orange-700 underline underline-offset-2 hover:text-orange-600 transition-colors">
                 {t('signIn')}
               </Link>
             </span>
           </div>
         </form>
+        </div>
       </div>
     </div>
   );

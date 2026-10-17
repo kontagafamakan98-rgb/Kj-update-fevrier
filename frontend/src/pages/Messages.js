@@ -5,6 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { messagesAPI } from '../services/apiEndpoints';
 import { handleApiError } from '../services/api';
 import { MessagesSkeleton } from '../components/SkeletonLoader';
+import Link from '../components/LienVue';
 // Le cadre de page (largeur, gouttière, pas) a UN propriétaire —
 // `src/config/app-cadres.js` — et cette page le LIT : deux chaînes recopiées
 // divergeraient au premier correctif, en silence.
@@ -172,8 +173,14 @@ export default function Messages() {
 
   const getOtherPersonName = () => activeConversationData?.other_user_name || pageT('otherUser');
 
+  // L'ÉTAT VIDE est un écran à part entière, pas un manque : la pastille en
+  // crème et le titre serif le traitent comme un commencement, et le lien mène
+  // à la seule action qui puisse ouvrir une conversation (postuler à une
+  // mission). Sans lui, l'écran vide n'offrait RIEN à faire.
   const EmptyIcon = () => (
-    <MessageCircle size={48} className="mx-auto text-gray-300" strokeWidth={1.5} />
+    <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-orange-50">
+      <MessageCircle size={36} className="text-orange-500" strokeWidth={1.5} aria-hidden="true" />
+    </div>
   );
 
   if (loading) {
@@ -183,53 +190,86 @@ export default function Messages() {
     return <MessagesSkeleton />;
   }
 
+  // AUCUNE CONVERSATION : l'écran n'a rien à montrer, donc il n'ouvre pas un
+  // panneau vide de 75 vh avec une colonne de liste elle aussi vide — deux
+  // cadres qui ne disent rien. Une carte, une phrase, une action : c'est la
+  // règle déjà appliquée aux listes vides du site.
+  if (conversations.length === 0) {
+    return (
+      <CadrePage chemin="/messages" titre={t('messages')} classeCorps="">
+        {/* La HAUTEUR est celle que le squelette réserve (`h-[75vh]`, la même
+            que le panneau de `MessagesSkeleton`) : sans elle, l'écran vide
+            laissait le pied de page remonter de 400 px à l'arrivée des données
+            (CLS 0,0504 mesuré par `e2e/cadres-app.spec.js` pour un plafond de
+            0,02). Le rembourrage, lui, se LIT (`carte-publique`) : un rembourrage
+            vertical fixe s'écarterait du jeton d'autant plus que la fenêtre
+            grandit. */}
+        <div className="carte-editoriale carte-publique flex h-[75vh] flex-col items-center justify-center text-center">
+          <EmptyIcon />
+          {/* L'échelle est celle d'un titre de CARTE (`.titre-carte-app`), pas
+              d'un titre de section : l'élément LCP de `/messages` est le `<h1>`
+              du cadre (« Messages »), et un titre de section dans la carte
+              prenait sa place (mesuré : 4 256 → 6 390 px², `e2e/lcp-app.spec.js`).
+              La hiérarchie voulue est aussi celle-là : le titre de la page
+              domine, l'état vide se lit en dessous. */}
+          <h2 className="titre-carte-app mt-6">{t('noConversations')}</h2>
+          <p className="mt-3 max-w-md text-stone-600">{t('startApplyingJobs')}</p>
+          {/* DEUX suites possibles, et c'est ce que l'écran vide doit offrir :
+              une mission à proposer (la conversation naît de là) et la marche à
+              suivre pour qui ne sait pas encore comment ça se passe. Un seul
+              bouton laissait le visiteur qui hésite sans rien. */}
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
+            <Link to="/jobs" className="bouton bouton-encre">
+              {t('searchJobs')}
+            </Link>
+            <Link to="/how-it-works" className="bouton bouton-clair">
+              {t('howItWorksTitle')}
+            </Link>
+          </div>
+        </div>
+      </CadrePage>
+    );
+  }
+
   return (
     <CadrePage chemin="/messages" titre={t('messages')} classeCorps="">
-      <div className="carte-editoriale overflow-hidden h-[75vh] flex">
+      <div className="carte-editoriale flex h-[75vh] overflow-hidden">
         {/* Liste des conversations : plein ecran sur mobile tant qu'aucune n'est ouverte,
             colonne fixe a partir de sm. */}
-        <div className={`w-full sm:w-[320px] sm:shrink-0 border-r border-gray-100 flex-col ${activeConversation ? 'hidden sm:flex' : 'flex'}`}>
-          <div className="px-4 py-3 border-b border-gray-100">
-            <span className="text-sm font-semibold text-gray-500 uppercase tracking-wide">{t('conversations')}</span>
+        <div className={`w-full flex-col border-r border-stone-200 bg-stone-50/60 sm:w-[320px] sm:shrink-0 ${activeConversation ? 'hidden sm:flex' : 'flex'}`}>
+          <div className="border-b border-stone-200 px-4 py-3">
+            <span className="sur-titre">{t('conversations')}</span>
           </div>
 
+          {/* Une conversation existe FORCÉMENT : l'écran sans aucune
+              conversation est rendu plus haut, en une seule carte. */}
           <div className="flex-1 overflow-y-auto">
-            {conversations.length > 0 ? (
-              conversations.map((conversation) => (
+            {conversations.map((conversation) => (
                 <button
                   key={conversation._id}
                   onClick={() => loadMessages(conversation._id, conversation)}
-                  className={`w-full px-4 py-3 text-left border-b border-gray-50 transition-colors hover:bg-gray-50 ${
-                    activeConversation === conversation._id ? 'bg-orange-50' : ''
+                  className={`ligne-app w-full border-b border-stone-100 text-left ${
+                    activeConversation === conversation._id ? 'ligne-app-active' : ''
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-gray-200 flex items-center justify-center">
-                      {conversation.other_user?.profile_photo ? (
-                        <img src={conversation.other_user.profile_photo} alt={conversation.other_user_name} className="h-full w-full object-cover" />
-                      ) : (
-                        <span className="text-gray-600 font-semibold">{(conversation.other_user_name || getOtherPersonName()).charAt(0).toUpperCase()}</span>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-gray-900 truncate">{conversation.other_user_name || getOtherPersonName()}</p>
-                      <p className="text-xs text-gray-500 truncate">{stripJobMarkerFromMessage(conversation.last_message)}</p>
-                    </div>
-                    {Number(conversation.unread_count || 0) > 0 && (
-                      <span className="shrink-0 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-sm bg-orange-600 text-white text-xs font-bold">
-                        {conversation.unread_count}
-                      </span>
+                  <div className="avatar-app">
+                    {conversation.other_user?.profile_photo ? (
+                      <img src={conversation.other_user.profile_photo} alt={conversation.other_user_name} className="h-full w-full object-cover" />
+                    ) : (
+                      (conversation.other_user_name || getOtherPersonName()).charAt(0).toUpperCase()
                     )}
                   </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-stone-900">{conversation.other_user_name || getOtherPersonName()}</p>
+                    <p className="truncate text-xs text-stone-500">{stripJobMarkerFromMessage(conversation.last_message)}</p>
+                  </div>
+                  {Number(conversation.unread_count || 0) > 0 && (
+                    <span className="inline-flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-[3px] bg-orange-600 px-1.5 text-xs font-bold text-white">
+                      {conversation.unread_count}
+                    </span>
+                  )}
                 </button>
-              ))
-            ) : (
-              <div className="px-4 py-12 text-center">
-                <EmptyIcon />
-                <p className="mt-3 text-sm font-medium text-gray-600">{t('noConversations')}</p>
-                <p className="mt-1 text-xs text-gray-400">{t('startApplyingJobs')}</p>
-              </div>
-            )}
+            ))}
           </div>
         </div>
 
@@ -237,26 +277,29 @@ export default function Messages() {
         <div className={`flex-1 flex-col ${activeConversation ? 'flex' : 'hidden sm:flex'}`}>
           {activeConversation ? (
             <>
-              <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-gray-50">
+              {/* L'EN-TÊTE DU FIL : sable et filet, la même teinte que la
+                  colonne des conversations — le fil et sa liste sont deux
+                  panneaux du même écran, pas deux pages voisines. */}
+              <div className="flex items-center gap-3 border-b border-stone-200 bg-stone-50 px-4 py-3">
                 <button
                   type="button"
                   onClick={() => setActiveConversation(null)}
-                  className="sm:hidden text-gray-500 hover:text-gray-700"
+                  className="text-stone-500 hover:text-stone-800 sm:hidden"
                   aria-label={t('backToConversations')}
                 >
                   <ArrowLeft size={20} />
                 </button>
-                <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-gray-200 flex items-center justify-center">
+                <div className="avatar-app">
                   {activeConversationData?.other_user?.profile_photo ? (
                     <img src={activeConversationData.other_user.profile_photo} alt={getOtherPersonName()} className="h-full w-full object-cover" />
                   ) : (
-                    <span className="text-xs text-gray-600 font-semibold">{getOtherPersonName().charAt(0).toUpperCase()}</span>
+                    getOtherPersonName().charAt(0).toUpperCase()
                   )}
                 </div>
-                <h3 className="font-semibold text-gray-900">{getOtherPersonName()}</h3>
+                <h3 className="titre-carte-app truncate">{getOtherPersonName()}</h3>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/50">
+              <div className="flex-1 space-y-3 overflow-y-auto bg-stone-50/40 p-4">
                 {hasMoreMessages && (
                   <div className="flex justify-center">
                     <button
@@ -280,10 +323,10 @@ export default function Messages() {
                   messages.map((message) => (
                     <div key={message.id} className={`flex ${message.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}>
                       <div
-                        className={`max-w-[80%] sm:max-w-md px-4 py-2 rounded-2xl text-sm ${
+                        className={`max-w-[80%] rounded-xl px-4 py-2 text-sm sm:max-w-md ${
                           message.sender_id === user?.id
-                            ? 'bg-orange-600 text-white rounded-tr-sm'
-                            : 'bg-white border border-gray-100 text-gray-900 rounded-tl-sm'
+                            ? 'bulle-ecrite rounded-tr-sm'
+                            : 'bulle-recue rounded-tl-sm'
                         }`}
                       >
                         {/* stripJobMarkerFromMessage nettoie un éventuel
@@ -293,7 +336,7 @@ export default function Messages() {
                             il est désormais stocké dans un champ séparé,
                             mais on garde ce nettoyage par sécurité). */}
                         <p className="whitespace-pre-line">{stripJobMarkerFromMessage(message.content)}</p>
-                        <p className={`text-[11px] mt-1 flex items-center justify-end gap-1 ${message.sender_id === user?.id ? 'text-orange-100' : 'text-gray-500'}`}>
+                        <p className={`mt-1 flex items-center justify-end gap-1 text-[11px] ${message.sender_id === user?.id ? 'text-orange-100' : 'text-stone-500'}`}>
                           {formatMessageTime(message.timestamp)}
                           {message.sender_id === user?.id && (
                             <span title={message.read_at ? t('readReceiptReadAt').replace('{time}', formatMessageTime(message.read_at)) : (message.read ? t('readReceiptRead') : t('readReceiptSent'))}>
@@ -308,7 +351,7 @@ export default function Messages() {
                 <div ref={messagesEndRef} />
               </div>
 
-              <form onSubmit={sendMessage} className="p-3 border-t border-gray-100 bg-white">
+              <form onSubmit={sendMessage} className="border-t border-stone-200 bg-white p-3">
                 <div className="flex items-center gap-2">
                   <label htmlFor="message_input" className="sr-only">{pageT('placeholder')}</label>
                   <input
@@ -320,13 +363,13 @@ export default function Messages() {
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     placeholder={pageT('placeholder')}
-                    className="flex-1 rounded-lg border border-gray-200 px-4 py-2.5 text-sm focus:outline-hidden focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    className="flex-1 px-4 py-2.5 text-sm outline-hidden focus:ring-2 focus:ring-orange-500"
                   />
                   <button
                     aria-label={pageT('sendMessageAria')}
                     type="submit"
                     disabled={!newMessage.trim()}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-50"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[3px] bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-50"
                   >
                     <Send size={17} />
                   </button>
@@ -334,10 +377,10 @@ export default function Messages() {
               </form>
             </>
           ) : (
-            <div className="flex-1 items-center justify-center text-gray-500 hidden sm:flex">
+            <div className="hidden flex-1 items-center justify-center text-stone-500 sm:flex">
               <div className="text-center">
                 <EmptyIcon />
-                <p className="mt-3 text-sm">{t('selectConversation')}</p>
+                <p className="mt-5 text-sm">{t('selectConversation')}</p>
               </div>
             </div>
           )}

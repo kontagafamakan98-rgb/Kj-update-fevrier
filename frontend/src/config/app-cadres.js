@@ -215,13 +215,18 @@ export const REGLES_DE_CHARGEMENT = {
     hauteurClass: HAUTEUR_PIED_HORS_ECRAN,
     pourquoi:
       'sa hauteur dépend de la BRANCHE de l’URL (formulaire et cartes de paiement avec `job_id`, ' +
-      'carte « mission requise » sans elle : 700,4 px de `main` en mobile) et le repli de ' +
-      '`<Suspense>` est peint AVANT que la page existe : il réserve la branche la PLUS HAUTE. ' +
+      'carte « mission requise » sans elle : 645,83 px de `main` en mobile depuis le port du ' +
+      'vocabulaire d’écran, 700,4 avant lui) et le repli de `<Suspense>` est peint AVANT que la ' +
+      'page existe : il réserve la branche la PLUS HAUTE. ' +
       'Mesuré le 09/10/2026 : sans réserve le pied de page restait VISIBLE en desktop pendant tout ' +
       'le chargement (y=859 pour une fenêtre de 940, déjà à sa place finale) ; avec elle il démarre ' +
-      'HORS écran aux deux tailles — 1019 pour 823 (mobile), 1004 pour 940 (desktop), réserve ' +
-      'peinte 758 / 875 px — et le relâchement vaut 0,0218 mobile / 0,0132 desktop (témoin sans ' +
-      'réserve : 0,0148 desktop)',
+      'HORS écran aux deux tailles — 1004,33 pour 823 (mobile), 1004 pour 940 (desktop), réserve ' +
+      'peinte 779,33 / 875 px. Re-mesuré le 17/10/2026 après la refonte : relâchement 0,0484 ' +
+      'mobile / 0,0131 desktop, sous le plafond de 0,06 ; la destination a PERDU 54,6 px (la bande ' +
+      'remplace la carte ombrée, et la carte « mission requise » lit `.carte-publique` au lieu de ' +
+      'son rembourrage écrit), donc le pied de page entre d’un cran de plus qu’avant (0,0218 / ' +
+      '0,0132) — c’est le prix mesuré de la refonte, pas une marge, et la déclaration de règle n’a ' +
+      'pas bougé (témoin sans réserve : 0,0148 desktop)',
   },
 };
 

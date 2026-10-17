@@ -149,9 +149,13 @@ describe('Page Profil — détection IP en échec', () => {
   it("n'applique aucun pays détecté : exemples de téléphone et banques par défaut", async () => {
     renderProfile();
 
+    // Le repère de la carte est DÉCLARÉ (`data-section`) : il ne dépend plus du
+    // dessin du conteneur — une refonte de la carte (filet au lieu d'ombre)
+    // faisait échouer ce cas sur une classe de PRÉSENTATION, pas sur ce qu'il
+    // mesure.
     const section = await screen
       .findByText('Comptes de paiement')
-      .then((el) => el.closest('.bg-white.rounded-lg.shadow-md'));
+      .then((el) => el.closest('[data-section="comptes-paiement"]'));
     fireEvent.click(within(section).getByRole('button', { name: 'Modifier' }));
 
     // Exemple de numéro : celui PAR DÉFAUT (Sénégal), pas celui d'un pays détecté.

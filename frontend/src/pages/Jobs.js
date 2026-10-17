@@ -35,8 +35,10 @@ import {
 // ── LES PUCES ET LE PANNEAU DES FILTRES ────────────────────────────────────
 // Le vocabulaire éditorial du site (src/index.css), et NON des utilitaires
 // recopiés : les onglets et les puces de catégorie étaient des PILULES
-// (`rounded-full`) aux teintes froides (`bg-gray-900`, `border-gray-200`),
-// c'est-à-dire la forme et la gamme que la refonte a retirées. Ils gardent
+// arrondies aux teintes FROIDES, c'est-à-dire la forme et la gamme que la
+// refonte a retirées — le nom de ces utilitaires n'est pas écrit ici, pas même
+// en prose : Tailwind lit le texte des sources, et une règle générée que rien
+// ne pose est refusée par `scripts/check-css-selecteurs-morts.js`. Ils gardent
 // leur fonction (une catégorie active reste visible sans ouvrir de menu) avec
 // le rayon des boutons du site et la gamme chaude.
 //
@@ -442,7 +444,7 @@ export default function Jobs() {
               type="button"
               onClick={() => setFilters((prev) => ({ ...prev, country: '' }))}
               aria-label={`${pageT('clearFilters')} — ${paysFiltre.name}`}
-              className={`inline-flex items-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-800 transition-colors hover:border-stone-300 ${paysFiltre.color}`}
+              className={`inline-flex items-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-800 transition-colors hover:border-stone-300 ${paysFiltre.classeCarte}`}
             >
               <CountryDisplay countryCode={paysFiltre.code} />
               <svg className="h-4 w-4 text-stone-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">

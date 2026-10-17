@@ -1,0 +1,10 @@
+[
+  {
+    "methode": "POST",
+    "chemin": "/api/email/resend-webhook",
+    "nom": "resend_email_webhook",
+    "code": null,
+    "response_model": "typing.Dict",
+    "dependances": []
+  }
+]

@@ -68,11 +68,27 @@ async def _seed_account_data(uid: str, email: str) -> dict:
         doc_id = str(uuid.uuid4())
         await db_insert(collection, {"id": doc_id, fields[0]: uid})
         inserted[collection] = doc_id
+    # Les collections lues par l'ADRESSE reçoivent leur document, une par une :
+    # le test de contenu exige que TOUTE collection de USER_DATA_BY_EMAIL soit
+    # rendue, donc une famille qui s'agrandit doit se semer ici — sans quoi il
+    # signalerait une absence que la fixture aurait créée elle-même.
     await db_insert("email_otps", {
         "email": email,
         "purpose": "signup",
         "otp_hash": "hash-qui-ne-doit-pas-sortir",
         "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
+    })
+    await db_insert("email_delivery_events", {
+        "id": str(uuid.uuid4()),
+        "email": email,
+        "motif": "bounce_transitoire",
+        "id_evenement": "msg-webhook-export",
+        "recu_le": datetime.now(timezone.utc),
+    })
+    await db_insert("email_suppressions", {
+        "id": str(uuid.uuid4()),
+        "email": email,
+        "motif": "bounce_permanent",
     })
     return inserted
 

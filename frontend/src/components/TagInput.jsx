@@ -1,9 +1,10 @@
 import { useState } from 'react';
+import { CHAMP_SANS_MARGE } from '../config/classes-champ';
 
-// Classes par défaut du champ de saisie (cohérentes avec les formulaires
-// orange du projet). Surchargeables via inputClassName (ex: création de
-// mission avec ses propres styles).
-const DEFAULT_INPUT_CLASS = 'flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-xs focus:outline-hidden focus:ring-orange-500 focus:border-orange-500';
+// Le champ de saisie lit le dessin du site (filet chaud, fond papier, anneau
+// orange) : il n'écrit plus ses utilitaires. Surchargeable via inputClassName
+// (ex : la création de mission, qui a son propre dessin de champ).
+const DEFAULT_INPUT_CLASS = `${CHAMP_SANS_MARGE} flex-1 min-w-0`;
 
 /**
  * Éditeur de tags réutilisable (compétences, spécialités, compétences
@@ -67,7 +68,7 @@ export default function TagInput({
 
   return (
     <div className={className}>
-      <div className="flex space-x-2">
+      <div className="flex gap-2">
         <input
           id={inputId}
           type="text"
@@ -78,11 +79,14 @@ export default function TagInput({
           placeholder={placeholder}
           className={inputClassName || DEFAULT_INPUT_CLASS}
         />
+        {/* L'action de la rangée : le vocabulaire de bouton du site, celui des
+            autres formulaires (`.bouton` porte la hauteur, le rayon et le
+            geste de survol — rien à réinventer ici). */}
         <button
           type="button"
           onClick={addTag}
           disabled={!input.trim() || atLimit}
-          className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bouton bouton-encre shrink-0 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {addLabel}
         </button>

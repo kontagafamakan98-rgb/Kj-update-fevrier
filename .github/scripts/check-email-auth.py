@@ -39,6 +39,16 @@ présents mais boîte injoignable ou message absent = échec (code 1) : un secre
 périmé ou un chemin d'envoi cassé sont des régressions, pas des faits
 d'exploitation.
 
+`--require-secrets` renverse ce premier cas, et c'est le mode du run de `main` :
+l'absence des identifiants y devient un ÉCHEC (code 1) au lieu d'une notice. La
+raison est mesurée, pas théorique — le job `fly-env-drift` qui porte cette sonde
+est un check REQUIS, donc un vert y est lu comme « les trois verdicts ont été
+lus » ; un secret retiré (rotation, ménage, changement de compte) éteindrait la
+sonde en silence, et personne ne relit une notice d'un run vert. Les deux secrets
+sont posés depuis le 18/09/2026, donc ce mode ne coûte rien aujourd'hui et rend
+le silence impossible demain. Un poste qui n'a pas les secrets garde l'annulation
+explicite (sans le drapeau).
+
 Usage :
     KOJO_PROBE_IMAP_USER=… KOJO_PROBE_IMAP_PASSWORD=… python .github/scripts/check-email-auth.py
 """
@@ -332,15 +342,29 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--backend", default=os.environ.get("KOJO_BACKEND_URL", BACKEND_DEFAULT))
     parser.add_argument("--timeout", type=float, default=float(os.environ.get("KOJO_EMAIL_PROBE_TIMEOUT", "180")))
+    parser.add_argument(
+        "--require-secrets",
+        action="store_true",
+        help=(
+            "sans identifiants, ÉCHOUER (code 1) au lieu de s'annuler en notice — le mode "
+            "du run de `main`, où la sonde est un check requis et où un vert vaut « vérifié »"
+        ),
+    )
     args = parser.parse_args(argv)
 
     creds = credentials(dict(os.environ))
     if not creds:
-        print(
-            "::notice title=Sonde email NON EXÉCUTÉE::"
+        # Le même constat, deux lectures : sur `main` (mode strict) il est un échec
+        # nommé, ailleurs il est une annulation explicite. Le sens du message ne
+        # change pas — seul le code de sortie dit à quel point on doit s'en occuper.
+        constat = (
             "KOJO_PROBE_IMAP_USER / KOJO_PROBE_IMAP_PASSWORD absents — SPF/DKIM/DMARC "
             "n'ont PAS été vérifiés (aucun verdict lu). Poser les deux secrets pour activer la sonde."
         )
+        if args.require_secrets:
+            print(f"::error title=Sonde email NON EXÉCUTÉE (secrets exigés)::{constat}")
+            return 1
+        print(f"::notice title=Sonde email NON EXÉCUTÉE::{constat}")
         return 0
 
     alias = probe_alias(creds["user"])

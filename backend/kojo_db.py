@@ -113,6 +113,21 @@ async def create_database_indexes():
         await db.business_events.create_index("cle", unique=True)
         await db.business_events.create_index("job_id")
         await db.business_events.create_index("user_id")
+
+        # Faits de livraison des emails (kojo_email_suppressions) :
+        # `id_evenement` (en-tête `svix-id` de Resend) est UNIQUE — c'est la
+        # contrainte qui absorbe une re-livraison du même fait, et sans elle un
+        # rebond rejoué compterait deux fois, donc l'alerte et le journal
+        # mentiraient. L'index TTL de ce journal vient des règles de
+        # conservation (bloc plus bas), jamais d'un expireAfterSeconds écrit
+        # ici.
+        await db.email_delivery_events.create_index("id_evenement", unique=True)
+        await db.email_delivery_events.create_index("email")
+
+        # Adresses injoignables : une adresse = un état. `email` est normalisé
+        # (minuscules, sans étiquette `+tag`, cf. kojo_email_suppressions) pour
+        # que `prenom+tag@…` et `prenom@…` ne fassent qu'une seule boîte.
+        await db.email_suppressions.create_index("email", unique=True)
         
         # Messages collection indexes
         # NOTE: les index précédents portaient sur "job_id" et "created_at",

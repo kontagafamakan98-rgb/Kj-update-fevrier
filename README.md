@@ -11,7 +11,7 @@ Kojo connecte clients et artisans en Afrique de l'Ouest (Sénégal, Mali, Côte 
 | Base de données | MongoDB Atlas |
 | Paiements | PayDunya (Orange Money, Wave, carte) |
 | Photos | Cloudinary |
-| Emails | Brevo / Gmail OAuth2 (ou `EMAIL_PROVIDER=none`) |
+| Emails | Brevo / Resend / Gmail OAuth2 (ou `EMAIL_PROVIDER=none`) |
 | Notifications push | VAPID (pywebpush) |
 | Déploiement | Fly.io (backend, ~0 $/mois) + Vercel (frontend) |
 
@@ -279,7 +279,9 @@ curl -s https://kojoforafrica.cc.cd/ | grep -c 'href="tel:'        # 2
 
 ## CI
 
-`.github/workflows/ci.yml` (9 jobs, dont 8 requis sur `main`) :
+`.github/workflows/ci.yml` (11 jobs, dont 10 requis sur `main` — la liste vit
+une seule fois, `.github/scripts/gate-perimetre.json`, cf. « Protection de
+`main` » plus bas) :
 
 - **audit-regression-test** — méta-test : injecte une régression et exige que
   chaque garde (docstrings, endpoints fantômes, `py_compile`, pyflakes) échoue.
@@ -292,6 +294,15 @@ curl -s https://kojoforafrica.cc.cd/ | grep -c 'href="tel:'        # 2
 - **backend-tests** — `pytest` contre un vrai MongoDB (service container),
   syntaxe Python (`py_compile`), **pyflakes (aucun nom non défini dans les
   modules `kojo_*` — garde-fou contre les imports manquants du découpage)**
+- **dependency-audit** — avis haut/critique sur les dépendances : `npm audit`
+  (dev incluses) et `pip-audit` sur `backend/requirements.txt`, l'avis constaté
+  étant nommé (paquet, version, correctif). **Requis depuis le 16/10/2026** (il
+  avait été rouge 6 fois sur 30 runs, tous sur des avis de PRODUCTION, sans
+  bloquer une seule fusion)
+- **e2e-playwright** — la suite navigateur Chromium : parcours clés, LCP/CLS par
+  route pré-rendue, tiers avant/après interaction, coquilles, CSP réelle.
+  **Requis depuis le 16/10/2026** (15 rouges sur 27 exécutions, dont un cas
+  réel — une PR a été fusionnée sous l'un d'eux)
 - **frontend-build** — tests Vitest + build Vite sur Node 24, puis 7 gardes sur
   les artefacts (shells de pré-rendu, splits i18n et `services/api`, cartes OG,
   famille d'icônes, manifeste PWA, budgets de bundle)
@@ -397,19 +408,34 @@ administrateur). Pour le modifier : `Settings → General → Pull Requests`, ou
 ### Protection de `main` (branche protégée)
 
 `main` est protégée par une règle GitHub : **aucun commit ne peut y entrer
-autrement que par une PR dont les 8 checks CI sont verts**. Concrètement :
+autrement que par une PR dont les 10 checks CI sont verts**. Concrètement :
 
 - **PR obligatoire** — les pushs directs sur `main` sont refusés par le serveur
   (`GH006: Protected branch update failed … Changes must be made through a pull
   request`), même pour l'administrateur du dépôt (protection appliquée aussi
   aux admins : impossible de la contourner « par erreur »).
-- **8 checks requis** — le workflow en compte **9** : `Bundle size report (PR
-  comment)` en est volontairement **exclu** (il publie des mesures, il ne juge
-  rien) : `Audits détectent
-  les régressions`, `Backend tests (Python + MongoDB)`, `Fly env doc-prod (drift
-  + secrets)`, `Frontend tests + build (Node/Vite)`, `Lighthouse performance
-  budgets`, `Mobile build (Capacitor + Android)`, `Workflow lint (actionlint +
-  shellcheck)`, `Deploy backend to Fly.io`.
+- **10 checks requis** — le workflow en déclare **11** : `Bundle size report (PR
+  comment)` en est volontairement **exclu** (il publie un commentaire de PR, il
+  ne juge rien ; son budget de taille est asserté par `check-bundle-size.js`
+  **dans** `frontend-build`, qui est requis). Les dix requis sont : `Audits
+  détectent les régressions`, `Backend tests (Python + MongoDB)`, `Dépendances
+  (avis de sécurité)`, `E2E Playwright tests (Chromium)`, `Fly env doc-prod
+  (drift + secrets)`, `Frontend tests + build (Node/Vite)`, `Lighthouse
+  performance budgets`, `Mobile build (Capacitor + Android)`, `Workflow lint
+  (actionlint + shellcheck)`, `Deploy backend to Fly.io`.
+- **Une seule liste, deux chemins** — cette liste vit dans
+  `.github/scripts/gate-perimetre.json` (une identité de job **et** le nom exact
+  du check-run, plus l'exemption motivée du rapport de taille) et **les deux**
+  chemins qui appliquent le gate la lisent : le réglage de `main` ci-dessus, et
+  la livraison automatique (`.github/scripts/livrer.py`), qui attend
+  **exactement** ces noms — plus « tous les `check-runs` » du commit de tête, qui
+  comptait le rapport de taille en plus. Le garde
+  `.github/scripts/check-gate-perimetre.py` (étape de `workflow-lint`, un check
+  requis) refuse un nom de check-run dérivé, un job de `ci.yml` ni déclaré ni
+  exempté, une exemption périmée ou un `strict` non déclaré — hors ligne, donc
+  dans un check requis ; la protection RÉELLE se relit avec un jeton admin
+  (`GH_TOKEN=… python3 .github/scripts/check-gate-perimetre.py --en-ligne`), ce
+  que le pré-vol de `livrer.py` fait à chaque livraison, avant de pousser.
 - **Branche à jour exigée** (`strict`) : une PR verte mais calculée sur une base
   périmée doit être mise à jour avant fusion — un vert obtenu sur un `main`
   ancien ne suffit pas.
@@ -424,7 +450,7 @@ autrement que par une PR dont les 8 checks CI sont verts**. Concrètement :
 > déploiement est bien visible dans l'historique des checks.
 
 Aucun filtre de chemins n'existe au niveau du workflow : **toute** PR vers
-`main` déclenche ces 9 jobs, donc un check requis n'est jamais « en attente »
+`main` déclenche ces 11 jobs, donc un check requis n'est jamais « en attente »
 indéfiniment (cas typique de blocage avec une protection de branche).
 
 Pour modifier temporairement la règle (par ex. débloquer une urgence), passer
