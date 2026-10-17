@@ -1,0 +1,61 @@
+{
+  "_commentaire": "Registre des étapes qui ne peuvent PAS échouer. Toute entrée exige un motif : une exception s'écrit, elle ne se contente pas d'exister. Jugé par check-informative-steps.py (workflow-lint).",
+  "declarations": [
+    {
+      "fichier": "ci.yml",
+      "job": "audit-regression-test",
+      "etape": "Injecter une régression backend (route sans docstring) → échec attendu",
+      "forme": "erreurs ignorees",
+      "nombre": 1,
+      "motif": "Harnais de mutation : `set +e` encadre UNE commande dont l'échec est le résultat ATTENDU ; le verdict de l'étape est l'assertion explicite `if [ \"$EXIT_CODE\" -eq 0 ] → exit 1` juste après."
+    },
+    {
+      "fichier": "ci.yml",
+      "job": "audit-regression-test",
+      "etape": "Injecter une régression frontend (endpoint fantôme) → échec attendu",
+      "forme": "erreurs ignorees",
+      "nombre": 1,
+      "motif": "Harnais de mutation : `set +e` encadre UNE commande dont l'échec est le résultat ATTENDU ; le verdict de l'étape est l'assertion explicite `if [ \"$EXIT_CODE\" -eq 0 ] → exit 1` juste après."
+    },
+    {
+      "fichier": "ci.yml",
+      "job": "audit-regression-test",
+      "etape": "Injecter une régression pyflakes (nom non défini) → échec attendu",
+      "forme": "commande neutralisee",
+      "nombre": 1,
+      "motif": "Harnais de mutation : `|| true` sert à CAPTURER la sortie d'un `grep` dans une substitution de commande (l'absence de constat n'est pas un échec) ; le verdict est `if [ -z \"$UNDEFINED\" ] → exit 1`."
+    },
+    {
+      "fichier": "ci.yml",
+      "job": "audit-regression-test",
+      "etape": "Injecter une régression syntaxe Python (py_compile) → échec attendu",
+      "forme": "erreurs ignorees",
+      "nombre": 1,
+      "motif": "Harnais de mutation : `set +e` encadre UNE commande dont l'échec est le résultat ATTENDU ; le verdict de l'étape est l'assertion explicite `if [ \"$EXIT_CODE\" -eq 0 ] → exit 1` juste après."
+    },
+    {
+      "fichier": "ci.yml",
+      "job": "dependency-audit",
+      "etape": "Avis sur les dépendances Python (backend/requirements.txt, dev incluses) — BLOQUANT",
+      "forme": "commande neutralisee",
+      "nombre": 1,
+      "motif": "`|| true` ne borne QUE l'extraction du tableau (`grep` sans correspondance n'est pas un avis) ; l'étape finit par `exit 1` dès que pip-audit sort non nul — verdict ou pas —, donc elle ne peut pas verdir sans conclure."
+    },
+    {
+      "fichier": "ci.yml",
+      "job": "lighthouse-ci",
+      "etape": "Fermer la pile locale et vérifier l’environnement final",
+      "forme": "commande neutralisee",
+      "nombre": 1,
+      "motif": "Nettoyage `if: always()` : `kill` d'un PID déjà sorti est un no-op légitime ; le verdict de l'étape reste l'appel `check-test-environment.js` sous `set -euo pipefail`, qui abandonne l'étape."
+    },
+    {
+      "fichier": "ci.yml",
+      "job": "mobile-build",
+      "etape": "Accept Android SDK licenses",
+      "forme": "commande neutralisee",
+      "nombre": 1,
+      "motif": "`yes | sdkmanager --licenses` répond à une invite interactive : le code de sortie de `yes` (SIGPIPE) n'est pas un verdict ; c'est le `./gradlew assembleDebug` juste en dessous qui refuse si une licence manque."
+    }
+  ]
+}

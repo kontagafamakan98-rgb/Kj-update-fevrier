@@ -45,6 +45,8 @@ Le seul fait que ce fichier DÉCLARE est le sort de chaque couple (le pendant
 machine de PRIVACY.md §2) ; ce qui doit être effacé, le champ email des OTP et
 la liste des couples viennent du routeur, jamais d'une copie.
 """
+from datetime import datetime, timezone
+
 import server as _srv
 from kojo_core import sanitize_email
 from kojo_routers_users import (
@@ -85,6 +87,13 @@ SORTS = {
     # comptabilité. Le lien au compte suit celui du job (`jobs.client_id`).
     ("business_events", "user_id"): CONSERVE,
     ("email_otps", USER_DATA_BY_EMAIL_FIELD): CONSERVE,
+    # Le journal des faits de livraison et la liste des adresses injoignables
+    # sont indexés par l'adresse, comme les codes OTP, et la suppression de
+    # compte ne les touche pas : le premier périme par sa règle de conservation,
+    # la seconde est levée par le propriétaire — elle ne sert qu'à ne pas écrire
+    # dans le vide, et un compte supprimé n'est plus écrit de toute façon.
+    ("email_delivery_events", USER_DATA_BY_EMAIL_FIELD): CONSERVE,
+    ("email_suppressions", USER_DATA_BY_EMAIL_FIELD): CONSERVE,
 }
 
 COORDONNEES = {
@@ -211,6 +220,11 @@ def _documents_a_semer(user_id: str, email: str):
           "cle": "mission_created:job-1", "job_id": "job-1"}),
         (("email_otps", USER_DATA_BY_EMAIL_FIELD), "email_otps",
          {"id": "code-1", "email": email, "otp_hash": "condense"}),
+        (("email_delivery_events", USER_DATA_BY_EMAIL_FIELD), "email_delivery_events",
+         {"id": "fait-livraison-1", "email": email, "motif": "bounce_transitoire",
+          "id_evenement": "msg-webhook-1", "recu_le": datetime.now(timezone.utc)}),
+        (("email_suppressions", USER_DATA_BY_EMAIL_FIELD), "email_suppressions",
+         {"id": "adresse-retenue-1", "email": email, "motif": "bounce_permanent"}),
     ]
 
 

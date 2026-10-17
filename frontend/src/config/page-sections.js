@@ -3,6 +3,10 @@
 // le bundle — Node n'exécute pas d'import relatif sans extension, ni d'import
 // JSON sans `with { type: 'json' }`.
 import { CONTACT, mailtoHref, telHref } from './contact.js';
+// Le dessin du CHAMP est partagé par les trois formulaires du site (login,
+// register, profile) : il a un propriétaire (./classes-champ.js) et ces plans le
+// lisent, plutôt que d'écrire chacun leur bordure et leur anneau de focus.
+import { CHAMP, CHAMP_TELEPHONE, CHAMP_PREFIXE, CHAMP_SELECTEUR } from './classes-champ.js';
 
 // Plan UNIQUE du corps des six pages dont la coquille publie une LISTE :
 // / (catégories, promesses, étapes, chiffres), /support (modes et lignes de
@@ -706,23 +710,54 @@ export const PAGE_SECTIONS = {
     // PLUS GRANDE devient un nouvel élément LCP.
     legalContactClass: 'text-xs text-stone-600',
     // Classes de la page : lues par src/pages/Login.js ET par la coquille.
-    frameClass: 'min-h-full flex items-center justify-center fond-sable py-12 px-4 sm:px-6 lg:px-8',
-    colonneClass: 'max-w-md w-full space-y-8',
+    //
+    // ── LE DESSIN DE L'ÉCRAN (17/10/2026) ───────────────────────────────────
+    // /login était la dernière page publique restée au vocabulaire d'AVANT la
+    // refonte : libellés `text-gray-700`, champs `rounded-md border-gray-300`,
+    // bouton `bg-orange-600`, encadré légal `bg-orange-50` — quatre familles de
+    // chaînes qu'aucune autre page ne portait plus. Le formulaire devient une
+    // CARTE du site (`.carte-editoriale` + `.carte-publique`), son bouton lit
+    // `.bouton` comme les actions des écrans connectés, et son encadré légal
+    // est un `.encart` (filet orange à gauche) au lieu d'un aplat orange clair.
+    // La carte est déclarée ici et publiée par la coquille : les deux canaux
+    // peignent la même enveloppe, donc la bascule coquille → React ne déplace
+    // rien (le bloc est centré verticalement, une hauteur différente aurait
+    // décalé tout le formulaire).
+    frameClass: 'min-h-full flex items-center justify-center fond-sable cadre-page px-4 sm:px-6',
+    colonneClass: 'max-w-md w-full',
+    carteClass: 'carte-editoriale carte-publique',
     titleClass: 'mt-6 text-center titre-page',
     formClass: 'mt-8 space-y-6',
     champsClass: 'space-y-4',
-    labelClass: 'block text-sm font-medium text-gray-700',
-    champClass: 'mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-hidden focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm',
-    ligneMotDePasseClass: 'flex items-center justify-between',
-    lienMotDePasseClass: 'text-sm font-medium text-orange-600 hover:text-orange-500',
-    champMotDePasseClass: 'appearance-none relative block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-hidden focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm',
-    boutonClass: 'group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50',
-    encadreLegalClass: 'rounded-lg border border-orange-200 bg-orange-50 p-4 space-y-2',
-    legalNoticeClass: 'text-sm font-semibold text-orange-900',
-    legalLienClass: 'inline-flex items-center text-sm font-medium text-orange-700 hover:text-orange-800 underline',
+    labelClass: 'block whitespace-nowrap text-sm font-semibold text-stone-800',
+    champClass: CHAMP,
+    // Le séparateur (« ou ») et la boîte d'erreur restent ÉCRITS dans la page
+    // et dans la coquille : les deux vivent sous condition (`VITE_GOOGLE_CLIENT_ID`
+    // pour l'un, une réponse d'API pour l'autre), et `exigerCorpsDeclare` lit un
+    // champ de plan comme un texte TOUJOURS publié — le déclarer ici faisait
+    // refuser le build dès que le client Google n'était pas configuré.
+    // La rangée du mot de passe porte DEUX textes dans une colonne de 320 px :
+    // sans `flex-wrap`, `justify-between` rétrécissait le LIBELLÉ jusqu'à le
+    // replier (« Mot de / passe ») tandis que le lien, lui, restait entier —
+    // relevé au port du dessin le 17/10/2026. Le lien ne se coupe plus, et si
+    // les deux ne tiennent pas, le lien passe à la ligne.
+    ligneMotDePasseClass: 'flex flex-wrap items-center justify-between gap-x-3 gap-y-1',
+    lienMotDePasseClass: 'whitespace-nowrap text-sm font-semibold text-orange-700 underline underline-offset-2 hover:text-orange-600',
+    // La place de l'œil (quarante-quatre pixels à droite) s'ajoute au champ
+    // partagé : c'est la seule différence, et elle est lisible ici.
+    champMotDePasseClass: `${CHAMP} pr-11`,
+    // `relative` n'est pas décoratif : LoadingButton monte son spinner dans une
+    // couche `absolute inset-0`, qui prend le bouton pour référence. React
+    // l'ajoute lui-même à la racine du bouton, la coquille n'a que ce plan —
+    // l'omettre faisait diverger les classes de la MÊME boîte sur /login et
+    // /register (sonde e2e/classes-coquille-react.spec.js, 17/10/2026).
+    boutonClass: 'relative bouton bouton-encre w-full',
+    encadreLegalClass: 'encart space-y-2',
+    legalNoticeClass: 'text-sm font-semibold text-stone-900',
+    legalLienClass: 'inline-flex items-center text-sm font-medium text-orange-700 underline underline-offset-2 hover:text-orange-800',
     noAccountClass: 'text-center',
-    noAccountTexteClass: 'text-sm text-gray-600',
-    lienInscriptionClass: 'font-medium text-orange-600 hover:text-orange-500',
+    noAccountTexteClass: 'text-sm text-stone-600',
+    lienInscriptionClass: 'font-semibold text-orange-700 hover:text-orange-600',
     // Le glyphe du bloc légal est DESSINÉ (page-icons.js) : le plan nomme une
     // icône, pas une clé i18n d'emoji (`iconLegalNotice` reste au dictionnaire
     // comme valeur interdite pour les coquilles, cf. check-prerender-shells).
@@ -732,6 +767,19 @@ export const PAGE_SECTIONS = {
   },
 
   '/register': {
+    // ── Les champs du formulaire (17/10/2026) ─────────────────────────────
+    // Ces quatre chaînes sont lues par Register.js ET par sa coquille
+    // (vite-plugins/prerender/shells-routes.js) : les champs du formulaire
+    // pré-rendu et ceux de React portent donc le même filet, le même fond et le
+    // même focus — la bascule ne change rien à leur dessin. Le dessin lui-même
+    // vit dans ./classes-champ.js, avec celui de /login et de /profile.
+    champClass: CHAMP,
+    champTelephoneClass: CHAMP_TELEPHONE,
+    champPrefixeClass: CHAMP_PREFIXE,
+    selecteurPaysClass: CHAMP_SELECTEUR,
+    // Même plan de bouton que /login : la coquille publie le même `<button>`
+    // que React, `relative` compris (spinner de LoadingButton).
+    boutonClass: 'relative bouton bouton-encre w-full',
     titleKey: 'title',
     subtitleKey: 'subtitle',
     detectingLocationKey: 'detectingLocation',
@@ -894,7 +942,18 @@ export const PAGE_SECTIONS = {
     // décision de cette page-là, pas un pas de site.
     frameClass: 'min-h-full bg-gray-50 py-8',
     corpsClass: 'max-w-6xl mx-auto px-4 space-y-6',
-    titleClass: 'titre-page mb-2',
+    // ── LE VOCABULAIRE D'ÉCRAN (17/10/2026) ──────────────────────────────────
+    // /payment était le dernier écran déclaré sans le vocabulaire des autres :
+    // en-tête en carte blanche ombrée, montants en pavés gris/vert/bleu, titres
+    // en `titre-entree`. Les cinq chaînes ci-dessous sont publiées par la
+    // COQUILLE (bande + carte « mission requise ») et lues par la page : une
+    // seule déclaration pour les deux canaux, comme le cadre lui-même.
+    bandeClass: 'bande-app bloc-app',
+    subtitleClass: 'mt-2 text-sm text-stone-600 sm:max-w-2xl sm:text-base',
+    carteClass: 'carte-editoriale carte-publique',
+    carteTitreClass: 'titre-carte-app',
+    ctaClass: 'bouton bouton-encre',
+    titleClass: 'titre-page',
     // ── LA RÈGLE DE SON ÉTAT DE CHARGEMENT N'EST PAS ICI, ET C'EST UN REFUS MESURÉ ──
     // Elle a été écrite dans ce plan le 09/10/2026, et `npm run build` l'a REFUSÉE :
     // `exigerCorpsDeclare` a lu `squelette.regle` comme un texte déclaré et a réclamé
@@ -907,6 +966,12 @@ export const PAGE_SECTIONS = {
     noJobTitleKey: 'paymentPageNoJobTitle',
     noJobTextKey: 'paymentPageNoJobText',
     noJobCtaKey: 'paymentPageNoJobCta',
+    // LE PLUS GRAND TEXTE PEINT de la route, et c'est le CORPS de cette carte —
+    // ni le titre ni le sous-titre de la bande. Déclaré ici depuis le
+    // 17/10/2026 : `e2e/lcp-geometrie-declaree.spec.js` exige que l'élément élu
+    // porte une classe du plan, sinon la géométrie du LCP n'a plus de
+    // propriétaire et la sonde ne peut plus rien vérifier.
+    noJobTextClass: 'text-stone-600 max-w-lg mx-auto mb-5',
   },
 
   // /support : le bloc de contact de la coquille était recopié, libellé par

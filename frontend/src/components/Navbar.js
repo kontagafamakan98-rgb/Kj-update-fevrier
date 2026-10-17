@@ -97,9 +97,20 @@ export default function Navbar() {
   // règle de survol des liens (même épaisseur, même couleur).
   const estActif = (chemin) =>
     chemin === '/' ? location.pathname === '/' : location.pathname.startsWith(chemin);
+  // Le dessin d'une entrée de barre reste un UTILITAIRE : ce lien est rendu par
+  // une fonction (`className={lienDesktop('/dashboard')}`), donc la classe
+  // n'est jamais écrite en position de classe littérale — une classe de SITE y
+  // serait déclarée « nommée et jamais posée » par
+  // `scripts/check-css-selecteurs-mortes.js`, à juste titre. La mesure ne
+  // change pas (px-3 py-2, 14 px, filet de 2 px) ; l'entrée courante prend en
+  // plus un fond de crème, pour qu'on sache où l'on est sans lire le
+  // soulignement. Aucune hauteur ne bouge : la barre fait 65 px dans les deux
+  // canaux, et la coquille pré-rendue publie une barre VIDE.
   const lienDesktop = (chemin) =>
-    `text-gray-700 hover:text-orange-600 px-3 py-2 text-sm font-medium transition-colors border-b-2 ${
-      estActif(chemin) ? 'border-orange-600 text-orange-600' : 'border-transparent'
+    `px-3 py-2 text-sm font-medium transition-colors border-b-2 ${
+      estActif(chemin)
+        ? 'border-orange-600 bg-orange-50 text-orange-700'
+        : 'border-transparent text-stone-700 hover:text-orange-700'
     }`;
 
   return (

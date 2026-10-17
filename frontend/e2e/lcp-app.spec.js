@@ -252,6 +252,21 @@ async function relever(browser, chemin, viewport) {
       chemin: location.pathname,
       images: document.querySelectorAll('img').length,
       cadres: document.querySelectorAll('.cadre-page').length,
+      // L'ÉTAT DES POLICES est publié avec le chiffre : l'aire d'un texte ne se
+      // compare pas d'un hôte à l'autre sans lui (voir `lcp-app-budgets.cjs`,
+      // « l'aire de l'ENCRE de l'élément élu suit les polices de l'hôte »). La
+      // famille APPLIQUÉE à l'élément élu est celle qui a décidé du repli — un
+      // hôte qui n'aurait pas appliqué les polices servies le dit ici.
+      polices: (() => {
+        const elu = window.__kojoLcpElements[window.__kojoLcpElements.length - 1] || null;
+        return {
+          statut: document.fonts.status,
+          appliquee: elu ? getComputedStyle(elu).fontFamily : null,
+          servies: [...document.fonts]
+            .filter((face) => face.status === 'loaded')
+            .map((face) => face.family),
+        };
+      })(),
     }));
     return {
       ...relevé,
@@ -408,6 +423,13 @@ test.describe('Parcours E2E — le LCP des cinq routes d’application, coquille
             `${bande.plancher}–${bande.plafond} px² (${bande.runs.length} runs ` +
             `[${bande.runs.join(' / ')}] px², marge ×${bande.marge} sur le pire relevé ${bande.pire} px², ` +
             `élément élu au relevé : ${bande.element}).\n` +
+            // L'ÉLÉMENT VIVANT, nommé : sans lui, un rouge sur un autre hôte ne
+            // dit que « plus grand » — et l'aire d'un TEXTE suit les polices de
+            // l'hôte (mesuré le 11/10/2026 : /profile mobile, même élément, même
+            // phrase, 11 211 px² ici et 16 215 sur le runner, trois lignes au lieu
+            // de deux). Ce fait-là se lit dans la boîte du dessous.
+            `      Élément élu À CE RUN : ${decrire(derniere)} — ${relevé.candidates.length} candidate(s), ` +
+            `polices ${JSON.stringify(relevé.etat.polices || 'non relevées')}.\n` +
             (verdict === 'au-dessus'
               ? '      Un élément qui peint plus grand qu’au relevé — un changement d’élément élu, une section ' +
                 'entière au lieu d’une ligne — fait monter cette aire sans que rien d’autre ne bouge. Réparer la ' +
@@ -423,6 +445,7 @@ test.describe('Parcours E2E — le LCP des cinq routes d’application, coquille
         console.log(
           `ℹ️  LCP ${cle} (${taille}) : ${derniere.taille} px² <${derniere.balise}>« ${derniere.texte} » à ` +
             `t=${derniere.debut} ms (FCP ${relevé.fcp} ms), zone ${relevé.provenance.zone} · ` +
+            `boîte ${derniere.cadre ? `${derniere.cadre.largeur}×${derniere.cadre.hauteur}` : 'illisible'} px · ` +
             `bande ${bande.plancher}–${bande.plafond} px² (pire relevé ${bande.pire} ×${bande.marge}) · ` +
             `coquille ${relevé.fichier} (${relevé.coquille}) · ` +
             `${relevé.candidates.length} candidate(s) · ${relevé.etat.cadres} cadre(s) · ${relevé.etat.images} image(s)`

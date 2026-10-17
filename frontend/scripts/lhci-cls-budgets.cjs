@@ -213,7 +213,16 @@ const CLS_BUDGETS = {
       + 'destination (les barres réservées dépassent le formulaire réel), donc la page se RÉTRÉCIT à l’arrivée '
       + 'des données — c’est là que naît ce 0,0288-0,0458, à comparer au plafond de 0,06 (marge ~25 %). '
       + 'La contrainte que la sonde interdit est l’inverse (réserver MOINS que sa destination : variante '
-      + 'réduite, 0,0801) ; réduire ce squelette-là sans passer sous le formulaire réel reste à mesurer'
+      + 'réduite, 0,0801) ; réduire ce squelette-là sans passer sous le formulaire réel reste à mesurer. '
+      + 'RE-MESURE DU 17/10/2026, APRÈS LE PORT DU VOCABULAIRE D’ÉCRAN (bande d’identité, tuiles de '
+      + 'montant, cartes à filet) : le chunk retenu vaut 0,0484 mobile / 0,0131 desktop (pied hors '
+      + 'écran à y=1004,33 / 1004, réserve peinte 779,33 / 875 px, destination 645,83 / 794), la '
+      + 'branche « mission requise » 0,0451 / 0,0147 et la branche « mission » 0,0046 / 0,0470. Le '
+      + 'relâchement mobile passe de 0,0218 à 0,0484 parce que la destination a perdu 54,6 px — une '
+      + 'bande remplace une carte ombrée, et la carte « mission requise » lit le rembourrage de '
+      + '`.carte-publique`. Le plafond de 0,06 n’a PAS bougé : la marge tombe de 1,75× à 1,24×, et '
+      + 'c’est ce chiffre-là que la prochaine retouche de cette page doit regarder avant d’en retirer '
+      + 'de la hauteur'
   },
   '/profile': { max: 0.06, pireMediane: 0.045, mesure: '0,0450 sur 27 runs' },
   // Route CONNECTÉE qu'AUCUNE passe Lighthouse n'audite (`/messages` n'est pas

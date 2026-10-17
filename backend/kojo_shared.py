@@ -251,6 +251,13 @@ _NOTIF_MSG: Dict[str, Dict[str, Dict[str, str]]] = {
         "new_ticket_support": {"title": "Nouveau ticket support", "body": "{ticket_text}"},
         "address_dispatched": {"title": "📍 Adresse du chantier reçue", "body": "L'adresse de « {job_title} » vous a été envoyée."},
         "owner_payout_stuck_alert": {"title": "🚨 Décaissement bloqué", "body": "Paiement {payment_id} : {amount} FCFA toujours en « {status} » depuis plus de {hours} h. Vérification manuelle requise."},
+        # Alerte d'EXPLOITATION, et elle n'existe qu'en fr et en : c'est une
+        # phrase d'ingénierie pour le propriétaire (elle nomme des variables
+        # d'environnement), et `_get_notif_msgs` sert DÉJÀ le repli français
+        # quand une langue n'a pas la clé. Une traduction approximative en
+        # wolof/bambara/mooré vaudrait moins que ce repli : sur une panne qui
+        # empêche l'envoi des codes de connexion, on publie ce qu'on sait dire.
+        "owner_email_provider_down": {"title": "🚨 Fournisseur email muet", "body": "Le fournisseur email actif « {provider} » ne peut plus envoyer ({motif}) : {detail}. Aucun email de Kojo ne part (codes de connexion, réinitialisations). Vérifier EMAIL_PROVIDER, les clés et l'expéditeur, puis /monitor/email."},
     },
     "en": {
         "bonus_filleul_first_mission": {"title": "🎁 Referral bonus unlocked", "body": "Your first job « {job_title} » is complete: +{amount} FCFA bonus credited to you."},
@@ -278,6 +285,7 @@ _NOTIF_MSG: Dict[str, Dict[str, Dict[str, str]]] = {
         "new_ticket_support": {"title": "New support ticket", "body": "{ticket_text}"},
         "address_dispatched": {"title": "📍 Job address received", "body": "The address for « {job_title} » has been sent to you."},
         "owner_payout_stuck_alert": {"title": "🚨 Stuck payout", "body": "Payment {payment_id}: {amount} FCFA still in « {status} » for over {hours} h. Manual check required."},
+        "owner_email_provider_down": {"title": "🚨 Email provider silent", "body": "The active email provider « {provider} » can no longer send ({motif}): {detail}. No Kojo email is going out (login codes, resets). Check EMAIL_PROVIDER, its keys and sender, then /monitor/email."},
     },
     "wo": {
         "bonus_filleul_first_mission": {"title": "🎁 Bonus bu parrainage bi", "body": "Sa njëkk liggéey « {job_title} » mujj na: +{amount} FCFA bonus ñu la jox."},

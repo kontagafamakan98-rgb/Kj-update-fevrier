@@ -30,9 +30,24 @@
  *    son `<title>` et sa `description`. Avant, seule l'accueil était sondée : le
  *    sitemap annonçait huit pages dont sept n'étaient jamais lues, donc une page
  *    servie sans description (ou avec le canonical d'une autre) restait
- *    silencieuse. Les fiches `/jobs/:id` du sitemap sont ensuite échantillonnées
+ *    silencieuse. Les fiches `/jobs/:id` sont ensuite échantillonnées
  *    (`MAX_JOB_PAGES`) et jugées sur les trois mêmes métadonnées ; leur carte OG
  *    et le verrou 404 après suppression restent à `check-og-job-200.js`.
+ *
+ *    Ces fiches ont DEUX sources, et c'est le point qui manquait : le sitemap
+ *    (ce qu'un crawler découvre) ET l'API publique des missions
+ *    (`/api/jobs`, la même origine, statuts vivants). Mesuré le 12/10/2026 : le
+ *    sitemap annonçait 8 URL dont ZÉRO fiche — les deux sources disaient alors la
+ *    même chose (aucune mission servie), mais avec une SEULE source un sitemap
+ *    muet et une base vide produisaient exactement le même rapport, et la sonde
+ *    n'aurait jugé aucune fiche le jour où il y en aurait eu. Ce que la seconde
+ *    source change :
+ *      • les fiches vivantes que le sitemap n'énumère PAS sont lues quand même
+ *        (elles sont jugées, et leur absence du sitemap est refusée en strict —
+ *        une fiche servie mais non découvrable est un défaut, pas un silence) ;
+ *      • un échantillon vide n'est un fait MESURÉ que si les deux sources
+ *        concordent ; sitemap muet + API illisible est une SONDE AVEUGLE, et le
+ *        mode strict la refuse (aucune fiche jugée, aucune source lisible).
  *
  * En mode INFORMATIF (le défaut, pour un run de poste), le script ne fait JAMAIS
  * échouer : une intégration non configurée ou un écart d'adresse sont des faits
@@ -51,6 +66,14 @@
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { SITE_ORIGIN, canonicalHref, isLoopbackUrl, metaContent, titleOf } from './site-meta.js';
+// Le corpus « missions vivantes » est DÉCLARÉ (scripts/corpus-missions.js) : quand
+// les DEUX sources concordent sur un corpus vide, aucune fiche réelle n'est
+// jugée — cette surface aveugle se publie en `::warning`, et elle est REFUSÉE si
+// elle n'est pas déclarée (cf. l'en-tête de ce script).
+import {
+  SURFACE_SEO_PRODUCTION_FICHES,
+  verdictDeSurfaceVide,
+} from './corpus-missions.js';
 
 // Les quatre intégrations, la variable d'environnement qui les active, et si
 // leur ABSENCE est un défaut (`required`) ou un choix d'exploitation.
@@ -262,8 +285,73 @@ const MAX_PAGES = 20;
  * `check-og-job-200.js` possède déjà — la carte OG, ses variantes, le verrou
  * 404 après suppression — n'est PAS rejoué ici, et l'échantillon ne prétend pas
  * couvrir les fiches qu'il n'a pas lues (la notice le dit).
+ *
+ * Le plafond borne l'UNION des deux sources (sitemap puis API publique) : c'est
+ * un coût de lecture, pas une couverture — les fiches du sitemap passent en
+ * premier, parce que ce sont celles qu'un crawler découvre.
  */
 const MAX_JOB_PAGES = 3;
+
+/**
+ * Statuts dont la fiche est PUBLIQUE et indexable — exactement ceux que le
+ * sitemap du backend énumère (`open`, `in_progress`, cf.
+ * `kojo_routers_public.get_sitemap_xml`). La seconde source doit lire le même
+ * ensemble : comparer un sitemap « open + in_progress » à une liste sans filtre
+ * ferait refuser une fiche TERMINÉE, qui n'a rien à y faire.
+ */
+export const LIVE_JOB_STATUSES = ['open', 'in_progress'];
+
+/** Chemin de l'API publique des missions, sur la MÊME origine (rewrite Vercel). */
+export const PUBLIC_JOBS_PATH = '/api/jobs';
+
+/**
+ * Les fiches VIVANTES que l'API PUBLIQUE sert — la SECONDE source des fiches.
+ *
+ * Lecture bornée et idempotente : un appel par statut vivant, `limit` = la
+ * taille de l'échantillon. La liste est triée par `created_at` décroissant
+ * (`kojo_routers_jobs_listing.get_jobs`), donc les fiches lues sont les plus
+ * récentes — un échantillon représentatif, comme celui du sitemap.
+ *
+ * Jamais d'exception : une panne devient une entrée d'`erreurs`, nommée par le
+ * statut fautif. Une forme de charge utile inattendue est NOMMÉE plutôt que
+ * devinée : une enveloppe ajoutée côté backend doit se lire dans le verdict, pas
+ * se traduire en « aucune fiche ».
+ *
+ * @returns {Promise<{urls: string[], live: number, erreurs: string[]}>}
+ */
+export async function readPublicJobs(base, fetchImpl, { limit = MAX_JOB_PAGES } = {}) {
+  const urls = [];
+  const erreurs = [];
+  for (const status of LIVE_JOB_STATUSES) {
+    try {
+      const response = await fetchImpl(`${base}${PUBLIC_JOBS_PATH}?status=${status}&limit=${limit}`, {
+        redirect: 'follow',
+        headers: PROBE_HEADERS,
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!response.ok) {
+        erreurs.push(`${status} : HTTP ${response.status}`);
+        continue;
+      }
+      const charge = JSON.parse(await response.text());
+      if (!Array.isArray(charge)) {
+        erreurs.push(`${status} : forme inattendue (${typeof charge})`);
+        continue;
+      }
+      for (const job of charge) {
+        if (!job || !job.id) {
+          erreurs.push(`${status} : une fiche sans identifiant`);
+          continue;
+        }
+        const url = `${base}/jobs/${job.id}`;
+        if (!urls.includes(url)) urls.push(url);
+      }
+    } catch (error) {
+      erreurs.push(`${status} : ${error.message}`);
+    }
+  }
+  return { urls, live: urls.length, erreurs };
+}
 
 /**
  * Défauts d'une page vis-à-vis de sa PROPRE adresse, chacun nommant la page et
@@ -318,9 +406,15 @@ async function readPage(url, fetchImpl) {
  * plafond) et un ÉCHANTILLON borné des fiches `/jobs/:id`.
  *
  * @returns {Promise<{checked: Array<{url: string, defects: string[]}>, total: number,
- *   truncated: number, jobs: {checked: Array, total: number, sampled: number}}>}
+ *   truncated: number, jobs: {checked: Array, sampled: number, total: number,
+ *   sitemap: number, api: number, apiErreurs: string[], horsSitemap: number}}>}
  */
-async function checkSitemapPages({ locs = [], fetchImpl, homeHtml }) {
+async function checkSitemapPages({
+  locs = [],
+  fetchImpl,
+  homeHtml,
+  apiJobs = { urls: [], live: 0, erreurs: [] },
+}) {
   const sitePages = [];
   const jobPages = [];
   for (const loc of locs) {
@@ -345,15 +439,25 @@ async function checkSitemapPages({ locs = [], fetchImpl, homeHtml }) {
     checked.push({ url, defects: pageDefects(page) });
   }
 
+  // Les fiches à juger : celles du SITEMAP d'abord (ce qu'un crawler découvre),
+  // puis celles de l'API PUBLIQUE — c'est cette seconde liste qui fait juger des
+  // fiches que le sitemap n'énumère pas. L'union est bornée au plafond.
+  const fiches = jobPages.map((url) => ({ url, source: 'sitemap' }));
+  for (const url of apiJobs.urls || []) {
+    if (!fiches.some((fiche) => fiche.url === url)) fiches.push({ url, source: 'api' });
+  }
+
   const sampled = [];
-  for (const url of jobPages.slice(0, MAX_JOB_PAGES)) {
+  for (const { url, source } of fiches.slice(0, MAX_JOB_PAGES)) {
     const page = await readPage(url, fetchImpl);
-    // Une fiche peut être clôturée entre la lecture du sitemap et sa lecture :
-    // un 404 n'est PAS un défaut (une mission vivante disparaît normalement),
-    // c'est une mesure impossible — nommée, pas jugée. Une page servie en 200
-    // reste jugée sur ses métadonnées.
+    // Une fiche peut être clôturée entre la lecture qui l'a listée et sa
+    // lecture : un 404 n'est PAS un défaut (une mission vivante disparaît
+    // normalement), c'est une mesure impossible — nommée, pas jugée. Une page
+    // servie en 200 reste jugée sur ses métadonnées.
     sampled.push(
-      page.error ? { url, disparue: page.error } : { url, defects: pageDefects(page) }
+      page.error
+        ? { url, source, disparue: page.error }
+        : { url, source, defects: pageDefects(page) }
     );
   }
 
@@ -361,46 +465,135 @@ async function checkSitemapPages({ locs = [], fetchImpl, homeHtml }) {
     checked,
     total: sitePages.length,
     truncated: sitePages.length - checked.length,
-    jobs: { checked: sampled, total: jobPages.length, sampled: sampled.length },
+    jobs: {
+      checked: sampled,
+      sampled: sampled.length,
+      total: fiches.length,
+      sitemap: jobPages.length,
+      api: apiJobs.live || 0,
+      apiErreurs: apiJobs.erreurs || [],
+      horsSitemap: fiches.filter((fiche) => fiche.source === 'api').length,
+    },
   };
 }
 
 /**
- * Notices de l'échantillon des fiches `/jobs/:id`.
+ * Notices de l'échantillon des fiches `/jobs/:id`, avec les DEUX sources.
  *
- * @returns {{notices: string[], défauts: string[]}}
+ * Un échantillon vide n'est pas une conformité : il n'est publié comme un fait
+ * que si une source l'a dit (les deux concordent), et l'absence des fiches du
+ * sitemap est refusée dès que l'API publique en sert.
+ *
+ * @returns {{notices: string[], défauts: string[], avertissements: string[]}}
  */
-export function jobSampleNotices({ checked = [], total = 0, sampled = 0 } = {}) {
+export function jobSampleNotices({
+  checked = [],
+  total = 0,
+  sampled = 0,
+  sitemap = 0,
+  api = 0,
+  apiErreurs = [],
+  horsSitemap = 0,
+} = {}) {
+  const défauts = checked.filter(({ defects }) => defects?.length).flatMap(({ defects }) => defects);
+  const trousDeSource = [];
+  const apiNommee = `API publique (${PUBLIC_JOBS_PATH})`;
+
+  // ── Les deux sources ne disent pas la même chose : des fiches VIVANTES que le
+  //    sitemap n'énumère pas sont servies, donc non découvrables. C'est un défaut
+  //    de découverte, et il n'était PAS visible tant que le sitemap était la
+  //    seule source — le rapport disait alors « aucune fiche ».
+  if (api > 0 && sitemap === 0) {
+    trousDeSource.push(
+      `fiches /jobs/:id : ${api} fiche(s) vivante(s) servie(s) par l'${apiNommee} ` +
+        "ne figure(nt) dans AUCUN sitemap — un crawler ne les découvre pas par là, et la sonde ne les " +
+        'jugeait pas tant que le sitemap était sa seule source.',
+    );
+  }
+  // ── Une source illisible n'est pas un « aucune fiche » : c'est une mesure
+  //    impossible, et elle est NOMMÉE. Sans lecture de l'API publique, les fiches
+  //    que le sitemap omet restent invisibles à la sonde COMME au crawler.
+  if (apiErreurs.length) {
+    trousDeSource.push(
+      `fiches /jobs/:id : l'${apiNommee} n'a pas pu être lue (${apiErreurs.join(' ; ')}) — ` +
+        'vérification de complétude impossible : les fiches absentes du sitemap ne sont jugées nulle part.',
+    );
+  }
+
+  // ── Aucune fiche à juger. Ce n'est un FAIT que si une source a pu le dire :
+  //    sitemap muet + API illisible = sonde aveugle, et un échantillon vide ne
+  //    doit pas se lire comme une conformité (cf. F9).
+  if (total === 0 && !trousDeSource.length) {
+    // ── Corps VIDE ET concordant : la sonde ne juge la forme d'AUCUNE fiche
+    //    réelle. C'est un fait mesuré, mais c'est aussi une surface AVEUGLE :
+    //    elle est donc DÉCLARÉE (scripts/corpus-missions.js) et publiée en
+    //    `::warning` — bruyante, jamais bloquante. Non déclarée, elle serait un
+    //    DÉFAUT (refusé par le mode strict) : une sonde qui ne mesure rien ne
+    //    doit pas pouvoir le taire.
+    const verdict = verdictDeSurfaceVide({
+      cle: SURFACE_SEO_PRODUCTION_FICHES,
+      detail: `sitemap ${sitemap} fiche(s) et ${apiNommee} ${api} fiche(s) vivante(s)`,
+    });
+    return {
+      notices: [
+        `Pages — fiches /jobs/:id : aucune jugée — le sitemap n'annonce aucune fiche ET l'${apiNommee} ` +
+          "n'en sert aucune : les deux sources CONCORDENT, il n'y a pas de fiche vivante à juger " +
+          '(aucune conclusion n’est tirée sur cette forme de page, mais elle n’est pas muette pour autant).',
+      ],
+      défauts: verdict.erreur ? [verdict.erreur] : [],
+      avertissements: verdict.erreur ? [] : [verdict.avertissement],
+    };
+  }
   if (total === 0) {
     return {
       notices: [
-        "Pages — fiches /jobs/:id : aucune dans le sitemap — l'échantillon est vide, " +
-          'aucune fiche vivante à vérifier (aucune conclusion sur cette forme de page).',
+        `Pages — fiches /jobs/:id : AUCUNE jugée — le sitemap n'annonce aucune fiche et l'${apiNommee} ` +
+          "n'a pas pu être lue : les deux sources sont muettes, impossible de distinguer « aucune mission " +
+          'vivante » d’une découverte cassée.',
       ],
-      défauts: [],
+      défauts: trousDeSource,
+      avertissements: [],
     };
   }
-  const défauts = checked.filter(({ defects }) => defects?.length).flatMap(({ defects }) => defects);
+
   const disparues = checked.filter(({ disparue }) => disparue);
   const notes = [`${sampled} sur ${total} vérifiée(s)`];
-  if (disparues.length) notes.push(`${disparues.length} disparue(s) depuis la lecture du sitemap (non jugées)`);
+  if (disparues.length) notes.push(`${disparues.length} disparue(s) entre la lecture et sa vérification (non jugées)`);
+  if (horsSitemap) notes.push(`${horsSitemap} venue(s) de l'${apiNommee} (absente(s) du sitemap)`);
   const résumé =
     `Pages — fiches /jobs/:id : ${notes.join(' ; ')} (canonical, title, description) : ` +
     (défauts.length ? `${défauts.length} défaut(s) nommé(s) ci-dessous` : 'conformes') +
-    `. Échantillon borné à ${MAX_JOB_PAGES} : la carte OG et le verrou 404 restent à check-og-job-200.js.`;
-  return { notices: [résumé, ...défauts.map((d) => `Pages — ${d}`)], défauts };
+    ` — sources lues : ${sitemap} du sitemap, ${api} de l'${apiNommee}. ` +
+    `Échantillon borné à ${MAX_JOB_PAGES} : la carte OG et le verrou 404 restent à check-og-job-200.js.`;
+  return {
+    notices: [résumé, ...[...défauts, ...trousDeSource].map((d) => `Pages — ${d}`)],
+    défauts: [...défauts, ...trousDeSource],
+    avertissements: [],
+  };
 }
 
 /**
  * Notices de la section « Pages » : un résumé par famille, puis un `::notice`
  * par défaut.
  *
- * @returns {{notices: string[], défauts: string[]}} Les défauts sont ceux que le
- *   mode strict refuse.
+ * @returns {{notices: string[], défauts: string[], avertissements: string[]}} Les
+ *   défauts sont ceux que le mode strict refuse ; les avertissements sont les
+ *   surfaces aveugles DÉCLARÉES (corpus vide), publiées en `::warning`.
  */
 export function pagesNotices({ checked = [], total = 0, truncated = 0, jobs = {}, error }) {
   if (error) {
-    return { notices: [`Pages — non vérifiées : le sitemap n'est pas lisible (${error}).`], défauts: [] };
+    // Le sitemap est la source des pages du SITE, pas celle des fiches : celles
+    // que l'API publique sert sont jugées quand même, et la section le dit au
+    // lieu de se taire entièrement.
+    const echantillon = jobSampleNotices(jobs);
+    return {
+      notices: [
+        `Pages — non vérifiées : le sitemap n'est pas lisible (${error}).`,
+        ...echantillon.notices,
+      ],
+      défauts: echantillon.défauts,
+      avertissements: echantillon.avertissements,
+    };
   }
   const notes = [];
   if (truncated) notes.push(`${truncated} page(s) au-delà du plafond de ${MAX_PAGES}`);
@@ -414,6 +607,7 @@ export function pagesNotices({ checked = [], total = 0, truncated = 0, jobs = {}
   return {
     notices: [résumé, ...défauts.map((d) => `Pages — ${d}`), ...echantillon.notices],
     défauts: [...défauts, ...echantillon.défauts],
+    avertissements: echantillon.avertissements,
   };
 }
 
@@ -436,6 +630,7 @@ export async function runSeoProductionReport({
     return {
       skipped: true,
       manquantes: [],
+      avertissements: [],
       notices: [
         `base locale (${cleanBase}) : les intégrations SEO/analytics s'activent par ` +
           "variables d'environnement posées sur Vercel — un build local ne dit rien de " +
@@ -457,20 +652,26 @@ export async function runSeoProductionReport({
     return {
       skipped: true,
       manquantes: [],
+      avertissements: [],
       notices: [`accueil non lisible (${error.message}) : aucune conclusion.`],
     };
   }
 
   const analysis = analyzeSeoServedHtml(html);
   const sitemap = await readSitemap(cleanBase, fetchImpl);
+  // La SECONDE source des fiches : l'API publique des missions, sur la même
+  // origine. Elle sert à juger les fiches que le sitemap n'énumère pas, et à
+  // distinguer « aucune mission vivante » d'un sitemap muet (cf. l'en-tête).
+  const apiJobs = await readPublicJobs(cleanBase, fetchImpl);
   // La section « Pages » suit le sitemap SERVI : ce qu'un sitemap annonce doit
   // être servi avec ses métadonnées. Son HTML n'est lu que si le sitemap l'est.
   const pages = await checkSitemapPages({
     locs: sitemap.locs || [],
     fetchImpl,
     homeHtml: html,
+    apiJobs,
   });
-  const pagesRapport = pagesNotices(sitemap.error ? { error: sitemap.error } : pages);
+  const pagesRapport = pagesNotices(sitemap.error ? { error: sitemap.error, jobs: pages.jobs } : pages);
   const presentes = INTEGRATIONS.filter(({ key }) => analysis[key].present);
   const requises = INTEGRATIONS.filter(({ required }) => required);
   // Ce que le mode strict refuse : les intégrations REQUISES absentes, nommées
@@ -489,6 +690,11 @@ export async function runSeoProductionReport({
     analyse: analysis,
     pages: pages.checked,
     jobPages: pages.jobs.checked,
+    // Le détail de l'échantillon (sources, erreurs de lecture) : ce qui fait
+    // qu'un échantillon vide est mesuré plutôt que subi.
+    jobSample: pages.jobs,
+    // Les surfaces aveugles DÉCLARÉES (corpus vide) : publiées en `::warning`.
+    avertissements: pagesRapport.avertissements || [],
     notices: [
       ...INTEGRATIONS.map((integration) => noticeFor(integration, analysis[integration.key])),
       `${presentes.length}/${INTEGRATIONS.length} intégration(s) présente(s) sur ${cleanBase} ` +
@@ -522,6 +728,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
     `Sonde SEO de la production — ${result.skipped ? 'sans verdict' : 'verdict publié'}${strict ? ' [strict]' : ''}`
   );
   for (const notice of result.notices) console.log(`::notice title=SEO production::${notice}`);
+  // Une surface AVEUGLE (corpus vide, les deux sources concordantes) est
+  // BRUYANTE dans les deux modes : `::warning` nommant le chemin non mesuré, son
+  // motif et son remède. Non déclarée, elle est passée en DÉFAUT et refusée par
+  // le mode strict (l'erreur, elle, est publiée ci-dessous).
+  for (const avertissement of result.avertissements || []) {
+    console.log(`::warning title=Surface aveugle (corpus vide)::${avertissement}`);
+  }
   if (strict) {
     // Une sonde qui ne peut pas conclure échoue : un « sans verdict » vert
     // voudrait dire « rien de cassé » alors que rien n'a été mesuré.

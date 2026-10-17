@@ -65,6 +65,22 @@
   },
   {
     "methode": "GET",
+    "chemin": "/monitor/email",
+    "nom": "monitor_email",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "HEAD",
+    "chemin": "/monitor/email",
+    "nom": "monitor_email",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "GET",
     "chemin": "/monitor/cloudinary",
     "nom": "monitor_cloudinary",
     "code": null,

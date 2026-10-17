@@ -9,27 +9,26 @@
 //
 // Sources de configuration, par ordre de priorité :
 //   1. window.__KOJO_API_URL__ || window.__API_URL__  (override runtime)
-//   2. import.meta.env.VITE_API_URL || VITE_API_BASE_URL || VITE_BACKEND_URL
-//   3. process.env.REACT_APP_BACKEND_URL || REACT_APP_API_URL
+//   2. proxy /api même-origine sur le web en production (désactivable)
+//   3. import.meta.env.VITE_API_URL || VITE_API_BASE_URL || VITE_BACKEND_URL
+//   4. process.env.REACT_APP_BACKEND_URL || REACT_APP_API_URL
 //      (injecté par vite.config.js via `define`, depuis les variables
 //      d'environnement REACT_APP_* du build)
-//   4. repli dev : localhost:8000 quand on est sur localhost (port ≠ 8000)
-//   5. défaut : https://api.kojoforafrica.cc.cd
+//   5. repli dev : localhost:8000 quand on est sur localhost (port ≠ 8000)
+//   6. défaut : https://api.kojoforafrica.cc.cd
 //
 // Convention : VITE_API_URL / REACT_APP_BACKEND_URL peuvent être définis AVEC
 // ou SANS le suffixe /api (les deux conventions coexistent). getBackendBaseUrl
 // renvoie la base telle quelle (avec /api si fourni) ; buildApiUrl normalise
 // vers l'origine nue puis ajoute /api exactement une fois.
 //
-// PROXY MÊME-ORIGINE (production) : DÉSACTIVÉ PAR DÉFAUT. Un domaine
-// *.vercel.app est sur la Public Suffix List → le navigateur REFUSE les
-// cookies de session y étant posés, ce qui cassait le login en production
-// (boucle 401 → /login, même en navigation privée). Le frontend appelle
-// donc le backend Fly EN CROSS-ORIGINE DIRECT (api.kojoforafrica.cc.cd), où le
-// cookie SameSite=None est posé sur un domaine normal et fonctionne (mode
-// prévu par le backend). Le proxy même-origine Vercel reste réactivable
-// via VITE_USE_SAME_ORIGIN_API=true, mais UNIQUEMENT avec un domaine custom
-// (pas *.vercel.app) dont les cookies ne sont pas bloqués.
+// PROXY MÊME-ORIGINE (production) : ACTIVÉ PAR DÉFAUT sur le web servi.
+// vercel.json réécrit /api/* vers Fly : les cookies hôte-seul sont ainsi
+// posés sur l'origine frontend, et kojo_csrf reste lisible après rechargement.
+// Un hôte <projet>.vercel.app accepte lui aussi les cookies hôte-seul ;
+// seul un attribut Domain visant le suffixe public vercel.app serait refusé.
+// VITE_USE_SAME_ORIGIN_API=false garde le mode direct pour le diagnostic.
+// Le développement local et Capacitor conservent l'API distante configurée.
 // ============================================================================
 
 const trimTrailingSlashes = (value = '') => String(value || '').replace(/\/+$/, '');
@@ -52,16 +51,7 @@ const isSameOriginApiProd = () => {
   const normalized = String(envFlag || '').trim().toLowerCase();
   if (normalized === 'true' || normalized === '1') return true; // opt-in explicite (ex: domaine custom)
   if (normalized === 'false' || normalized === '0') return false;
-  // Par défaut : FALSE. En production sur un domaine *.vercel.app (Public
-  // Suffix List), le navigateur REFUSE les cookies de session posés sur ce
-  // domaine → login en boucle (401 → /login), y compris en navigation privée.
-  // On appelle donc le backend Fly EN CROSS-ORIGIN DIRECT (api.kojoforafrica.cc.cd)
-  // : le cookie SameSite=None y est posé sur un domaine normal (non
-  // public-suffix) et fonctionne. C'est le mode prévu par le backend
-  // (kojo_settings : « cross-site, SameSite=None »). Le proxy même-origine
-  // Vercel ne doit être réactivé QUE avec un domaine custom dont les cookies
-  // ne sont pas bloqués (VITE_USE_SAME_ORIGIN_API=true).
-  return false;
+  return import.meta.env.PROD;
 };
 
 // Détecte si on tourne sur une origine servie (https/http avec host réel),
@@ -69,8 +59,10 @@ const isSameOriginApiProd = () => {
 // courante est un proxy Vercel valable.
 const hasServedOrigin = () => {
   if (typeof window === 'undefined' || !window.location) return false;
-  const { hostname } = window.location;
-  return Boolean(hostname) && hostname !== 'localhost' && hostname !== '127.0.0.1';
+  if (window.Capacitor?.isNativePlatform?.()) return false;
+  const { protocol, hostname } = window.location;
+  return ['http:', 'https:'].includes(protocol)
+    && Boolean(hostname) && hostname !== 'localhost' && hostname !== '127.0.0.1';
 };
 
 const readRuntimeOverride = () => {
@@ -105,8 +97,8 @@ const resolveBackendBaseUrl = () => {
   // Proxy même-origine en production : on émet des requêtes RELATIVES sur
   // l'origine courante (proxifiée par Vercel vers Fly). On ne retourne PAS
   // une origine absolue ici ; buildApiUrl gérera le préfixe /api relatif.
-  // Ce chemin est court-circuité si une origine backend explicite (env) est
-  // fournie — utile pour le mobile Capacitor ou le debug direct vers Fly.
+  // Le proxy prime sur l'URL de build VITE_API_URL ; le runtime explicite,
+  // le mode direct opt-in et Capacitor gardent leur origine configurée.
   if (isSameOriginApiProd() && hasServedOrigin()) {
     return '';
   }

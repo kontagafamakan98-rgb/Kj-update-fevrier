@@ -1,0 +1,23 @@
+{
+  "pourquoi": "LE PÉRIMÈTRE DU GATE, DÉCLARÉ UNE SEULE FOIS POUR LES DEUX CHEMINS QUI L'APPLIQUENT. Jusqu'au 16/10/2026, deux périmètres jugeaient la même livraison sans se connaître : la protection de main exigeait HUIT checks nommés (mesuré le 12/10/2026 : 8 contexts, strict: true) pendant que ci.yml en déclarait ONZE, et la livraison automatique (.github/scripts/livrer.py) attendait, elle, TOUS les check-runs du commit de tête — y compris ceux que la protection ignorait. Conséquence mesurée : une fusion faite dans l'interface GitHub pouvait passer avec la suite e2e rouge (15 rouges / 27 exécutions, dont un cas réel : /how-it-works) ou avec des avis de sécurité de PRODUCTION non corrigés (6 rouges / 30 runs) — alors que le trajet de livraison, lui, refusait ces mêmes runs. Ce fichier porte donc la liste UNIQUE : les deux périmètres attendent exactement ces vérifications, ni plus ni moins. Les décisions surface par surface (ce qu'un échec coûterait, et pourquoi le rapport de taille n'est pas une vérification) sont dans AUDIT-VERIFICATIONS-NON-BLOQUANTES.md (§2.1, §2.2, §2.3) et CI-COVERAGE.md (angle 20). Le garde .github/scripts/check-gate-perimetre.py refuse qu'un nom déclaré ici ne corresponde plus à un job de ci.yml (le check-run porterait alors un nom que personne n'attend), qu'un job de ci.yml ne soit ni déclaré ni exempté, et — en ligne — que la protection de main exige autre chose que cette liste ; livrer.py vérifie la même chose avant de pousser, et n'attend QUE ces noms.",
+  "strict": true,
+  "checks": [
+    { "job": "audit-regression-test", "nom": "Audits détectent les régressions" },
+    { "job": "backend-tests", "nom": "Backend tests (Python + MongoDB)" },
+    { "job": "dependency-audit", "nom": "Dépendances (avis de sécurité)" },
+    { "job": "e2e-playwright", "nom": "E2E Playwright tests (Chromium)" },
+    { "job": "fly-env-drift", "nom": "Fly env doc-prod (drift + secrets)" },
+    { "job": "frontend-build", "nom": "Frontend tests + build (Node/Vite)" },
+    { "job": "lighthouse-ci", "nom": "Lighthouse performance budgets" },
+    { "job": "mobile-build", "nom": "Mobile build (Capacitor + Android)" },
+    { "job": "deploy-fly", "nom": "Deploy backend to Fly.io" },
+    { "job": "workflow-lint", "nom": "Workflow lint (actionlint + shellcheck)" }
+  ],
+  "hors_gate": [
+    {
+      "job": "bundle-size-report",
+      "nom": "Bundle size report (PR comment)",
+      "motif": "Ce job PUBLIE un commentaire de PR (taille et écart vs main) : il ne prétend pas vérifier, et son budget réel — scripts/check-bundle-size.js — est asserté DANS frontend-build, qui est requis. L'exiger bloquerait une fusion sur un rapport (et sur son saut, quand l'artefact de frontend-build manque) sans rien ajouter à ce qui est vérifié ; l'attendre dans la livraison, c'était la moitié du décalage des deux périmètres. Il est donc hors gate des DEUX côtés, déclaré ici plutôt que silencieusement oublié — et un job qui ne serait plus exempté ferait rougir le garde."
+    }
+  ]
+}

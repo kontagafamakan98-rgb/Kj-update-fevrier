@@ -17,6 +17,10 @@ import TagInput from '../components/TagInput';
 import ConfirmModal from '../components/ConfirmModal';
 import { Users, CheckCircle2 } from 'lucide-react';
 import CountryDisplay, { CountrySelect } from '../components/CountryDisplay';
+// Le dessin du champ (filet chaud, fond papier, focus orange) a UN
+// propriétaire : src/config/classes-champ.js — le même que /login et
+// /register. Les six champs de texte de cette page le lisent.
+import { CHAMP, CHAMP_PREFIXE, CHAMP_TELEPHONE } from '../config/classes-champ';
 import PaymentAccountsManager from '../components/PaymentAccountsManager';
 import { usersAPI, reviewAPI, workerProfileAPI } from '../services/apiEndpoints';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/profile';
@@ -238,63 +242,76 @@ export default function Profile() {
   }
 
   return (
-    // `titre={null}` est VOULU : le nom du profil est le titre d'un bandeau
-    // orange, donc `.titre-heros` (crème, serif) et non `.titre-page`, dont
-    // l'encre foncée disparaîtrait sur ce fond. Le cadre n'ajoute donc pas
-    // d'en-tête — il ne pose que le pas et la largeur.
+    // `titre={null}` est VOULU : le nom du profil est le titre de son BANDEAU
+    // (`.bande-app`, le même que le tableau de bord), donc le cadre n'ajoute pas
+    // un second en-tête au-dessus — il ne pose que le pas et la largeur.
     <CadrePage chemin="/profile" classeCorps="">
-      <div className="carte-editoriale overflow-hidden">
-        <div className="bg-orange-600 carte-cotes py-8">
-          <div className="flex items-center">
-            <ProfilePhoto
-              key={photoRefreshKey}
-              user={user}
-              size={80}
-              editable={false}
-              showEditButton={false}
-              className="border-2 border-white"
-            />
-            <div className="ml-6">
-              <div className="flex items-center gap-2 flex-wrap">
-                {/* Le nom est le titre d'un bandeau ORANGE : c'est donc
-                    `.titre-heros` (crème, serif) et non `.titre-page`, dont
-                    l'encre foncée disparaîtrait sur ce fond. */}
-                <h1 className="titre-heros">{user.first_name} {user.last_name}</h1>
-                <VerifiedBadge verified={user.is_verified} />
-                {user.user_type === 'worker' && <WorkerTrustBadge person={user} />}
-              </div>
-              <p className="text-orange-100">
-                {user.user_type === 'client' ? t('client') : t('worker')} • <CountryDisplay countryCode={user.country} className="inline-flex align-middle" />
-              </p>
-              <div className="flex items-center mt-2">
-                <span className="text-yellow-300">{'★'.repeat(Math.round(user.rating || 0))}{'☆'.repeat(Math.max(0, 5 - Math.round(user.rating || 0)))}</span>
-                <span className="text-orange-100 ml-2">{user.rating || 0}/5 ({t('reviewsCount').replace('{count}', user.total_reviews || 0)})</span>
-              </div>
+      {/* LE BANDEAU D'IDENTITÉ. Il remplace le fond orange plein : sur cette
+          page, l'orange ne disait rien de plus que « voici un bloc à part », et
+          il aurait fallu du texte en crème pour tenir dessus. Le bandeau de
+          crème du tableau de bord dit la même chose (« vous êtes ici ») avec
+          l'encre du site, donc les deux écrans d'arrivée d'un compte connecté
+          se ressemblent par le RYTHME et non par une teinte. */}
+      <section className="bande-app bloc-app">
+        <div className="flex items-start gap-5">
+          <ProfilePhoto
+            key={photoRefreshKey}
+            user={user}
+            size={80}
+            editable={false}
+            showEditButton={false}
+            className="shrink-0 rounded-full bg-white p-1"
+          />
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="titre-page">{user.first_name} {user.last_name}</h1>
+              <VerifiedBadge verified={user.is_verified} />
+              {user.user_type === 'worker' && <WorkerTrustBadge person={user} />}
+            </div>
+            {/* Le RÔLE et le pays sont des ÉTIQUETTES, pas une phrase : ce sont
+                deux appartenances, et une étiquette se lit sans être lue. */}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="etiquette-app etiquette-app-orange">
+                {user.user_type === 'client' ? t('client') : t('worker')}
+              </span>
+              <span className="etiquette-app">
+                <CountryDisplay countryCode={user.country} className="inline-flex align-middle" />
+              </span>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-stone-600">
+              <span className="text-orange-600" aria-hidden="true">
+                {'★'.repeat(Math.round(user.rating || 0))}
+                {'☆'.repeat(Math.max(0, 5 - Math.round(user.rating || 0)))}
+              </span>
+              <span className="font-semibold text-stone-900">{user.rating || 0}/5</span>
+              <span>({t('reviewsCount').replace('{count}', user.total_reviews || 0)})</span>
             </div>
           </div>
         </div>
+      </section>
 
-        {error && <div className="mx-6 mt-6 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">{error}</div>}
-        {success && <div className="mx-6 mt-6 bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded-md">{success}</div>}
+      {error && <div className="bloc-app rounded-[3px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+      {success && <div className="bloc-app rounded-[3px] border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{success}</div>}
 
-        <div className="carte-cotes py-6 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">{t('myReviewsTitle')}</h2>
+      <div className="carte-editoriale overflow-hidden">
+        <div className="carte-cotes border-b border-stone-200 py-6">
+          <h2 className="titre-carte-app text-stone-900 mb-4">{t('myReviewsTitle')}</h2>
           {reviews.length === 0 ? (
-            <p className="text-sm text-gray-500">{t('noReviewsYet')}</p>
+            <p className="text-sm text-stone-500">{t('noReviewsYet')}</p>
           ) : (
             <div className="space-y-3">
               {reviews.map((review) => (
-                <div key={review.id} className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                <div key={review.id} className="rounded-[3px] border border-stone-200 fond-sable px-4 py-3">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm font-semibold text-gray-900 truncate">
+                    <span className="truncate text-sm font-semibold text-stone-900">
                       {review.reviewer_name || t('anonymousReviewer')}
                     </span>
-                    <span className="text-yellow-400 text-sm">
+                    <span className="text-sm text-orange-600" aria-hidden="true">
                       {'★'.repeat(Math.max(0, Math.min(5, review.rating)))}{'☆'.repeat(Math.max(0, 5 - Math.min(5, review.rating)))}
                     </span>
                   </div>
                   {review.comment && (
-                    <p className="mt-1 text-sm text-gray-600 whitespace-pre-line">{review.comment}</p>
+                    <p className="mt-1 whitespace-pre-line text-sm text-stone-600">{review.comment}</p>
                   )}
                 </div>
               ))}
@@ -302,10 +319,13 @@ export default function Profile() {
           )}
         </div>
 
-        <div className="carte-cotes py-6 border-b border-gray-200">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">{t('personalInformation')}</h2>
-            <button onClick={() => setIsEditing(!isEditing)} className="text-orange-600 hover:text-orange-700 font-medium">
+        <div className="carte-cotes border-b border-stone-200 py-6">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 className="titre-carte-app text-stone-900">{t('personalInformation')}</h2>
+            <button
+              onClick={() => setIsEditing(!isEditing)}
+              className="text-sm font-semibold text-orange-700 hover:underline"
+            >
               {isEditing ? t('cancel') : t('edit')}
             </button>
           </div>
@@ -325,8 +345,8 @@ export default function Profile() {
         </div>
 
         {user.user_type === 'worker' && (
-          <div className="carte-cotes py-6 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">{pageT('workerProfileSection')}</h2>
+          <div className="carte-cotes border-b border-stone-200 py-6">
+            <h2 className="titre-carte-app text-stone-900 mb-4">{pageT('workerProfileSection')}</h2>
             {workerProfile ? (
               <WorkerProfileView profile={workerProfile} pageT={pageT} t={t} />
             ) : (
@@ -336,9 +356,9 @@ export default function Profile() {
         )}
 
         {user.user_type === 'worker' && (
-          <div className="carte-cotes py-6 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">{t('portfolioTitle')}</h2>
-            <p className="text-sm text-gray-500 mb-4">{t('portfolioHelp')}</p>
+          <div className="carte-cotes border-b border-stone-200 py-6">
+            <h2 className="titre-carte-app text-stone-900 mb-2">{t('portfolioTitle')}</h2>
+            <p className="text-sm text-stone-500 mb-4">{t('portfolioHelp')}</p>
             <PortfolioManager
               images={portfolioImages}
               uploading={portfolioUploading}
@@ -350,7 +370,7 @@ export default function Profile() {
         )}
 
         {user.user_type === 'worker' && (
-          <div className="carte-cotes py-6 border-b border-gray-200">
+          <div className="carte-cotes border-b border-stone-200 py-6">
             <ReferralCard referral={referral} t={t} referredBy={user?.referred_by} />
             <FilleulsCard filleuls={filleuls} t={t} />
           </div>
@@ -371,8 +391,8 @@ export default function Profile() {
             et le parcours e2e (`e2e/carte-facade.spec.js`) refuse une carte
             qui serait montée au premier écran. */}
         {cartePays && (
-          <div className="carte-cotes py-6 border-t border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900 mb-1">{t('location')}</h2>
+          <div className="carte-cotes border-t border-stone-200 py-6">
+            <h2 className="titre-carte-app text-stone-900 mb-1">{t('location')}</h2>
             <p className="mb-4 text-sm text-gray-500">
               <CountryDisplay countryCode={user.country} className="inline-flex align-middle" />
             </p>
@@ -399,18 +419,20 @@ export default function Profile() {
         <div className="carte-cotes pb-6">
           <Link
             to="/support"
-            className="flex items-center justify-between rounded-2xl border border-gray-100 bg-gray-50 px-4 py-4 text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+            className="flex items-center justify-between rounded-[3px] border border-stone-200 bg-stone-50 px-4 py-4 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100"
           >
             <span>{t('supportHelp')}</span>
             <span className="text-orange-600">→</span>
           </Link>
         </div>
 
-        {/* Zone dangereuse : suppression du compte (RGPD) */}
+        {/* Zone dangereuse : suppression du compte (RGPD). Même famille que le
+            reste — un filet, pas une ombre — et la seule teinte ROSE du site :
+            elle dit « irréversible » sans emprunter la couleur d'un statut. */}
         <div className="carte-cotes pb-6">
-          <div className="rounded-2xl border border-red-200 bg-red-50/50 p-5">
-            <h2 className="text-lg font-semibold text-red-800 mb-1">{t('deleteAccountTitle') || 'Supprimer mon compte'}</h2>
-            <p className="text-sm text-red-700 mb-4">
+          <div className="rounded-[3px] border border-rose-200 bg-rose-50/60 p-5">
+            <h2 className="titre-carte-app mb-1 text-rose-800">{t('deleteAccountTitle') || 'Supprimer mon compte'}</h2>
+            <p className="mb-4 text-sm text-rose-800/90">
               {t('deleteAccountWarning') || 'Cette action est définitive : votre profil, vos propositions et vos missions seront supprimés. Les messages déjà échangés restent visibles pour votre interlocuteur.'}
             </p>
             {!deletingAccount && (
@@ -419,7 +441,7 @@ export default function Profile() {
                 value={deleteConfirm}
                 onChange={(e) => setDeleteConfirm(e.target.value)}
                 placeholder={t('deleteAccountConfirmHint') || 'Tapez SUPPRIMER pour confirmer'}
-                className="w-full max-w-sm rounded-lg border border-red-300 px-4 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-red-400 mb-3"
+                className="mb-3 w-full max-w-sm rounded-[3px] border border-rose-300 bg-white px-4 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-rose-400"
               />
             )}
             <button
@@ -440,7 +462,7 @@ export default function Profile() {
                 }
               }}
               disabled={deletingAccount}
-              className={`inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold text-white ${deletingAccount ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'}`}
+              className={`inline-flex items-center rounded-[3px] px-4 py-2 text-sm font-semibold text-white ${deletingAccount ? 'cursor-not-allowed bg-stone-400' : 'bg-rose-600 hover:bg-rose-700'}`}
             >
               {deletingAccount ? (t('deleting') || 'Suppression en cours…') : (t('deleteAccountCta') || 'Supprimer définitivement mon compte')}
             </button>
@@ -458,23 +480,29 @@ function ProfileView({ profile, t, pageT }) {
 
   return (
     <div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">{t('email')}</label>
-          <p className="mt-1 text-gray-900">{profile.email}</p>
+      {/* QUATRE TUILES D'INFORMATION, pas quatre paires « libellé → valeur » :
+          ce que le profil PUBLIE est un petit tableau de bord de soi, et une
+          tuile se balaie du regard là où une phrase se lit. Le libellé est en
+          petites capitales, comme `.tuile-mesure-libelle`, et la valeur porte
+          l'encre — même hiérarchie, sans réutiliser la classe (une mesure est
+          un CHIFFRE, une information est un texte). */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="rounded-[3px] border border-stone-200 fond-sable px-4 py-3">
+          <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-stone-500">{t('email')}</span>
+          <p className="mt-1.5 break-words text-sm font-medium text-stone-900">{profile.email}</p>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">{t('phone')}</label>
-          <p className="mt-1 text-gray-900">{profile.phone}</p>
+        <div className="rounded-[3px] border border-stone-200 fond-sable px-4 py-3">
+          <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-stone-500">{t('phone')}</span>
+          <p className="mt-1.5 text-sm font-medium text-stone-900">{profile.phone}</p>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">{t('preferredLanguage')}</label>
-          <p className="mt-1 text-gray-900">{getLanguageLabel(profile.preferred_language, t)}</p>
+        <div className="rounded-[3px] border border-stone-200 fond-sable px-4 py-3">
+          <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-stone-500">{t('preferredLanguage')}</span>
+          <p className="mt-1.5 text-sm font-medium text-stone-900">{getLanguageLabel(profile.preferred_language, t)}</p>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">{t('verified')}</label>
-          <p className="mt-1">
-            <span className={`px-2 py-1 text-xs rounded-lg ${profile.is_verified ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+        <div className="rounded-[3px] border border-stone-200 fond-sable px-4 py-3">
+          <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-stone-500">{t('verified')}</span>
+          <p className="mt-1.5">
+            <span className={`etiquette-app ${profile.is_verified ? 'etiquette-app-vert' : ''}`}>
               {profile.is_verified ? t('verified') : `${t('no')} ${t('verified').toLowerCase()}`}
             </span>
           </p>
@@ -483,20 +511,17 @@ function ProfileView({ profile, t, pageT }) {
 
       {profile.bio && (
         <div className="mt-6">
-          <label className="block text-sm font-medium text-gray-700">{pageT('bio')}</label>
-          <p className="mt-2 text-gray-900 whitespace-pre-line">{profile.bio}</p>
+          <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-stone-500">{pageT('bio')}</span>
+          <p className="mt-1.5 whitespace-pre-line text-stone-900">{profile.bio}</p>
         </div>
       )}
 
       {skills.length > 0 && (
         <div className="mt-6">
-          <label className="block text-sm font-medium text-gray-700">{pageT('skills')}</label>
+          <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-stone-500">{pageT('skills')}</span>
           <div className="mt-2 flex flex-wrap gap-2">
             {skills.map((skill, index) => (
-              <span
-                key={`${skill}-${index}`}
-                className="bg-orange-100 text-orange-800 px-3 py-1 rounded-lg text-sm"
-              >
+              <span key={`${skill}-${index}`} className="etiquette-app">
                 {skill}
               </span>
             ))}
@@ -585,7 +610,7 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
       {success && <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-sm relative">{success}</div>}
 
       <div className="mb-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">{pageT('photoTitle')}</h3>
+        <h3 className="titre-carte-app text-stone-900 mb-4">{pageT('photoTitle')}</h3>
         <ProfilePhotoUploader
           targetUserId={user?.id}
           onUploadSuccess={(photoUrl) => {
@@ -597,19 +622,19 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label htmlFor="first_name" className="block text-sm font-medium text-gray-700">{pageT('firstName')}</label>
-          <input type="text" id="first_name" name="first_name" autoComplete="given-name" value={formData.first_name} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-orange-500 focus:border-orange-500" />
+          <label htmlFor="first_name" className="block text-sm font-semibold text-stone-800">{pageT('firstName')}</label>
+          <input type="text" id="first_name" name="first_name" autoComplete="given-name" value={formData.first_name} onChange={handleChange} className={CHAMP} />
         </div>
 
         <div>
-          <label htmlFor="last_name" className="block text-sm font-medium text-gray-700">{pageT('lastName')}</label>
-          <input type="text" id="last_name" name="last_name" autoComplete="family-name" value={formData.last_name} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-orange-500 focus:border-orange-500" />
+          <label htmlFor="last_name" className="block text-sm font-semibold text-stone-800">{pageT('lastName')}</label>
+          <input type="text" id="last_name" name="last_name" autoComplete="family-name" value={formData.last_name} onChange={handleChange} className={CHAMP} />
         </div>
 
         <div>
-          <label htmlFor="phone" className="block text-sm font-medium text-gray-700">{t('phone')}</label>
-          <div className="mt-1 flex rounded-md">
-            <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
+          <label htmlFor="phone" className="block text-sm font-semibold text-stone-800">{t('phone')}</label>
+          <div className="mt-1 flex">
+            <span className={CHAMP_PREFIXE}>
               {getPhonePrefixByCountry(formData.country.toLowerCase())}
             </span>
             <input
@@ -623,15 +648,15 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
                 updateFormData('phone', `${prefix} ${e.target.value.replace(/[^\d\s]/g, '')}`);
               }}
               placeholder={pageT('phonePlaceholder')}
-              className="flex-1 block w-full px-3 py-2 border border-gray-300 rounded-r-md shadow-xs focus:outline-hidden focus:ring-orange-500 focus:border-orange-500"
+              className={CHAMP_TELEPHONE}
             />
           </div>
           <p className="mt-1 text-sm text-gray-500">{t('phoneFormat')}: {getPhonePrefixByCountry(formData.country.toLowerCase())} {PHONE_NUMBER_MASK}</p>
         </div>
 
         <div>
-          <label htmlFor="preferred_language" className="block text-sm font-medium text-gray-700">{t('preferredLanguage')}</label>
-          <select id="preferred_language" name="preferred_language" autoComplete="off" value={formData.preferred_language} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-orange-500 focus:border-orange-500">
+          <label htmlFor="preferred_language" className="block text-sm font-semibold text-stone-800">{t('preferredLanguage')}</label>
+          <select id="preferred_language" name="preferred_language" autoComplete="off" value={formData.preferred_language} onChange={handleChange} className={CHAMP}>
             {getAvailableLanguagesForCountry(formData.country).map(lang => (
               <option key={lang} value={lang}>{getLanguageLabel(lang, t)}</option>
             ))}
@@ -639,7 +664,7 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
         </div>
 
         <div>
-          <label htmlFor="country" className="block text-sm font-medium text-gray-700">{pageT('country')}</label>
+          <label htmlFor="country" className="block text-sm font-semibold text-stone-800">{pageT('country')}</label>
           <div className="mt-1">
             <CountrySelect
               id="country"
@@ -656,13 +681,13 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
         <div className="space-y-4">
           <h3 className="text-lg font-medium text-gray-900">{pageT('professionalInfo')}</h3>
           <div>
-            <label htmlFor="bio" className="block text-sm font-medium text-gray-700">{pageT('bio')}</label>
-            <textarea id="bio" name="bio" autoComplete="off" rows={4} value={formData.bio} onChange={handleChange} placeholder={pageT('bioPlaceholder')} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-orange-500 focus:border-orange-500" />
+            <label htmlFor="bio" className="block text-sm font-semibold text-stone-800">{pageT('bio')}</label>
+            <textarea id="bio" name="bio" autoComplete="off" rows={4} value={formData.bio} onChange={handleChange} placeholder={pageT('bioPlaceholder')} className={CHAMP} />
             <p className="mt-1 text-sm text-gray-500">{pageT('bioHelp')}</p>
           </div>
 
           <div>
-            <label htmlFor="skills" className="block text-sm font-medium text-gray-700">{pageT('skills')}</label>
+            <label htmlFor="skills" className="block text-sm font-semibold text-stone-800">{pageT('skills')}</label>
             <TagInput
               className="mt-1"
               inputId="skills"
@@ -678,9 +703,9 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
         </div>
       )}
 
-      <div className="flex justify-end space-x-4">
-        <button type="button" onClick={onCancel} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">{pageT('cancel')}</button>
-        <button type="submit" className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-md">{pageT('save')}</button>
+      <div className="flex flex-wrap justify-end gap-3">
+        <button type="button" onClick={onCancel} className="bouton bouton-clair">{pageT('cancel')}</button>
+        <button type="submit" className="bouton bouton-encre">{pageT('save')}</button>
       </div>
     </form>
   );
@@ -691,7 +716,7 @@ function WorkerProfileView({ profile, pageT, t }) {
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <label className="block text-sm font-medium text-gray-700">{pageT('specialties')}</label>
+          <label className="block text-sm font-semibold text-stone-800">{pageT('specialties')}</label>
           <div className="mt-1 flex flex-wrap gap-2">
             {profile.specialties?.map((specialty, index) => (
               <span key={index} className="bg-orange-100 text-orange-800 px-2 py-1 rounded-lg text-sm">{specialty}</span>
@@ -700,12 +725,12 @@ function WorkerProfileView({ profile, pageT, t }) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">{pageT('yearsExperience')}</label>
+          <label className="block text-sm font-semibold text-stone-800">{pageT('yearsExperience')}</label>
           <p className="mt-1 text-gray-900">{pageT('years', { count: profile.experience_years })}</p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">{pageT('availability')}</label>
+          <label className="block text-sm font-semibold text-stone-800">{pageT('availability')}</label>
           <p className="mt-1">
             <span className={`px-2 py-1 text-xs rounded-lg ${profile.availability ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
               {profile.availability ? t('availableStatus') : t('unavailableStatus')}
@@ -716,7 +741,7 @@ function WorkerProfileView({ profile, pageT, t }) {
 
       {profile.description && (
         <div>
-          <label className="block text-sm font-medium text-gray-700">{pageT('description')}</label>
+          <label className="block text-sm font-semibold text-stone-800">{pageT('description')}</label>
           <p className="mt-1 text-gray-900">{profile.description}</p>
         </div>
       )}
@@ -761,21 +786,21 @@ function WorkerProfileCreate({ onCreate, pageT }) {
         </div>
 
         <div>
-          <label htmlFor="experience_years" className="block text-sm font-medium text-gray-700">{pageT('yearsExperience')}</label>
-          <input type="number" id="experience_years" name="experience_years" autoComplete="off" min="0" required value={formData.experience_years} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-orange-500 focus:border-orange-500" />
+          <label htmlFor="experience_years" className="block text-sm font-semibold text-stone-800">{pageT('yearsExperience')}</label>
+          <input type="number" id="experience_years" name="experience_years" autoComplete="off" min="0" required value={formData.experience_years} onChange={handleChange} className={CHAMP} />
         </div>
 
         <div>
-          <label htmlFor="description" className="block text-sm font-medium text-gray-700">{pageT('descriptionOptional')}</label>
-          <textarea id="description" name="description" autoComplete="off" rows={3} value={formData.description} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-orange-500 focus:border-orange-500" placeholder={pageT('descriptionPlaceholder')} />
+          <label htmlFor="description" className="block text-sm font-semibold text-stone-800">{pageT('descriptionOptional')}</label>
+          <textarea id="description" name="description" autoComplete="off" rows={3} value={formData.description} onChange={handleChange} className={CHAMP} placeholder={pageT('descriptionPlaceholder')} />
         </div>
 
         <div className="flex items-center">
-          <input type="checkbox" id="availability" name="availability" autoComplete="off" checked={formData.availability} onChange={handleChange} className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded-sm" />
+          <input type="checkbox" id="availability" name="availability" autoComplete="off" checked={formData.availability} onChange={handleChange} className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-stone-300 rounded-sm" />
           <label htmlFor="availability" className="ml-2 text-sm text-gray-700">{pageT('availableForProjects')}</label>
         </div>
 
-        <button type="submit" className="w-full bg-orange-600 hover:bg-orange-700 text-white py-2 px-4 rounded-md">{pageT('createWorkerProfile')}</button>
+        <button type="submit" className="bouton bouton-encre w-full">{pageT('createWorkerProfile')}</button>
       </form>
     </div>
   );
@@ -788,7 +813,7 @@ function PortfolioManager({ images, uploading, onUpload, onRemove, t }) {
       {images.length > 0 ? (
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 mb-4">
           {images.map((url, index) => (
-            <div key={`${url}-${index}`} className="relative aspect-square overflow-hidden rounded-xl border border-gray-200 group">
+            <div key={`${url}-${index}`} className="group relative aspect-square overflow-hidden rounded-lg border border-stone-200">
               <img src={url} alt={`${t('portfolioPhotoAlt')} ${index + 1}`} className="h-full w-full object-cover" />
               <button
                 type="button"
@@ -815,7 +840,7 @@ function PortfolioManager({ images, uploading, onUpload, onRemove, t }) {
         type="button"
         disabled={uploading || images.length >= 10}
         onClick={() => inputRef.current?.click()}
-        className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700 hover:bg-orange-100 disabled:opacity-50"
+        className="rounded-[3px] border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700 hover:bg-orange-100 disabled:opacity-50"
       >
         {uploading ? t('portfolioUploading') : (images.length >= 10 ? t('portfolioFull') : t('portfolioAddPhoto'))}
       </button>
@@ -884,21 +909,21 @@ function ReferralCard({ referral, t, referredBy }) {
 
   return (
     <div>
-      <h2 className="text-lg font-semibold text-gray-900 mb-2">{t('referralTitle')}</h2>
+      <h2 className="titre-carte-app text-stone-900 mb-2">{t('referralTitle')}</h2>
       <p className="text-sm text-gray-500 mb-4">{t('referralText')}</p>
       {referredBy ? (
-        <p className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
+        <p className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
           {t('referralReferredNote')}
         </p>
       ) : (
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          <code className="rounded-xl border border-dashed border-orange-300 bg-orange-50 px-4 py-2 font-mono text-lg font-bold tracking-widest text-orange-700">
+          <code className="rounded-lg border border-dashed border-orange-300 bg-orange-50 px-4 py-2 font-mono text-lg font-bold tracking-widest text-orange-700">
             {referral.referral_code}
           </code>
           <button
             type="button"
             onClick={copyCode}
-            className="rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
+            className="rounded-[3px] bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
           >
             {copied ? t('referralCopied') : t('referralCopy')}
           </button>
@@ -907,7 +932,7 @@ function ReferralCard({ referral, t, referredBy }) {
               href={referral.invite_url}
               target="_blank"
               rel="noreferrer"
-              className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              className="rounded-[3px] border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
             >
               {t('referralInviteLink')}
           </a>
@@ -916,7 +941,7 @@ function ReferralCard({ referral, t, referredBy }) {
       )}
 
       {/* Récompense de parrainage : solde + retrait + historique */}
-      <div className="mt-4 rounded-xl border border-green-200 bg-green-50 p-4">
+      <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4">
         <div className="flex items-center justify-between">
           <p className="text-sm font-semibold text-green-800">{t('referralRewardTitle')}</p>
           <p className="text-sm font-bold text-green-700">{balance.toLocaleString('fr-FR')} FCFA</p>
@@ -933,7 +958,7 @@ function ReferralCard({ referral, t, referredBy }) {
             type="button"
             onClick={() => setConfirmWithdraw(true)}
             disabled={withdrawing}
-            className="mt-3 w-full rounded-xl bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-60"
+            className="mt-3 w-full rounded-[3px] bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-60"
           >
             {withdrawing ? t('referralWithdrawing') : t('referralWithdraw')}
           </button>
@@ -1008,7 +1033,7 @@ function FilleulsCard({ filleuls, t }) {
         {filleuls.map((filleul) => (
           <li
             key={filleul.id}
-            className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3"
+            className="flex items-center justify-between rounded-lg border border-stone-200 bg-white px-4 py-3"
           >
             <div className="flex items-center min-w-0">
               {filleul.profile_photo ? (

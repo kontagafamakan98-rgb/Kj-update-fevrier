@@ -25,10 +25,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # `pyflakes` est installé à chaque run (non épinglé, donc rien dans le
+      # dépôt ne dit quelle version il faut) : la clé de cache ne peut pas
+      # décrire ce qui est installé, elle suit donc le fichier de référence des
+      # dépendances Python du dépôt — comme `backend-tests` et `lighthouse-ci`.
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
 
       - name: Set up Node 24
         uses: actions/setup-node@v4
@@ -194,6 +200,94 @@ jobs:
       - name: Check test assertions describe behaviour (no export existence)
         run: python3 .github/scripts/check-test-existence-assertions.py
 
+      # La sonde SEO a DEUX modes, et le mode INFORMATIF est celui qui a laissé
+      # F9 ouvert (quatre intégrations SEO/analytics absentes de la production,
+      # un `::notice` par fait constaté, aucun run rouge nulle part). L'étape
+      # informative de ce fichier a été retirée le 10/10/2026 pour cette raison
+      # exacte — mais rien n'empêchait de la reposer, et le mode par DÉFAUT du
+      # script reste l'informatif : c'est l'oubli de `--strict` qui est
+      # silencieux, pas le rappel.
+      #
+      # Le garde lit TOUT `.github/workflows/` (même choix que celui des pins) :
+      # un workflow ajouté demain est couvert sans être inscrit ici. Il refuse
+      # aussi une étape stricte qui ne peut PAS échouer (`continue-on-error`,
+      # commande neutralisée), et il REFUSE DE CONCLURE s'il ne lit aucune
+      # invocation — un garde qui ne voit rien ne prouve rien. Voir
+      # .github/scripts/check-seo-probe-strict.py.
+      - name: Check the SEO probe is always invoked strict (no informative step)
+        run: python3 .github/scripts/check-seo-probe-strict.py
+
+      # ── LA FAMILLE de F9, pas seulement la sonde SEO ──────────────────────
+      # F9 avait une cause unique — une étape qui publie un rapport sans pouvoir
+      # faire rougir le run — et la sonde SEO n'en était qu'une INSTANCE. La
+      # syntaxe qui la produisait est, elle, disponible partout :
+      # `continue-on-error: true`, une commande neutralisée (`|| true`, `|| :`,
+      # `|| exit 0`), des erreurs ignorées (`set +e`). Rien n'empêchait d'en
+      # reposer une ailleurs : le step serait vert, le rapport publié, personne
+      # ne rougirait — exactement le silence que F9 a coûté deux jours.
+      #
+      # L'inventaire mesuré le 12/10/2026 : 7 formes sur 152 étapes lues, et
+      # AUCUNE n'était un défaut — quatre harnais de mutation qui encadrent UNE
+      # commande dont l'échec est le résultat attendu, l'extraction d'un tableau
+      # pip-audit, un `kill` de PID déjà sorti, une invite sdkmanager. Ce garde
+      # ne les interdit pas : il les rend VISIBLES et exige qu'elles soient
+      # DÉCLARÉES, une par une, avec leur motif, dans
+      # .github/scripts/informative-steps.json. Une déclaration périmée, un
+      # compte qui change, un motif trop court : refusés. Et sous 40 étapes lues,
+      # il refuse de conclure (un garde qui ne voit rien ne prouve rien).
+      - name: Check no workflow step can fail silently (declared registry)
+        run: python3 .github/scripts/check-informative-steps.py
+
+      # ── LES DEUX PÉRIMÈTRES DU GATE, LA MÊME LISTE ────────────────────────
+      # Deux chemins appliquent le même gate et, le 12/10/2026, ils ne
+      # jugeaient pas la même chose : la protection de `main` exigeait HUIT
+      # checks nommés pendant que ce fichier en déclarait ONZE, et la livraison
+      # automatique (.github/scripts/livrer.py) attendait, elle, TOUS les
+      # check-runs. Une fusion faite dans l'interface GitHub pouvait donc passer
+      # avec la suite e2e rouge (15 rouges / 27 exécutions, dont un cas réel) et
+      # avec des avis de sécurité de PRODUCTION non corrigés — quand le trajet
+      # de livraison refusait ces mêmes runs.
+      #
+      # La liste vit UNE fois (.github/scripts/gate-perimetre.json) : la
+      # protection de `main` et la livraison attendent exactement ces checks.
+      # Ce garde rend le verdict HORS LIGNE, donc dans un job requis : chaque
+      # check déclaré doit nommer un job de `ci.yml` — par son identifiant ET par
+      # le nom que GitHub rapportera (un nom qui a dérivé ferait attendre les
+      # deux périmètres un check-run qui n'arrivera jamais) — et tout job de
+      # `ci.yml` doit être soit déclaré, soit exempté AVEC son motif.
+      #
+      # La protection de branche RÉELLE, elle, ne se lit qu'avec un jeton admin
+      # du dépôt : ce job ne peut pas l'obtenir, c'est pourquoi cette comparaison
+      # vit dans le pré-vol de `livrer.py` (qui a le jeton) et dans
+      # `check-gate-perimetre.py --en-ligne` pour un run manuel. Le garde refuse
+      # de conclure sous ses planchers de lecture (8 checks, 10 jobs lus) : un
+      # lecteur cassé rendrait tous ses refus muets.
+      - name: Check the delivery and branch protection gate the same checks
+        run: python3 .github/scripts/check-gate-perimetre.py
+
+      # ── UNE MUTATION LAISSÉE EN PLACE NE SURVIT PLUS À UNE SUITE LOCALE ───
+      # Le harnais de mutation écrit dans un fichier RÉEL du dépôt, restaure, et
+      # VÉRIFIE sa restauration par empreinte : tant qu'il va au bout, rien ne
+      # reste derrière lui. Mais un processus TUÉ entre l'écriture et la
+      # restauration (Ctrl-C, commande expirée, runner annulé) ne restaure rien,
+      # et RIEN ne le disait : la suite locale repassait verte sur un dépôt muté,
+      # garde neutralisé compris.
+      #
+      # Ce garde refuse qu'un fichier du dépôt s'écarte de son ÉTAT DE RÉFÉRENCE
+      # sans l'avoir déclaré. Le périmètre se DÉRIVE des mutations déclarées
+      # (guard-proofs.json), moins la machinerie déclarée hors périmètre dans
+      # .github/scripts/etat-reference.json — une surface aveugle se déclare, avec
+      # motif, remède et date. Il refuse une dérive non déclarée (avec ses deux
+      # empreintes), une MUTATION ENCORE EN PLACE (que le registre des preuves
+      # nomme), une cible sans état de référence, une entrée périmée, une
+      # déclaration muette, et refuse de conclure sous son plancher de lecture.
+      #
+      # Ce qu'il a trouvé à sa pose, le 16/10/2026 : une mutation restée en place
+      # dans frontend/scripts/check-prerender-shells.js — le refus du catch-all
+      # neutralisé dans l'arbre de travail, sans que rien ne le signale.
+      - name: Check no repo file drifted from its reference state (declared)
+        run: python3 .github/scripts/check-etat-reference.py
+
       # shellcheck (pré-installé sur ubuntu-latest) : analyse statique des
       # scripts shell du dépôt. Échoue sur les erreurs (les warnings restent
       # informatifs — comportement par défaut de shellcheck).
@@ -257,12 +351,18 @@ jobs:
       # plus). Échec bruyant si un verdict n'est pas `pass`.
       #
       # main uniquement : un run de PR enverrait un vrai email de production et
-      # lirait la boîte de test pour rien. Sans les secrets, la sonde publie une
-      # `::notice` et s'arrête en 0 — elle dit qu'elle n'a PAS vérifié au lieu
-      # de sortir verte.
+      # lirait la boîte de test pour rien.
+      #
+      # `--require-secrets` : sur `main`, l'absence des identifiants est un ÉCHEC
+      # (code 1), pas une `::notice`. Ce job est un check REQUIS, donc son vert se
+      # lit « les trois verdicts ont été lus » — un secret retiré éteindrait la
+      # sonde en silence, et personne ne relit la notice d'un run vert. Les deux
+      # secrets sont posés depuis le 18/09/2026 (mesuré sur le dépôt) : ce mode ne
+      # coûte rien aujourd'hui. Un poste qui ne les a pas garde l'annulation
+      # explicite, sans le drapeau.
       - name: Sonde email authentifié (SPF/DKIM/DMARC lus dans Gmail, main only)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: python .github/scripts/check-email-auth.py
+        run: python .github/scripts/check-email-auth.py --require-secrets
         env:
           KOJO_PROBE_IMAP_USER: ${{ secrets.KOJO_PROBE_IMAP_USER }}
           KOJO_PROBE_IMAP_PASSWORD: ${{ secrets.KOJO_PROBE_IMAP_PASSWORD }}
@@ -311,13 +411,54 @@ jobs:
         working-directory: backend
         run: |
           pip install --quiet pyflakes
-          UNDEFINED=$(python -m pyflakes kojo_*.py server.py | grep "undefined name" || true)
-          if [ -n "$UNDEFINED" ]; then
-            echo "$UNDEFINED"
+          # Le corpus est COMPTÉ avant d'être jugé : « aucun nom non défini » sur un
+          # glob qui ne résout plus (zéro fichier lu) serait un vert qui ne repose
+          # sur rien. C'est la règle des planchers de lecture du dépôt, et le rapport
+          # publie le compte lu.
+          FICHIERS=$(find . -maxdepth 1 \( -name 'kojo_*.py' -o -name 'server.py' \) | wc -l)
+          if [ "$FICHIERS" -lt 20 ]; then
+            echo "::error::pyflakes n'a lu que $FICHIERS fichier(s) (plancher 20) — le corpus est cassé, ce contrôle ne prouve rien"
+            exit 1
+          fi
+          # `|| STATUT=$?` : pyflakes sort en 1 dès qu'il a un constat, ce qui est un
+          # VERDICT, pas une erreur — le code est CAPTURÉ, jamais avalé. Cette forme
+          # empêche l'abandon du step : elle est DÉCLARÉE dans
+          # .github/scripts/informative-steps.json avec son motif, pour qu'elle ne
+          # soit pas anonyme (même règle que les autres étapes qui ne peuvent pas
+          # échouer).
+          STATUT=0
+          python -m pyflakes kojo_*.py server.py > /tmp/pyflakes.txt 2>&1 || STATUT=$?
+          # Les deux filtres sont des `awk` : ils rendent TOUJOURS 0, donc ils n'ont
+          # pas besoin d'avaler un code de sortie — aucune neutralisation de plus ici.
+          awk '/undefined name/' /tmp/pyflakes.txt > /tmp/pyflakes-undefined.txt
+          if [ -s /tmp/pyflakes-undefined.txt ]; then
+            cat /tmp/pyflakes-undefined.txt
             echo "::error::Noms non définis détectés (imports manquants lors du découpage)"
             exit 1
           fi
-          echo "✓ Aucun nom non défini dans les modules kojo_*"
+          # Pyflakes a-t-il RENDU un verdict ? Ses diagnostics s'écrivent
+          # `fichier:ligne:colonne: message` — la forme est reconnue par son MOTIF
+          # (`:ligne:colonne: `), pas par l'absence de `:` devant, parce qu'un
+          # chemin absolu en porte un (`C:/…/kojo_x.py:2:12: …`) : l'ancrer sur le
+          # début de ligne ferait passer un diagnostic légitime pour un
+          # sans-verdict, c'est-à-dire un faux rouge.
+          # Tout le reste — traceback, « No module named », sortie d'un processus
+          # mort — EST un sans-verdict, et un sans-verdict ne doit pas se lire comme
+          # un vert (la leçon de F9, CI-COVERAGE.md). Les autres catégories de
+          # pyflakes (« imported but unused ») restent HORS du gate, À DESSEIN :
+          # elles ne disent rien d'un import manquant du découpage. Elles sont
+          # PUBLIÉES, pas tues.
+          awk 'NF && $0 !~ /:[0-9]+:[0-9]+: /' /tmp/pyflakes.txt > /tmp/pyflakes-sans-verdict.txt
+          if [ -s /tmp/pyflakes-sans-verdict.txt ]; then
+            cat /tmp/pyflakes-sans-verdict.txt
+            echo "::error::pyflakes n'a pas rendu de verdict (sortie code $STATUT qui n'est pas un diagnostic) — rien n'a été vérifié"
+            exit 1
+          fi
+          if [ -s /tmp/pyflakes.txt ]; then
+            echo "Autres constats pyflakes (hors gate : ce contrôle ne juge que les noms non définis) :"
+            cat /tmp/pyflakes.txt
+          fi
+          echo "✓ Aucun nom non défini dans les $FICHIERS fichier(s) lus (pyflakes, code $STATUT)"
 
       - name: Docstrings des endpoints (audit_docstrings.py, strict)
         working-directory: backend
@@ -537,11 +678,30 @@ jobs:
         working-directory: frontend
         run: node scripts/check-juges-de-temps.js
 
+      # LE DOCUMENT QUE JUGENT LES GARDES CI-DESSOUS est publié ici, une fois :
+      # les gardes qui suivent lisent CE `build/`, et `bundle-size-report` (plus
+      # bas) MESURE ce même répertoire au lieu de le reconstruire. Les deux jobs
+      # construisaient avec exactement la même commande et le même
+      # `VITE_API_URL` — une égalité garantie par un commentaire, donc par la
+      # mémoire de qui lit l'autre job — et le rapport pouvait alors mesurer un
+      # artefact que le garde n'avait jamais jugé.
       - name: Build
         working-directory: frontend
         env:
           VITE_API_URL: https://api.kojoforafrica.cc.cd/api
         run: npm run build
+
+      # L'artefact part DÈS que le build existe : si un garde rougit plus bas,
+      # ce job s'arrête — et `bundle-size-report`, qui en dépend, ne tourne pas
+      # non plus : il n'y a rien à lui livrer, donc rien à mesurer. Durée de vie
+      # courte, le consommateur étant le job suivant du même run.
+      - name: Publier le build pour le rapport de taille
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-frontend
+          path: frontend/build
+          retention-days: 1
+          if-no-files-found: error
 
       # Vérifie le PRÉ-RENDU par route dans les artefacts de build : jobs.html
       # et login.html doivent contenir leur shell statique (h1/formulaire →
@@ -600,6 +760,26 @@ jobs:
       - name: Check third-party class coverage (no class observed by no channel)
         working-directory: frontend
         run: node scripts/check-couverture-tiers.js
+
+      # LE CORPUS DE PRODUCTION VIDE NE DOIT PLUS PASSER POUR UN VERT. Mesure du
+      # 12/10/2026 : la production ne servait aucune mission vivante
+      # (`GET /api/jobs?status=open` → `[]`, sitemap de 8 URL dont zéro fiche,
+      # `open_jobs: 0`), et TROIS sondes — `check-og-images.js`,
+      # `check-og-job-200.js`, `check-seo-production.js` — sortaient en 0 en
+      # annonçant chacune, en `::notice`, qu'elles n'avaient rien pu mesurer : un
+      # lecteur du résumé ne pouvait pas distinguer « vérifié » de « rien
+      # mesuré » (la forme de silence que F9 a coûtée). Les surfaces aveugles
+      # sont désormais DÉCLARÉES (scripts/corpus-missions.js : chemin, motif,
+      # remède, date) et les sondes les publient en `::warning` — non déclarée,
+      # une surface fait REFUSER la sonde. Ce garde audit l'inventaire : il balaie
+      # TOUT `scripts/` pour qu'une lecture du corpus par une sonde non déclarée
+      # soit refusée (une sonde ajoutée demain est couverte sans être inscrite
+      # nulle part), refuse une déclaration PÉRIMÉE, MUETTE, un motif ou un
+      # remède qui ne dit rien, et REFUSE DE CONCLURE sous ses planchers de
+      # lecture. Preuve d'échec dans scripts/__tests__/check-corpus-missions.test.js.
+      - name: Check the production corpus inventory (declared blind surfaces)
+        working-directory: frontend
+        run: node scripts/check-corpus-missions.js
 
       # Le garde ci-dessus compare les textes que le plan DÉCLARE. Celui-ci
       # compare TOUT ce que les coquilles publient — chaque fragment visible des
@@ -988,7 +1168,10 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         working-directory: frontend
         run: |
-          set -uo pipefail
+          # `-e` REMIS le 12/10/2026 : le step s'en passait sans motif écrit, et un
+          # step qui n'abandonne pas sur une commande en échec peut perdre son
+          # verdict en route (garde `.github/scripts/check-informative-steps.py`).
+          set -euo pipefail
           ATTENDU="${{ github.sha }}"
           # Le step travaille depuis frontend/ : le chemin `frontend/` serait
           # alors cherché sous frontend/frontend/ et renverrait vide. Le point
@@ -1000,6 +1183,36 @@ jobs:
           fi
           echo "Révisions acceptées : $ATTENDU (commit poussé) ou $DERNIER_FRONTEND (dernier commit ayant touché frontend/)"
           node scripts/check-deployed-revision.js --attendu "$ATTENDU" --sinon "$DERNIER_FRONTEND" --tentatives 9 --delai 20
+
+      # ── LA PRODUCTION VIENT D'ÊTRE DÉPLOYÉE : la sonde SEO stricte la lit ────
+      # Le step ci-dessus vient de constater que la production SERT le frontend de
+      # ce commit, c'est-à-dire qu'un déploiement NOUVEAU est en ligne. C'est le
+      # seul instant où un écart introduit par ce build est encore attribuable à
+      # ce run : les intégrations SEO/analytics (GA4, Search Console, Plausible,
+      # profils sociaux) ne vivent que dans des variables `VITE_*` INLINÉES au
+      # build par Vercel, donc un build qui les perd n'échoue nulle part — le HTML
+      # servi est simplement plus pauvre.
+      #
+      # La sonde QUOTIDIENNE (`.github/workflows/seo-production-probe.yml`,
+      # `17 6 * * *`) constate le même fait, mais jusqu'à 24 h plus tard : F9 a vécu
+      # deux jours avec quatre intégrations absentes de la production et la CI
+      # verte. Ici l'écart est constaté en minutes, sur la livraison qui l'a
+      # introduit.
+      #
+      # MÊME commande que le cron (`--strict`), pas une variante — et c'est aussi
+      # celle que `npm run livrer` lance de son côté : trois définitions de
+      # « conforme » divergeraient, et l'une deviendrait plus indulgente que les
+      # autres. Coût mesuré le 12/10/2026 : 4,1 s (accueil + sitemap + ses 8 pages).
+      #
+      # Il ne tourne QUE si le step précédent a conclu : un frontend pas encore
+      # déployé arrête le job LÀ — juger l'ancien artefact en le présentant comme
+      # le nouveau serait le faux vert que ce dépôt refuse. Même garde que lui
+      # (`main` seulement) : sur une PR, la production ne dit rien de la PR, et un
+      # repli local ferait refuser la sonde (elle ne conclut pas sur du local).
+      - name: La production vient d'être déployée — la sonde SEO stricte la lit maintenant
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        working-directory: frontend
+        run: node scripts/check-seo-production.js --strict
 
       # ── COMBIEN la base est-elle en retard, et depuis QUAND la production ? ──
       # Le step ci-dessus répond OUI/NON (« le frontend servi est-il celui de ce
@@ -1022,9 +1235,38 @@ jobs:
       # dépôt, `origin/main..HEAD` valait 14 et l'attente réelle 0 (l'arbre de la
       # tête était celui de la base). Un compte brut ferait chercher un retard
       # inexistant à chaque branche issue d'une fusion par squash.
+      #
+      # LA MESURE N'EST PRISE QU'UNE FOIS PAR RUN. Le rapport de taille
+      # (`bundle-size-report`, plus bas) publie CES DEUX PHRASES dans le
+      # commentaire de PR : il les REÇOIT (artefact ci-dessous) au lieu de
+      # rappeler le garde — deux appels, c'étaient deux sondes de production et
+      # deux lectures de git pour un chiffre qui pouvait différer d'un job à
+      # l'autre, et un commentaire annonçant un autre nombre que l'annotation du
+      # run. La révision mesurée est donc déclarée ICI, une seule fois : la tête
+      # de la PR sur `pull_request` (HEAD y est le commit de FUSION simulé, qui
+      # contient déjà `main` et ne dirait rien de ce que la PR porte), le commit
+      # poussé sinon.
       - name: Retard de la base et âge du déploiement de production (signal)
         working-directory: frontend
-        run: node scripts/check-retard-main.js
+        env:
+          REVISION_MESUREE: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          node scripts/check-retard-main.js \
+            --base origin/main \
+            --tete "$REVISION_MESUREE" \
+            --markdown .bundle-size/livraison.md
+
+      # Durée de vie courte : l'artefact est consommé par le job SUIVANT du même
+      # run (`bundle-size-report`). `if-no-files-found: error` : un rapport de PR
+      # sans sa mesure dirait « non mesuré » pour un câblage cassé, plus difficile
+      # à lire qu'un step en échec qui nomme sa cause.
+      - name: Publier la mesure de livraison pour le commentaire de PR
+        uses: actions/upload-artifact@v4
+        with:
+          name: retard-livraison
+          path: frontend/.bundle-size/livraison.md
+          retention-days: 1
+          if-no-files-found: error
 
   # ─── Frontend : rapport de taille publié en commentaire de PR ────────────
   # `check-bundle-size.js` est un garde BINAIRE (« dans les budgets » ou
@@ -1066,19 +1308,20 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install dependencies
-        working-directory: frontend
-        run: npm ci
-
-      # Même commande et même env que frontend-build : les artefacts ne sont
-      # pas partagés entre jobs (aucun upload de build/), donc on rebuild —
-      # mais avec exactement les mêmes entrées, sinon les tailles mesurées ici
-      # et celles du garde ne seraient pas comparables entre elles.
-      - name: Build
-        working-directory: frontend
-        env:
-          VITE_API_URL: https://api.kojoforafrica.cc.cd/api
-        run: npm run build
+      # CE JOB N'INSTALLE RIEN ET NE CONSTRUIT RIEN, et ce n'est pas une
+      # économie au jugé : `bundle-size-report.js` n'importe que des modules
+      # `node:` (`fs`, `path`, `url`) plus `check-bundle-size.js`, lui-même
+      # `node:zlib` — aucune dépendance installée n'est lue. C'est ce qui permet
+      # de RECEVOIR le build au lieu de le refaire : il mesure donc l'artefact
+      # que les gardes viennent de juger (artefact `build-frontend`, publié par
+      # `frontend-build`, dont ce job dépend), au lieu de reconstruire avec
+      # « exactement les mêmes entrées » — une égalité qu'un commentaire ne
+      # garantit pas et que deux builds séparés ne peuvent pas tenir.
+      - name: Récupérer le build mesuré par frontend-build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-frontend
+          path: frontend/build
 
       # Référence = dernière mesure de `main`. La clé embarque le SHA (donc
       # n'est jamais réutilisée telle quelle) et `restore-keys` sélectionne la
@@ -1096,16 +1339,20 @@ jobs:
 
       # Cadence de livraison, dans le MÊME commentaire : de combien `main` est en
       # avance sur la révision mesurée, et depuis quand la production sert un
-      # artefact reconstruit. La révision est celle de la PR (sur `pull_request`,
-      # HEAD est le commit de fusion simulé, qui contient déjà `main`). Advisory :
-      # un échec n'arrête pas le rapport, qui dit « non mesuré » et pourquoi.
-      - name: Retard de livraison et âge de la production (pour le commentaire)
-        id: livraison
-        continue-on-error: true
-        working-directory: frontend
-        env:
-          REVISION_MESUREE: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: node scripts/check-retard-main.js --base origin/main --tete "$REVISION_MESUREE" --markdown .bundle-size/livraison.md
+      # artefact reconstruit.
+      #
+      # La mesure est REÇUE, jamais refaite ici : elle est prise une seule fois par
+      # run, par `frontend-build` (dont ce job dépend), qui la publie en artefact.
+      # La révision qu'elle a mesurée est celle que le commentaire annonce : la tête
+      # de la PR, jamais le commit de fusion (qui contient déjà `main`). Le
+      # `continue-on-error` de l'ancienne étape n'a plus lieu d'être : ce job ne
+      # mesure plus rien ici, il LIT une mesure — et un artefact manquant est un
+      # câblage cassé, donc un échec nommé, pas un rapport muet.
+      - name: Récupérer la mesure de livraison (prise une seule fois par run)
+        uses: actions/download-artifact@v4
+        with:
+          name: retard-livraison
+          path: frontend/.bundle-size
 
       # Au premier run de `main`, .bundle-size/baseline.json n'existe pas : le
       # script le détecte (existsSync) et rend un rapport sans écarts.
@@ -1171,6 +1418,13 @@ jobs:
   #      éléments rendus qui occupent la même boîte dans la coquille et chez React
   #      doivent porter les mêmes classes ; un écart non déclaré échoue en nommant
   #      la paire (voir frontend/e2e/classes-coquille-react.spec.js).
+  #   8. Session au rechargement, dans la topologie de la PRODUCTION : page et API
+  #      sur deux hôtes, cookie rangé chez l'API, session jugée par la sonde
+  #      livrée (directApi). Le proxy /api de la pile locale rend tout
+  #      même-origine et laissait passer le défaut mesuré en production le
+  #      12/10/2026 : réintroduit le 16/10/2026, il ne fait rougir que le rejeu
+  #      cross-site (voir frontend/e2e/session-proxy.spec.js, et sa contre-épreuve
+  #      qui tue la session à l'instant que la sonde juge).
   e2e-playwright:
     name: E2E Playwright tests (Chromium)
     runs-on: ubuntu-latest
@@ -1614,6 +1868,34 @@ jobs:
           LHCI_TEST_PASSWORD: ${{ secrets.LHCI_TEST_PASSWORD }}
         run: node scripts/check-og-job-200.js
 
+      # LA FORME d'une fiche /jobs/:id, jugée sur une mission de CONTRÔLE : le
+      # document servi par un crawler sans JavaScript — <title> qui NOMME la
+      # mission, description = son extrait de 150 caractères, meta robots
+      # indexable (aucun noindex), canonical de CETTE fiche, og:url et
+      # twitter:url accordés, <h1> statique porteur du titre, og:title accordé au
+      # <title> — puis suppression et verrou (404 + noindex + carte 404 +
+      # sitemap). Rien d'autre ne la jugeait : check-og-images.js et
+      # check-seo-production.js lisent les missions du CLIENT (aucune le
+      # 12/10/2026, donc deux ::warning déclarés), et le cycle OG ci-dessus ne
+      # juge que les cartes. La forme dépendait donc de l'état des DONNÉES du
+      # client — un jour sans mission était un jour de silence.
+      # Comme le cycle OG, il ÉCRIT (POST puis DELETE) : ici, dans la MongoDB
+      # jetable du job (KOJO_BACKEND_URL = backend local), donc AUCUNE écriture en
+      # production — et hors loopback, la sonde exige le mandat explicite
+      # KOJO_CANARI_ALLOW_WRITE=1 (jamais posé par un run de PR). Quand elle ne
+      # peut pas écrire, elle publie un ::warning déclaré (surface
+      # job-form-canari:forme, registre scripts/corpus-missions.js) au lieu de
+      # passer pour un vert. Toujours AVANT Lighthouse CI, pour que la mission de
+      # contrôle ait disparu de la liste quand /jobs est audité.
+      - name: Check /jobs/:id FORM (create control mission → judge served document → delete → lock)
+        working-directory: frontend
+        env:
+          LHCI_CI_EMAIL: ${{ secrets.LHCI_CI_EMAIL }}
+          LHCI_CI_PASSWORD: ${{ secrets.LHCI_CI_PASSWORD }}
+          LHCI_TEST_EMAIL: ${{ secrets.LHCI_TEST_EMAIL }}
+          LHCI_TEST_PASSWORD: ${{ secrets.LHCI_TEST_PASSWORD }}
+        run: node scripts/check-job-form-canari.js
+
       # ubuntu-latest embarque Google Chrome : chrome-launcher le détecte
       # automatiquement (pas d'action d'installation nécessaire).
       # KOJO_LHCI_BASE_URL dit QUELLE surface est auditée : une preview Vercel
@@ -1872,7 +2154,10 @@ jobs:
         env:
           DISPATCH: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
-          set -uo pipefail
+          # `-e` REMIS le 12/10/2026 : le step s'en passait sans motif écrit, et un
+          # step qui n'abandonne pas sur une commande en échec peut perdre son
+          # verdict en route (garde `.github/scripts/check-informative-steps.py`).
+          set -euo pipefail
           if [ "$DISPATCH" = "true" ]; then
             ATTENDU="${{ github.sha }}"
             ORIGINE="dispatch manuel (déploiement forcé)"
@@ -1938,10 +2223,16 @@ jobs:
         working-directory: frontend
         run: npm audit --audit-level=high
 
+      # `pip-audit` n'est pas dans `requirements.txt` (c'est l'outil qui
+      # l'audite) : sa clé de cache est le fichier AUDITÉ, seule chose qui
+      # puisse dire de re-résoudre l'arbre — et un audit rejoué à l'identique
+      # n'a pas à re-télécharger sa chaîne de dépendances.
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
 
       - name: Avis sur les dépendances Python (backend/requirements.txt, dev incluses) — BLOQUANT
         working-directory: backend

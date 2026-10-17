@@ -12,6 +12,16 @@ callback perdue (réseau, redémarrage) → un versement travailleur ou un
 remboursement client peut rester « en cours » indéfiniment côté suivi sans
 que personne ne soit notifié. Ce sweeper résout les statuts quand PayDunya
 répond, et escalade au propriétaire quand il ne peut pas.
+
+AUTO-ALERTE DU FOURNISSEUR EMAIL (17/10/2026) — la seconde boucle : elle juge
+le fournisseur email ACTIF avec la MÊME sonde que `/monitor/email`
+(`kojo_email.active_email_provider_health_probe`) et prévient le propriétaire
+quand il est MUET, UNE SEULE FOIS PAR PANNE. Ce que ça change : la panne email
+n'était connue que par un moniteur EXTERNE (job `backend-health-probe`, cron
+06:30) — donc jusqu'à 24 h de silence, et rien du tout si le dépôt ou le
+moniteur tombait. Ici le backend se juge lui-même, sur la sonde qui existe
+déjà : aucune règle dupliquée, donc aucune divergence possible entre ce qui est
+surveillé et ce qui envoie réellement les emails.
 """
 
 import asyncio
@@ -21,12 +31,16 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from kojo_core import db, resolve_owner_id
-from kojo_email import send_email_via_brevo_api
+from kojo_email import (
+    active_email_provider_health_probe,
+    send_email_via_active_provider,
+)
 from kojo_models import NotificationType
 # Les durées de conservation ne sont pas recopiées ici : la purge demande à
 # chaque règle son filtre (kojo_retention), qui porte aussi l'index TTL.
 from kojo_retention import RETENTION_RULES
 from kojo_settings import (
+    EMAIL_HEALTH_ALERT_INTERVAL_MINUTES,
     OWNER_EMAIL,
     OWNER_USER_ID,
     PAYOUT_ALERT_REMINDER_DAYS,
@@ -179,8 +193,8 @@ async def payout_stuck_sweep_once(now: Optional[datetime] = None) -> dict:
         )
         # Fallback EMAIL : le compte owner n'a aucun push token web enregistré
         # en prod → la notification in-app/push peut ne jamais être vue. L'email
-        # Brevo (best-effort, comme les tickets support) garantit que l'alerte
-        # atteint Famakan dans tous les cas.
+        # du fournisseur ACTIF (EMAIL_PROVIDER, best-effort comme les tickets
+        # support) garantit que l'alerte atteint Famakan dans tous les cas.
         if OWNER_EMAIL:
             try:
                 subject = (
@@ -188,7 +202,7 @@ async def payout_stuck_sweep_once(now: Optional[datetime] = None) -> dict:
                     if is_reminder
                     else "KOJO — Alerte décaissement bloqué"
                 )
-                send_email_via_brevo_api(
+                await send_email_via_active_provider(
                     OWNER_EMAIL,
                     subject,
                     f"Un décaissement reste bloqué depuis plus de {PAYOUT_ALERT_THRESHOLD_HOURS} h.\n"
@@ -352,3 +366,223 @@ async def retention_purge_loop():
             break
         except Exception as exc:
             logger.warning(f"⚠️ Erreur purge de conservation: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# AUTO-ALERTE DU FOURNISSEUR EMAIL ACTIF
+# ---------------------------------------------------------------------------
+#
+# Ce que ce passage ajoute, et pourquoi il vit ICI plutôt que dans le moniteur
+# externe : la panne d'email est celle qui EMPÊCHE de s'en plaindre. Si le
+# fournisseur est muet, aucun code de connexion ne part, aucune
+# réinitialisation de mot de passe n'arrive — et le seul témoin, jusqu'ici,
+# était un job planifié ailleurs (`.github/workflows/backend-health-probe.yml`,
+# cron 06:30) qui interroge `/monitor/email`. Deux trous : jusqu'à 24 h de
+# silence, et un silence TOTAL le jour où le dépôt, GitHub Actions ou le réseau
+# qui porte la sonde tombe (et si le vrai problème EST l'email, personne n'a
+# été prévenu par email pour le savoir).
+#
+# LA SONDE EST RÉUTILISÉE, jamais réécrite : `active_email_provider_health_probe`
+# (kojo_email) est celle que sert `/monitor/email`. Une seconde résolution du
+# fournisseur actif ferait juger autre chose que ce que les envois suivent — et
+# c'est précisément l'erreur que cette famille a déjà payée (voir l'en-tête de
+# la sonde). Elle est appelée en `to_thread` comme dans `/monitor` : c'est un
+# appel `requests` (5 s de délai), il ne doit pas figer la boucle d'événements.
+#
+# UNE SEULE ALERTE PAR PANNE, et l'état qui le permet : un document par sujet
+# dans `scheduler_alerts` ("état", il ne périme pas — comme les suppressions
+# d'email, c'est une décision, pas un journal). `signature` = fournisseur jugé +
+# MOTIF, et c'est elle qui dit si la panne est la MÊME :
+#   • même signature, santé déjà muette → rien n'est envoyé (la promesse) ;
+#   • santé saine puis muette → NOUVELLE panne, nouvelle alerte (le
+#     rétablissement ré-arme) ;
+#   • motif ou fournisseur qui CHANGE en restant muet → nouvelle panne : c'est
+#     un fait neuf pour le propriétaire (« mal configuré » après « muet » n'est
+#     pas la même action à mener), et le taire serait perdre le seul signal.
+
+EMAIL_ALERT_COLLECTION = "scheduler_alerts"
+_EMAIL_ALERT_SUBJECT = "email_provider"
+# Le détail est conservé pour être LU par un humain : c'est une phrase de
+# verdict, pas une archive de réponse d'API.
+_EMAIL_ALERT_DETAIL_MAX = 300
+
+
+def _motif_de_panne(verdict: dict) -> str:
+    """Le motif, réduit à ce qui décide de la suite.
+
+    « muet » — le fournisseur ne part pas du tout : clés manquantes, transport
+    injoignable, HTTP d'erreur, `EMAIL_PROVIDER=none` (ou nom inconnu, que la
+    sonde nomme).
+    « mal-configure » — il répond mais l'EXPÉDITEUR est inutilisable : domaine
+    non vérifié chez Resend, expéditeur inactif chez Brevo, jeton OAuth révoqué
+    chez Gmail. Les deux mènent à « aucun email ne part », mais pas à la même
+    correction.
+    """
+    return "mal-configure" if verdict.get("configured") else "muet"
+
+
+def _signature_de_panne(verdict: dict) -> str:
+    """L'identité de la panne : le fournisseur JUGÉ et le motif."""
+    return "%s:%s" % (verdict.get("provider") or "inconnu", _motif_de_panne(verdict))
+
+
+async def email_provider_auto_alert_once(now: Optional[datetime] = None) -> dict:
+    """Un passage : juge le fournisseur email ACTIF et alerte s'il est muet.
+
+    Retourne un résumé testable {provider, sante, alertes, retablissements,
+    pannes_ignorees} : `alertes` vaut 1 exactement quand une alerte est partie
+    sur ce passage, `pannes_ignorees` 1 quand la même panne durait déjà (et
+    que rien n'est donc envoyé).
+    """
+    now = now or datetime.now(timezone.utc)
+    # La sonde ne lève jamais (contrat des sondes d'infra) — mais un patch de
+    # test pourrait la casser, et la boucle isole déjà ses itérations.
+    verdict = await asyncio.to_thread(active_email_provider_health_probe)
+
+    provider = str(verdict.get("provider") or "inconnu")
+    ok = bool(verdict.get("ok"))
+    configured = bool(verdict.get("configured"))
+    detail = str(verdict.get("detail") or "")[:_EMAIL_ALERT_DETAIL_MAX]
+
+    collection = db[EMAIL_ALERT_COLLECTION]
+    etat = await collection.find_one({"_id": _EMAIL_ALERT_SUBJECT}) or {}
+    resume = {
+        "provider": provider,
+        "sante": "ok" if ok else "muette",
+        "alertes": 0,
+        "retablissements": 0,
+        "pannes_ignorees": 0,
+    }
+
+    # ── Le fournisseur répond : rien à alerter, et on RÉARME ────────────────
+    if ok:
+        changement = {"sante": "ok", "detail": detail, "derniere_sonde_at": now}
+        if etat.get("sante") == "muette":
+            # Rétabli : la prochaine panne sera une NOUVELLE panne (donc une
+            # nouvelle alerte), et cet instant est écrit — sans quoi une reprise
+            # serait indiscernable d'une panne toujours en cours.
+            changement["retabli_at"] = now
+            resume["retablissements"] = 1
+            logger.info(
+                "✅ Fournisseur email '%s' de nouveau sain (panne ouverte depuis %s)."
+                % (provider, etat.get("panne_depuis") or "inconnu")
+            )
+        await collection.update_one(
+            {"_id": _EMAIL_ALERT_SUBJECT}, {"$set": changement}, upsert=True
+        )
+        return resume
+
+    # ── Muet : la même panne n'alerte qu'une fois ──────────────────────────
+    motif = _motif_de_panne(verdict)
+    signature = _signature_de_panne(verdict)
+    deja_alertee = etat.get("sante") == "muette" and etat.get("signature") == signature
+
+    changement = {
+        "sante": "muette",
+        "signature": signature,
+        "provider": provider,
+        "configured": configured,
+        "motif": motif,
+        "detail": detail,
+        "derniere_sonde_at": now,
+    }
+    if etat.get("sante") != "muette":
+        changement["panne_depuis"] = now
+
+    if deja_alertee:
+        await collection.update_one(
+            {"_id": _EMAIL_ALERT_SUBJECT}, {"$set": changement}, upsert=True
+        )
+        resume["pannes_ignorees"] = 1
+        logger.debug(
+            "Auto-alerte email: panne '%s' déjà signalée (depuis %s) — pas de seconde alerte."
+            % (signature, etat.get("panne_depuis") or "inconnu")
+        )
+        return resume
+
+    # ── Nouvelle panne : une alerte, et par DEUX canaux qui ne dépendent pas
+    #    de l'email : la notification in-app (elle marche quand le fournisseur
+    #    est muet) et l'email best-effort (il marche quand la panne n'est que
+    #    partielle — clé restreinte, expéditeur douteux). Le compte owner n'a
+    #    aucun push token web en production : l'un sans l'autre laisserait un
+    #    cas sans destinataire.
+    owner_id = await resolve_owner_id() or OWNER_USER_ID
+    await notify_user_localized(
+        user_id=owner_id,
+        key="owner_email_provider_down",
+        notif_type=NotificationType.GENERAL,
+        related_type="email_provider",
+        provider=provider,
+        motif=motif,
+        detail=detail,
+    )
+
+    alerte_envoyee = False
+    alerte_erreur = ""
+    if OWNER_EMAIL:
+        try:
+            await send_email_via_active_provider(
+                OWNER_EMAIL,
+                "KOJO — Fournisseur email muet (%s, %s)" % (provider, motif),
+                "La sonde du fournisseur email ACTIF a rendu un verdict d'échec.\n"
+                "Fournisseur jugé : %s\n"
+                "Motif : %s\n"
+                "Détail : %s\n\n"
+                "Conséquence : aucun email de Kojo ne part (codes de connexion, "
+                "réinitialisations de mot de passe, alertes).\n"
+                "À vérifier : EMAIL_PROVIDER, les clés du fournisseur et son "
+                "EXPÉDITEUR (domaine vérifié chez Resend, expéditeur actif chez "
+                "Brevo, jeton OAuth chez Gmail). /monitor/email doit repasser 200.\n"
+                "Le rétablissement RÉ-ARME cette alerte : une reprise puis une "
+                "nouvelle panne donnera un nouvel email ; la même panne, jamais "
+                "deux." % (provider, motif, detail or "(aucun)"),
+            )
+            alerte_envoyee = True
+        except Exception as exc:
+            # Le fournisseur est muet : c'est le cas NORMAL où cet email ne part
+            # pas. On le DIT (et on l'écrit en base) au lieu de le taire — un
+            # envoi qui échoue en silence ferait croire à une alerte reçue.
+            alerte_erreur = str(exc)[:_EMAIL_ALERT_DETAIL_MAX]
+            logger.warning(
+                "⚠️ Auto-alerte email: envoi impossible (le fournisseur est muet) : %s" % exc
+            )
+    else:
+        alerte_erreur = "OWNER_EMAIL non configuré"
+        logger.warning(
+            "⚠️ Auto-alerte email: OWNER_EMAIL absent — la notification in-app est le seul canal."
+        )
+
+    changement["alerte_envoyee_at"] = now
+    changement["alerte_envoyee"] = alerte_envoyee
+    changement["alerte_erreur"] = alerte_erreur
+    await collection.update_one(
+        {"_id": _EMAIL_ALERT_SUBJECT}, {"$set": changement}, upsert=True
+    )
+    resume["alertes"] = 1
+    logger.warning(
+        "🚨 Auto-alerte email: fournisseur '%s' %s — alerte envoyée (email=%s). Détail: %s"
+        % (provider, motif, alerte_envoyee, detail or "(aucun)")
+    )
+    return resume
+
+
+async def email_provider_alert_loop():
+    """Tâche de fond : juge périodiquement le fournisseur email ACTIF.
+
+    Même modèle que les deux autres boucles : sommeil d'abord (aucune sonde au
+    redémarrage, ni à chaque déploiement), annulable proprement au shutdown,
+    erreurs isolées par itération, et un BAIL par passage — sans lui, N machines
+    Fly sonderaient le fournisseur N fois et pourraient alerter N fois.
+    """
+    while True:
+        try:
+            await asyncio.sleep(EMAIL_HEALTH_ALERT_INTERVAL_MINUTES * 60)
+            await executer_si_bail(
+                "email_provider_alert",
+                timedelta(minutes=EMAIL_HEALTH_ALERT_INTERVAL_MINUTES),
+                email_provider_auto_alert_once,
+            )
+        except asyncio.CancelledError:
+            break
+        except Exception as exc:
+            logger.warning(f"⚠️ Erreur auto-alerte fournisseur email: {exc}")

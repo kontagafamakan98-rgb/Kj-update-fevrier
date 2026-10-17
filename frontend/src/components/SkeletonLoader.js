@@ -346,17 +346,23 @@ export const JobDetailsSkeleton = () => {
         <div className="lg:col-span-2 space-y-6">
           <div className="carte-editoriale carte-publique">
             <Skeleton className="h-8 w-3/4" />
-            <div className="flex items-center gap-3 mt-3">
-              <Skeleton className="h-6 w-24 rounded-full" />
+            <div className="mt-3 flex items-center gap-3">
+              {/* L'ÉTAT est une pastille (`pastille-statut`, rayon de 4 px et
+                  texte de 12 px), pas une pilule : la boîte du squelette suit. */}
+              <Skeleton className="h-6 w-24 rounded-sm" />
               <Skeleton className="h-4 w-32" />
             </div>
-            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mt-6">
+            <div className="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
               <Skeleton className="h-4 w-40" />
-              <Skeleton className="h-9 w-32" />
+              {/* Le PRIX est une mesure : un libellé puis un chiffre serif. */}
+              <div className="flex flex-col gap-1">
+                <Skeleton className="h-3 w-16" />
+                <Skeleton className="h-8 w-32" />
+              </div>
             </div>
-            <div className="flex flex-wrap gap-3 mt-6">
-              <Skeleton className="h-12 w-36 rounded-xl" />
-              <Skeleton className="h-12 w-28 rounded-xl" />
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Skeleton className="h-12 w-36 rounded-[3px]" />
+              <Skeleton className="h-12 w-28 rounded-[3px]" />
             </div>
           </div>
           <div className="carte-editoriale carte-publique space-y-3">
@@ -375,7 +381,7 @@ export const JobDetailsSkeleton = () => {
           <div className="carte-editoriale carte-publique">
             <Skeleton className="h-6 w-24 mb-4" />
             <div className="flex items-center gap-3">
-              <Skeleton className="h-12 w-12 rounded-full" />
+              <Skeleton className="h-10 w-10 rounded-full" />
               <div className="space-y-2 flex-1">
                 <Skeleton className="h-4 w-32" />
                 <Skeleton className="h-3 w-24" />
@@ -635,43 +641,50 @@ export const DashboardSkeleton = () => {
 export const ProfileSkeleton = () => {
   return (
     <CadrePage chemin="/profile" squelette>
-      <div className="carte-editoriale overflow-hidden">
-        {/* Header orange / photo / nom */}
-        <div className="bg-orange-600 carte-cotes py-8">
-          <div className="flex items-center">
-            <Skeleton className="h-20 w-20 rounded-full bg-white/30 border-2 border-white" />
-            <div className="ml-6 flex-1">
-              <Skeleton className="h-7 w-56 max-w-full bg-white/30" />
-              <div className="mt-2">
-                <Skeleton className="h-4 w-40 bg-white/30" />
-              </div>
-              <div className="mt-3">
-                <Skeleton className="h-4 w-52 bg-white/30" />
-              </div>
+      {/* LE BANDEAU D'IDENTITÉ — la MÊME boîte que la page : `.bande-app`,
+          l'avatar de 80 px à gauche, le titre et deux lignes à droite. Le
+          squelette peignait un fond orange de `py-8` dont la page s'est
+          séparée : deux blocs à tenir d'accord, et la hauteur de celui-ci
+          décide de tout le décalage du premier écran. */}
+      <div className="bande-app bloc-app">
+        <div className="flex items-start gap-5">
+          <Skeleton className="h-20 w-20 shrink-0 rounded-full" />
+          <div className="min-w-0 flex-1">
+            <Skeleton className="h-8 w-56 max-w-full" />
+            <div className="mt-3 flex gap-2">
+              <Skeleton className="h-6 w-24 rounded-[3px]" />
+              <Skeleton className="h-6 w-20 rounded-[3px]" />
+            </div>
+            <div className="mt-3">
+              <Skeleton className="h-4 w-52" />
             </div>
           </div>
         </div>
+      </div>
 
+      <div className="carte-editoriale overflow-hidden">
         {/* Section avis */}
-        <div className="carte-cotes py-6 border-b border-gray-200">
+        <div className="carte-cotes border-b border-stone-200 py-6">
           <Skeleton className="h-5 w-40" />
           <div className="mt-4">
             <Skeleton className="h-4 w-3/4 max-w-md" />
           </div>
         </div>
 
-        {/* Section informations personnelles */}
-        <div className="carte-cotes py-6 border-b border-gray-200">
-          <div className="flex justify-between items-center mb-4">
-            <Skeleton className="h-5 w-48" />
+        {/* Section informations personnelles — quatre TUILES (le profil les
+            peint ainsi depuis le 17/10/2026), donc quatre boîtes à filet et
+            non quatre paires de lignes. */}
+        <div className="carte-cotes border-b border-stone-200 py-6">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <Skeleton className="h-6 w-48" />
             <Skeleton className="h-4 w-16" />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index}>
-                <Skeleton className="h-4 w-20" />
-                <div className="mt-1">
-                  <Skeleton className="h-4 w-40" />
+              <div key={index} className="rounded-[3px] border border-stone-200 px-4 py-3">
+                <Skeleton className="h-3 w-20" />
+                <div className="mt-2">
+                  <Skeleton className="h-4 w-40 max-w-full" />
                 </div>
               </div>
             ))}
@@ -679,15 +692,15 @@ export const ProfileSkeleton = () => {
         </div>
 
         {/* Sections bas de carte : paiement + support */}
-        <div className="carte-cotes py-6 border-b border-gray-200">
-          <Skeleton className="h-5 w-40" />
+        <div className="carte-cotes border-b border-stone-200 py-6">
+          <Skeleton className="h-6 w-40" />
           <div className="mt-4">
-            <Skeleton className="h-10 w-full rounded-lg" />
+            <Skeleton className="h-10 w-full rounded-[3px]" />
           </div>
         </div>
 
         <div className="carte-cotes pb-6">
-          <Skeleton className="h-14 w-full rounded-2xl" />
+          <Skeleton className="h-14 w-full rounded-[3px]" />
         </div>
       </div>
     </CadrePage>
@@ -738,36 +751,39 @@ export const MessagesSkeleton = () => {
 export const PaymentContentSkeleton = () => {
   return (
     <div className="space-y-6">
-      {/* Carte quote : en-tête + 3 champs */}
-      <div className="carte-editoriale p-6">
-        <div className="flex items-center justify-between gap-3 flex-wrap mb-5">
+      {/* Carte quote : en-tête + 3 champs. Le rembourrage est celui de la carte
+          RÉELLE (`.carte-editoriale` + `.carte-publique`) : le squelette ne doit
+          pas seulement peindre le même nombre de blocs, il doit en tenir la
+          même boîte. */}
+      <div className="carte-editoriale carte-publique">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <Skeleton className="h-6 w-40" />
-          <Skeleton className="h-6 w-32 rounded-full" />
+          <Skeleton className="h-6 w-32 rounded-[3px]" />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div>
             <Skeleton className="h-4 w-16" />
-            <Skeleton className="h-11 w-full mt-2 rounded-xl" />
+            <Skeleton className="mt-2 h-11 w-full rounded-[3px]" />
           </div>
           <div>
             <Skeleton className="h-4 w-16" />
-            <Skeleton className="h-11 w-full mt-2 rounded-xl" />
+            <Skeleton className="mt-2 h-11 w-full rounded-[3px]" />
           </div>
           <div>
             <Skeleton className="h-4 w-16" />
-            <Skeleton className="h-11 w-full mt-2 rounded-xl" />
+            <Skeleton className="mt-2 h-11 w-full rounded-[3px]" />
           </div>
         </div>
-        {/* Bouton payer */}
-        <Skeleton className="h-11 w-48 mt-6 rounded-xl" />
+        {/* Bouton payer — 52 px : c'est la hauteur que `.bouton` donne au vrai. */}
+        <Skeleton className="mt-6 h-13 w-48 rounded-[3px]" />
       </div>
 
       {/* Carte paiements récents */}
-      <div className="carte-editoriale p-6">
+      <div className="carte-editoriale carte-publique">
         <Skeleton className="h-6 w-56" />
-        <div className="mt-4 space-y-3">
-          <Skeleton className="h-16 w-full rounded-xl" />
-          <Skeleton className="h-16 w-full rounded-xl" />
+        <div className="mt-3">
+          <Skeleton className="h-16 w-full rounded-[3px]" />
+          <Skeleton className="mt-3 h-16 w-full rounded-[3px]" />
         </div>
       </div>
     </div>
@@ -819,10 +835,15 @@ export const PaymentSkeleton = () => {
   return (
     <div className={plan.frameClass}>
       <div className={`${plan.corpsClass} ${hauteurClass}`}>
-        <div className="carte-editoriale p-6">
-          {/* h1 text-3xl + sous-titre */}
-          <Skeleton className="h-9 w-72 max-w-full" />
-          <Skeleton className="h-6 w-96 max-w-full mt-2" />
+        {/* LE BANDEAU D'IDENTITÉ du repli : la même boîte que la page
+            (`.bande-app`), et la BOÎTE DU TITRE calculée des mêmes jetons
+            (`reserve-titre-page`, index.css) plutôt qu'une hauteur écrite ici.
+            DEUX blocs seulement — titre et sous-titre : `antiClsSkeletons`
+            exige que ce repli n'ajoute que ces deux-là au contenu, et le
+            bandeau de la page n'a pas de sur-titre pour la même raison. */}
+        <div className={plan.bandeClass}>
+          <Skeleton className="reserve-titre-page w-3/4" />
+          <Skeleton className="mt-2 h-5 w-full max-w-xl" />
         </div>
         <PaymentContentSkeleton />
       </div>

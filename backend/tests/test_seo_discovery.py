@@ -69,6 +69,83 @@ class TestSitemapDynamic:
         assert "deleted-sitemap" not in resp.text
         assert "completed-sitemap" not in resp.text
 
+
+def fiche_inseree(id: str, statut: str, quand: str, titre: str | None = None) -> dict:
+    """Un document de mission COMPLET, tel qu'un visiteur anonyme le voit.
+
+    `JobPublic` exige `description` et `location` : un document minimal est ÉCARTÉ
+    avec un warning (`_job_view`, vue publique). Un test qui l'omettrait lirait un
+    `[]` de validation et croirait mesurer l'API.
+    """
+    return {
+        "id": id,
+        "title": titre or f"Mission {id}",
+        "description": "Description de la mission (vue publique).",
+        "category": "general",
+        "location": {"address": "Dakar, Sénégal"},
+        "status": statut,
+        "client_id": "client-x",
+        "deleted": False,
+        "created_at": quand,
+    }
+
+
+@pytest.mark.asyncio
+class TestFichesVivantesPourLaSonde:
+    """La SECONDE source de la sonde SEO : les fiches vivantes, PAR STATUT.
+
+    Depuis le 12/10/2026, `frontend/scripts/check-seo-production.js` lit les
+    fiches `/jobs/:id` de DEUX sources : le sitemap, et cette API publique
+    (`?status=open` puis `?status=in_progress` — l'ensemble que le sitemap
+    énumère). Le couplage vit ici parce qu'il est backend : si le filtre `status`
+    cessait de filtrer, la sonde lirait des fiches CLÔTURÉES, dont la page n'est
+    ni dans le sitemap ni servie (404) — elles seraient comptées « disparues »,
+    donc NON jugées, et une fiche vivante absente du sitemap pourrait passer pour
+    une simple fiche morte. Le silence remplacerait le rouge.
+    """
+
+    async def test_chaque_statut_vivant_se_lit_seul(self, client: AsyncClient):
+        # Lecture ANONYME : c'est la seule que la sonde fait (ni cookie, ni
+        # compte). Passer par `auth_headers` ici authentifierait le client httpx
+        # et la propriété serait mesurée sur la vue CONNECTÉE — qui rend le
+        # document brut SANS validation, donc un document minimal y passerait
+        # alors qu'un visiteur, lui, ne le verrait pas.
+        for doc in (
+            fiche_inseree("job-open-source-001", "open", "2026-10-12T09:00:00+00:00"),
+            fiche_inseree("job-in-progress-source-001", "in_progress", "2026-10-12T10:00:00+00:00"),
+            fiche_inseree("job-completed-source-001", "completed", "2026-10-12T11:00:00+00:00"),
+        ):
+            await db_insert("jobs", doc)
+
+        ouverts = (await client.get("/api/jobs?status=open&limit=3")).json()
+        en_cours = (await client.get("/api/jobs?status=in_progress&limit=3")).json()
+
+        # La forme que la sonde lit : un TABLEAU JSON (une enveloppe ajoutée ici
+        # serait nommée « forme inattendue » par la sonde, pas lue comme vide).
+        assert isinstance(ouverts, list) and isinstance(en_cours, list)
+        ids_ouverts = [job["id"] for job in ouverts]
+        ids_en_cours = [job["id"] for job in en_cours]
+        assert ids_ouverts == ["job-open-source-001"]
+        assert ids_en_cours == ["job-in-progress-source-001"]
+        # Un statut CLÔTURÉ n'entre dans AUCUNE des deux lectures de la sonde.
+        assert "job-completed-source-001" not in ids_ouverts + ids_en_cours
+
+    async def test_la_liste_bornee_lit_les_fiches_les_plus_recentes(self, client: AsyncClient):
+        """`limit` borne la lecture (la sonde demande `MAX_JOB_PAGES`) et le tri
+        est le plus RÉCENT d'abord : l'échantillon est donc fait des dernières
+        missions publiées, pas d'un ordre d'insertion."""
+        for rang in range(4):
+            await db_insert("jobs", fiche_inseree(
+                f"job-borne-{rang}", "open", f"2026-10-12T0{rang}:00:00+00:00",
+                titre=f"Mission bornée {rang}",
+            ))
+
+        bornees = (await client.get("/api/jobs?status=open&limit=3")).json()
+
+        assert [job["title"] for job in bornees] == [
+            "Mission bornée 3", "Mission bornée 2", "Mission bornée 1",
+        ]
+
 @pytest.mark.asyncio
 class TestJobOgImage:
     """Carte Open Graph dynamique des fiches mission (/api/og/jobs/:id.png).

@@ -130,6 +130,44 @@ afterEach(() => {
 // deviennent same-site (résout le blocage Safari ITP des cookies tiers).
 // Le mode direct vers Fly reste activable via window.__KOJO_USE_SAME_ORIGIN_API__ = false.
 describe('proxy même-origine (production)', () => {
+  const origineServie = (url) => {
+    vi.stubGlobal('window', { location: new URL(url) });
+    vi.stubEnv('PROD', true);
+    vi.stubEnv('VITE_USE_SAME_ORIGIN_API', '');
+    vi.stubEnv('VITE_API_URL', 'https://api.kojoforafrica.cc.cd/api');
+  };
+
+  it('production : passe par /api malgré une URL backend absolue configurée', () => {
+    origineServie('https://kojoforafrica.cc.cd');
+    expect(getBackendBaseUrl()).toBe('');
+    expect(buildApiUrl('/auth/me')).toBe('/api/auth/me');
+    expect(buildApiUrl('/api/auth/me')).toBe('/api/auth/me');
+    expect(buildBackendUrl('/api/uploads/p.jpg')).toBe('/api/uploads/p.jpg');
+  });
+
+  it('preview Vercel : garde aussi les cookies sur l’origine servie', () => {
+    origineServie('https://kojo-preview.vercel.app');
+    expect(buildApiUrl('/auth/me')).toBe('/api/auth/me');
+  });
+
+  it('désactivation explicite : conserve l’accès direct au backend', () => {
+    origineServie('https://kojoforafrica.cc.cd');
+    vi.stubEnv('VITE_USE_SAME_ORIGIN_API', 'false');
+    expect(buildApiUrl('/auth/me')).toBe('https://api.kojoforafrica.cc.cd/api/auth/me');
+  });
+
+  it('Capacitor : conserve l’API distante même avec un hôte localhost HTTPS', () => {
+    origineServie('https://localhost');
+    window.Capacitor = { isNativePlatform: () => true };
+    expect(buildApiUrl('/auth/me')).toBe('https://api.kojoforafrica.cc.cd/api/auth/me');
+  });
+
+  it('développement : conserve l’URL backend configurée', () => {
+    origineServie('http://kojo.localhost:3000');
+    vi.stubEnv('PROD', false);
+    expect(buildApiUrl('/auth/me')).toBe('https://api.kojoforafrica.cc.cd/api/auth/me');
+  });
+
   afterEach(() => {
     vi.unstubAllEnvs();
     delete window.__KOJO_USE_SAME_ORIGIN_API__;

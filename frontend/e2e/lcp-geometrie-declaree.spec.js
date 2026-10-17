@@ -132,6 +132,17 @@ const ROUTES_DECLAREES = [
     champ: { mobile: 'subtitleClass', desktop: 'titreEntreeClass' },
     plancher: { mobile: 10000, desktop: 5900 },
   },
+  // /payment, re-mesuré le 17/10/2026 au port du vocabulaire d'écran : le plus
+  // grand texte peint est le CORPS de la carte « mission requise » — l'état par
+  // défaut, celui que la coquille publie — et non le titre ni le sous-titre de
+  // la bande. Relevé à la sonde LCP (412×823 et 1350×940) : **33 510 px²**
+  // (333,84 × 100,38) en mobile, **39 312 px²** (512 × 76,78) en desktop.
+  // Le plancher vaut ≈ 60 % du plus petit des deux, comme les autres pages
+  // pré-rendues : il attrape une page vidée de son texte sans devenir un test
+  // de police. Le repli de `<Suspense>` ne la mesure pas — il ne publie aucun
+  // `<h1>` ni ce corps (voir `PaymentSkeleton`) — donc la candidate reste
+  // unique, horodatée au premier paint.
+  { route: '/payment', champ: 'noJobTextClass', plancher: 20000 },
 ];
 
 /**

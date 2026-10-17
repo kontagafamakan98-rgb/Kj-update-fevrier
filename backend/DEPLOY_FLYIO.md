@@ -85,6 +85,28 @@ fly secrets set \
   identique à celle de `.env.example`. Un garde-fou CI
   (`backend/tests/test_vapid_sub_claim.py`) vérifie le format des références
   du dépôt à chaque push.
+- 📥 **Webhooks Resend (rebonds, plaintes)** — `POST /api/email/resend-webhook`.
+  Resend y annonce qu'une adresse a rebondi ou que son destinataire nous a
+  signalés comme spam ; le backend marque alors l'adresse injoignable et
+  **cesse de lui écrire** (un rebond ignoré est un échec silencieux : on croit
+  avoir prévenu, personne n'a rien reçu).
+
+  Déclarer l'URL dans le tableau de bord Resend (Webhooks → Add endpoint),
+  puis copier le **Signing Secret** (il commence par `whsec_`) dans
+  `RESEND_WEBHOOK_SECRET` :
+  ```bash
+  fly secrets set RESEND_WEBHOOK_SECRET="whsec_…"
+  fly deploy
+  ```
+  Sans ce secret, la route **refuse** tout appel (503) au lieu de supprimer une
+  adresse sur la parole du premier venu — la fonctionnalité reste donc
+  désactivée tant qu'il n'est pas posé, et le reste du backend fonctionne.
+  Vérification :
+  `curl -X POST -H 'content-type: application/json' -d '{}' \
+   https://<ton-app>.fly.dev/api/email/resend-webhook` → **401** (signature
+  absente) si le secret est posé, **503** (ingestion désactivée) sinon — dans
+  les deux cas jamais 200 : une requête non signée ne retient aucune adresse.
+
 - **`REDIS_URL` (recommandé en prod)** : active un rate-limiting PARTAGÉ
   multi-workers. Sans Redis, le rate-limiter reste en mémoire par process
   (limites effectives × N workers, non partagées). Provisionner un Redis sur
@@ -335,6 +357,34 @@ auprès de PayDunya (jamais de confiance au payload).
 - Les machines ne s'arrêtent jamais (`auto_stop_machines = false`) : pas de
   cold start, **plus besoin d'UptimeRobot en anti-sleep** (à garder seulement
   en moniteur d'alerte sur `https://api.kojoforafrica.cc.cd/health`).
+- Sondes hors `/api`, pointables par un moniteur : `/health` (l'app),
+  `/monitor` (agrégé : 503 si au moins 2 fournisseurs down, défaut), et les
+  sondes dédiées `/monitor/paydunya`, `/monitor/email`, `/monitor/brevo`,
+  `/monitor/cloudinary`. `/monitor/email` juge le fournisseur **actif**
+  (`EMAIL_PROVIDER`) et son expéditeur : il rougit sur une clé refusée, un
+  transport coupé, un domaine Resend non vérifié, un expéditeur Brevo inactif
+  ou un jeton Gmail révoqué — c'est-à-dire sur les pannes qu'un utilisateur
+  découvrirait en demandant son code. Son `detail` dit ce qui a été jugé.
+- La sonde quotidienne `backend/scripts/check_health_probe.py` (job
+  `backend-health-probe`, cron 06:30) interroge `/health`, puis
+  `/monitor/email` et `/monitor` dérivés de la même origine : un fournisseur
+  email muet ou mal configuré **fait échouer le job** en nommant la cause, et
+  un composite au-delà de son seuil nomme les fournisseurs down. Une panne
+  isolée sous le seuil reste un WARN, comme le contrat du composite.
+- **Auto-alerte (17/10/2026)** : le backend ne dépend PAS de ce job externe.
+  La boucle `kojo_scheduler.email_provider_alert_loop` juge le fournisseur
+  ACTIF toutes les `EMAIL_HEALTH_ALERT_INTERVAL_MINUTES` (15 par défaut) avec
+  la MÊME sonde que `/monitor/email`, puis prévient le propriétaire **une
+  seule fois par panne** (document d'état `scheduler_alerts`, `_id`
+  `email_provider`) : notification in-app au compte propriétaire RÉSOLU par
+  email, et email best-effort — dont l'échec est écrit (`alerte_erreur`) au
+  lieu d'être tu, puisque le cas normal d'une panne totale est que l'email ne
+  puisse pas partir. Le rétablissement (`retabli_at`) RÉ-ARME l'alerte : une
+  reprise suivie d'une nouvelle panne redonne un email ; un motif qui change
+  en restant muet (`muet` → `mal-configure`, ou un autre fournisseur) est une
+  nouvelle panne. Aucun secret à poser : le réglage est optionnel. Gardes :
+  `backend/tests/test_email_provider_auto_alert.py`,
+  `backend/tests/test_scheduler_leases.py` (bail partagé entre machines).
 
 ## 8. Auto-déploiement GitHub Actions (comme l'auto-deploy Render)
 

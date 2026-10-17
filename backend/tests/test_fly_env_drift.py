@@ -535,6 +535,34 @@ class TestOrphelinsBoutEnBout:
         #    deviendrait un second orphelin et l'égalité ci-dessus tomberait.
         assert all("SECRET_LU_DANS_KOJO_SETTINGS_SEULEMENT" not in e for e in check.errors)
 
+    def test_le_controle_des_formats_de_secrets_dit_s_il_a_eu_lieu(
+        self, check, monkeypatch, capsys, references_fixture
+    ):
+        """Sans SSH, le contrôle doit le DIRE au lieu de ne rien dire.
+
+        Mesuré le 12/10/2026 sur les trois derniers pushs de `main` : le journal
+        du job ne portait NI `[OK]` NI `[WARN]` sur les formats des secrets
+        déployés — `read_secrets_via_ssh` n'écrit sa ligne que dans le cas
+        d'EXCEPTION, jamais quand `flyctl ssh` rend une sortie vide sans erreur.
+        Un lecteur du run ne pouvait donc pas distinguer « vérifié » de
+        « sauté ». Les deux issues sont maintenant nommées : ces deux cas
+        tiennent chacune des deux moitiés (sans la seconde, on pourrait
+        satisfaire le test en écrivant « rien n'a été fait » pour toujours).
+        """
+        self._run(check, monkeypatch, self.SECRETS_FIXTURE)
+        sortie_sans_ssh = capsys.readouterr().out
+        assert "[AUCUN VERDICT] formats des" in sortie_sans_ssh, sortie_sans_ssh
+        assert "NON" in sortie_sans_ssh
+
+        monkeypatch.setattr(
+            check, "read_secrets_via_ssh", lambda keys: {cle: "valeur-factice" for cle in keys}
+        )
+        check.errors, check.checked = [], []
+        check.main([])
+        sortie_avec_ssh = capsys.readouterr().out
+        assert "[OK] formats des" in sortie_avec_ssh, sortie_avec_ssh
+        assert "vérifiés" in sortie_avec_ssh
+
     def test_le_check_est_bien_cable_dans_le_workflow_ci(self, check):
         # Un orphelin ne peut être détecté que si le job appelle réellement le
         # script AVEC un jeton : supprimer l'étape rendrait tous les tests

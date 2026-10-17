@@ -257,6 +257,13 @@ describe('check-og-images — branche 404 (aucune mission en base)', () => {
     // Une notice doit dire que la branche 200 n'a pas été exercée : un vert ne
     // doit pas laisser croire que tout le chemin a été validé.
     expect(result.notices.join('\n')).toMatch(/aucune mission en base .*n'a PAS été exercée/);
+    // ET la surface aveugle est BRUYANTE : `::warning` (publié par le CLI),
+    // nommant le chemin non mesuré, son motif et son remède — déclaré dans
+    // scripts/corpus-missions.js. Ici l'assertion porte sur le texte publié :
+    // une surface aveugle connue mais muette serait un faux vert de plus.
+    expect(result.avertissements.join('\n')).toContain('Surface aveugle DÉCLARÉE');
+    expect(result.avertissements.join('\n')).toContain('branche 200 de /jobs/:id');
+    expect(result.avertissements.join('\n')).toContain('Remède :');
     expect(result.checked.join('\n')).toContain('404 + noindex');
     expect(calls).toContain(`${ORIGIN}/jobs/check-nonexistent-job`);
   });

@@ -270,21 +270,18 @@ const handleUnauthorized = (path, { redirect = true } = {}) => {
       });
     };
 
-    // Session cookie httpOnly toujours présente (kojo_csrf associé lisible) :
-    // le 401 vient d'un token STALE en localStorage (vestige de la migration
-    // cookie auth), pas d'une session morte. On purge le stockage
-    // (auto-guérison : les prochains appels partent en cookie-only) mais on
-    // NE redirige PAS vers /login — l'utilisateur est toujours connecté. Si
-    // la session cookie est réellement morte, /auth/me échouera et le garde
-    // de route (App.js) renverra vers /login.
-    if (hasSessionCookie()) {
-      purge('localStorage');
-      purge('sessionStorage');
-      return;
-    }
-
+    // Le 401 peut venir d'un JETON PÉRIMÉ en stockage (shell natif, mode
+    // hybride) alors que la session vit encore côté serveur : on purge le
+    // stockage — les appels suivants repartent sans en-tête — mais on NE
+    // redirige PAS, car rien localement ne prouve que la session est morte.
+    // Le jugement porte sur ce qui peut être périmé (le stockage), jamais sur
+    // la lisibilité d'un cookie : elle n'existe pas cross-site, et deux modes
+    // doivent rendre le même verdict. Sur le web, aucun jeton n'est stocké :
+    // un 401 y signifie donc session morte, et la redirection suit.
+    const staleToken = Boolean(getAuthToken());
     purge('localStorage');
     purge('sessionStorage');
+    if (staleToken) return;
   } catch (_error) {}
 
   if (!redirect) return;
@@ -323,8 +320,13 @@ const handleUnauthorized = (path, { redirect = true } = {}) => {
 // kojo_session posé par le backend sur login/register. Les requêtes web
 // envoient le cookie automatiquement (credentials: 'include'). Les
 // mutations (POST/PUT/PATCH/DELETE) authentifiées par cookie doivent
-// ré-échoquer le cookie CSRF kojo_csrf dans l'en-tête X-CSRFToken
-// (protection CSRF double-submit).
+// ré-échoquer le jeton CSRF dans l'en-tête X-CSRFToken (protection CSRF
+// double-submit).
+//
+// Ce lecteur sert à l'ÉCHO CSRF, jamais à juger une session : sa lisibilité
+// dépend de l'hôte qui a posé le cookie (même-origine = lisible, cross-site =
+// rangé sur l'hôte de l'API, donc invisible). Aucune décision de session ne
+// doit en dépendre — c'est le contrat de hasSessionTrace ci-dessous.
 const CSRF_COOKIE_NAME = 'kojo_csrf';
 
 const readCsrfCookie = () => {
@@ -336,12 +338,54 @@ const readCsrfCookie = () => {
   return match ? decodeURIComponent(match.slice(CSRF_COOKIE_NAME.length + 1)) : '';
 };
 
-// Détection d'une session active pour l'amorçage au montage de l'app : le
-// cookie de session est httpOnly (non lisible en JS), mais le cookie CSRF
-// associé l'est → sa présence indique qu'une session existe.
-export const hasSessionCookie = () => Boolean(readCsrfCookie());
+// TRACE NON SECRÈTE DE SESSION — le SEUL signal d'amorçage du web.
+//
+// Ce n'est ni un jeton ni une preuve : c'est le profil laissé par une
+// connexion réussie ('user'). Il ne sert qu'à décider s'il vaut la peine de
+// poser la question au serveur (/auth/me) ; jamais à afficher quoi que ce soit
+// (un profil n'est montré que sur un 200 du serveur).
+//
+// INVARIANT : la trace est purgée par les MÊMES chemins que la session —
+// clearToken (logout) et la purge de handleUnauthorized (401) — toutes deux
+// couvrent 'user' via AUTH_STORAGE_KEYS. Une trace qui survivrait à la mort de
+// la session ferait sonder /auth/me à chaque chargement, indéfiniment.
+export const hasSessionArtifact = () => {
+  try {
+    if (typeof localStorage === 'undefined') return false;
+    return Boolean(localStorage.getItem('user'));
+  } catch (_error) {
+    // Stockage indisponible (navigation privée) : aucune trace lisible.
+    return false;
+  }
+};
 
-const request = async (method, path, { params, data, headers, signal, skipUnauthorizedRedirect = false, skipRecovery = false } = {}) => {
+/**
+ * Y a-t-il une raison de demander au serveur si une session vit ?
+ *
+ * Le juge est LOCAL et ne consulte AUCUN cookie :
+ *   • le jeton du shell natif (getAuthToken — toujours '' sur le web) ;
+ *   • la trace de profil ci-dessus.
+ *
+ * Pourquoi jamais le cookie : le cookie de session est httpOnly, donc
+ * illisible par nature, et son compagnon CSRF n'est lisible QUE si le
+ * navigateur l'a rangé sur l'origine de la page — vrai en même-origine, faux
+ * en cross-site. Juger la session sur cette lisibilité, c'était avoir deux
+ * comportements pour un même état serveur : en production cross-site, l'app se
+ * déclarait anonyme après chaque F5 alors que le cookie vivait toujours et
+ * renvoyait /login à un utilisateur connecté (mesuré par
+ * scripts/check-session-reload-production.js). Un seul signal, un seul
+ * verdict, quel que soit l'hôte qui porte les cookies.
+ *
+ * Contrepartie assumée : un navigateur dont le stockage local est vidé (mais
+ * dont le cookie de session vit encore) est invité à se reconnecter. Sonder
+ * sans aucune trace coûterait un 401 à CHAQUE visiteur anonyme — accueil et
+ * crawlers compris — ce que ce dépôt a explicitement refusé.
+ *
+ * @returns {boolean} Vrai s'il faut poser la question au serveur.
+ */
+export const hasSessionTrace = () => Boolean(getAuthToken()) || hasSessionArtifact();
+
+const request = async (method, path, { params, data, headers, signal, skipUnauthorizedRedirect = false, skipRecovery = false, sessionProbe = false } = {}) => {
   const normalizedPath = String(path || '').startsWith('/') ? path : `/${path || ''}`;
   const url = `${buildApiUrl(normalizedPath)}${buildQueryString(params)}`;
   const token = getAuthToken();
@@ -428,8 +472,25 @@ const request = async (method, path, { params, data, headers, signal, skipUnauth
     // récupération ; /auth/me EST la sonde → pas de récursion.
     const isAuthFailure = response.status === 401;
     const isCsrfFailure = response.status === 403 && /csrf/i.test(String(payload?.detail || ''));
+    // QUI PEUT ÊTRE RÉCUPÉRÉ, ET AVEC QUEL JETON EN MAIN :
+    //   • un 401 (jeton périmé en stockage, shell natif) n'est récupérable que
+    //     s'il y avait un jeton à remplacer ;
+    //   • un 403 CSRF l'est SANS jeton stocké — et c'est nécessaire sur le web,
+    //     qui n'en a aucun par construction. Le backend ne vérifie le CSRF que
+    //     pour une requête authentifiée PAR LE COOKIE (kojo_auth_core.py,
+    //     _verify_csrf), donc ce 403 PROUVE qu'une session vivait à l'instant du
+    //     refus : rien d'autre n'aurait pu produire ce refus.
+    //     L'exiger d'un jeton rendait la récupération impossible sur le web :
+    //     après un rechargement, la seule façon d'obtenir un CSRF devenait de
+    //     LIRE le cookie kojo_csrf — lisible seulement quand le navigateur l'a
+    //     rangé sur l'origine de la page, jamais en cross-site. La session
+    //     restaurée était alors inutilisable (toute écriture en 403) dans la
+    //     topologie même que la production connaît. La sonde /auth/me (GET, donc
+    //     exempte de CSRF) rétablit la session et le middleware ré-échoit
+    //     X-Kojo-CSRFToken, que le rejeu renvoie — sans lire document.cookie, et
+    //     sans écrire aucun jeton en stockage.
     const canRecover = (isAuthFailure || isCsrfFailure)
-      && Boolean(token)
+      && (Boolean(token) || isCsrfFailure)
       && !skipRecovery
       && normalizedPath !== '/auth/me'
       && !BUSINESS_401_PREFIXES.some((prefix) => normalizedPath.startsWith(prefix));
@@ -442,7 +503,12 @@ const request = async (method, path, { params, data, headers, signal, skipUnauth
       if (recovered !== RECOVERY_FAILED) return recovered;
     }
 
-    if (response.status === 401) {
+    // Une SONDE (sessionProbe) ne juge pas et ne purge pas : elle rapporte.
+    // Sans cela, le 401 de la sonde vidait le stockage AVANT que l'appelant ne
+    // tranche, et l'appelant — jugeant sur un stockage déjà vide — croyait à une
+    // session morte alors qu'un simple jeton périmé pouvait être toute la
+    // cause. Le seul juge reste donc l'appel qui a échoué.
+    if (response.status === 401 && !sessionProbe) {
       handleUnauthorized(normalizedPath, { redirect: !skipUnauthorizedRedirect });
     }
 
@@ -472,10 +538,18 @@ const request = async (method, path, { params, data, headers, signal, skipUnauth
 /**
  * Récupération de session après un 401 (token expiré) ou un 403 CSRF : la
  * session réelle peut encore vivre dans le cookie httpOnly (ou la mémoire CSRF
- * est périmée). Sonde /auth/me (skipRecovery + redirect désactivé pour ne pas
- * récurser ni rediriger si la session est morte), puis REJOUE la requête
+ * est périmée). Sonde /auth/me (sessionProbe : ni purge, ni redirection, ni
+ * récursion — une sonde rapporte, elle ne juge pas), puis REJOUE la requête
  * originale avec le jeton/CSRF rafraîchis. Renvoie RECOVERY_FAILED si la
- * session est réellement morte (le 401 normal purge + redirige ensuite).
+ * session est réellement morte : l'appel d'origine garde alors la main, purge
+ * le stockage, et ne navigue que si aucun jeton n'était en cause.
+ *
+ * Le cas du WEB est le 403 CSRF : il n'y a AUCUN jeton en stockage, et ce refus
+ * prouve pourtant qu'une session cookie vivait (le backend ne vérifie le CSRF
+ * que pour une requête authentifiée par cookie). La sonde rétablit la session et
+ * ré-échoit X-Kojo-CSRFToken ; le rejeu s'en sert. La récupération ne dépend donc
+ * ni d'un jeton stocké, ni de la lisibilité de kojo_csrf depuis l'origine
+ * frontend — les deux n'existent pas sur le web cross-site.
  */
 const recoverSession = async (method, path, options) => {
   // Single-flight PARTAGÉ : si une sonde est déjà en cours (ou vient de
@@ -484,6 +558,7 @@ const recoverSession = async (method, path, options) => {
     sessionRecoveryPromise = request('GET', '/auth/me', {
       skipUnauthorizedRedirect: true,
       skipRecovery: true,
+      sessionProbe: true,
     }).finally(() => {
       // La promesse partagée est consommée : la prochaine série de 401
       // déclenchera une NOUVELLE sonde (l'état de session a pu changer).

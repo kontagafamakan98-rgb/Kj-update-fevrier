@@ -147,6 +147,50 @@ class TestAliasEtAnnulation:
         assert creds["password"] == "abcd efgh"
 
 
+class TestSansIdentifiantsDeuxLectures:
+    """Le MÊME constat, deux codes de sortie — et c'est le drapeau qui décide.
+
+    Mesure du 12/10/2026 : le job `fly-env-drift`, qui porte cette sonde, est un
+    check REQUIS de la protection de branche. Un vert y est donc lu « les trois
+    verdicts ont été lus » ; un secret retiré (rotation, ménage) éteindrait la
+    sonde en silence, personne ne relisant la notice d'un run vert. Sur `main`,
+    l'absence devient un ÉCHEC ; ailleurs (poste, run manuel) elle reste une
+    annulation explicite. Les tests ci-dessous tiennent les DEUX moitiés :
+    exiger partout rendrait la sonde inutilisable sans secrets.
+    """
+
+    @staticmethod
+    def _sans_secrets(monkeypatch):
+        for nom in ("KOJO_PROBE_IMAP_USER", "KOJO_PROBE_IMAP_PASSWORD"):
+            monkeypatch.delenv(nom, raising=False)
+
+    def test_sans_drapeau_la_sonde_sannule_en_notice(self, probe, monkeypatch, capsys):
+        self._sans_secrets(monkeypatch)
+
+        assert probe.main([]) == 0
+        sortie = capsys.readouterr().out
+        assert "Sonde email NON EXÉCUTÉE" in sortie
+        assert "KOJO_PROBE_IMAP_USER" in sortie
+
+    def test_avec_drapeau_labsence_echoue_en_nommant_les_deux_secrets(
+        self, probe, monkeypatch, capsys
+    ):
+        self._sans_secrets(monkeypatch)
+
+        assert probe.main(["--require-secrets"]) == 1
+        sortie = capsys.readouterr().out
+        assert "::error title=Sonde email NON EXÉCUTÉE (secrets exigés)" in sortie
+        assert "KOJO_PROBE_IMAP_USER" in sortie
+        assert "KOJO_PROBE_IMAP_PASSWORD" in sortie
+
+    def test_le_run_de_main_passe_le_drapeau(self, probe):
+        """Un drapeau qui n'est pas passé ne sert à rien : c'est cette liaison-là
+        qui fait du run de `main` un gate, pas le code du script."""
+        workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+
+        assert "check-email-auth.py --require-secrets" in workflow
+
+
 class FausseSession:
     """Session IMAP simulée : `search` répond selon le numéro d'essai.
 

@@ -3,27 +3,43 @@
 Ce document dit **où** se trouvent les accès et **quoi** faire, jamais les valeurs
 elles-mêmes. Aucun secret ne doit être écrit ici ni dans le dépôt.
 
-Les cases `[ ]` et les mentions `À RENSEIGNER` sont à compléter par le
-propriétaire du projet. Un élément absent de ce document est un risque : le
-compléter est la première action à faire.
+Les identités de la section 1 sont renseignées. Ce qui reste à faire est
+écrit ici plutôt que supposé :
+
+- **Vérifier les accès** (cases `[ ]` de la section 1) : une identité écrite
+  n'est pas un accès prouvé. La vérification se fait en se connectant, pas en
+  relisant ce tableau.
+- **Les deux DATES du journal (section 7)** : elles ne peuvent venir que de
+  l'historique du fournisseur (releases Fly, journal des jetons GitHub) ; elles
+  n'ont pas été inventées ici.
+
+Un élément absent de ce document est un risque : le compléter est la première
+action à faire.
 
 ## 1. Services et comptes
 
 | Service | Rôle | Propriétaire du compte | Accès de secours | Vérifié |
 |---|---|---|---|---|
-| Fly.io (app `kojo-backend`) | Hébergement du backend | À RENSEIGNER | À RENSEIGNER | [ ] |
-| Vercel (projet `kj-update-fevrier`) | Hébergement du frontend | À RENSEIGNER | À RENSEIGNER | [ ] |
-| MongoDB Atlas | Base de données de production | À RENSEIGNER | À RENSEIGNER | [ ] |
-| GitHub (dépôt + secrets Actions) | Code et CI/CD | À RENSEIGNER | À RENSEIGNER | [ ] |
-| Cloudinary | Stockage des photos de profil | À RENSEIGNER | À RENSEIGNER | [ ] |
-| PayDunya | Paiements et décaissements | À RENSEIGNER | À RENSEIGNER | [ ] |
-| Brevo / Gmail (e-mails) | Envoi des e-mails transactionnels | À RENSEIGNER | À RENSEIGNER | [ ] |
-| Sentry | Remontée des erreurs | À RENSEIGNER | À RENSEIGNER | [ ] |
-| Nom de domaine (`kojoforafrica.cc.cd`) | DNS | À RENSEIGNER | À RENSEIGNER | [ ] |
+| Fly.io (app `kojo-backend`) | Hébergement du backend | Famakan Kontaga | Famakan Kontaga | [ ] |
+| Vercel (projet `kj-update-fevrier`) | Hébergement du frontend | Famakan Kontaga | Famakan Kontaga | [ ] |
+| MongoDB Atlas | Base de données de production | Famakan Kontaga | Famakan Kontaga | [ ] |
+| GitHub (dépôt + secrets Actions) | Code et CI/CD | Famakan Kontaga | Famakan Kontaga | [ ] |
+| Cloudinary | Stockage des photos de profil | Famakan Kontaga | Famakan Kontaga | [ ] |
+| PayDunya | Paiements et décaissements | Famakan Kontaga | Famakan Kontaga | [ ] |
+| Brevo / Gmail (e-mails) | Envoi des e-mails transactionnels | Famakan Kontaga | Famakan Kontaga | [ ] |
+| Sentry | Remontée des erreurs | Famakan Kontaga | Famakan Kontaga | [ ] |
+| Nom de domaine (`kojoforafrica.cc.cd`) | DNS | Famakan Kontaga | Famakan Kontaga | [ ] |
 
 Règle : chaque compte doit avoir **au moins deux personnes** capables de s'y
 connecter, et l'adresse de récupération ne doit pas dépendre d'une seule boîte
 mail personnelle.
+
+**Écart connu au 10/10/2026** : la même personne est inscrite comme
+propriétaire et comme accès de secours, donc la règle des deux personnes n'est
+PAS satisfaite — un compte tenu par une seule personne reste un point de
+défaillance unique, malgré un tableau rempli. Nommer une seconde personne par
+service (ou constater qu'une même seconde personne couvre tous les services)
+est la seule façon de fermer cet écart ; d'ici là, le tableau dit ce qu'il dit.
 
 ## 2. Où vivent les secrets
 

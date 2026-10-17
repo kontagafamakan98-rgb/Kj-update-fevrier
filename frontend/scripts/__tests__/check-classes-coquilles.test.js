@@ -226,7 +226,15 @@ describe('classes-coquilles — LA FAMILLE DES LISTES', () => {
     // n'est pas une décision, et une entrée dont le module n'existe plus est une
     // exception qui ment. Les deux refus ont leur cas ci-dessus ; ici, le fait
     // que le registre livré soit dans l'état attendu.
-    expect(CLASSES_PROPRES_AUX_COQUILLES.length).toBeGreaterThan(10);
+    // Le plancher valait > 10 jusqu'au 17/10/2026. Ce jour-là, six listes
+    // d'exemption ont disparu parce que la coquille de /register a lu les
+    // classes de la PAGE (`champClass`, `champTelephoneClass`,
+    // `champPrefixeClass`, `selecteurPaysClass`) au lieu de les recopier : une
+    // exemption qui ne protège plus rien est refusée par le garde lui-même
+    // (« entrée périmée »), donc le registre livré vaut 9 et un plancher à 10
+    // n'aurait tenu qu'en gardant des entrées qui mentent. Le plancher reste
+    // un PLANCHER : il prouve que le registre est lu, pas qu'il est gros.
+    expect(CLASSES_PROPRES_AUX_COQUILLES.length).toBeGreaterThan(8);
     for (const entree of CLASSES_PROPRES_AUX_COQUILLES) {
       expect(String(entree.motif ?? '').trim(), `${entree.publiee}`).not.toBe('');
       expect(entree.module, `${entree.publiee}`).toMatch(/^vite-plugins\/prerender\//);

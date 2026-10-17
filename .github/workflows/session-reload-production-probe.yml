@@ -30,14 +30,37 @@ on:
     # 06:47 UTC : après la sonde SEO (06:17) et la sonde de santé (06:30), hors
     # des heures pleines pour ne pas concurrencer les crons d'autres dépôts.
     - cron: '47 6 * * *'
+  # Le dispatch sert à juger une AUTRE surface que la production : la même
+  # sonde, la même commande, un `--base` et un `--cross-site` de plus.
+  #
+  # PRÉPRODUCTION (une preview Vercel) : deux réglages, aucun du dépôt. (1) Le
+  # jeton « Protection Bypass for Automation » — sans lui la page de connexion
+  # d'une preview répond 302 vers vercel.com/sso-api (mesuré le 16/10/2026) —
+  # vient d'un SECRET, jamais d'une entrée de dispatch : une entrée est publiée
+  # dans les journaux du run. (2) `cross_site_api` demande le jugement
+  # CROSS-SITE (drapeau même-origine d'exécution désactivé), parce que sur un
+  # déploiement Vercel le bundle utilise le proxy /api : juger le cross-site sans
+  # ce drapeau ferait accuser le frontend à tort (« aucun appel authentifié »).
+  # Sur le cron, les deux entrées sont vides : la surface jugée reste la
+  # production, par son proxy même-origine — la conduite quotidienne ne change
+  # pas d'un iota.
   workflow_dispatch:
+    inputs:
+      site:
+        description: "Origine frontend à juger (défaut : vide = production)"
+        required: false
+        default: ""
+      cross_site_api:
+        description: "Origine de l'API pour un jugement cross-site (défaut : vide = proxy même-origine de `site`)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
 
 jobs:
   probe:
-    name: Session après rechargement (production)
+    name: Session et attributs du cookie (production)
     runs-on: ubuntu-latest
     # Plafond : sans lui, une production qui ne répond plus laisserait le job
     # patienter jusqu'à l'abandon du runner (360 min) au lieu de rougir.
@@ -74,11 +97,27 @@ jobs:
 
       # La sonde refuse de conclure, en nommant les secrets, s'ils sont absents :
       # un run rouge doit dire quelle variable poser.
-      - name: Vérifier que la session survit au rechargement (production)
+      # Même sonde : le cookie Chromium doit rester HttpOnly, Secure et
+      # SameSite=None après connexion ET après rechargement. Valeur jamais loggée.
+      # Le jeton de contournement, lui non plus : il est lu de l'environnement et
+      # passé en en-tête par la sonde, jamais écrit dans la commande (une commande
+      # de `run:` est publiée dans les journaux du run).
+      - name: Vérifier la session et les attributs réels du cookie (surface et API jugées)
         working-directory: frontend
         env:
           LHCI_CI_EMAIL: ${{ secrets.LHCI_CI_EMAIL }}
           LHCI_CI_PASSWORD: ${{ secrets.LHCI_CI_PASSWORD }}
           LHCI_TEST_EMAIL: ${{ secrets.LHCI_TEST_EMAIL }}
           LHCI_TEST_PASSWORD: ${{ secrets.LHCI_TEST_PASSWORD }}
-        run: node scripts/check-session-reload-production.js
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          SITE_A_JUGER: ${{ inputs.site }}
+          API_CROSS_SITE: ${{ inputs.cross_site_api }}
+        run: |
+          arguments=()
+          if [ -n "$SITE_A_JUGER" ]; then
+            arguments+=(--base "$SITE_A_JUGER")
+          fi
+          if [ -n "$API_CROSS_SITE" ]; then
+            arguments+=(--cross-site "$API_CROSS_SITE")
+          fi
+          node scripts/check-session-reload-production.js ${arguments[@]+"${arguments[@]}"}

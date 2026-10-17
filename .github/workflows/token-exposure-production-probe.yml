@@ -1,0 +1,114 @@
+name: Token exposure production probe (daily)
+
+# ─── Pourquoi un workflow SÉPARÉ, et pas une étape de plus ──────────────────
+# La sonde de session (session-reload-production-probe) juge si une session
+# SURVIT ; celle-ci juge OU VIT LE JETON — invisible sur le web, survivant dans
+# le shell natif. Deux faits, deux corrections — et deux étapes dans un même job
+# se masqueraient : une étape qui échoue arrête les suivantes, donc un rouge de
+# session cacherait un jeton exposé pendant des jours. Deux jobs, deux verdicts
+# indépendants.
+#
+# Les DEUX moitiés de ce job vivent dans le même passage à dessein : un seul
+# marqueur (`isNativeShell`) décide des deux, et elles se répondent — le web ne
+# doit RIEN garder, le natif ne doit RIEN perdre. Les refus des deux moitiés sont
+# collectés ensemble (aucun n'est court-circuité par l'autre), donc aucun rouge ne
+# peut en cacher un autre. Le shell natif est jugé comme un CONTRAT du bundle
+# servi sous marqueurs Capacitor, pas comme une application installée : le
+# marqueur est posé par la sonde, et un redémarrage est simulé (contexte neuf,
+# même stockage, aucun cookie). La persistance réelle du stockage dans la WebView
+# n'est pas mesurée d'ici — c'est écrit dans la sonde, pas tu.
+#
+# Les autres sondes de production du dépôt lisent des faits de SERVEUR (HTML
+# servi, /health, préflight CORS). Celle-ci observe ce qu'un SCRIPT DE LA PAGE
+# peut lire : c'est là que se logent les fuites — un jeton rangé en stockage,
+# un cookie de session devenu lisible, un en-tête Authorization sur une requête
+# du navigateur. Rien de tout cela ne se voit en HTTP.
+#
+# Elle tourne une fois par jour au lieu de chaque push, à dessein : elle dépend
+# d'un compte réel et d'un réseau public, donc elle ne bloque aucune PR. Mais
+# elle ÉCHOUE (code 1) au lieu de publier une note : l'exposition d'un jeton est
+# un invariant, pas une métrique.
+#
+# Aucune écriture : la sonde LIT une session existante (aucune inscription,
+# aucun compte créé), ne modifie rien, et jette son contexte à chaque tentative.
+#
+# PRÉPRODUCTION (une preview Vercel) : l'entrée `site` en juge une autre — la
+# page d'une preview répond 302 vers vercel.com/sso-api sans le jeton
+# « Protection Bypass for Automation » (mesuré le 16/10/2026), qui vient d'un
+# SECRET et jamais d'une entrée de dispatch (une entrée est publiée dans les
+# journaux du run). Sur le cron, l'entrée est vide : la surface jugée reste la
+# production.
+on:
+  schedule:
+    # 06:52 UTC : après la sonde SEO (06:17), la sonde de santé (06:30) et la
+    # sonde de session (06:47) — décalé pour ne pas leur disputer le runner.
+    - cron: '52 6 * * *'
+  workflow_dispatch:
+    inputs:
+      site:
+        description: "Origine frontend à juger (défaut : vide = production)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Exposition du jeton (production)
+    runs-on: ubuntu-latest
+    # Plafond : sans lui, une production qui ne répond plus laisserait le job
+    # patienter jusqu'à l'abandon du runner (360 min) au lieu de rougir.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Cache Playwright Chromium binaries
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+
+      - name: Install Playwright Chromium dependencies (and binary if cache miss)
+        working-directory: frontend
+        run: |
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+            npx playwright install-deps chromium
+          else
+            npx playwright install --with-deps chromium
+          fi
+
+      # La sonde refuse de conclure, en nommant les secrets, s'ils sont absents :
+      # un run rouge doit dire quelle variable poser.
+      # Le jeton de contournement est lu de l'environnement et passé en en-tête
+      # de contexte par la sonde, jamais écrit dans la commande (une commande de
+      # `run:` est publiée dans les journaux du run). Les valeurs de jeton, elles,
+      # ne sont publiées par AUCUN message : le relevé est calculé dans la page et
+      # ne remonte que des couples (réservoir, clé, forme).
+      - name: "Vérifier le jeton sur les deux surfaces (web : invisible ; natif : il survit au redémarrage)"
+        working-directory: frontend
+        env:
+          LHCI_CI_EMAIL: ${{ secrets.LHCI_CI_EMAIL }}
+          LHCI_CI_PASSWORD: ${{ secrets.LHCI_CI_PASSWORD }}
+          LHCI_TEST_EMAIL: ${{ secrets.LHCI_TEST_EMAIL }}
+          LHCI_TEST_PASSWORD: ${{ secrets.LHCI_TEST_PASSWORD }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          SITE_A_JUGER: ${{ inputs.site }}
+        run: |
+          arguments=()
+          if [ -n "$SITE_A_JUGER" ]; then
+            arguments+=(--base "$SITE_A_JUGER")
+          fi
+          node scripts/check-token-exposure-production.js ${arguments[@]+"${arguments[@]}"}

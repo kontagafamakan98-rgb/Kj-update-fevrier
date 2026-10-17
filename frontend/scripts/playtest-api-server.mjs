@@ -205,6 +205,16 @@ const reposerLEtatDuCompte = (user) => {
 };
 let currentOrigin = 'http://127.0.0.1:4173';
 
+// Écho du jeton CSRF, comme le middleware de production
+// (kojo_middlewares.py, WestAfricaSecurityMiddleware) : la valeur du cookie est
+// ré-émise dans X-Kojo-CSRFToken — en-tête EXPOSÉ en CORS (server.py). C'est le
+// canal qui permet à un client cross-site, où `document.cookie` ne montre rien,
+// de garder le double-submit en mémoire. Il est posé par requête AVANT le
+// routage, et un handler qui a déjà posé le sien (login : nouveau jeton) garde
+// le sien — l'écraser avec l'ancienne valeur donnerait header=ancien,
+// cookie=nouveau, soit un 403 à la première mutation après la rotation.
+let csrfAEchoer = '';
+
 const send = (res, status, body, headers = {}) => {
   const payload = JSON.stringify(body);
   const allowOrigin = currentOrigin && currentOrigin !== '*' ? currentOrigin : 'http://127.0.0.1:4173';
@@ -214,6 +224,13 @@ const send = (res, status, body, headers = {}) => {
     'Access-Control-Allow-Credentials': 'true',
     'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
     'Access-Control-Allow-Headers': 'Accept,Content-Type,Authorization,X-CSRFToken',
+    // Sans cet expose, un fetch CROSS-ORIGIN ne peut PAS lire l'écho : `headers.get`
+    // rend null et l'application n'a aucun moyen de garder le double-submit sans
+    // lire un cookie — c'est exactement la dépendance que le modèle doit pouvoir
+    // trancher. La production expose le même en-tête (server.py,
+    // CORSMiddleware(expose_headers=[... 'X-Kojo-CSRFToken'])).
+    'Access-Control-Expose-Headers': 'X-Kojo-CSRFToken',
+    ...(csrfAEchoer && !headers['X-Kojo-CSRFToken'] ? { 'X-Kojo-CSRFToken': csrfAEchoer } : {}),
     ...headers
   });
   res.end(payload);
@@ -237,13 +254,39 @@ const currentUser = (req) => {
   return sessions.get(token) || null;
 };
 // Les deux cookies que le backend pose à la connexion : la session (httpOnly) et
-// le jeton CSRF (lisible par le JavaScript, c'est ce que `hasSessionCookie` lit).
+// le jeton CSRF (lisible par le JavaScript, que le client ré-échoie dans
+// X-CSRFToken — un signal d'ÉCRITURE, jamais un signal de session).
 const enTetesDeSession = (token) => ({
   'Set-Cookie': [
     `kojo_session=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax`,
     `kojo_csrf=csrf-${encodeURIComponent(token)}; Path=/; SameSite=Lax`,
   ],
+  // Le jeton FRAIS est échoé avec les cookies qu'il accompagne (le handler a la
+  // main sur son propre en-tête, cf. send).
+  'X-Kojo-CSRFToken': `csrf-${token}`,
 });
+
+// Double-submit de la fixture, comme le backend (kojo_auth_core.py,
+// _verify_csrf appelé depuis _decode_auth_token) : la vérification ne porte que
+// sur les requêtes AUTHENTIFIÉES PAR LE COOKIE et de méthode non sûre — une
+// requête Bearer (mobile) n'a pas de cookies ambiants, et une requête sans
+// session est refusée par le 401, pas par le CSRF.
+//
+// Sans ce contrôle, le double local laissait passer une écriture que la
+// production refuse : il devenait impossible de distinguer « l'app ré-échoie le
+// jeton » de « l'app lit le cookie lisible » — les deux rendaient 200. C'est
+// exactement ce que le modèle cross-site doit trancher.
+const refusCsrf = (req) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return null;
+  const porteur = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  if (porteur) return null;
+  const session = cookieDe(req, 'kojo_session');
+  if (!session || !sessions.get(session)) return null;
+  const entete = String(req.headers['x-csrftoken'] || '').trim();
+  const cookie = cookieDe(req, 'kojo_csrf').trim();
+  if (entete && cookie && entete === cookie) return null;
+  return { detail: 'Validation CSRF échouée. Jeton manquant ou invalide.' };
+};
 const route = (req) => new URL(req.url, `http://${req.headers.host}`);
 
 const server = http.createServer(async (req, res) => {
@@ -253,7 +296,10 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') return send(res, 204, {});
   const url = route(req);
   const path = url.pathname.replace(/^\/api/, '') || '/';
+  csrfAEchoer = cookieDe(req, 'kojo_csrf');
   try {
+    const refus = refusCsrf(req);
+    if (refus) return send(res, 403, refus);
     if (req.method === 'GET' && path === '/health') return send(res, 200, { status: 'ok', fixture: true });
     if (req.method === 'GET' && path === '/geolocation/available-countries') return send(res, 200, { countries: [] });
     if (req.method === 'GET' && path === '/geolocation/detect') return send(res, 200, { detected: false, country: null });

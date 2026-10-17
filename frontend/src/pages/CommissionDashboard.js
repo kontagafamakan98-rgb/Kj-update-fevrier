@@ -120,10 +120,10 @@ const CommissionDashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-full bg-gray-50 flex items-center justify-center">
+      <div className="min-h-full cadre-page flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500 mx-auto"></div>
-          <div className="mt-4 text-orange-600 font-medium">{pageT('checkingAccess')}</div>
+          <div className="mx-auto h-16 w-16 animate-spin rounded-full border-b-2 border-orange-500"></div>
+          <div className="mt-4 font-semibold text-stone-600">{pageT('checkingAccess')}</div>
         </div>
       </div>
     );
@@ -131,65 +131,73 @@ const CommissionDashboard = () => {
 
   if (!isOwner) {
     return (
-      <div className="min-h-full bg-gray-50 py-8">
-        <div className="max-w-4xl mx-auto px-4 text-center">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-8">
-            <Ban className="h-14 w-14 mx-auto mb-4 text-red-500" aria-hidden="true" />
-            <h1 className="text-2xl font-bold text-red-800 mb-4">{pageT('accessReserved')}</h1>
-            <p className="text-red-700 mb-6">{pageT('accessMessage')}</p>
-            <div className="bg-red-100 border border-red-300 rounded-lg p-4 mb-6">
-              <p className="text-sm text-red-800">{pageT('securityNote')}</p>
-            </div>
-            <div className="space-y-2 text-sm text-red-600">
-              <p>{pageT('connectedUser')}: {user?.first_name} {user?.last_name}</p>
-              <p>{pageT('email')}: {user?.email}</p>
-              <p>{pageT('accessLevel')}: {pageT('standardUser')}</p>
-            </div>
-            <button onClick={() => window.history.back()} className="mt-6 px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
-              {pageT('back')}
-            </button>
+      <div className="min-h-full cadre-page max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="carte-editoriale carte-publique text-center">
+          <Ban className="mx-auto mb-4 h-14 w-14 text-rose-600" aria-hidden="true" />
+          <h1 className="titre-page">{pageT('accessReserved')}</h1>
+          <p className="mt-2 text-sm text-stone-600 sm:text-base">{pageT('accessMessage')}</p>
+          <div className="mt-6 rounded-[3px] border border-stone-200 fond-sable p-4">
+            <p className="text-sm text-stone-600">{pageT('securityNote')}</p>
           </div>
+          <div className="mt-6 space-y-2 text-sm text-stone-600">
+            <p>{pageT('connectedUser')} : {user?.first_name} {user?.last_name}</p>
+            <p>{pageT('email')} : {user?.email}</p>
+            <p>{pageT('accessLevel')} : {pageT('standardUser')}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => window.history.back()}
+            className="bouton bouton-clair mt-6"
+          >
+            {pageT('back')}
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-full bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="mb-8">
-          <h1 className="titre-page mb-2">{pageT('title')}</h1>
-          <p className="text-gray-600">{pageT('subtitle')}</p>
+    <div className="min-h-full cadre-page max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="space-y-6">
+        {/* LE BANDEAU D'ÉCRAN (17/10/2026) : le titre et son chapeau étaient
+            posés à même le fond, en teinte douce, et s'espaçaient d'une marge
+            écrite à la main. Ils ouvrent maintenant la bande crème que portent
+            les autres écrans, et son pas vient de `.space-y-6` (l'écran perd
+            donc son rembourrage vertical fixe, remplacé par `cadre-page`).
+            Aucun nom d'utilitaire n'est écrit ici, même pour mémoire : Tailwind
+            lit le texte des sources. */}
+        <section className="bande-app" data-section="bande-commissions">
+          <h1 className="titre-page">{pageT('title')}</h1>
+          <p className="mt-2 text-sm text-stone-600 sm:max-w-2xl sm:text-base">{pageT('subtitle')}</p>
+        </section>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <StatCard icon={<Banknote className="h-4 w-4" aria-hidden="true" />} titre={pageT('totalCommissions')} valeur={`${formatMoney(displayStats.total_commission_earned || displayStats.totalCommissions)} XOF`} />
+          <StatCard icon={<BarChart3 className="h-4 w-4" aria-hidden="true" />} titre={pageT('totalVolume')} valeur={`${formatMoney(displayStats.total_volume || displayStats.totalVolume)} XOF`} />
+          {/* Le nombre de transactions est une MESURE comme les trois autres : les
+              quatre tuiles lisent `.tuile-mesure`, donc elles s'alignent au
+              chiffre près (chiffres tabulaires) au lieu de porter quatre pavés
+              de couleur qui faisaient ressembler la grille à quatre cartes. */}
+          <StatCard icon={<Hash className="h-4 w-4" aria-hidden="true" />} titre={pageT('transactions')} valeur={displayStats.total_transactions || displayStats.totalTransactions || 0} />
+          <StatCard icon={<CalendarDays className="h-4 w-4" aria-hidden="true" />} titre={pageT('today')} valeur={`${formatMoney(displayStats.daily_commission || displayStats.todayCommissions)} XOF`} />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <StatCard icon={<Banknote className="h-6 w-6 text-green-600" aria-hidden="true" />} classeFond="bg-green-100" title={pageT('totalCommissions')} value={`${formatMoney(displayStats.total_commission_earned || displayStats.totalCommissions)} XOF`} classeValeur="text-green-600" />
-          <StatCard icon={<BarChart3 className="h-6 w-6 text-blue-600" aria-hidden="true" />} classeFond="bg-blue-100" title={pageT('totalVolume')} value={`${formatMoney(displayStats.total_volume || displayStats.totalVolume)} XOF`} classeValeur="text-blue-600" />
-          {/* Le nombre de transactions est une MESURE, pas une émotion : il porte
-              le graphite, quand les deux cartes de montants gardent la couleur du
-              mouvement d'argent (vert perçu, bleu du volume) et la journée de
-              référence garde l'orange de marque. Quatre teintes qui ne se
-              chevauchent pas, et aucune qui appartienne à une autre famille de
-              sens. */}
-          <StatCard icon={<Hash className="h-6 w-6 text-slate-600" aria-hidden="true" />} classeFond="bg-slate-100" title={pageT('transactions')} value={displayStats.total_transactions || displayStats.totalTransactions || 0} classeValeur="text-slate-700" />
-          <StatCard icon={<CalendarDays className="h-6 w-6 text-orange-600" aria-hidden="true" />} classeFond="bg-orange-100" title={pageT('today')} value={`${formatMoney(displayStats.daily_commission || displayStats.todayCommissions)} XOF`} classeValeur="text-orange-600" />
-        </div>
-
-        <div className="carte-editoriale p-6 mb-8">
-          <div className="flex justify-between items-center mb-6 gap-4 flex-wrap">
-            <h2 className="titre-entree">{pageT('receptionAccounts')}</h2>
+        <div className="carte-editoriale carte-publique" data-section="comptes-encaissement">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+            <h2 className="titre-carte-app">{pageT('receptionAccounts')}</h2>
             <button
+              type="button"
               onClick={() => (editingAccounts ? saveAccounts() : setEditingAccounts(true))}
-              className={`px-4 py-2 rounded-lg font-medium ${editingAccounts ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+              className={`bouton ${editingAccounts ? 'bouton-encre' : 'bouton-clair'}`}
             >
               {editingAccounts ? pageT('saveAccounts') : pageT('editAccounts')}
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <AccountCard
               title="Orange Money"
-              icone={<Wallet className="h-6 w-6 text-orange-500" aria-hidden="true" />}
+              icone={<Wallet className="h-5 w-5" aria-hidden="true" />}
               editing={editingAccounts}
               primaryLabel={pageT('phoneNumber')}
               secondaryLabel={pageT('accountName')}
@@ -206,7 +214,7 @@ const CommissionDashboard = () => {
 
             <AccountCard
               title="Wave"
-              icone={<Waves className="h-6 w-6 text-blue-500" aria-hidden="true" />}
+              icone={<Waves className="h-5 w-5" aria-hidden="true" />}
               editing={editingAccounts}
               primaryLabel={pageT('phoneNumber')}
               secondaryLabel={pageT('accountName')}
@@ -223,7 +231,7 @@ const CommissionDashboard = () => {
 
             <AccountCard
               title={pageT('bankCard')}
-              icone={<CreditCard className="h-6 w-6 text-gray-600" aria-hidden="true" />}
+              icone={<CreditCard className="h-5 w-5" aria-hidden="true" />}
               editing={editingAccounts}
               primaryLabel={pageT('accountNumber')}
               secondaryLabel={pageT('bank')}
@@ -242,44 +250,50 @@ const CommissionDashboard = () => {
 
         <OwnerMissionEvents />
 
-        <div className="carte-editoriale p-6">
-          <div className="flex justify-between items-center mb-6 gap-4 flex-wrap">
-            <h2 className="titre-entree">{pageT('history')}</h2>
-            <button onClick={loadOwnerData} className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+        <div className="carte-editoriale carte-publique" data-section="historique-commissions">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+            <h2 className="titre-carte-app">{pageT('history')}</h2>
+            <button type="button" onClick={loadOwnerData} className="bouton bouton-clair">
               {pageT('refresh')}
             </button>
           </div>
 
           {transactions.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <Briefcase className="h-12 w-12 mx-auto mb-4 text-gray-400" aria-hidden="true" />
+            <div className="py-8 text-center text-stone-600">
+              <Briefcase className="mx-auto mb-4 h-12 w-12 text-stone-400" aria-hidden="true" />
               <p>{pageT('noTransactions')}</p>
-              <p className="text-sm mt-2">{pageT('noTransactionsHelp')}</p>
+              <p className="mt-2 text-sm">{pageT('noTransactionsHelp')}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              {/* Le tableau garde sa forme (six colonnes se comparent mieux en
+                  tableau qu'en lignes empilées) mais lit les teintes du site :
+                  filet et fond de tête viennent des jetons, et les deux montants
+                  de commission/part ouvrier ne sont plus deux couleurs inventées
+                  — la commission est la part du site (orange), la part ouvrier
+                  reste l'encre. */}
+              <table className="min-w-full divide-y divide-stone-200">
+                <thead className="fond-sable">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{pageT('transaction')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{pageT('totalAmount')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{pageT('yourCommission')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{pageT('workerAmount')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{pageT('method')}</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{pageT('date')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-stone-500">{pageT('transaction')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-stone-500">{pageT('totalAmount')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-stone-500">{pageT('yourCommission')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-stone-500">{pageT('workerAmount')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-stone-500">{pageT('method')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-stone-500">{pageT('date')}</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="divide-y divide-stone-200 bg-white">
                   {transactions.slice(0, 10).map((transaction) => (
-                    <tr key={transaction.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">{transaction.id}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><span className="font-semibold">{formatMoney(transaction.totalAmount)} XOF</span></td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm"><span className="font-semibold text-green-600">{formatMoney(transaction.ownerCommission)} XOF</span></td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm"><span className="font-semibold text-blue-600">{formatMoney(transaction.workerAmount)} XOF</span></td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <tr key={transaction.id} className="hover:bg-stone-50">
+                      <td className="whitespace-nowrap px-4 py-4 font-mono text-sm text-stone-900">{transaction.id}</td>
+                      <td className="whitespace-nowrap px-4 py-4 text-sm text-stone-900"><span className="font-semibold">{formatMoney(transaction.totalAmount)} XOF</span></td>
+                      <td className="whitespace-nowrap px-4 py-4 text-sm"><span className="font-semibold text-orange-700">{formatMoney(transaction.ownerCommission)} XOF</span></td>
+                      <td className="whitespace-nowrap px-4 py-4 text-sm"><span className="font-semibold text-stone-900">{formatMoney(transaction.workerAmount)} XOF</span></td>
+                      <td className="whitespace-nowrap px-4 py-4 text-sm text-stone-900">
                         <span className="inline-flex items-center">{getMethodIcon(transaction.paymentMethod)}<span className="ml-2 capitalize">{String(transaction.paymentMethod || '—').replace(/_/g, ' ')}</span></span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(transaction.timestamp)}</td>
+                      <td className="whitespace-nowrap px-4 py-4 text-sm text-stone-600">{formatDate(transaction.timestamp)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -292,46 +306,44 @@ const CommissionDashboard = () => {
   );
 };
 
-// `bg`/`valueColor` portaient des CLASSES sous un nom qui ne le disait pas — le
-// verdict de la feuille LIVRÉE en déclarait deux mortes (`bg-slate-100`,
-// `text-slate-700`), quand Tailwind ne les générait que depuis ce fichier.
-// `classe*` est la convention lue par `scripts/css-selecteurs-morts.js`.
-function StatCard({ icon, classeFond, title, value, classeValeur }) {
+// La TUILE DE MESURE (vocabulaire d'écran, 17/10/2026) : un libellé et un
+// chiffre, rien d'autre. Les quatre pavés de couleur qui entouraient chaque
+// icône ont disparu — ils donnaient quatre teintes de sens à quatre mesures qui
+// n'en portent pas, et empêchaient les chiffres de s'aligner.
+function StatCard({ icon, titre, valeur }) {
   return (
-    <div className="carte-editoriale p-6">
-      <div className="flex items-center">
-        <div className={`p-3 rounded-full ${classeFond} mr-4`}><span className="text-2xl">{icon}</span></div>
-        <div>
-          <p className="text-sm font-medium text-gray-600">{title}</p>
-          <p className={`text-2xl font-bold ${classeValeur}`}>{value}</p>
-        </div>
-      </div>
+    <div className="tuile-mesure">
+      <p className="tuile-mesure-libelle flex items-center gap-2">
+        <span className="text-orange-600">{icon}</span>
+        {titre}
+      </p>
+      <p className="tuile-mesure-chiffre">{valeur}</p>
     </div>
   );
 }
 
 function AccountCard({ title, icone, editing, primaryLabel, secondaryLabel, primaryValue, secondaryValue, primaryPlaceholder, secondaryPlaceholder, notConfigured, onPrimaryChange, onSecondaryChange, primaryName, secondaryName }) {
   return (
-    <div className="border border-gray-200 rounded-lg p-4">
-      <div className="flex items-center mb-3">
-        <span className="mr-2">{icone}</span>
-        <h3 className="font-semibold text-gray-900">{title}</h3>
+    <div className="rounded-[3px] border border-stone-200 p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <span className="text-orange-600">{icone}</span>
+        <h3 className="titre-carte-app">{title}</h3>
       </div>
       <div className="space-y-3">
         <div>
-          <label htmlFor={primaryName} className="block text-sm font-medium text-gray-700 mb-1">{primaryLabel}</label>
+          <label htmlFor={primaryName} className="block text-sm font-medium text-stone-700">{primaryLabel}</label>
           {editing ? (
-            <input id={primaryName} name={primaryName} type="text" autoComplete="off" value={primaryValue} onChange={(e) => onPrimaryChange(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500" placeholder={primaryPlaceholder} />
+            <input id={primaryName} name={primaryName} type="text" autoComplete="off" value={primaryValue} onChange={(e) => onPrimaryChange(e.target.value)} className="mt-2 w-full px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-orange-500" placeholder={primaryPlaceholder} />
           ) : (
-            <p className="font-mono text-sm bg-gray-50 p-2 rounded-sm">{primaryValue || notConfigured}</p>
+            <p className="fond-sable mt-2 rounded-[3px] px-2 py-1.5 font-mono text-sm text-stone-900">{primaryValue || notConfigured}</p>
           )}
         </div>
         <div>
-          <label htmlFor={secondaryName} className="block text-sm font-medium text-gray-700 mb-1">{secondaryLabel}</label>
+          <label htmlFor={secondaryName} className="block text-sm font-medium text-stone-700">{secondaryLabel}</label>
           {editing ? (
-            <input id={secondaryName} name={secondaryName} type="text" autoComplete="off" value={secondaryValue} onChange={(e) => onSecondaryChange(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500" placeholder={secondaryPlaceholder} />
+            <input id={secondaryName} name={secondaryName} type="text" autoComplete="off" value={secondaryValue} onChange={(e) => onSecondaryChange(e.target.value)} className="mt-2 w-full px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-orange-500" placeholder={secondaryPlaceholder} />
           ) : (
-            <p className="text-sm bg-gray-50 p-2 rounded-sm">{secondaryValue || notConfigured}</p>
+            <p className="fond-sable mt-2 rounded-[3px] px-2 py-1.5 text-sm text-stone-900">{secondaryValue || notConfigured}</p>
           )}
         </div>
       </div>

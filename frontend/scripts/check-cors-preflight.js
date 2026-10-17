@@ -38,13 +38,15 @@
  *     préflight : la session par cookie ne passerait pas.
  *
  * ── Pourquoi elle ÉCHOUE au lieu d'informer ────────────────────────────────
- * Contrairement à la sonde SEO (une intégration non configurée est un fait
- * d'exploitation acceptable), cette paire est un invariant : si elle casse, le
- * site ne fonctionne plus. Un `::notice` passerait inaperçu — c'est exactement
- * ce qui s'est produit pendant des heures. L'échec est donc bruyant, et un
- * délai de réessai absorbe la fenêtre de bascule : sur `main`, ce job tourne en
- * même temps que le déploiement Fly, où une instance peut encore servir l'ancien
- * code (justement celui qui refuse la nouvelle origine).
+ * Contrairement à la sonde SEO, dont le verdict tombe une fois par jour sur une
+ * exécution planifiée (l'étape informative de `ci.yml` a été retirée le
+ * 10/10/2026 : cf. CI-COVERAGE.md §3 F9), cette paire est un invariant : si elle
+ * casse, le site ne fonctionne plus. Un `::notice` passerait inaperçu — c'est
+ * exactement ce qui s'est produit pendant des heures. L'échec est donc bruyant,
+ * dans le run de `main` lui-même, et un délai de réessai absorbe la fenêtre de
+ * bascule : sur `main`, ce job tourne en même temps que le déploiement Fly, où
+ * une instance peut encore servir l'ancien code (justement celui qui refuse la
+ * nouvelle origine).
  *
  * main uniquement : sur une PR, ce sont les previews qui sont auditées et le
  * déploiement est sauté — la sonde vérifie la production, pas une preview.

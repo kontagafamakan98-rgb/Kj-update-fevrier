@@ -163,6 +163,12 @@ def get_rate_limit_bucket(path: str) -> tuple[str, int, int]:
         # Envoi de messages : 60 POST/min/IP (les GET/HEAD/OPTIONS de
         # lecture/polling sont exemptés, voir RateLimitMiddleware)
         return ("messages", 60, 1)
+    if path.startswith("/api/support/robot/chat"):
+        # Assistant IA : un message = un appel MODÈLE payant, mais la
+        # conversation a besoin d'aller vite (l'utilisateur enchaîne les tours).
+        # 20 POST/5min/IP est le plafond de coût ; la règle est testée AVANT le
+        # préfixe /api/support, qui refuserait 10 messages en 5 minutes.
+        return ("support-robot", 20, 5)
     if path.startswith("/api/support"):
         # Tickets support (création publique) : 10 POST/5min/IP
         return ("support", 10, 5)

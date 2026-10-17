@@ -13,7 +13,7 @@ from fastapi import HTTPException
 
 from kojo_business_events import enregistrer_evenement
 from kojo_core import db, resolve_owner_id
-from kojo_email import send_email_via_brevo_api
+from kojo_email import send_email_via_active_provider
 from kojo_models import NotificationType
 from kojo_settings import (
     BACKEND_PUBLIC_URL,
@@ -207,7 +207,7 @@ async def _circuit_owner_alert() -> None:
         logger.warning(f"⚠️ Notification alerte circuit breaker échouée: {exc}")
     if OWNER_EMAIL:
         try:
-            send_email_via_brevo_api(
+            await send_email_via_active_provider(
                 OWNER_EMAIL,
                 "KOJO — PayDunya injoignable (circuit breaker ouvert)",
                 (

@@ -210,10 +210,27 @@ SUPPORT_TICKET_RETENTION_DAYS = 365
 # après la mission. Le délai court à partir de l'envoi.
 MESSAGE_RETENTION_DAYS = 730
 
+# Fait de livraison d'un email (rebond, plainte, livraison réussie) : c'est une
+# TRACE de diagnostic — « pourquoi cette personne n'a-t-elle rien reçu ? » —
+# et elle porte l'adresse du destinataire. Elle est donc bornée : ce qui
+# gouverne durablement l'envoi n'est pas le journal, c'est la suppression
+# (`email_suppressions`), qui ne périme pas et se lève sur décision.
+EMAIL_DELIVERY_EVENT_RETENTION_DAYS = 90
+
 # Fréquence du passage de purge (minutes). L'index TTL reste la garantie de
 # fond ; ce balayage applique les mêmes règles côté application et les rend
 # observables. Une fois par jour suffit largement.
 RETENTION_SWEEP_INTERVAL_MINUTES = int(os.environ.get('RETENTION_SWEEP_INTERVAL_MINUTES', '1440'))
+
+# Fréquence de l'auto-alerte du fournisseur email ACTIF (minutes) : le backend
+# juge lui-même, avec la sonde de `/monitor/email`, le fournisseur qu'un envoi
+# utiliserait MAINTENANT, et prévient le propriétaire UNE SEULE FOIS PAR PANNE
+# (kojo_scheduler.email_provider_auto_alert_once). Quinze minutes : assez court
+# pour qu'une clé révoquée soit vue avant que les utilisateurs réclament leur
+# code, assez long pour ne pas marteler l'API du fournisseur (la sonde a déjà
+# son cache TTL de 60 s). Ce réglage ne remplace PAS la sonde externe du dépôt
+# (`backend/scripts/check_health_probe.py`, cron 06:30) : il la double.
+EMAIL_HEALTH_ALERT_INTERVAL_MINUTES = int(os.environ.get('EMAIL_HEALTH_ALERT_INTERVAL_MINUTES', '15'))
 
 # --- Vérification email (OTP) ---
 _env_email_otp_secret = os.environ.get('EMAIL_OTP_SECRET', '').strip()
@@ -385,6 +402,9 @@ GMAIL_ACCESS_TOKEN_SAFETY_SECONDS = max(30, int(os.environ.get('GMAIL_ACCESS_TOK
 
 GMAIL_ACCESS_TOKEN_CACHE: Dict[str, Any] = {"access_token": "", "expires_at": 0.0}
 
+# Fournisseur email actif : 'brevo' (défaut) | 'resend' | 'gmail' | 'none'.
+# Cette valeur décide de TOUS les envois (OTP, reçus, alertes owner) : voir
+# kojo_email.send_email_via_active_provider.
 EMAIL_PROVIDER = os.environ.get('EMAIL_PROVIDER', 'brevo').strip().lower()
 
 BREVO_API_KEY = os.environ.get('BREVO_API_KEY', '').strip()
@@ -403,6 +423,52 @@ PASSWORD_RESET_FROM_EMAIL = os.environ.get('PASSWORD_RESET_FROM_EMAIL', BREVO_SE
 BREVO_REPLY_TO_EMAIL = os.environ.get('BREVO_REPLY_TO_EMAIL', 'kojoapp98@gmail.com').strip()
 
 BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email'
+
+# Resend (https://resend.com) — fournisseur alternatif, API REST.
+# La clé `re_…` doit être un secret d'exécution (backend/.env en local, secrets
+# Fly en production), jamais une valeur de build : dans du code frontend elle
+# finirait dans le bundle servi à tous les visiteurs.
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '').strip()
+
+# Expéditeur Resend. Il doit appartenir à un domaine VÉRIFIÉ chez Resend
+# (SPF/DKIM), sinon Resend n'accepte que les envois vers l'adresse du compte
+# — `onboarding@resend.dev` est l'expéditeur de TEST, pas de production.
+RESEND_SENDER_EMAIL = os.environ.get('RESEND_SENDER_EMAIL', '').strip()
+
+RESEND_SENDER_NAME = os.environ.get('RESEND_SENDER_NAME', 'KOJO').strip() or 'KOJO'
+
+# Même règle que BREVO_REPLY_TO_EMAIL : l'expéditeur du domaine n'a pas de
+# boîte, donc sans Reply-To une réponse à un email KOJO rebondit. Défaut =
+# la même boîte lue (les deux fournisseurs partagent la réponse).
+RESEND_REPLY_TO_EMAIL = os.environ.get('RESEND_REPLY_TO_EMAIL', BREVO_REPLY_TO_EMAIL).strip()
+
+RESEND_API_URL = 'https://api.resend.com/emails'
+
+# Webhook Resend (rebonds, plaintes) : Resend publie ses faits de livraison sur
+# une URL déclarée dans son tableau de bord, signés par un secret Svix
+# (`whsec_…`) — les en-têtes `svix-id`, `svix-timestamp`, `svix-signature`.
+#
+# OPTIONNELLE, et son absence DÉSACTIVE l'ingestion au lieu de l'assouplir :
+# sans secret, la route ne peut pas distinguer Resend d'un inconnu qui
+# annoncerait « cette adresse a rebondi ». Supprimer une adresse sur la parole
+# du premier venu ferait taire les emails d'un tiers ; la route refuse donc
+# (503) et le dit, et le reste du backend démarre sans elle.
+RESEND_WEBHOOK_SECRET = os.environ.get('RESEND_WEBHOOK_SECRET', '').strip()
+
+# Fenêtre de FRAÎCHEUR d'une signature de webhook (secondes). Une signature
+# porte un horodatage : sans borne, une requête signée capturée une fois se
+# rejoue à jamais. 300 s est la tolérance des bibliothèques Svix officielles.
+EMAIL_WEBHOOK_TOLERANCE_SECONDS = max(
+    30, int(os.environ.get('EMAIL_WEBHOOK_TOLERANCE_SECONDS', '300'))
+)
+
+# Rebonds TRANSITOIRES consécutifs (boîte pleine, serveur momentanément
+# injoignable) avant d'alerter le propriétaire : ils ne suppriment pas
+# l'adresse — la boîte existe —, mais une série qui dure est exactement
+# l'échec silencieux qu'on veut arrêter. Alerte à chaque multiple du seuil.
+EMAIL_SOFT_BOUNCE_ALERT_THRESHOLD = max(
+    1, int(os.environ.get('EMAIL_SOFT_BOUNCE_ALERT_THRESHOLD', '3'))
+)
 
 GMAIL_DEPRECATED_NOTICE = 'Gmail OAuth disabled in favor of Brevo'
 
@@ -467,3 +533,23 @@ FAMAKAN_OWNER_EMAIL = os.environ.get('FAMAKAN_OWNER_EMAIL', '').strip() or OWNER
 OWNER_USER_ID = os.environ.get('OWNER_USER_ID', 'kojo-owner').strip() or 'kojo-owner'
 
 OWNER_INITIAL_PASSWORD = os.environ.get('OWNER_INITIAL_PASSWORD', '').strip()
+
+# --- Assistant IA (Neon AI Gateway) ---------------------------------------
+# Le gateway vit DANS la branche Neon et expose un endpoint compatible OpenAI :
+# l'hôte de branche (sans chemin) reçoit `/v1/chat/completions`. Neon n'injecte
+# que ces deux variables (jamais OPENAI_API_KEY) : `NEON_AI_GATEWAY_BASE_URL`
+# est l'hôte du gateway de la branche, `NEON_AI_GATEWAY_TOKEN` le jeton Neon.
+#
+# OPTIONNELLES : sans elles, l'assistant IA est DÉSACTIVÉ (is_configured() est
+# faux, la route répond 503) et /support retombe sur le questionnaire. Le
+# backend démarre donc sans elles — c'est un défaut de repli, pas un secret
+# requis (voir OPTIONAL_KEYS de .github/scripts/check-fly-env-drift.py).
+# Le slash final est retiré ici : sinon `…/v1` deviendrait `…//v1`.
+AI_GATEWAY_BASE_URL = os.environ.get('NEON_AI_GATEWAY_BASE_URL', '').strip().rstrip('/')
+AI_GATEWAY_TOKEN = os.environ.get('NEON_AI_GATEWAY_TOKEN', '').strip()
+# Identifiant de catalogue du modèle (models.dev/providers/neon) : le gateway
+# route selon ce seul champ, donc changer de fournisseur ne touche PAS le code.
+AI_GATEWAY_MODEL = os.environ.get('NEON_AI_GATEWAY_MODEL', 'claude-haiku-4-5').strip()
+# Un appel modèle est facturé et plus lent qu'une requête interne : borne
+# explicite, pour qu'un gateway lent ne bloque pas un worker indéfiniment.
+AI_GATEWAY_TIMEOUT_SECONDS = int(os.environ.get('NEON_AI_GATEWAY_TIMEOUT_SECONDS', '30'))

@@ -50,6 +50,11 @@ import { PHONE_PREFIX_FALLBACK, phoneNumberExample } from '../../src/config/phon
 import { COUNTRY_PLACEHOLDER } from '../../src/config/country-placeholder.js';
 import { photoFormatsLine } from '../../src/config/photo-formats.js';
 import { CONTACT } from '../../src/config/contact.js';
+// Le PLAN de /payment, pour la classe du titre de sa coquille : le garde la LIT
+// (`PAGE_SECTIONS['/payment'].titleClass`) depuis le port du vocabulaire
+// d'écran, donc la fixture conforme doit la lire aussi — une chaîne recopiée
+// ici rougirait pour la mauvaise raison le jour où le plan change de pas.
+import { PAGE_SECTIONS } from '../../src/config/page-sections.js';
 // Le chrome de l'app (navbar + .App + main.flex-1) : la fixture des coquilles
 // le matérialise depuis SA source, comme le garde l'exige — une chaîne
 // recopiée ici pourrait diverger du build sans que rien ne rougisse. Et il le
@@ -66,7 +71,6 @@ import {
 // source (le module que le build appelle), jamais recopiées.
 import { buildRouteShells } from '../../vite-plugins/prerender/shells-routes.js';
 import { makeScopedTranslator as makeJobsTranslator } from '../../src/utils/pack2PageI18n/jobs.js';
-import { PAGE_SECTIONS } from '../../src/config/page-sections.js';
 
 const FRONTEND_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SCRIPT = path.join(FRONTEND_DIR, 'scripts', 'check-prerender-shells.js');
@@ -216,7 +220,7 @@ const pages = () => ({
     TETE_SHELL +
     ogTagFor('payment.html') +
     '</head><body><div id="root">' + CHROME_OUVERTURE +
-    '<h1 class="titre-page mb-2">KOJO Paiements réels</h1>' +
+    `<h1 class="${PAGE_SECTIONS['/payment'].titleClass}">KOJO Paiements réels</h1>` +
     '<p>Un paiement doit être rattaché à une mission</p>' +
     `<p>${fr.paymentPageNoJobText}</p>` +
     '<a href="/jobs">Voir les missions disponibles</a>' +

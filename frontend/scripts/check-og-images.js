@@ -46,6 +46,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { API_ORIGIN, SITE_ORIGIN, declaresNoIndex, metaContent, metaContents } from './site-meta.js';
+// Le corpus « missions vivantes » est DÉCLARÉ (scripts/corpus-missions.js) : quand
+// la base auditée n'en sert aucune, la branche 200 de /jobs/:id n'est pas
+// mesurée, et cette surface aveugle se publie en `::warning` — elle REFUSE si
+// elle n'est pas déclarée (cf. l'en-tête de ce script et CI-COVERAGE.md).
+import {
+  SURFACE_OG_IMAGES_FICHE_200,
+  verdictDeSurfaceVide,
+} from './corpus-missions.js';
 // Les cartes par route sont la propriété de src/config/og-cards.js : ce module
 // (et le build qui l'importe) n'en garde AUCUNE copie, donc la coquille
 // pré-rendue et la page au runtime ne peuvent pas annoncer deux cartes
@@ -221,7 +229,7 @@ export async function baseServesJobOgRoute({ base, fetchImpl = fetch, timeoutMs 
  * @returns {Promise<{ok: boolean, errors: string[], checked: string[],
  *   jobId: string, jobTitle: string, job200Exercised: boolean,
  *   jobRoute: {serves: boolean, status: number, url: string, detail: string},
- *   jobRouteServed: boolean, notices: string[]}>}
+ *   jobRouteServed: boolean, notices: string[], avertissements: string[]}>}
  */
 export async function runOgImageCheck({
   base = process.env.KOJO_LHCI_BASE_URL || DEFAULT_BASE,
@@ -246,6 +254,9 @@ export async function runOgImageCheck({
   const errors = [];
   const checked = [];
   const notices = [];
+  // Bruyantes, jamais bloquantes (corpus de la base auditée vide) : publiées en
+  // `::warning` par l'appelant. Une surface NON déclarée, elle, va dans `errors`.
+  const avertissements = [];
 
   const isAbsolute = (value) => /^https?:\/\//.test(value || '');
 
@@ -434,6 +445,15 @@ export async function runOgImageCheck({
         `seul le chemin 404 (pré-rendu backend + rewrite + noindex) est vérifié à la place.`;
       notices.push(notice);
       log(`  ⚠️ ${notice}`);
+      // Le corpus est vide : la surface est-elle DÉCLARÉE comme aveugle ?
+      // Déclarée → ::warning (bruyant, non bloquant) ; sinon → refus, parce
+      // qu'un vert qui n'a rien mesuré est le silence que F9 a coûté.
+      const verdict = verdictDeSurfaceVide({
+        cle: SURFACE_OG_IMAGES_FICHE_200,
+        detail: `aucune mission servie par ${BACKEND}/api/jobs`,
+      });
+      if (verdict.erreur) errors.push(verdict.erreur);
+      else avertissements.push(verdict.avertissement);
     }
   }
 
@@ -532,6 +552,7 @@ export async function runOgImageCheck({
     errors,
     checked,
     notices,
+    avertissements,
     jobId,
     jobTitle,
     job200Exercised,
@@ -553,6 +574,12 @@ if (isDirectRun) {
   // doit dire ce qui n'a PAS été testé, pas seulement « vert ».
   for (const notice of result.notices) {
     console.log(`::notice title=Chemins non couverts::${notice}`);
+  }
+  // Et une surface AVEUGLE (corpus vide) est bruyante : `::warning` nommant le
+  // chemin non mesuré, son motif et son remède. Déclarée = jamais bloquante ;
+  // non déclarée = le refus est dans `errors` (sortie 1 ci-dessous).
+  for (const avertissement of result.avertissements) {
+    console.log(`::warning title=Surface aveugle (corpus vide)::${avertissement}`);
   }
   if (!result.ok) process.exit(1);
 }

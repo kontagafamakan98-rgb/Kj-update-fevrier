@@ -252,7 +252,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="rounded-[3px] border border-stone-200 bg-white p-6">
         <div className="animate-pulse">
           <div className="h-4 bg-gray-200 rounded-sm w-1/4 mb-4"></div>
           <div className="h-4 bg-gray-200 rounded-sm w-full mb-2"></div>
@@ -263,11 +263,15 @@ const PaymentAccountsManager = ({ onSuccess }) => {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <div className="flex justify-between items-center mb-6">
+    <div data-section="comptes-paiement" className="rounded-[3px] border border-stone-200 bg-white p-6">
+      {/* L'EN-TÊTE SE REPLIE : sur 412 px, un titre, un compte d'étapes et le
+          bouton ne tiennent pas sur une rangée — le bouton sortait de la carte.
+          Le repli est une décision de CARTE (elle sait sa largeur), pas une
+          media query : il se règle donc sur la largeur de son conteneur. */}
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">{t('paymentAccounts')}</h2>
-          <p className="text-sm text-gray-600 mt-1">
+          <h2 className="titre-carte-app">{t('paymentAccounts')}</h2>
+          <p className="text-sm text-stone-600 mt-1">
             {user?.user_type === 'worker' 
               ? `${t('minimumRequired')}: ${getRequiredMinimum()} ${t('accountsLinked').toLowerCase()} (${t('workerPaymentRequirement').toLowerCase()})`
               : `${t('minimumRequired')}: ${getRequiredMinimum()} ${t('accountRequired')}`
@@ -275,20 +279,23 @@ const PaymentAccountsManager = ({ onSuccess }) => {
           </p>
         </div>
         
-        <div className="flex items-center space-x-3">
+        <div className="flex shrink-0 items-center gap-3">
           {/* Status Badge */}
-          <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+          <div className={`whitespace-nowrap rounded-[3px] border px-2.5 py-1 text-xs font-semibold ${
             getLinkedAccountsCount() >= getRequiredMinimum()
-              ? 'bg-green-100 text-green-800'
-              : 'bg-yellow-100 text-yellow-800'
+              ? 'border-green-200 bg-green-50 text-green-800'
+              : 'border-orange-200 bg-orange-50 text-orange-800'
           }`}>
             {getLinkedAccountsCount()}/{getRequiredMinimum()} {t('accountsLinked').toLowerCase()}
           </div>
           
           {!isEditing && (
+            // L'action d'entrée du bloc, au vocabulaire de bouton du site :
+            // elle ouvre la paire Annuler/Enregistrer ci-dessous, et une
+            // pastille `rounded-md` à côté d'elles peindrait deux boutons.
             <button
               onClick={() => setIsEditing(true)}
-              className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+              className="bouton bouton-encre"
             >
               {t('modify')}
             </button>
@@ -310,7 +317,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
 
       <div className="space-y-6">
         {/* Orange Money */}
-        <div className="border rounded-lg p-4">
+        <div className="rounded-[3px] border border-stone-200 p-4">
           <div className="flex items-center mb-3">
             <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center mr-3">
               <span className="text-white text-sm font-bold">OM</span>
@@ -352,7 +359,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
         </div>
 
         {/* Wave */}
-        <div className="border rounded-lg p-4">
+        <div className="rounded-[3px] border border-stone-200 p-4">
           <div className="flex items-center mb-3">
             <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-3">
               <span className="text-white text-sm font-bold">W</span>
@@ -398,7 +405,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
         </div>
 
         {/* Bank Account */}
-        <div className="border rounded-lg p-4">
+        <div className="rounded-[3px] border border-stone-200 p-4">
           <div className="flex items-center mb-3">
             <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center mr-3">
               <Landmark className="h-4 w-4 text-white" aria-hidden="true" />
@@ -541,22 +548,22 @@ const PaymentAccountsManager = ({ onSuccess }) => {
       </div>
 
       {isEditing && (
-        <div className="flex justify-end space-x-4 mt-6 pt-6 border-t">
+        <div className="mt-6 flex flex-wrap justify-end gap-3 border-t pt-6">
           <button
             onClick={handleCancel}
             disabled={saving}
-            className="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors disabled:opacity-50"
+            className="bouton bouton-clair disabled:cursor-not-allowed disabled:opacity-50"
           >
             {t('cancel')}
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            className="bouton bouton-encre disabled:cursor-not-allowed disabled:opacity-50"
           >
             {saving ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-white" aria-hidden="true"></div>
                 {t('loading')}
               </>
             ) : (

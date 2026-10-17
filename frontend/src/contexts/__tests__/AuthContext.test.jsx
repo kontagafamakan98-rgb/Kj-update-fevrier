@@ -13,10 +13,21 @@
  * - Un VISITEUR ANONYME (ni jeton, ni cookie) ne sonde JAMAIS /auth/me : la
  *   requête était un 401 garanti à chaque chargement de page, visible dans la
  *   console du navigateur et payé par tous les visiteurs non connectés.
+ * - CONTRÔLE P0.1 : sur le web, la session est le cookie httpOnly SEUL — ni
+ *   'token' ni 'token_expires_at' ne sont écrits (login compris) ; le shell
+ *   natif Capacitor, lui, a le droit d'écrire les deux (pas de cookie fiable).
+ * - CROSS-ORIGIN (production) : le cookie est rangé sur l'hôte de l'API, donc
+ *   AUCUN cookie de session n'est lisible depuis l'origine frontend. Sans la
+ *   trace locale (hasSessionTrace : jeton natif ou profil en cache), l'app se
+ *   déclarait anonyme au rechargement et renvoyait /login à un utilisateur
+ *   connecté (mesuré en production). La lisibilité d'un cookie ne décide de
+ *   RIEN : deux hôtes possibles pour les cookies, un seul verdict. La trace ne
+ *   doit PAS, à elle seule, autoriser l'affichage du cache hors-ligne : elle ne
+ *   vaut pas preuve de session.
  */
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
 
 // --- Mocks : isole AuthProvider du réseau, du réseau-optimizer et du push ---
 
@@ -35,14 +46,17 @@ vi.mock('../../services/api', () => ({
   // anonyme de loadUser est ainsi testé sur son vrai critère (jeton présent ou
   // non), pas sur une doublure qui répondrait toujours la même chose.
   getAuthToken: vi.fn(() => localStorage.getItem('token') || ''),
-  // Cookie CSRF lisible : absent par défaut (les tests web le posent).
-  hasSessionCookie: vi.fn(() => false),
+  // Trace de session — le SEUL juge d'amorçage : branchée sur le stockage comme
+  // getAuthToken, pour que le court-circuit soit jugé sur son vrai critère (une
+  // trace est-elle là ?), pas sur une doublure à réponse fixe.
+  hasSessionTrace: vi.fn(() => Boolean(localStorage.getItem('token')) || Boolean(localStorage.getItem('user'))),
+  hasSessionArtifact: vi.fn(() => Boolean(localStorage.getItem('user'))),
   // Les scénarios historiques modélisent une session portée par le jeton, donc
   // le shell natif. Le web (cookie seul) est couvert en fin de fichier.
   isNativeShell: vi.fn(() => true),
 }));
 
-import { markSoftRedirectConsumed, isNativeShell, hasSessionCookie } from '../../services/api';
+import { markSoftRedirectConsumed, isNativeShell, hasSessionTrace, hasSessionArtifact } from '../../services/api';
 
 // Réseau « bon » : loadUser doit appeler /auth/me (pas le chemin cache pauvre).
 vi.mock('../../utils/networkOptimizer', () => ({
@@ -93,6 +107,47 @@ const renderProvider = () =>
   );
 
 const readStoredUser = () => JSON.parse(localStorage.getItem('user') || 'null');
+
+// Sonde de CONNEXION : `login` est le seul chemin qui pourrait écrire un
+// jeton (establishSession → persistSessionToken). C'est donc lui qu'il faut
+// déclencher pour verrouiller l'écriture — pas le seul démarrage.
+const LoginProbe = () => {
+  const { user, login, loading } = useAuth();
+  return (
+    <div>
+      <span data-testid="country">{user?.country || 'none'}</span>
+      <span data-testid="loading">{String(loading)}</span>
+      <button onClick={() => login('jean@example.com', 'motdepasse')}>connect</button>
+    </div>
+  );
+};
+
+const renderLogin = () =>
+  render(
+    <AuthProvider>
+      <LoginProbe />
+    </AuthProvider>
+  );
+
+// JWT minimal dont le payload porte un `exp` (base64url, sans padding comme un
+// vrai jeton) : c'est cette valeur que readJwtExpiry décode pour poser
+// 'token_expires_at'.
+const EXP_SECONDES = 2000000000;
+const JWT_SONDE = [
+  'entete',
+  btoa(JSON.stringify({ sub: 'user-1', exp: EXP_SECONDES }))
+    .replace(/=+$/, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_'),
+  'signature',
+].join('.');
+
+// Connexion puis attente de l'état connecté (le test ne poursuit qu'une fois
+// la session établie).
+const connecter = async () => {
+  fireEvent.click(screen.getByRole('button', { name: 'connect' }));
+  await waitFor(() => expect(screen.getByTestId('country').textContent).toBe('mali'));
+};
 
 describe('AuthContext — cohérence du snapshot localStorage user', () => {
   beforeEach(() => {
@@ -217,12 +272,11 @@ describe('AuthContext — web : la session est le cookie httpOnly seul', () => {
     localStorage.clear();
     sessionStorage.clear();
     isNativeShell.mockReturnValue(false);
-    hasSessionCookie.mockReturnValue(false);
+    hasSessionTrace.mockClear();
   });
 
   afterEach(() => {
     isNativeShell.mockReturnValue(true);
-    hasSessionCookie.mockReturnValue(false);
     vi.restoreAllMocks();
     localStorage.clear();
     sessionStorage.clear();
@@ -242,15 +296,122 @@ describe('AuthContext — web : la session est le cookie httpOnly seul', () => {
     expect(authAPI.getProfile).not.toHaveBeenCalled();
   });
 
-  it('cookie de session présent (sans aucun jeton) → le profil est restauré au rechargement', async () => {
-    hasSessionCookie.mockReturnValue(true);
+  it('un cookie CSRF lisible ne vaut pas session : sans trace locale, aucune sonde', async () => {
+    // Le cookie CSRF est lisible ici (même-origine) et invisible en cross-site.
+    // En faire un signal d'amorçage donnait deux comportements pour un même
+    // état serveur — c'est précisément ce qui a été retiré.
+    document.cookie = 'kojo_csrf=csrf-visible; path=/';
+    authAPI.getProfile.mockResolvedValue({ ...FRESH_USER });
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('loading').textContent).toBe('false'));
+    expect(authAPI.getProfile).not.toHaveBeenCalled();
+    expect(screen.getByTestId('country').textContent).toBe('none');
+    expect(localStorage.getItem('token')).toBeNull();
+    document.cookie = 'kojo_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+  });
+
+  it('cross-origin (aucun cookie lisible sur l\'origine frontend) → la session est restaurée au rechargement', async () => {
+    // Production : l'API est appelée directement sur son propre hôte, où le
+    // navigateur range kojo_session ET kojo_csrf. `document.cookie` de
+    // l'origine frontend n'en montre aucun — réel en cross-origin, ce n'est pas
+    // une doublure, et c'est exactement pourquoi aucune décision de session ne
+    // doit lire un cookie. Le seul vestige lisible est le profil laissé par la
+    // connexion précédente ; /auth/me a le dernier mot.
+    localStorage.setItem('user', JSON.stringify({ id: 'user-1', country: 'mali' }));
+    expect(document.cookie).not.toContain('kojo_session');
+    expect(hasSessionArtifact()).toBe(true);
+    expect(hasSessionTrace()).toBe(true);
     authAPI.getProfile.mockResolvedValue({ ...FRESH_USER });
 
     renderProvider();
 
     await waitFor(() => expect(screen.getByTestId('country').textContent).toBe('mali'));
+    // Une seule question posée au serveur, et c'est la bonne.
     expect(authAPI.getProfile).toHaveBeenCalledTimes(1);
-    // Aucun jeton n'a été écrit pour y parvenir.
     expect(localStorage.getItem('token')).toBeNull();
+  });
+
+  it('le vestige SEUL ne survit pas à un 401 (aucun utilisateur fantôme)', async () => {
+    // Le serveur répond 401 : le profil en cache est le vestige d'une session
+    // finie. Il ne doit NI s'afficher, NI ouvrir un chemin de cache hors-ligne :
+    // tous les appels de cet utilisateur échoueraient. Il est purgé, donc le
+    // chargement suivant ne repose même pas la question.
+    localStorage.setItem('user', JSON.stringify({ id: 'user-1', country: 'mali' }));
+    const erreur401 = new Error('401');
+    erreur401.response = { status: 401 };
+    authAPI.getProfile.mockRejectedValue(erreur401);
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('loading').textContent).toBe('false'));
+    expect(screen.getByTestId('country').textContent).toBe('none');
+    expect(hasSessionArtifact()).toBe(false);
+  });
+
+  it('connexion web : ni token ni token_expires_at, dans AUCUN des deux stockages', async () => {
+    // Le backend vient de poser le cookie httpOnly ; il renvoie aussi le jeton
+    // dans le corps de la réponse (mode Bearer pour les intégrations). Le web
+    // ne doit PAS le conserver : c'est ce corps de réponse qui était stocké
+    // par les anciennes versions, puis relu et envoyé en en-tête.
+    authAPI.login.mockResolvedValue({ user: { ...FRESH_USER }, access_token: JWT_SONDE });
+
+    renderLogin();
+    await waitFor(() => expect(screen.getByTestId('loading').textContent).toBe('false'));
+    await connecter();
+
+    expect(localStorage.getItem('token')).toBeNull();
+    expect(localStorage.getItem('token_expires_at')).toBeNull();
+    expect(sessionStorage.getItem('token')).toBeNull();
+    expect(sessionStorage.getItem('token_expires_at')).toBeNull();
+    // Le reste de la session a bien été établi (absence de jeton ≠ login raté).
+    expect(readStoredUser().country).toBe('mali');
+    expect(authAPI.login).toHaveBeenCalledWith({ email: 'jean@example.com', password: 'motdepasse' });
+  });
+});
+
+describe('AuthContext — shell natif : le jeton a le droit d\'être écrit', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    sessionStorage.clear();
+    // Capacitor : pas de cookie httpOnly fiable, le jeton reste le seul canal.
+    isNativeShell.mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+
+  it('connexion native : le jeton ET son expiration sont persistés', async () => {
+    authAPI.login.mockResolvedValue({ user: { ...FRESH_USER }, access_token: JWT_SONDE });
+
+    renderLogin();
+    await waitFor(() => expect(screen.getByTestId('loading').textContent).toBe('false'));
+    await connecter();
+
+    // Contre-épreuve du test web : la garde isNativeShell ne doit pas
+    // interdire au shell natif la session qu'il n'a pas d'autre moyen de
+    // retrouver après redémarrage.
+    expect(localStorage.getItem('token')).toBe(JWT_SONDE);
+    expect(localStorage.getItem('token_expires_at')).toBe(String(EXP_SECONDES * 1000));
+  });
+
+  it('démarrage natif : le jeton stocké est CONSERVÉ (purge réservée au web)', async () => {
+    // purgeWebSessionTokens sort tôt sur isNativeShell : si elle cessait de
+    // distinguer les deux shells, le shell natif perdrait sa session à chaque
+    // lancement sans qu'aucun test web ne le voie.
+    localStorage.setItem('token', JWT_SONDE);
+    localStorage.setItem('token_expires_at', String(EXP_SECONDES * 1000));
+    authAPI.getProfile.mockResolvedValue({ ...FRESH_USER });
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('country').textContent).toBe('mali'));
+    expect(localStorage.getItem('token')).toBe(JWT_SONDE);
+    expect(authAPI.getProfile).toHaveBeenCalledTimes(1);
   });
 });

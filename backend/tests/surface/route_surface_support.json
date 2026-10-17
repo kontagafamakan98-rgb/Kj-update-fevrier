@@ -1,6 +1,14 @@
 [
   {
     "methode": "POST",
+    "chemin": "/api/support/robot/chat",
+    "nom": "robot_chat",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "POST",
     "chemin": "/api/support/tickets/status",
     "nom": "get_support_ticket_status",
     "code": null,

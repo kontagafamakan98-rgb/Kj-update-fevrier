@@ -332,7 +332,7 @@
       "invoque_par": "ci",
       "preuve": "frontend/scripts/__tests__/check-session-reload-production.test.js",
       "runner": "vitest",
-      "motif": "la SEULE sonde du dépôt qui juge ce que le NAVIGATEUR garde d'une session : toutes les autres lisent des faits de serveur (HTML servi, /health, préflight CORS). Elle se connecte par le formulaire servi avec le compte CI, recharge la page, puis refuse séparément le justificatif qui n'a pas survécu (correction côté cookie : AUTH_COOKIE_SAMESITE / périmètre) et l'application qui ne le restaure pas (correction côté garde d'amorçage). Le relevé de persistance (jeton en stockage, cookie lisible depuis l'origine frontend) est journalisé à chaque run sans jamais devenir un verdict : c'est une autre propriété, avec une autre correction"
+      "motif": "la SEULE sonde du dépôt qui juge ce que le NAVIGATEUR garde d'une session : toutes les autres lisent des faits de serveur (HTML servi, /health, préflight CORS). Elle se connecte par le formulaire servi avec le compte CI, recharge la page, puis refuse séparément le justificatif qui n'a pas survécu (correction côté cookie : AUTH_COOKIE_SAMESITE / périmètre) et l'application qui ne le restaure pas (correction côté garde d'amorçage). Les attributs réels de kojo_session sont lus par context.cookies sur /auth/me après connexion et rechargement : HttpOnly=true, Secure=true, SameSite=None, cookie applicable unique ; toute dérive est un refus indépendant du 200. La valeur du cookie n'est jamais publiée. Le relevé de stockage et de cookie lisible reste informatif"
     },
     {
       "chemin": "frontend/scripts/check-spa-routes.js",
@@ -340,6 +340,14 @@
       "invoque_par": "ci",
       "preuve": "frontend/scripts/__tests__/check-spa-routes.test.js",
       "runner": "vitest"
+    },
+    {
+      "chemin": "frontend/scripts/check-token-exposure-production.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-token-exposure-production.test.js",
+      "runner": "vitest",
+      "motif": "les DEUX moitiés d'un même invariant, jugées dans le même passage parce qu'un seul marqueur (`isNativeShell`) les décide. WEB : la SEULE sonde du dépôt qui juge l'EXPOSITION d'un jeton sur le domaine web servi — elle se connecte par le formulaire servi avec le compte CI, recharge la page, puis relit DANS la page ce qu'un script de la page lirait (clé de stockage nommée comme un justificatif, valeur en FORME de JWT en stockage, cookie lisible ou URL, en-tête Authorization). NATIF : le MÊME bundle sous les marqueurs Capacitor, où le jeton DOIT être écrit et SURVIVRE à un redémarrage — contexte neuf avec le seul stockage du premier, aucun cookie (la WebView native n'en a pas de fiable), et la session doit revenir par GET /auth/me 200 porté par le jeton. Le relevé web est pris à DEUX instants, parce que l'application purge elle-même au démarrage les clés héritées (`purgeWebSessionTokens`, AuthContext.js) : premier instant du document puis après amorçage — mesurer le seul second rendait vert un jeton hérité pourtant lisible pendant tout le chargement, constaté sur l'origine servie le 16/10/2026. Neuf refus, jamais une note : chaque exposition nomme le réservoir, la clé et la PHASE, et JAMAIS la valeur (un jeton journalisé est un jeton publié) ; une surface ILLISIBLE (réservoir, document.cookie) est un refus, un relevé d'avant amorçage non déposé aussi, et sans session ouverte la sonde refuse de conclure ; côté natif, un contexte où RIEN n'a été écrit est un refus (elle jugerait le web en croyant juger le natif), un redémarrage porteur de cookies aussi (il ne prouverait pas que le jeton suffit), une application muette au redémarrage, une session restaurée SANS en-tête Authorization, un jeton disparu et un 401. Ce qu'elle ne peut pas juger, écrit plutôt que tu : le parcours observé est l'amorçage (pas les mutations d'un utilisateur réel), les relevés sont des instants datés, et le shell natif est le CONTRAT du bundle servi sous marqueurs — pas une application installée (la persistance réelle du stockage dans la WebView n'est pas mesurée d'ici)."
     },
     {
       "chemin": "backend/kojo_balises.py",
@@ -378,6 +386,22 @@
       "runner": "pytest"
     },
     {
+      "chemin": ".github/scripts/check-etat-reference.py",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "backend/tests/test_etat_reference.py",
+      "runner": "pytest",
+      "motif": "refuse qu'un fichier du dépôt s'écarte de son ÉTAT DE RÉFÉRENCE sans l'avoir déclaré : le harnais de mutation écrit dans un fichier réel puis restaure et VÉRIFIE la restauration par empreinte, donc une mutation laissée en place n'est possible que si le processus MEURT entre les deux — Ctrl-C, expiration, runner annulé — et là rien ne le dit, la suite locale passe sur un dépôt muté. Le périmètre se DÉRIVE du registre des preuves (cibles des mutations déclarées) moins la machinerie déclarée hors périmètre ; il refuse une dérive non déclarée avec ses deux empreintes, une mutation ENCORE EN PLACE (nommée par le registre des preuves), une cible sans état de référence, une entrée périmée, une déclaration muette (motif de moins de 40 caractères, date illisible), et refuse de conclure sous son plancher de lecture"
+    },
+    {
+      "chemin": ".github/scripts/check-informative-steps.py",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "backend/tests/test_informative_steps_guard.py",
+      "runner": "pytest",
+      "motif": "refuse toute étape de workflow qui ne PEUT PAS échouer sans être déclarée : F9 avait une cause unique — un rapport publié sans verdict — et la sonde SEO n'en était qu'une instance, la syntaxe (`continue-on-error`, `|| true`, `set +e`) étant disponible partout. Mesure l'inventaire de TOUT .github/workflows/ (7 formes sur 155 étapes lues le 16/10/2026, toutes déclarées avec leur motif dans .github/scripts/informative-steps.json), refuse une déclaration périmée, un nombre d'occurrences qui change, un motif trop court, un registre illisible ou une forme inconnue, et refuse de conclure sous 40 étapes lues"
+    },
+    {
       "chemin": ".github/scripts/check-og-test-mutations.py",
       "role": "garde",
       "invoque_par": "ci",
@@ -390,6 +414,14 @@
       "invoque_par": "ci",
       "preuve": "backend/tests/test_privacy_policy_guard.py",
       "runner": "pytest"
+    },
+    {
+      "chemin": ".github/scripts/check-seo-probe-strict.py",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "backend/tests/test_seo_probe_strict_guard.py",
+      "runner": "pytest",
+      "motif": "refuse une invocation de la sonde SEO de production hors mode `--strict` : le mode informatif publie un `::notice` par fait constaté et rend 0, donc il ne peut pas bloquer une PR — c'est le mode par DÉFAUT du script, et c'est ce silence qui a laissé F9 ouvert jusqu'au retrait de l'étape informative de ci.yml le 10/10/2026. Refuse aussi une étape stricte qui ne peut pas échouer (`continue-on-error`, `|| true`) : une étape qui ne peut pas rougir est informative quel que soit son drapeau. Lit TOUT .github/workflows/ (un workflow ajouté demain est couvert), et refuse de conclure quand il ne lit aucune invocation"
     },
     {
       "chemin": ".github/scripts/check-test-existence-assertions.py",
@@ -409,10 +441,9 @@
       "chemin": ".github/scripts/livrer.py",
       "role": "outil",
       "invoque_par": "aucun",
-      "preuve": null,
-      "runner": null,
-      "motif": "outil d'orchestration de livraison complète : pousse la branche de travail, ouvre/détecte la PR, attend les checks CI, fusionne via l'API GitHub, synchronise localement et confirme formellement que Vercel et Fly.io servent la révision",
-      "hors_mutation": "outil d'ops sans verdict interne sur le dépôt : orchestre des commandes git et les gardes check-deployed-revision.js et check_deployed_revision.py déjà mutés et éprouvés"
+      "preuve": "backend/tests/test_gate_perimetre.py",
+      "runner": "pytest",
+      "motif": "outil d'orchestration de livraison complète : pousse la branche de travail, ouvre/détecte la PR, attend les checks du PÉRIMÈTRE DÉCLARÉ (`.github/scripts/gate-perimetre.json`, lu par import de `perimetre_gate.py` — plus « tous les check-runs », qui faisait refuser la livraison sur un rapport de taille pendant qu'une fusion manuelle passait sous une suite e2e rouge), fusionne via l'API GitHub, synchronise localement, confirme formellement que Vercel et Fly.io servent la révision, et lance la sonde SEO STRICTE (cf. `backend/tests/test_livrer_seo_strict.py`). Il porte désormais UN verdict sur le dépôt, en PRÉ-VOL et AVANT de pousser : la déclaration du périmètre contre `ci.yml` ET contre la protection de branche RÉELLE (jeton admin) — et un périmètre déclaré vide est un refus, jamais un retour à « tous les check-runs »."
     },
     {
       "chemin": "backend/scripts/audit_docstrings.py",
@@ -539,6 +570,15 @@
       "hors_mutation": "muté par sa PROPRE preuve, pas par la table : test_dmarc_policy.py charge le module réel par chemin et verrouille ce qui décide (échelle des paliers, délai d'observation, retour arrière, parseur DNS) — une branche neutralisée y rougit, là où la table ne rejoue que les gardes qui portent un verdict sur le dépôt"
     },
     {
+      "chemin": "backend/scripts/send_test_email_resend.py",
+      "role": "outil",
+      "invoque_par": "aucun",
+      "preuve": null,
+      "runner": null,
+      "motif": "outil d'ops exécuté à la main : il envoie UN email de contrôle par le fournisseur Resend pour valider une clé et un domaine — son verdict porte sur l'état du compte chez Resend, pas sur un fichier du dépôt",
+      "hors_mutation": "aucun verdict de dépôt à neutraliser : il n'audite rien et sort en 0/1/2 selon la réponse du fournisseur. Ce qui décide de son sort (l'appel Resend) est muté par la preuve du fournisseur lui-même — test_email_provider_resend.py verrouille l'endpoint, l'en-tête `Bearer` et le contrat d'erreur ; le script, lui, ne fait que l'appeler"
+    },
+    {
       "chemin": "backend/scripts/provision_ci_test_account.py",
       "role": "outil",
       "invoque_par": "ci",
@@ -571,7 +611,7 @@
       "invoque_par": "test",
       "preuve": "frontend/scripts/__tests__/lcp-app-budgets.test.js",
       "runner": "vitest",
-      "motif": "la TABLE de l'AIRE LCP des cinq routes d'APPLICATION (`CADRES_APP` de src/config/app-cadres.js), par route ET par taille, avec le relevé qui l'adosse (3 runs par cellule, l'élément élu nommé) et la BANDE qui s'en dérive : plancher à 60 % de la mesure, plafond à ×1,25 par `plafondDe` de `lhci-cls-budgets.cjs` — LUE, jamais réécrite, pour que les deux tables ne puissent pas diverger d'un cran d'arrondi. Ce module n'est pas un garde : il ne lit pas le dépôt et ne sort jamais en 1 — le verdict est prononcé EN NAVIGATEUR par `frontend/e2e/lcp-app.spec.js`, qui n'entre PAS dans le périmètre de ce registre (frontend/scripts/, .github/scripts/, backend/scripts/) et qui roule dans le job e2e via `npm run test:e2e`. CE QUI A ÉTÉ MESURÉ, ET POURQUOI LA TABLE EST PAR ROUTE ET PAR TAILLE (09/10/2026, fixture, coquille de production lue dans vercel.json, `--repeat-each=3`) : les TRENTE relevés sont identiques au px², deux à deux, et le MÊME élément est élu à chaque run — 8 626 / 17 172 px² pour /dashboard (<h1> « Bienvenue, Demo! »), 11 211 / 21 012 pour /profile, 4 256 / 8 478 pour /messages (<h1> « Messages »), 11 792 / 13 446 pour /create-job, 30 361 / 142 848 pour /jobs/:id. L'aire LCP de ces pages est donc de la GÉOMÉTRIE (DOM + CSS), comme le CLS : il n'y a AUCUN bruit de machine à couvrir, et la marge ne pouvait pas être justifiée comme telle. Elle l'est par la plus grande re-justification LÉGITIME relevée sur ces routes (+10,2 %, le titre de mission de /jobs/:id desktop qui passe sur deux lignes, 26 136 → 28 800 px², en-tête de e2e/lcp-app.spec.js) et par la classe de défaut qu'elle attrape (un CHANGEMENT D'ÉLÉMENT ÉLU : la photo du héros de l'accueil vaut 69 920 / 306 870 px² dans e2e/lcp-geometrie.spec.js, soit ×2,4 du plus grand peintre de /jobs/:id desktop). UNE BANDE, PAS SEULEMENT UN PLAFOND : un plafond seul est satisfait par une page VIDE (1 px² passe sous n'importe quelle borne haute), donc le plancher à 60 % — la proportion déjà retenue par `PLANCHERS_NOEUDS` et `PLANCHERS_PREMIER_ECRAN` — nomme l'autre faute, une route qui ne peint plus ce qu'elle peignait. LA TAILLE FAIT PARTIE DE LA CLÉ parce que la mesure le dit : /jobs/:id élit l'encart du séquestre en mobile et la DESCRIPTION de l'annonce en desktop (six fois plus grande), donc un plafond unique aurait été décoratif sur l'une des deux tailles.",
+      "motif": "la TABLE de l'AIRE LCP des cinq routes d'APPLICATION (`CADRES_APP` de src/config/app-cadres.js), par route ET par taille, avec le relevé qui l'adosse (3 runs par cellule, l'élément élu nommé) et la BANDE qui s'en dérive : plancher à 60 % de la mesure, plafond à ×1,25 par `plafondDe` de `lhci-cls-budgets.cjs` — LUE, jamais réécrite, pour que les deux tables ne puissent pas diverger d'un cran d'arrondi. Ce module n'est pas un garde : il ne lit pas le dépôt et ne sort jamais en 1 — le verdict est prononcé EN NAVIGATEUR par `frontend/e2e/lcp-app.spec.js`, qui n'entre PAS dans le périmètre de ce registre (frontend/scripts/, .github/scripts/, backend/scripts/) et qui roule dans le job e2e via `npm run test:e2e`. CE QUI A ÉTÉ MESURÉ, ET POURQUOI LA TABLE EST PAR ROUTE ET PAR TAILLE (09/10/2026, fixture, coquille de production lue dans vercel.json, `--repeat-each=3`) : les TRENTE relevés sont identiques au px², deux à deux, et le MÊME élément est élu à chaque run — 8 626 / 17 172 px² pour /dashboard (<h1> « Bienvenue, Demo! »), 11 211 / 21 012 pour /profile, 4 256 / 8 478 pour /messages (<h1> « Messages »), 11 792 / 13 446 pour /create-job, 30 361 / 142 848 pour /jobs/:id. L'aire LCP de ces pages est donc de la GÉOMÉTRIE (DOM + CSS), comme le CLS — VRAI DU POSTE, CORRIGÉ PAR LA MESURE DU 11/10/2026 : rejouée sur le runner de la CI, la MÊME cellule /profile mobile donne 16 215 px² (trois lignes au lieu de deux — l'aire d'un TEXTE suit les polices de l'hôte, cause déjà mesurée le 26/09/2026 jusqu'à −18 % d'encre À BOÎTE IDENTIQUE), et ce relevé est entré dans la table comme un RUN de la cellule, jamais moyenné (bande 9 700–20 300 px² au lieu de 6 700–14 000). La marge, elle, ne se justifie pas comme un bruit de machine : elle l'est par la plus grande re-justification LÉGITIME relevée sur ces routes (+10,2 %, le titre de mission de /jobs/:id desktop qui passe sur deux lignes, 26 136 → 28 800 px², en-tête de e2e/lcp-app.spec.js) et par la classe de défaut qu'elle attrape (un CHANGEMENT D'ÉLÉMENT ÉLU : la photo du héros de l'accueil vaut 69 920 / 306 870 px² dans e2e/lcp-geometrie.spec.js, soit ×2,4 du plus grand peintre de /jobs/:id desktop). UNE BANDE, PAS SEULEMENT UN PLAFOND : un plafond seul est satisfait par une page VIDE (1 px² passe sous n'importe quelle borne haute), donc le plancher à 60 % — la proportion déjà retenue par `PLANCHERS_NOEUDS` et `PLANCHERS_PREMIER_ECRAN` — nomme l'autre faute, une route qui ne peint plus ce qu'elle peignait. LA TAILLE FAIT PARTIE DE LA CLÉ parce que la mesure le dit : /jobs/:id élit l'encart du séquestre en mobile et la DESCRIPTION de l'annonce en desktop (six fois plus grande), donc un plafond unique aurait été décoratif sur l'une des deux tailles.",
       "hors_mutation": "ce n'est pas un garde mais une table : elle ne prononce aucun verdict et ne sort jamais en 1, donc « neutraliser » son contrôle ne ferait rougir aucun bras. Ses valeurs et ses RELATIONS sont verrouillées par son test direct (frontend/scripts/__tests__/lcp-app-budgets.test.js, 5 cas : ≥3 runs par cellule avec l'élément élu nommé, dérivation ÉGALE à `plafondDe(pire, MARGE)`, rapport plafond/mesure dans la marge publiée, plancher dérivé et non nul, trois verdicts épuisés bornes INCLUSES dont la contrepartie anti-faux-vert — la page réduite à 1 px² passe le plafond et est refusée par le plancher —, et le refus nommé d'une cellule non mesurée). Comme pour `lhci-cls-budgets.cjs` et `style-layout-budgets.cjs`, aucune mutation du harnais ne s'applique à ce fichier, et LE PARTAGE DES DEUX MOITIÉS A ÉTÉ MESURÉ le 09/10/2026 plutôt que supposé : remplacer les runs de `/dashboard` par 100 000 px² (la page en peint 8 626) laisse le test unitaire VERT — la table reste bien formée et correctement dérivée, elle décrit simplement une autre page — pendant que la sonde e2e, elle, rougit en nommant le côté franchi (« sous la bande mesurée 60000–125000 px² », puis, mutation séparée, « au-dessus la bande mesurée 600–1300 px² » : le describe de la sonde est en mode SÉRIEL, donc chaque côté se rejoue seul). Le garde unitaire tient donc la FORME et la DÉRIVATION, la sonde tient l'accord avec la PAGE, et les deux limites sont écrites dans leurs fichiers respectifs — aucune des deux ne se fait passer pour l'autre."
     },
     {
@@ -841,22 +881,62 @@
       "runner": "vitest",
       "motif": "budget de CSS inline PAR PAGE pré-rendue : la feuille critique du build est recopiée dans CHAQUE document et lue AVANT le premier paint. Le fait vivait en PROSE dans check-bundle-size.js, avec un compte PÉRIMÉ (22 pages, ~1,5 Mo) que la mesure du 09/10/2026 contredit (14 documents, dont 13 portant la même feuille : 69 276 o, sha d8c74e2cb457a497 ; 404.html 392 o ; total 900 980 o = 0,86 Mo — reporté sur la mesure du 11/10/2026 : 76 533 o, sha 41d0f2e82d7950d9, total 995 321 o = 0,95 Mo, budget 78 848 o) — un budget global ne dit donc ni QUELLE page a enflé ni de combien. Six refus NOMMÉS : dépassement chiffré, plancher (la contrepartie sans laquelle un budget plafond déclarerait « meilleure » une page qui a PERDU sa feuille critique), nombre de blocs <style> (0 = plugin d'inlining inerte, 2 = feuille sans propriétaire), feuille divergente d'une page qui ne l'a pas déclarée, page pré-rendue sans ligne, ligne périmée ; plus deux planchers de lecture qui refusent de juger un build vide ou incomplet. La table est la mesure du build réel, une ligne par document."
     },
-  {
-    "chemin": "frontend/scripts/check-classes-coquilles.js",
-    "role": "garde",
-    "invoque_par": "ci",
-    "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
-    "runner": "vitest",
-    "motif": "LE FAIT, ET LE TROU QU'IL FERME (mesure du 09/10/2026) : une coquille pré-rendue et React peignent la MÊME page deux fois, et jusqu'ici les deux peintures RECOPIAIENT leurs classes — 236 listes écrites en littéral dans vite-plugins/prerender/**, dont 203 avaient un jumeau EXACT dans src/**. Rien ne rougissait quand un seul des deux côtés changeait : une classe recopiée ne déplace aucun texte et ne change aucun mot, elle change une bordure, une ombre ou un état grisé — cela ne se voit qu'à l'œil, sur la page, et aucune des sondes existantes ne pouvait le voir (celles de géométrie comparent l'encre et le text-align calculé, celles de texte comparent les mots). Il tient donc les DEUX moitiés du remède : la RÉUTILISATION (ce qui est partagé vit dans un domicile unique, src/config/classes-chrome.js, lu par React ET par la coquille — un champ lu par un seul canal est un défaut, et un champ RETAPÉ dans une coquille aussi) et la DÉTECTION (toute autre liste doit avoir un jumeau chez React ou être déclarée propre à la coquille avec son motif, dans CLASSES_PROPRES_AUX_COQUILLES). Les déclarations sont tenues honnêtes par trois refus : une exemption SANS MOTIF est un oubli avec un droit de passage, une exemption PÉRIMÉE ne protège plus rien et mentirait le jour où la liste reviendrait, une exemption MENTEUSE n'est plus propre à la coquille. VOLUMES ET PLANCHERS, mesurés puis dérivés : la passe a ramené le compte à 213 listes publiées dont 182 jumelles et 31 déclarées (les 23 autres sont passées au domicile : les 18 listes du chrome et les 5 conteneurs de page de l'accueil), et le garde refuse de juger sous 5 modules de pré-rendu, 90 sources React, 128 listes et 110 jumelles (~60 % du relevé, la proportion déjà retenue par PLANCHERS_NOEUDS et PLANCHERS_PREMIER_ECRAN) — un lecteur CASSÉ rend zéro, pas 20 % de moins, donc un plancher serré n'ajoute pas de mordant et refuse du vert. Deux NIVEAUX sont séparés : un refus de juger (dossier de pré-rendu absent, src/ absent, balayage trop maigre, domicile introuvable) n'est pas un écart — les confondre ferait passer une panne de lecture pour un verdict. CE QU'IL NE PROUVE PAS, écrit plutôt que tu : un jumeau prouve que la CHAÎNE est écrite quelque part chez React, pas que c'est le MÊME ÉLÉMENT ; cette moitié est mesurée en navigateur (e2e/geometrie-coquille-react.spec.js, e2e/texte-coquille-react.spec.js), et le domicile partagé, lui, garantit l'identité de la VALEUR par construction. Il porte enfin un refus qu'aucun autre garde ne rend : une liste qui CONTIENT la valeur d'un champ sans être ce champ est ACCEPTÉE (la frontière est l'ÉGALITÉ — mesurée : le bloc social de l'accueil publie `font-medium hover:text-orange-800 underline underline-offset-2`, qui contient le libellé de lien du pied de page pour un autre élément), et une liste MODIFIÉE, elle, perd son jumeau et c'est le verdict des listes qui la renvoie."
-  },
-  {
-    "chemin": "frontend/scripts/classes-coquilles.js",
-    "role": "outil",
-    "invoque_par": "test",
-    "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
-    "runner": "vitest",
-    "motif": "la RÈGLE elle-même, pure et sans E/S : ce que publie une coquille (les listes de classes LITTÉRALES d'un attribut class=, avec leur ligne ; une liste COMPOSÉE n'est pas lue, elle assemble des valeurs, et ce sont ces valeurs que le domicile doit fournir), ce que React écrit (les trois formes de className : guillemets doubles, simples et gabarit, les composées ignorées), la liste des exemptions propres aux coquilles avec leurs trois refus (sans motif, périmée, menteuse, plus la déclaration en double), et le verdict du DOMICILE (chaque champ lu par au moins un module de pré-rendu ET par au moins une source React ; aucune coquille ne retape sa valeur, la frontière étant l'ÉGALITÉ de la liste entière — un fragment partagé est un autre élément, et une liste modifiée n'a plus de jumeau). Le garde prononce le verdict, ce module fournit la lecture, les planchers et les refus ; ses mutations le visent DIRECTEMENT (le harnais n'accepte que `cible` = `garde`), chacune prouvée par un cas nommé de scripts/__tests__/check-classes-coquilles.test.js."
-  }
+    {
+      "chemin": "frontend/scripts/check-classes-coquilles.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
+      "runner": "vitest",
+      "motif": "LE FAIT, ET LE TROU QU'IL FERME (mesure du 09/10/2026) : une coquille pré-rendue et React peignent la MÊME page deux fois, et jusqu'ici les deux peintures RECOPIAIENT leurs classes — 236 listes écrites en littéral dans vite-plugins/prerender/**, dont 203 avaient un jumeau EXACT dans src/**. Rien ne rougissait quand un seul des deux côtés changeait : une classe recopiée ne déplace aucun texte et ne change aucun mot, elle change une bordure, une ombre ou un état grisé — cela ne se voit qu'à l'œil, sur la page, et aucune des sondes existantes ne pouvait le voir (celles de géométrie comparent l'encre et le text-align calculé, celles de texte comparent les mots). Il tient donc les DEUX moitiés du remède : la RÉUTILISATION (ce qui est partagé vit dans un domicile unique, src/config/classes-chrome.js, lu par React ET par la coquille — un champ lu par un seul canal est un défaut, et un champ RETAPÉ dans une coquille aussi) et la DÉTECTION (toute autre liste doit avoir un jumeau chez React ou être déclarée propre à la coquille avec son motif, dans CLASSES_PROPRES_AUX_COQUILLES). Les déclarations sont tenues honnêtes par trois refus : une exemption SANS MOTIF est un oubli avec un droit de passage, une exemption PÉRIMÉE ne protège plus rien et mentirait le jour où la liste reviendrait, une exemption MENTEUSE n'est plus propre à la coquille. VOLUMES ET PLANCHERS, mesurés puis dérivés : la passe a ramené le compte à 213 listes publiées dont 182 jumelles et 31 déclarées (les 23 autres sont passées au domicile : les 18 listes du chrome et les 5 conteneurs de page de l'accueil), et le garde refuse de juger sous 5 modules de pré-rendu, 90 sources React, 128 listes et 110 jumelles (~60 % du relevé, la proportion déjà retenue par PLANCHERS_NOEUDS et PLANCHERS_PREMIER_ECRAN) — un lecteur CASSÉ rend zéro, pas 20 % de moins, donc un plancher serré n'ajoute pas de mordant et refuse du vert. Deux NIVEAUX sont séparés : un refus de juger (dossier de pré-rendu absent, src/ absent, balayage trop maigre, domicile introuvable) n'est pas un écart — les confondre ferait passer une panne de lecture pour un verdict. CE QU'IL NE PROUVE PAS, écrit plutôt que tu : un jumeau prouve que la CHAÎNE est écrite quelque part chez React, pas que c'est le MÊME ÉLÉMENT ; cette moitié est mesurée en navigateur (e2e/geometrie-coquille-react.spec.js, e2e/texte-coquille-react.spec.js), et le domicile partagé, lui, garantit l'identité de la VALEUR par construction. Il porte enfin un refus qu'aucun autre garde ne rend : une liste qui CONTIENT la valeur d'un champ sans être ce champ est ACCEPTÉE (la frontière est l'ÉGALITÉ — mesurée : le bloc social de l'accueil publie `font-medium hover:text-orange-800 underline underline-offset-2`, qui contient le libellé de lien du pied de page pour un autre élément), et une liste MODIFIÉE, elle, perd son jumeau et c'est le verdict des listes qui la renvoie."
+    },
+    {
+      "chemin": "frontend/scripts/classes-coquilles.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
+      "runner": "vitest",
+      "motif": "la RÈGLE elle-même, pure et sans E/S : ce que publie une coquille (les listes de classes LITTÉRALES d'un attribut class=, avec leur ligne ; une liste COMPOSÉE n'est pas lue, elle assemble des valeurs, et ce sont ces valeurs que le domicile doit fournir), ce que React écrit (les trois formes de className : guillemets doubles, simples et gabarit, les composées ignorées), la liste des exemptions propres aux coquilles avec leurs trois refus (sans motif, périmée, menteuse, plus la déclaration en double), et le verdict du DOMICILE (chaque champ lu par au moins un module de pré-rendu ET par au moins une source React ; aucune coquille ne retape sa valeur, la frontière étant l'ÉGALITÉ de la liste entière — un fragment partagé est un autre élément, et une liste modifiée n'a plus de jumeau). Le garde prononce le verdict, ce module fournit la lecture, les planchers et les refus ; ses mutations le visent DIRECTEMENT (le harnais n'accepte que `cible` = `garde`), chacune prouvée par un cas nommé de scripts/__tests__/check-classes-coquilles.test.js."
+    },
+    {
+      "chemin": "frontend/scripts/check-corpus-missions.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-corpus-missions.test.js",
+      "runner": "vitest",
+      "motif": "LE CORPUS DE PRODUCTION VIDE NE DOIT PLUS POUVOIR PASSER POUR UN VERT. Mesure du 12/10/2026 : la production ne servait aucune mission vivante (GET /api/jobs?status=open → [], sitemap de 8 URL dont ZERO fiche, /api/public/stats → open_jobs: 0), et TROIS sondes de production — check-og-images.js, check-og-job-200.js, check-seo-production.js — sortaient en 0 en annonçant chacune, en ::notice, qu'elles n'avaient rien pu mesurer. Un lecteur du résumé ne pouvait pas distinguer « vérifié » de « rien mesuré » : c'est la forme de silence que F9 a coûtée. Ce garde audite l'inventaire qui rend la règle exécutable (scripts/corpus-missions.js) et refuse SEPT formes, en les nommant : une lecture du corpus par une sonde NON déclarée (le périmètre est le dossier scripts/, pas une liste : une sonde ajoutée demain est couverte — les mentions du chemin dans un COMMENTAIRE ne comptent pas, trois fichiers en parlent en prose), une déclaration PÉRIMÉE (surface déclarée que sa sonde ne demande plus, sonde déclarée qui ne lit plus le corpus, surface absente de la liste de sa sonde), une déclaration MUETTE (sonde qui ne consulte pas verdictDeSurfaceVide, ou qui ne publie aucun ::warning), un motif de moins de 40 caractères, un remède de moins de 20, une date non ISO, un chemin vide, un corpus sans plancher (un plancher sous 1 ne refuse rien), une clé de registre sans constante exportée, une exemption de registre sans sujet, et il REFUSE DE CONCLURE sous ses planchers de lecture (30 fichiers, 3 sondes, 3 surfaces, 1 corpus) parce qu'un balayage cassé rendrait tous ses refus muets. Ce qu'il ne juge pas, et qui est écrit : si le corpus DEVRAIT être vide (décision d'exploitation, publiée en ::warning à chaque run par les sondes elles-mêmes) et si une surface déclarée est mesurable ailleurs (son motif et son remède le disent, et le garde publie l'inventaire à chaque passage)."
+    },
+    {
+      "chemin": "frontend/scripts/corpus-missions.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/check-corpus-missions.test.js",
+      "runner": "vitest",
+      "motif": "LA RÈGLE, pure et sans E/S : le CORPUS « missions-vivantes » (statuts open + in_progress, plancher 1, lecture par l'API publique), les SONDES qui le lisent (les trois fichiers déclarés, chacun avec la surface qu'il déclare), le REGISTRE des surfaces aveugles (clé dérivée en nom de constante, chemin couvert, motif, remède, date) et l'AUDIT de l'inventaire — injectable (auditerInventaire(sources, inventaire)), comme fetchImpl l'est dans les sondes, pour que les cas limites se mesurent SANS muter le registre livré. Il rend DEUX verdicts que les sondes demandent au même endroit : déclarée, une surface aveugle publie un AVERTISSEMENT (nommant le corpus vide, le chemin non mesuré, le détail du run, le motif et le remède) ; NON déclarée, elle rend une ERREUR et l'appelant REFUSE (sortie 1), parce qu'un vert qui n'a rien mesuré est le silence que F9 a coûté. Le balayage des sources ignore les commentaires (sansCommentaires) : le corpus est cité en prose dans lhci-cls-budgets.cjs, mesure-lighthouse-locale.mjs et vercel-rewrite-server.js, et compter une phrase pour une lecture ferait crier le garde sur des fichiers qui ne lisent rien — limite assumée : les littéraux de motif /…/ ne sont pas décodés, ce qui est sans effet ici (un littéral ne peut pas porter // non échappé)."
+    },
+    {
+      "chemin": "frontend/scripts/check-job-form-canari.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-job-form-canari.test.js",
+      "runner": "vitest",
+      "motif": "LA FORME D'UNE FICHE /jobs/:id EST JUGÉE MÊME QUAND LA BASE N'A AUCUNE MISSION VIVANTE. Constat du 12/10/2026 : la production ne servait aucune mission vivante, donc la forme du document qu'un crawler lit (title, description, meta robots, canonical, og:url, twitter:url, og:title accordé au title, h1 statique) n'était jugée NULLE PART — check-og-images.js et check-seo-production.js lisent des missions EXISTANTES (et publient, justement, un ::warning déclaré quand il n'y en a pas), et le cycle OG ne juge que les cartes. La forme dépendait donc de l'état des DONNÉES du client : un jour sans mission était un jour de silence. Ce garde coupe cette dépendance — il CRÉE sa mission de contrôle (POST /api/jobs), juge la fiche SERVIE, la SUPPRIME toujours, puis exige le verrou d'après-suppression (404 + noindex, carte 404, sitemap) et la contrepartie qui le rend non vide (la mission DOIT être listée dans le sitemap avant sa suppression). Il ÉCRIT : l'écriture n'a donc lieu que sur un backend que le job contrôle (loopback), ou sous MANDAT explicite (KOJO_CANARI_ALLOW_WRITE=1) — jamais par accident, la règle du 20/09/2026 (« une CI n'écrit pas chez le client ») n'ayant pas été posée pour rien. Sans mandat, il publie un ::warning déclaré (surface job-form-canari:forme au registre) et REFUSE (sortie 1) si la surface n'y est plus. Il ne recopie pas les règles qu'il réutilise : la charge utile, la résolution du jeton, la lecture du sitemap et le verrou viennent de check-og-job-200.js, les cartes de runOgImageCheck, les balises de site-meta.js. Ce qu'il ne juge pas, écrit plutôt que tu : la forme des missions du CLIENT (leurs textes réels), qui reste lue là où le corpus est réel."
+    },
+    {
+      "chemin": ".github/scripts/check-gate-perimetre.py",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "backend/tests/test_gate_perimetre.py",
+      "runner": "pytest",
+      "motif": "LE FAIT, ET LE TROU QU'IL FERME : deux chemins appliquent le même gate et, le 12/10/2026, ils ne jugeaient pas le même périmètre — la protection de `main` exigeait HUIT checks nommés (8 contexts, strict: true) pendant que ci.yml en déclarait ONZE, et la livraison automatique (livrer.py) attendait, elle, TOUS les check-runs. Une fusion faite dans l'interface GitHub pouvait donc passer avec la suite e2e rouge (15 rouges / 27 exécutions, dont un cas réel) et avec des avis de sécurité de PRODUCTION non corrigés (6 rouges / 30 runs), quand le trajet de livraison refusait ces mêmes runs. Ce garde rend le verdict HORS LIGNE, donc dans un job requis (workflow-lint) : chaque check déclaré dans .github/scripts/gate-perimetre.json doit nommer un job de ci.yml par son identifiant ET par le nom que GitHub rapportera (le nom du check-run est celui du job — un nom dérivé ferait attendre les deux périmètres un check-run qui n'arrivera jamais), tout job de ci.yml doit être soit déclaré, soit exempté AVEC son motif (≥ 40 caractères), et une exemption périmée, une exemption qui est aussi un check déclaré, un `strict` non déclaré sont refusés. La protection de branche RÉELLE ne se lit qu'avec un jeton admin du dépôt (ce job ne peut pas l'obtenir) : cette moitié vit dans le pré-vol de livrer.py et dans `--en-ligne` (jeton du propriétaire), et un jeton qui ne peut pas lire la protection est un refus NOMMÉ. Il refuse de conclure sous ses planchers de lecture (8 checks, 10 jobs lus) — un lecteur cassé rendrait tous ses refus muets."
+    },
+    {
+      "chemin": ".github/scripts/perimetre_gate.py",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "backend/tests/test_gate_perimetre.py",
+      "runner": "pytest",
+      "motif": "LA RÈGLE, pure et sans E/S (comme frontend/scripts/css-selecteurs-morts.js et corpus-missions.js) : ce qu'est un job de ci.yml dans le texte du workflow — son nom de check-run est celui du JOB, jamais le `- name:` d'une étape (à SIX espaces, quand le nom d'un job est à QUATRE) —, la déclaration unique du périmètre lue comme un fait, l'AUDIT de l'une contre l'autre (nom dérivé, job disparu ou non couvert, exemption périmée, muette ou menteuse, strict non déclaré, planchers de lecture) et la COMPARAISON EN LIGNE de la protection de branche (désaccord dans les deux sens, et le `strict`). Elle est importée par le garde qui prononce le verdict et par le pré-vol de livrer.py : c'est ce seul import partagé qui garantit que la protection et la livraison attendent la même liste, au lieu de deux définitions qui divergent — l'asymétrie mesurée du 12/10/2026. Le chemin en ligne (`lire_protection`) rend un refus nommé plutôt qu'une exception : il est prouvé sans réseau, par injection de la charge utile, et sa lecture réelle appartient à la livraison."
+    }
   ],
   "rejeux": [
     {
@@ -1657,8 +1737,8 @@
       "id": "seo-production: fiche /jobs/:id lue mais jamais jugee",
       "garde": "frontend/scripts/check-seo-production.js",
       "cible": "frontend/scripts/check-seo-production.js",
-      "trouve": "      page.error ? { url, disparue: page.error } : { url, defects: pageDefects(page) }",
-      "remplace": "      page.error ? { url, disparue: page.error } : { url, defects: [] }",
+      "trouve": "        : { url, source, defects: pageDefects(page) }",
+      "remplace": "        : { url, source, defects: [] }",
       "runner": "node",
       "preuve": "frontend/scripts/__tests__/check-seo-production.test.js",
       "commande": [
@@ -1712,6 +1792,70 @@
       "cwd": "backend",
       "attend": [
         "FAILED tests/test_ci_workflow_pins.py::TestLectureDuWorkflow::test_motif_valide_sur_fixture_rend_exit_zero"
+      ]
+    },
+    {
+      "id": "seo-strict: drapeau --strict non exige",
+      "garde": ".github/scripts/check-seo-probe-strict.py",
+      "cible": ".github/scripts/check-seo-probe-strict.py",
+      "trouve": "    return MODE_STRICT not in commande",
+      "remplace": "    return False",
+      "runner": "python",
+      "preuve": "backend/tests/test_seo_probe_strict_guard.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_seo_probe_strict_guard.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_seo_probe_strict_guard.py::TestAnalyse::test_une_invocation_informative_est_refusee_et_nommee",
+        "FAILED tests/test_seo_probe_strict_guard.py::TestAnalyse::test_manque_le_mode_strict"
+      ]
+    },
+    {
+      "id": "seo-strict: commande neutralisee toleree",
+      "garde": ".github/scripts/check-seo-probe-strict.py",
+      "cible": ".github/scripts/check-seo-probe-strict.py",
+      "trouve": "    if NEUTRALISATION.search(commande):",
+      "remplace": "    if False:",
+      "runner": "python",
+      "preuve": "backend/tests/test_seo_probe_strict_guard.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_seo_probe_strict_guard.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_seo_probe_strict_guard.py::TestAnalyse::test_une_commande_neutralisee_est_refusee"
+      ]
+    },
+    {
+      "id": "seo-strict: surface de livraison non lue",
+      "garde": ".github/scripts/check-seo-probe-strict.py",
+      "cible": ".github/scripts/check-seo-probe-strict.py",
+      "trouve": "    for relatif in SURFACES_HORS_WORKFLOW:",
+      "remplace": "    for relatif in []:",
+      "runner": "python",
+      "preuve": "backend/tests/test_seo_probe_strict_guard.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_seo_probe_strict_guard.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_seo_probe_strict_guard.py::TestCLI::test_le_script_de_livraison_est_lu_et_juge"
       ]
     },
     {
@@ -3677,7 +3821,7 @@
       "attend": [
         "sort 1 et nomme la police du gabarit (source-code-pro)"
       ]
-        },
+    },
     {
       "id": "environment: nettoyage execute sans accord",
       "garde": "frontend/scripts/check-test-environment.js",
@@ -3795,7 +3939,7 @@
       ],
       "cwd": "frontend",
       "attend": [
-        "de CSS inline > budget 78848 o"
+        "de CSS inline > budget 82944 o"
       ]
     },
     {
@@ -3881,265 +4025,1166 @@
         "REFUSE de juger un script ILLISIBLE (un lecteur partiel ne rend pas un verdict complet)"
       ]
     },
-  {
-    "id": "classes-coquilles: jumeau neutralise",
-    "garde": "frontend/scripts/classes-coquilles.js",
-    "cible": "frontend/scripts/classes-coquilles.js",
-    "trouve": "const sansJumelle = listes.filter((liste) => !liste.jumelles.length);",
-    "remplace": "const sansJumelle = [];",
-    "runner": "node",
-    "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
-    "commande": [
-      "npx",
-      "vitest",
-      "run",
-      "scripts/__tests__/check-classes-coquilles.test.js",
-      "--reporter=default"
-    ],
-    "cwd": "frontend",
-    "attend": [
-      "refuse une liste sans jumeau ni déclaration"
-    ]
-  },
-  {
-    "id": "classes-coquilles: exemption sans motif toleree",
-    "garde": "frontend/scripts/classes-coquilles.js",
-    "cible": "frontend/scripts/classes-coquilles.js",
-    "trouve": "if (!String(entree.motif ?? '').trim()) {",
-    "remplace": "if (false) {",
-    "runner": "node",
-    "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
-    "commande": [
-      "npx",
-      "vitest",
-      "run",
-      "scripts/__tests__/check-classes-coquilles.test.js",
-      "--reporter=default"
-    ],
-    "cwd": "frontend",
-    "attend": [
-      "refuse une exemption SANS MOTIF"
-    ]
-  },
-  {
-    "id": "classes-coquilles: exemption perimee toleree",
-    "garde": "frontend/scripts/classes-coquilles.js",
-    "cible": "frontend/scripts/classes-coquilles.js",
-    "trouve": "if (!publiee) {",
-    "remplace": "if (false) {",
-    "runner": "node",
-    "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
-    "commande": [
-      "npx",
-      "vitest",
-      "run",
-      "scripts/__tests__/check-classes-coquilles.test.js",
-      "--reporter=default"
-    ],
-    "cwd": "frontend",
-    "attend": [
-      "refuse une exemption PÉRIMÉE"
-    ]
-  },
-  {
-    "id": "classes-coquilles: exemption menteuse toleree",
-    "garde": "frontend/scripts/classes-coquilles.js",
-    "cible": "frontend/scripts/classes-coquilles.js",
-    "trouve": "if (jumelles.has(entree.publiee)) {",
-    "remplace": "if (false) {",
-    "runner": "node",
-    "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
-    "commande": [
-      "npx",
-      "vitest",
-      "run",
-      "scripts/__tests__/check-classes-coquilles.test.js",
-      "--reporter=default"
-    ],
-    "cwd": "frontend",
-    "attend": [
-      "refuse une exemption MENTEUSE"
-    ]
-  },
-  {
-    "id": "classes-coquilles: recopie de la valeur toleree",
-    "garde": "frontend/scripts/classes-coquilles.js",
-    "cible": "frontend/scripts/classes-coquilles.js",
-    "trouve": "if (listes.some((liste) => liste.valeur === valeur)) {",
-    "remplace": "if (false) {",
-    "runner": "node",
-    "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
-    "commande": [
-      "npx",
-      "vitest",
-      "run",
-      "scripts/__tests__/check-classes-coquilles.test.js",
-      "--reporter=default"
-    ],
-    "cwd": "frontend",
-    "attend": [
-      "refuse une coquille qui RECOPIE la valeur du domicile"
-    ]
-  },
-  {
-    "id": "classes-coquilles: champ non lu par une coquille tolere",
-    "garde": "frontend/scripts/classes-coquilles.js",
-    "cible": "frontend/scripts/classes-coquilles.js",
-    "trouve": "if (!luParCoquille.length) {",
-    "remplace": "if (false) {",
-    "runner": "node",
-    "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
-    "commande": [
-      "npx",
-      "vitest",
-      "run",
-      "scripts/__tests__/check-classes-coquilles.test.js",
-      "--reporter=default"
-    ],
-    "cwd": "frontend",
-    "attend": [
-      "refuse un champ du domicile lu par AUCUNE coquille"
-    ]
-  },
-  {
-    "id": "classes-coquilles: champ non lu par react tolere",
-    "garde": "frontend/scripts/classes-coquilles.js",
-    "cible": "frontend/scripts/classes-coquilles.js",
-    "trouve": "if (!luParReact.length) {",
-    "remplace": "if (false) {",
-    "runner": "node",
-    "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
-    "commande": [
-      "npx",
-      "vitest",
-      "run",
-      "scripts/__tests__/check-classes-coquilles.test.js",
-      "--reporter=default"
-    ],
-    "cwd": "frontend",
-    "attend": [
-      "refuse un champ du domicile lu par AUCUNE source React"
-    ]
-  },
-  {
-    "id": "classes-coquilles: plancher du sujet neutralise",
-    "garde": "frontend/scripts/check-classes-coquilles.js",
-    "cible": "frontend/scripts/check-classes-coquilles.js",
-    "trouve": "if (coquilles.length < MIN_MODULES_COQUILLES || react.length < MIN_SOURCES_REACT) {",
-    "remplace": "if (false) {",
-    "runner": "node",
-    "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
-    "commande": [
-      "npx",
-      "vitest",
-      "run",
-      "scripts/__tests__/check-classes-coquilles.test.js",
-      "--reporter=default"
-    ],
-    "cwd": "frontend",
-    "attend": [
-      "refuse un balayage trop maigre"
-    ]
-  },
-  {
-    "id": "classes-coquilles: plancher des listes neutralise",
-    "garde": "frontend/scripts/check-classes-coquilles.js",
-    "cible": "frontend/scripts/check-classes-coquilles.js",
-    "trouve": "if (volumes.listes < MIN_LISTES_LUES || volumes.avecJumelle < MIN_LISTES_AVEC_JUMELLE) {",
-    "remplace": "if (false) {",
-    "runner": "node",
-    "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
-    "commande": [
-      "npx",
-      "vitest",
-      "run",
-      "scripts/__tests__/check-classes-coquilles.test.js",
-      "--reporter=default"
-    ],
-    "cwd": "frontend",
-    "attend": [
-      "refuse un sujet trop maigre en LISTES"
-    ]
-  },
-  {
-    "id": "classes-coquilles: dossier de pre-rendu absent tolere",
-    "garde": "frontend/scripts/check-classes-coquilles.js",
-    "cible": "frontend/scripts/check-classes-coquilles.js",
-    "trouve": "const dossier = path.join(racine, DOSSIER_COQUILLES);\n    if (!fs.existsSync(dossier)) {",
-    "remplace": "const dossier = path.join(racine, DOSSIER_COQUILLES);\n    if (false) {",
-    "runner": "node",
-    "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
-    "commande": [
-      "npx",
-      "vitest",
-      "run",
-      "scripts/__tests__/check-classes-coquilles.test.js",
-      "--reporter=default"
-    ],
-    "cwd": "frontend",
-    "attend": [
-      "refuse un dossier de pré-rendu absent"
-    ]
-  },
-  {
-    "id": "classes-coquilles: racine sans src tolerée",
-    "garde": "frontend/scripts/check-classes-coquilles.js",
-    "cible": "frontend/scripts/check-classes-coquilles.js",
-    "trouve": "const dossierReact = path.join(racine, 'src');\n    if (!fs.existsSync(dossierReact)) {",
-    "remplace": "const dossierReact = path.join(racine, 'src');\n    if (false) {",
-    "runner": "node",
-    "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
-    "commande": [
-      "npx",
-      "vitest",
-      "run",
-      "scripts/__tests__/check-classes-coquilles.test.js",
-      "--reporter=default"
-    ],
-    "cwd": "frontend",
-    "attend": [
-      "refuse une racine sans"
-    ]
-  },
-  {
-    "id": "classes-coquilles: domicile introuvable tolere",
-    "garde": "frontend/scripts/check-classes-coquilles.js",
-    "cible": "frontend/scripts/check-classes-coquilles.js",
-    "trouve": "if (!domicileLisible) {",
-    "remplace": "if (false) {",
-    "runner": "node",
-    "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
-    "commande": [
-      "npx",
-      "vitest",
-      "run",
-      "scripts/__tests__/check-classes-coquilles.test.js",
-      "--reporter=default"
-    ],
-    "cwd": "frontend",
-    "attend": [
-      "refuse un domicile introuvable"
-    ]
-  },
-  {
-    "id": "session-reload: un justificatif disparu au rechargement tolere",
-    "garde": "frontend/scripts/check-session-reload-production.js",
-    "cible": "frontend/scripts/check-session-reload-production.js",
-    "trouve": "  if (after.status !== 200) {",
-    "remplace": "  if (false && after.status !== 200) {",
-    "runner": "node",
-    "preuve": "frontend/scripts/__tests__/check-session-reload-production.test.js",
-    "commande": [
-      "npx",
-      "vitest",
-      "run",
-      "scripts/__tests__/check-session-reload-production.test.js",
-      "--reporter=default"
-    ],
-    "cwd": "frontend",
-    "attend": [
-      "GET /api/auth/me depuis la page recharg"
-    ]
-  }
+    {
+      "id": "classes-coquilles: jumeau neutralise",
+      "garde": "frontend/scripts/classes-coquilles.js",
+      "cible": "frontend/scripts/classes-coquilles.js",
+      "trouve": "const sansJumelle = listes.filter((liste) => !liste.jumelles.length);",
+      "remplace": "const sansJumelle = [];",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-classes-coquilles.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une liste sans jumeau ni déclaration"
+      ]
+    },
+    {
+      "id": "classes-coquilles: exemption sans motif toleree",
+      "garde": "frontend/scripts/classes-coquilles.js",
+      "cible": "frontend/scripts/classes-coquilles.js",
+      "trouve": "if (!String(entree.motif ?? '').trim()) {",
+      "remplace": "if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-classes-coquilles.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une exemption SANS MOTIF"
+      ]
+    },
+    {
+      "id": "classes-coquilles: exemption perimee toleree",
+      "garde": "frontend/scripts/classes-coquilles.js",
+      "cible": "frontend/scripts/classes-coquilles.js",
+      "trouve": "if (!publiee) {",
+      "remplace": "if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-classes-coquilles.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une exemption PÉRIMÉE"
+      ]
+    },
+    {
+      "id": "classes-coquilles: exemption menteuse toleree",
+      "garde": "frontend/scripts/classes-coquilles.js",
+      "cible": "frontend/scripts/classes-coquilles.js",
+      "trouve": "if (jumelles.has(entree.publiee)) {",
+      "remplace": "if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-classes-coquilles.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une exemption MENTEUSE"
+      ]
+    },
+    {
+      "id": "classes-coquilles: recopie de la valeur toleree",
+      "garde": "frontend/scripts/classes-coquilles.js",
+      "cible": "frontend/scripts/classes-coquilles.js",
+      "trouve": "if (listes.some((liste) => liste.valeur === valeur)) {",
+      "remplace": "if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-classes-coquilles.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une coquille qui RECOPIE la valeur du domicile"
+      ]
+    },
+    {
+      "id": "classes-coquilles: champ non lu par une coquille tolere",
+      "garde": "frontend/scripts/classes-coquilles.js",
+      "cible": "frontend/scripts/classes-coquilles.js",
+      "trouve": "if (!luParCoquille.length) {",
+      "remplace": "if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-classes-coquilles.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse un champ du domicile lu par AUCUNE coquille"
+      ]
+    },
+    {
+      "id": "classes-coquilles: champ non lu par react tolere",
+      "garde": "frontend/scripts/classes-coquilles.js",
+      "cible": "frontend/scripts/classes-coquilles.js",
+      "trouve": "if (!luParReact.length) {",
+      "remplace": "if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-classes-coquilles.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse un champ du domicile lu par AUCUNE source React"
+      ]
+    },
+    {
+      "id": "classes-coquilles: plancher du sujet neutralise",
+      "garde": "frontend/scripts/check-classes-coquilles.js",
+      "cible": "frontend/scripts/check-classes-coquilles.js",
+      "trouve": "if (coquilles.length < MIN_MODULES_COQUILLES || react.length < MIN_SOURCES_REACT) {",
+      "remplace": "if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-classes-coquilles.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse un balayage trop maigre"
+      ]
+    },
+    {
+      "id": "classes-coquilles: plancher des listes neutralise",
+      "garde": "frontend/scripts/check-classes-coquilles.js",
+      "cible": "frontend/scripts/check-classes-coquilles.js",
+      "trouve": "if (volumes.listes < MIN_LISTES_LUES || volumes.avecJumelle < MIN_LISTES_AVEC_JUMELLE) {",
+      "remplace": "if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-classes-coquilles.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse un sujet trop maigre en LISTES"
+      ]
+    },
+    {
+      "id": "classes-coquilles: dossier de pre-rendu absent tolere",
+      "garde": "frontend/scripts/check-classes-coquilles.js",
+      "cible": "frontend/scripts/check-classes-coquilles.js",
+      "trouve": "const dossier = path.join(racine, DOSSIER_COQUILLES);\n    if (!fs.existsSync(dossier)) {",
+      "remplace": "const dossier = path.join(racine, DOSSIER_COQUILLES);\n    if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-classes-coquilles.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse un dossier de pré-rendu absent"
+      ]
+    },
+    {
+      "id": "classes-coquilles: racine sans src tolerée",
+      "garde": "frontend/scripts/check-classes-coquilles.js",
+      "cible": "frontend/scripts/check-classes-coquilles.js",
+      "trouve": "const dossierReact = path.join(racine, 'src');\n    if (!fs.existsSync(dossierReact)) {",
+      "remplace": "const dossierReact = path.join(racine, 'src');\n    if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-classes-coquilles.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une racine sans"
+      ]
+    },
+    {
+      "id": "classes-coquilles: domicile introuvable tolere",
+      "garde": "frontend/scripts/check-classes-coquilles.js",
+      "cible": "frontend/scripts/check-classes-coquilles.js",
+      "trouve": "if (!domicileLisible) {",
+      "remplace": "if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-classes-coquilles.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-classes-coquilles.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse un domicile introuvable"
+      ]
+    },
+    {
+      "id": "session-reload: un justificatif disparu au rechargement tolere",
+      "garde": "frontend/scripts/check-session-reload-production.js",
+      "cible": "frontend/scripts/check-session-reload-production.js",
+      "trouve": "  if (after.status !== 200) {",
+      "remplace": "  if (false && after.status !== 200) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-session-reload-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-session-reload-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "GET /api/auth/me depuis la page recharg"
+      ]
+    },
+    {
+      "id": "session-cookie: HttpOnly non controle",
+      "garde": "frontend/scripts/check-session-reload-production.js",
+      "cible": "frontend/scripts/check-session-reload-production.js",
+      "trouve": "if (attributes[key] !== expected) {",
+      "remplace": "if (key !== 'httpOnly' && attributes[key] !== expected) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-session-reload-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-session-reload-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse la derive HttpOnly"
+      ]
+    },
+    {
+      "id": "session-cookie: Secure non controle",
+      "garde": "frontend/scripts/check-session-reload-production.js",
+      "cible": "frontend/scripts/check-session-reload-production.js",
+      "trouve": "if (attributes[key] !== expected) {",
+      "remplace": "if (key !== 'secure' && attributes[key] !== expected) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-session-reload-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-session-reload-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse la derive Secure"
+      ]
+    },
+    {
+      "id": "session-cookie: SameSite non controle",
+      "garde": "frontend/scripts/check-session-reload-production.js",
+      "cible": "frontend/scripts/check-session-reload-production.js",
+      "trouve": "if (attributes[key] !== expected) {",
+      "remplace": "if (key !== 'sameSite' && attributes[key] !== expected) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-session-reload-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-session-reload-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse la derive SameSite"
+      ]
+    },
+    {
+      "id": "session-cookie: absence ou ambiguite toleree",
+      "garde": "frontend/scripts/check-session-reload-production.js",
+      "cible": "frontend/scripts/check-session-reload-production.js",
+      "trouve": "if (cookies.length !== 1) {",
+      "remplace": "if (false && cookies.length !== 1) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-session-reload-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-session-reload-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse un cookie absent",
+        "refuse des cookies de session ambigus"
+      ]
+    },
+    {
+      "id": "token-exposure: une cle de justificatif toleree",
+      "garde": "frontend/scripts/check-token-exposure-production.js",
+      "cible": "frontend/scripts/check-token-exposure-production.js",
+      "trouve": "        if (clesDeJeton.test(cle)) {",
+      "remplace": "        if (false && clesDeJeton.test(cle)) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-token-exposure-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-token-exposure-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "nom de justificatif"
+      ]
+    },
+    {
+      "id": "token-exposure: un jeton dans l URL tolere",
+      "garde": "frontend/scripts/check-token-exposure-production.js",
+      "cible": "frontend/scripts/check-token-exposure-production.js",
+      "trouve": "    for (const [surface, valeurs] of surfaces) {",
+      "remplace": "    for (const [surface, valeurs] of []) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-token-exposure-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-token-exposure-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "location.search"
+      ]
+    },
+    {
+      "id": "token-exposure: une surface aveugle prise pour un vert",
+      "garde": "frontend/scripts/check-token-exposure-production.js",
+      "cible": "frontend/scripts/check-token-exposure-production.js",
+      "trouve": "    if (!lisible) {",
+      "remplace": "    if (false && !lisible) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-token-exposure-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-token-exposure-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "surface aveugle : localStorage"
+      ]
+    },
+    {
+      "id": "token-exposure: un en-tete Authorization tolere",
+      "garde": "frontend/scripts/check-token-exposure-production.js",
+      "cible": "frontend/scripts/check-token-exposure-production.js",
+      "trouve": "  for (const { methode, chemin } of requetes) {",
+      "remplace": "  for (const { methode, chemin } of []) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-token-exposure-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-token-exposure-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "Authorization (GET /api/jobs)"
+      ]
+    },
+    {
+      "id": "token-exposure: un compteur de requetes a zero tolere",
+      "garde": "frontend/scripts/check-token-exposure-production.js",
+      "cible": "frontend/scripts/check-token-exposure-production.js",
+      "trouve": "  if (phase === APRES_AMORCAGE && vues < 1) {",
+      "remplace": "  if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-token-exposure-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-token-exposure-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "ne vaut pas une preuve"
+      ]
+    },
+    {
+      "id": "token-exposure: une session absente toleree",
+      "garde": "frontend/scripts/check-token-exposure-production.js",
+      "cible": "frontend/scripts/check-token-exposure-production.js",
+      "trouve": "    if (verdicts.afterLogin !== 200) {",
+      "remplace": "    if (false && verdicts.afterLogin !== 200) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-token-exposure-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-token-exposure-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "session non ouverte après la connexion"
+      ]
+    },
+    {
+      "id": "token-exposure: le relevé du premier instant non juge",
+      "garde": "frontend/scripts/check-token-exposure-production.js",
+      "cible": "frontend/scripts/check-token-exposure-production.js",
+      "trouve": "      errors.push(...jugerExposition(releveAvantBoot, { quand: AVANT_AMORCAGE }));",
+      "remplace": "      void releveAvantBoot;",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-token-exposure-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-token-exposure-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "avant l'amorçage de l'application"
+      ]
+    },
+    {
+      "id": "token-exposure: la surface native non etablie toleree",
+      "garde": "frontend/scripts/check-token-exposure-production.js",
+      "cible": "frontend/scripts/check-token-exposure-production.js",
+      "trouve": "  if (!jetonEcrit) {",
+      "remplace": "  if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-token-exposure-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-token-exposure-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "la connexion n'a écrit AUCUN jeton"
+      ]
+    },
+    {
+      "id": "token-exposure: un jeton natif disparu tolere",
+      "garde": "frontend/scripts/check-token-exposure-production.js",
+      "cible": "frontend/scripts/check-token-exposure-production.js",
+      "trouve": "  } else if (!jetonApres.presence) {",
+      "remplace": "  } else if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-token-exposure-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-token-exposure-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "le jeton n'a PAS survécu au redémarrage"
+      ]
+    },
+    {
+      "id": "token-exposure: une session native perdue toleree",
+      "garde": "frontend/scripts/check-token-exposure-production.js",
+      "cible": "frontend/scripts/check-token-exposure-production.js",
+      "trouve": "  if (statutAuthMe !== null && statutAuthMe !== 200) {",
+      "remplace": "  if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-token-exposure-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-token-exposure-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "la session est PERDUE"
+      ]
+    },
+    {
+      "id": "token-exposure: un rechargement non restaure pris pour un refus",
+      "garde": "frontend/scripts/check-token-exposure-production.js",
+      "cible": "frontend/scripts/check-token-exposure-production.js",
+      "trouve": "    checked.push(\n      verdicts.appObserved",
+      "remplace": "    errors.push(\n      verdicts.appObserved",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-token-exposure-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-token-exposure-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "un rechargement non restauré ne rougit PAS ici : c’est le fait d’une AUTRE sonde"
+      ]
+    },
+    {
+      "id": "token-exposure: une premisse non marquee toleree",
+      "garde": "frontend/scripts/check-token-exposure-production.js",
+      "cible": "frontend/scripts/check-token-exposure-production.js",
+      "trouve": "export const premisse = (fait) => `${MARQUE_PREMISSE} · ${fait} ${RENVOI_RECHARGEMENT}`;",
+      "remplace": "export const premisse = (fait) => `${fait}`;",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-token-exposure-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-token-exposure-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "marque ses PRÉMISSES et renvoie le rechargement à sa sonde, dans le MESSAGE"
+      ]
+    },
+    {
+      "id": "session-reload: une premisse non marquee toleree",
+      "garde": "frontend/scripts/check-session-reload-production.js",
+      "cible": "frontend/scripts/check-session-reload-production.js",
+      "trouve": "export const premisse = (fait) => `${MARQUE_PREMISSE} · ${fait} ${RENVOI_EXPOSITION}`;",
+      "remplace": "export const premisse = (fait) => `${fait}`;",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-session-reload-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-session-reload-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "marque ses PRÉMISSES et renvoie l’exposition à sa sonde, dans le MESSAGE"
+      ]
+    },
+    {
+      "id": "token-exposure: une session native portee par un cookie toleree",
+      "garde": "frontend/scripts/check-token-exposure-production.js",
+      "cible": "frontend/scripts/check-token-exposure-production.js",
+      "trouve": "  if (cookiesAvantRedemarrage > 0) {",
+      "remplace": "  if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-token-exposure-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-token-exposure-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "le redémarrage simulé porte 2 cookie(s)"
+      ]
+    },
+    {
+      "id": "token-exposure: la restauration native sans le jeton toleree",
+      "garde": "frontend/scripts/check-token-exposure-production.js",
+      "cible": "frontend/scripts/check-token-exposure-production.js",
+      "trouve": "  if (statutAuthMe !== null && !enteteBearer) {",
+      "remplace": "  if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-token-exposure-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-token-exposure-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "SANS en-tête Authorization"
+      ]
+    },
+    {
+      "id": "token-exposure: une application muette au redemarrage toleree",
+      "garde": "frontend/scripts/check-token-exposure-production.js",
+      "cible": "frontend/scripts/check-token-exposure-production.js",
+      "trouve": "  if (statutAuthMe === null) {",
+      "remplace": "  if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-token-exposure-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-token-exposure-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "l'application n'a pas sondé"
+      ]
+    },
+    {
+      "id": "informative-steps: detection des formes neutralisee",
+      "garde": ".github/scripts/check-informative-steps.py",
+      "cible": ".github/scripts/check-informative-steps.py",
+      "trouve": "                if FORMES[forme].search(commande):",
+      "remplace": "                if False:",
+      "runner": "python",
+      "preuve": "backend/tests/test_informative_steps_guard.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_informative_steps_guard.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_informative_steps_guard.py::TestDetection::test_une_commande_neutralisee_non_declaree_est_refusee_et_nommee",
+        "FAILED tests/test_informative_steps_guard.py::TestDetection::test_les_erreurs_ignorees_sont_vues",
+        "FAILED tests/test_informative_steps_guard.py::TestCLI::test_le_garde_echoue_sur_une_fixture_non_declaree"
+      ]
+    },
+    {
+      "id": "informative-steps: declaration perimee toleree",
+      "garde": ".github/scripts/check-informative-steps.py",
+      "cible": ".github/scripts/check-informative-steps.py",
+      "trouve": "        if cle not in mesurees:",
+      "remplace": "        if False:",
+      "runner": "python",
+      "preuve": "backend/tests/test_informative_steps_guard.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_informative_steps_guard.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_informative_steps_guard.py::TestRegistre::test_une_declaration_perimee_est_refusee",
+        "FAILED tests/test_informative_steps_guard.py::TestCLI::test_une_forme_disparue_rend_sa_declaration_perimee"
+      ]
+    },
+    {
+      "id": "informative-steps: nombre declare non verifie",
+      "garde": ".github/scripts/check-informative-steps.py",
+      "cible": ".github/scripts/check-informative-steps.py",
+      "trouve": "        if len(groupe) != attendu:",
+      "remplace": "        if False:",
+      "runner": "python",
+      "preuve": "backend/tests/test_informative_steps_guard.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_informative_steps_guard.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_informative_steps_guard.py::TestRegistre::test_le_nombre_declare_est_verifie"
+      ]
+    },
+    {
+      "id": "informative-steps: plancher de lecture neutralise",
+      "garde": ".github/scripts/check-informative-steps.py",
+      "cible": ".github/scripts/check-informative-steps.py",
+      "trouve": "    if etapes_lues < MIN_ETAPES:",
+      "remplace": "    if False:",
+      "runner": "python",
+      "preuve": "backend/tests/test_informative_steps_guard.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_informative_steps_guard.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_informative_steps_guard.py::TestCLI::test_sous_le_plancher_de_lecture_le_garde_refuse_de_conclure"
+      ]
+    },
+    {
+      "id": "corpus: refus d'une surface aveugle non declaree neutralise",
+      "garde": "frontend/scripts/corpus-missions.js",
+      "cible": "frontend/scripts/corpus-missions.js",
+      "trouve": "  if (!surface) {",
+      "remplace": "  if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-corpus-missions.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-corpus-missions.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "une surface NON déclarée REFUSE"
+      ]
+    },
+    {
+      "id": "corpus: lecture du corpus non declaree toleree",
+      "garde": "frontend/scripts/corpus-missions.js",
+      "cible": "frontend/scripts/corpus-missions.js",
+      "trouve": "    if (lit && !declare) {",
+      "remplace": "    if (false && lit && !declare) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-corpus-missions.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-corpus-missions.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une LECTURE du corpus qui n"
+      ]
+    },
+    {
+      "id": "corpus: planchers de lecture neutralises",
+      "garde": "frontend/scripts/corpus-missions.js",
+      "cible": "frontend/scripts/corpus-missions.js",
+      "trouve": "    if (lues[grandeur] < plancher) {",
+      "remplace": "    if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-corpus-missions.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-corpus-missions.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse de conclure SOUS les planchers de lecture"
+      ]
+    },
+    {
+      "id": "og-images: avertissement de surface aveugle neutralise",
+      "garde": "frontend/scripts/check-og-images.js",
+      "cible": "frontend/scripts/check-og-images.js",
+      "trouve": "      else avertissements.push(verdict.avertissement);",
+      "remplace": "      else { void 0; }",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-og-images.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-og-images.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "Surface aveugle DÉCLARÉE"
+      ]
+    },
+    {
+      "id": "corpus-missions: balayage vide tolere",
+      "garde": "frontend/scripts/check-corpus-missions.js",
+      "cible": "frontend/scripts/check-corpus-missions.js",
+      "trouve": "    .filter((entree) => entree.isFile() && extensions.has(path.extname(entree.name)))",
+      "remplace": "    .filter(() => false)",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-corpus-missions.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-corpus-missions.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "inventaire RÉEL tient"
+      ]
+    },
+    {
+      "id": "canari: mandat d'ecriture non verifie",
+      "garde": "frontend/scripts/check-job-form-canari.js",
+      "cible": "frontend/scripts/check-job-form-canari.js",
+      "trouve": "  if (!ecriture.autorisee) {",
+      "remplace": "  if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-job-form-canari.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-job-form-canari.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "et la surface est DÉCLARÉE"
+      ]
+    },
+    {
+      "id": "canari: defauts de forme non remontes",
+      "garde": "frontend/scripts/check-job-form-canari.js",
+      "cible": "frontend/scripts/check-job-form-canari.js",
+      "trouve": "      for (const defaut of defauts) errors.push(defaut);",
+      "remplace": "      for (const defaut of defauts) void defaut;",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-job-form-canari.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-job-form-canari.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "nomme le défaut de titre dans"
+      ]
+    },
+    {
+      "id": "canari: canonical d'une autre page tolere",
+      "garde": "frontend/scripts/check-job-form-canari.js",
+      "cible": "frontend/scripts/check-job-form-canari.js",
+      "trouve": "    } else if (lu.pathname.replace(/\\/+$/, '') !== attendueUrl.pathname.replace(/\\/+$/, '')) {",
+      "remplace": "    } else if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-job-form-canari.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-job-form-canari.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse un canonical qui désigne une AUTRE page"
+      ]
+    },
+    {
+      "id": "gate-perimetre: declaration en ecart annoncee verte",
+      "garde": ".github/scripts/check-gate-perimetre.py",
+      "cible": ".github/scripts/check-gate-perimetre.py",
+      "trouve": "    if refus:",
+      "remplace": "    if False:",
+      "runner": "python",
+      "preuve": "backend/tests/test_gate_perimetre.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_gate_perimetre.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_gate_perimetre.py::TestCLI::test_une_declaration_en_ecart_fait_refuser_le_garde"
+      ]
+    },
+    {
+      "id": "gate-perimetre: nom de check derive tolere",
+      "garde": ".github/scripts/perimetre_gate.py",
+      "cible": ".github/scripts/perimetre_gate.py",
+      "trouve": "        if nom_ci != nom:",
+      "remplace": "        if False:",
+      "runner": "python",
+      "preuve": "backend/tests/test_gate_perimetre.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_gate_perimetre.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_gate_perimetre.py::TestNomDesChecks::test_un_nom_derive_est_refuse"
+      ]
+    },
+    {
+      "id": "gate-perimetre: job de ci.yml non couvert tolere",
+      "garde": ".github/scripts/perimetre_gate.py",
+      "cible": ".github/scripts/perimetre_gate.py",
+      "trouve": "        if job not in declares and job not in exemptes:",
+      "remplace": "        if False:",
+      "runner": "python",
+      "preuve": "backend/tests/test_gate_perimetre.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_gate_perimetre.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_gate_perimetre.py::TestCouverture::test_un_job_de_ci_yml_non_couvert_est_refuse"
+      ]
+    },
+    {
+      "id": "gate-perimetre: check declare absent de la protection tolere",
+      "garde": ".github/scripts/perimetre_gate.py",
+      "cible": ".github/scripts/perimetre_gate.py",
+      "trouve": "        if nom not in contextes:",
+      "remplace": "        if False:",
+      "runner": "python",
+      "preuve": "backend/tests/test_gate_perimetre.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_gate_perimetre.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_gate_perimetre.py::TestProtection::test_un_check_declare_absent_de_la_protection_est_refuse"
+      ]
+    },
+    {
+      "id": "gate-perimetre: plancher de lecture des jobs neutralise",
+      "garde": ".github/scripts/perimetre_gate.py",
+      "cible": ".github/scripts/perimetre_gate.py",
+      "trouve": "    if len(jobs) < PLANCHERS[\"jobs\"]:",
+      "remplace": "    if False:",
+      "runner": "python",
+      "preuve": "backend/tests/test_gate_perimetre.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_gate_perimetre.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_gate_perimetre.py::TestPlanchers::test_sous_le_plancher_de_lecture_le_garde_refuse"
+      ]
+    },
+    {
+      "id": "gate-perimetre: motif d'exemption trop court tolere",
+      "garde": ".github/scripts/perimetre_gate.py",
+      "cible": ".github/scripts/perimetre_gate.py",
+      "trouve": "        if len(motif) < LONGUEUR_MOTIF:",
+      "remplace": "        if False:",
+      "runner": "python",
+      "preuve": "backend/tests/test_gate_perimetre.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_gate_perimetre.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_gate_perimetre.py::TestCouverture::test_un_motif_trop_court_est_refuse"
+      ]
+    },
+    {
+      "id": "gate-perimetre: livraison sans perimetre declare acceptee",
+      "garde": ".github/scripts/livrer.py",
+      "cible": ".github/scripts/livrer.py",
+      "trouve": "    if not noms:",
+      "remplace": "    if False:",
+      "runner": "python",
+      "preuve": "backend/tests/test_gate_perimetre.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_gate_perimetre.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_gate_perimetre.py::TestLivraison::test_la_livraison_refuse_un_perimetre_vide"
+      ]
+    },
+    {
+      "id": "gate-perimetre: check hors perimetre ignore en silence",
+      "garde": ".github/scripts/livrer.py",
+      "cible": ".github/scripts/livrer.py",
+      "trouve": "        ignores = sorted({r[\"name\"] for r in runs} - set(noms))",
+      "remplace": "        ignores = []",
+      "runner": "python",
+      "preuve": "backend/tests/test_gate_perimetre.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_gate_perimetre.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_gate_perimetre.py::TestLivraison::test_la_livraison_attend_la_liste_declaree_et_rien_d_autre"
+      ]
+    },
+    {
+      "id": "etat-reference: derive non declaree toleree",
+      "garde": ".github/scripts/check-etat-reference.py",
+      "cible": ".github/scripts/check-etat-reference.py",
+      "trouve": "        if actuel != attendu:",
+      "remplace": "        if False and actuel != attendu:",
+      "runner": "python",
+      "preuve": "backend/tests/test_etat_reference.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_etat_reference.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_etat_reference.py::TestDerive::test_une_derive_non_declaree_est_refusee_et_nommee",
+        "FAILED tests/test_etat_reference.py::TestDerive::test_une_mutation_en_place_est_nommee"
+      ]
+    },
+    {
+      "id": "etat-reference: cible de mutation sans reference toleree",
+      "garde": ".github/scripts/check-etat-reference.py",
+      "cible": ".github/scripts/check-etat-reference.py",
+      "trouve": "        if cible not in reference:",
+      "remplace": "        if False and cible not in reference:",
+      "runner": "python",
+      "preuve": "backend/tests/test_etat_reference.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_etat_reference.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_etat_reference.py::TestPerimetre::test_une_cible_absente_de_la_reference_est_refusee"
+      ]
+    },
+    {
+      "id": "etat-reference: mutation en place blanchie par enregistrer",
+      "garde": ".github/scripts/check-etat-reference.py",
+      "cible": ".github/scripts/check-etat-reference.py",
+      "trouve": "    if en_place:",
+      "remplace": "    if False and en_place:",
+      "runner": "python",
+      "preuve": "backend/tests/test_etat_reference.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_etat_reference.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_etat_reference.py::TestEnregistrer::test_enregistrer_refuse_d_adopter_une_mutation_en_place"
+      ]
+    },
+    {
+      "id": "etat-reference: plancher de lecture neutralise",
+      "garde": ".github/scripts/check-etat-reference.py",
+      "cible": ".github/scripts/check-etat-reference.py",
+      "trouve": "    if lues < plancher:",
+      "remplace": "    if False and lues < plancher:",
+      "runner": "python",
+      "preuve": "backend/tests/test_etat_reference.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_etat_reference.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_etat_reference.py::TestPlancher::test_sous_le_plancher_le_garde_refuse_de_conclure"
+      ]
+    }
   ]
 }

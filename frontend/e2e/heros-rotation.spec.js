@@ -59,6 +59,21 @@ import { PHOTOS_HEROS, PHOTO_HEROS_DELAI_MS } from '../src/config/photos-heros.j
  * boîte de la rotation à une boîte relevée en plein montage mesurerait le
  * montage, pas la rotation.
  *
+ * ── LE MONTAGE N'EST PAS UN CRAN, ET IL PEUT TOMBER TARD (11/10/2026) ────
+ * React repose la source COURANTE sur le nœud de la coquille au montage : un
+ * enregistrement qui n'apprend rien figure donc au journal. La sonde comptait sur
+ * lui pour être DÉJÀ là quand le départ se lit — vrai sur un poste, faux sur un
+ * hôte chargé, où il arrive APRÈS (mesuré ici en bridant le CPU ×6 : `src` et
+ * journal VIDES à la lecture du départ, l'enregistrement de montage 300 ms plus
+ * tard). Le journal lu valait alors [montage, cran 1, cran 2] : la suite publiée
+ * était [1re photo, 2e, 3e] au lieu de [2e, 3e, 4e], sur trois enregistrements
+ * et DEUX intervalles (30,2 s) — c'est le rouge de la CI du 11/10/2026, et il se
+ * lisait comme un « départ décalé ». `REGLE_DES_CRANS` remplace l'index de départ
+ * en dur : un enregistrement qui repose la même source n'est pas un cran, il DATE
+ * l'apparition de la photo (c'est l'ancre du premier intervalle, le minuteur
+ * s'armant au montage), et la suite attendue se dérive CYCLIQUEMENT de cette
+ * photo de référence — au lieu de supposer un départ sur la première.
+ *
  * ── Ce que cette sonde ne fait pas ─────────────────────────────────────────
  * Elle ne juge ni le FORMAT téléchargé (`heros-format.spec.js`), ni le contrôle
  * de pause (`heros-pause.spec.js`), ni le LCP de l'accueil — seulement que la
@@ -151,6 +166,41 @@ const ESPION_ROTATION = () => {
   }
 };
 
+/**
+ * LA RÈGLE DES CRANS, POSÉE DANS LA PAGE ET LUE PAR LES DEUX LECTEURS.
+ *
+ * Un cran n'est pas un ENREGISTREMENT du journal : c'est un CHANGEMENT de
+ * source. La distinction a coûté un rouge en CI (voir l'en-tête) : le montage
+ * repose la source courante, il peut tomber après la lecture du départ, et le
+ * compter comme un cran décale la suite d'un rang tout en faisant croire à deux
+ * intervalles au lieu de trois.
+ *
+ * Elle est posée dans la page comme `__kojoRotationLire` : l'attente bornée et la
+ * lecture finale passent par la MÊME fonction, sans quoi deux copies de cette
+ * règle finiraient par ne plus dire la même chose.
+ *
+ * L'ANCRE est l'instant du dernier enregistrement écarté — celui du montage, qui
+ * date l'apparition de la photo et l'armement du minuteur. C'est lui qui mesure le
+ * PREMIER intervalle ; quand il n'y en a pas (rien à écarter), l'ancre est la
+ * lecture du départ, prise au plus près du montage.
+ */
+const REGLE_DES_CRANS = () => {
+  window.__kojoCransDuJournal = (changements, index, srcDepart) => {
+    const crans = [];
+    let precedent = srcDepart;
+    let ancre = null;
+    for (const changement of changements.slice(index)) {
+      if (changement.src === precedent) {
+        ancre = changement.t;
+        continue;
+      }
+      crans.push(changement);
+      precedent = changement.src;
+    }
+    return { crans, ancre };
+  };
+};
+
 /** Deux boîtes coïncident-elles, à la tolérance de sous-pixel du dépôt ? */
 const memeBoite = (a, b) => Boolean(a) && Boolean(b) && a.every((v, i) => Math.abs(v - b[i]) <= TOLERANCE_PX);
 
@@ -172,15 +222,17 @@ test.describe('la rotation du héros, cran par cran', () => {
       try {
         await page.addInitScript(ESPION_CLS);
         await page.addInitScript(ESPION_ROTATION);
+        await page.addInitScript(REGLE_DES_CRANS);
         await page.goto('/');
         await page.waitForSelector(MARQUEUR_DE_MONTAGE, { timeout: 15000 });
 
         // ── Le départ, lu AU PLUS PRÈS du montage : c'est ce qui permet de
         // mesurer le PREMIER intervalle (l'écart au montage), et pas seulement
-        // ceux qui séparent deux remplacements. On note aussi l'index courant du
-        // journal, pour que la suite d'observations soit celle d'APRÈS ce point —
-        // sans quoi un enregistrement du montage (React remplace le nœud de la
-        // coquille) serait compté comme un cran.
+        // ceux qui séparent deux remplacements. L'index courant du journal est
+        // noté, pour que la suite d'observations soit celle d'APRÈS ce point —
+        // l'enregistrement du montage est écarté par la RÈGLE (il repose la
+        // source courante), pas par cet index : sur un hôte chargé il arrive
+        // APRÈS cette lecture, et l'écarter par l'index le comptait comme un cran.
         const depart = await page.evaluate(() => ({
           lecture: window.__kojoRotationLire(),
           index: window.__kojoRotation.changements.length,
@@ -188,18 +240,28 @@ test.describe('la rotation du héros, cran par cran', () => {
         await attendreLaStabilite(page);
         const departStable = await page.evaluate(() => window.__kojoRotationLire());
 
-        // ── On attend ${CRANS} crans DE PLUS QUE LE POINT DE DÉPART : une
+        // ── La photo de RÉFÉRENCE : celle qui est peinte à la lecture du départ.
+        // Elle peut MANQUER — mesuré (CPU ×6) : `.cadre-image` est absent au
+        // moment du départ, React ayant vidé la racine sans avoir encore peint le
+        // héros. Le repli n'est pas une supposition : la coquille publie la
+        // PREMIÈRE photo déclarée et l'alternance part de l'index 0
+        // (`useState(0)` dans `PhotoDuHeros.js`), donc la source courante d'un
+        // héros pas encore peint est cette première photo — lue dans son domicile,
+        // jamais recopiée ici.
+        const reference = depart.lecture.src || PHOTOS_HEROS[0];
+
+        // ── On attend ${CRANS} CRANS — c'est-à-dire ${CRANS} CHANGEMENTS de
+        // source, la règle écartant les enregistrements qui reposent la même : une
         // CONDITION bornée, jamais une attente fixe (`frontend/e2e/` est déclaré
         // sur `attenteFixe` avec une déclaration vide : aucune durée ne décide
         // ici). Le plafond laisse ${CRANS} intervalles pleins plus le retard
-        // maximal toléré. Le compte part de `depart.index` et non de zéro :
-        // l'enregistrement du MONTAGE (React remplace le nœud de la coquille) est
-        // déjà dans le journal, et l'oublier faisait attendre un cran de moins
-        // que demandé (mesuré : « 2 changements observés au lieu de 3 »).
+        // maximal toléré.
         const observe = await page
           .waitForFunction(
-            (cible) => window.__kojoRotation.changements.length >= cible,
-            depart.index + CRANS,
+            (cible) =>
+              window.__kojoCransDuJournal(window.__kojoRotation.changements, cible.index, cible.src)
+                .crans.length >= cible.crans,
+            { index: depart.index, src: reference, crans: CRANS },
             { timeout: CRANS * (PHOTO_HEROS_DELAI_MS + RETARD_MAX_MS) }
           )
           .then(() => true)
@@ -209,39 +271,63 @@ test.describe('la rotation du héros, cran par cran', () => {
           rotation: window.__kojoRotation,
           cls: window.__kojoCls,
         }));
-        const crans = releve.rotation.changements.slice(depart.index);
+        // LA MÊME RÈGLE que celle de l'attente, dans la même page : le journal est
+        // relu ici en entier (l'attente s'arrête au ${CRANS}e cran, la lecture ne
+        // peut pas en manquer).
+        const { crans, ancre } = await page.evaluate(
+          ({ index, src }) => window.__kojoCransDuJournal(window.__kojoRotation.changements, index, src),
+          { index: depart.index, src: reference }
+        );
 
         // ── 1. La rotation a bien tourné le nombre de crans attendu ─────────
         // Un rouge d'attente ne dit pas quel défaut existe : c'est CETTE
         // assertion qui nomme ce qui a été vu (et le journal, pas un délai).
         expect(
           observe,
-          `« / » (${taille}) : ${crans.length} changement(s) de photo observé(s) en ` +
+          `« / » (${taille}) : ${crans.length} cran(s) de rotation observé(s) en ` +
             `${CRANS * (PHOTO_HEROS_DELAI_MS + RETARD_MAX_MS)} ms — ${CRANS} attendus ` +
             `(sources vues : ${JSON.stringify(crans.map((c) => c.src))})`
         ).toBe(true);
         expect(
           crans.length,
-          `« / » (${taille}) : ${crans.length} changements observés au lieu de ${CRANS} — ` +
-            'un changement de plus signalerait un SECOND minuteur (ou une avance de deux crans ' +
-            'comptée deux fois).'
+          `« / » (${taille}) : ${crans.length} cran(s) observé(s) au lieu de ${CRANS} — ` +
+            'un cran de plus signalerait un SECOND minuteur (ou une avance de deux crans) ; les ' +
+            'enregistrements qui reposent la MÊME source (le montage) ne sont pas comptés.'
         ).toBe(CRANS);
 
         // ── 2. La suite est EXACTEMENT la liste déclarée, cran par cran ─────
         // C'est la mesure de « un seul cran » : une implémentation qui sauterait
         // une photo afficherait bien une nouvelle source à chaque intervalle,
-        // mais pas celle-là.
+        // mais pas celle-là. La suite attendue se dérive CYCLIQUEMENT de la photo
+        // de référence lue dans la page, donc la sonde ne suppose plus que
+        // l'observation commence sur la première photo : c'est vrai sur un poste,
+        // et faux sur un hôte où la lecture du départ a manqué le montage.
+        const indexDepart = PHOTOS_HEROS.indexOf(reference);
+        expect(
+          indexDepart,
+          `« / » (${taille}) : la photo de référence « ${reference} » n'appartient pas à la liste ` +
+            `déclarée (${PHOTOS_HEROS.join(', ')}) — la suite ne peut pas être jugée cran par cran.`
+        ).not.toBe(-1);
+        const suiteAttendue = Array.from(
+          { length: CRANS },
+          (_, i) => PHOTOS_HEROS[(indexDepart + 1 + i) % PHOTOS_HEROS.length]
+        );
         expect(
           crans.map((c) => c.src),
-          `« / » (${taille}) : la suite observée n'est pas la liste déclarée, cran par cran. ` +
+          `« / » (${taille}) : la suite observée n'est pas la liste déclarée, cran par cran ` +
+            `(référence lue « ${reference} », suite attendue ${JSON.stringify(suiteAttendue)}). ` +
             'Un saut (index avancé deux fois), une répétition (index revenu en arrière) ou un ' +
             'départ décalé se lisent ici.'
-        ).toEqual(PHOTOS_HEROS.slice(1, CRANS + 1));
+        ).toEqual(suiteAttendue);
 
         // ── 3. Un cran PAR INTERVALLE déclaré ──────────────────────────────
-        // Le premier écart se mesure depuis la lecture du départ (prise juste
-        // après le montage) ; les suivants séparent deux remplacements observés.
-        const instants = [depart.lecture.t, ...crans.map((c) => c.t)];
+        // Le premier écart se mesure depuis l'ANCRE (le montage, qui date
+        // l'apparition de la photo et l'armement du minuteur) quand il y en a une,
+        // et depuis la lecture du départ sinon ; les suivants séparent deux
+        // remplacements observés. Ancrer sur la lecture du départ d'un hôte où le
+        // montage tombe plus tard compterait le retard de React comme du retard de
+        // la rotation — un rouge d'hôte.
+        const instants = [ancre === null ? depart.lecture.t : ancre, ...crans.map((c) => c.t)];
         const ecarts = instants.slice(1).map((t, i) => +(t - instants[i]).toFixed(1));
         const sousMinimal = ecarts.map((e, i) => ({ e, i })).filter(({ e }) => e < PHOTO_HEROS_DELAI_MS - MARGE_INTERVALLE_MS);
         const auDelaDuRetard = ecarts.map((e, i) => ({ e, i })).filter(({ e }) => e > PHOTO_HEROS_DELAI_MS + RETARD_MAX_MS);

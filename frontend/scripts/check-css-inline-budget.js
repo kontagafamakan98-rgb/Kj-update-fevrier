@@ -30,6 +30,22 @@
  *
  *   gzip de la feuille partagée : 15 115 o. Total CSS inline du build : 995 321 o.
  *
+ * ── Le relevé a bougé le 17/10/2026 : 80 324 o / 15 759 o gzip / 1 083 règles /
+ *    sha f5da31364d5a2964 ────────────────────────────────────────────────────
+ * Le vocabulaire des ÉCRANS D'APPLICATION (bandeau d'accueil, tuiles de mesure
+ * et d'action, lignes de liste, étiquettes, bulles de conversation — voir le
+ * bloc de `src/index.css` du même nom) atterrit ici pour la même raison que le
+ * reste : la feuille est inlinée ENTIÈRE. Il ajoute 39 règles et 3 791 o aux
+ * treize documents, soit +1,8 % sur une feuille lue avant le premier paint.
+ * Ce que ces octets achètent, et qui n'existait pas : les cinq écrans connectés
+ * n'avaient AUCUNE classe de site — ils recomposaient leurs cartes en
+ * utilitaires, chacun avec sa gouttière et son rayon, et trois d'entre eux
+ * peignaient des gris froids que le reste du site avait retirés. Le budget est
+ * REPORTÉ sur cette mesure (81 Ko), il n'est pas élargi pour faire passer un
+ * rouge : le dépassement était de 1 476 o sur l'ancien budget (77 Ko), la
+ * couverture offerte par la marge habituelle (mesure × 1,03) le contient, et la
+ * prochaine livraison qui touchera au CSS des écrans se re-mesurera pareil.
+ *
  * ── Le relevé a bougé le 11/10/2026, et c'est écrit ici ────────────────────
  * Le relevé précédent (09/10/2026) était de 69 276 o / 936 règles / sha
  * d8c74e2cb457a497, gzip 13 111 o, total 900 980 o. Il a grandi de 7 257 o
@@ -113,21 +129,22 @@ export const FEUILLE_DE_REFERENCE = 'index.html';
  * le dire — au lieu de dériver en silence.
  */
 export const CSS_INLINE_BUDGETS = {
-  // Relevé 11/10/2026 : 76 533 o / 15 115 o gzip / 1044 règles / sha 41d0f2e82d7950d9.
-  // (Relevé précédent du 09/10/2026 : 69 276 o / 13 111 o gzip / 936 règles / sha d8c74e2cb457a497.)
-  'index.html': { budget: 78848, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'about.html': { budget: 78848, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'app.html': { budget: 78848, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'contact.html': { budget: 78848, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'forgot-password.html': { budget: 78848, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'how-it-works.html': { budget: 78848, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'jobs.html': { budget: 78848, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'login.html': { budget: 78848, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'payment.html': { budget: 78848, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'privacy.html': { budget: 78848, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'register.html': { budget: 78848, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'support.html': { budget: 78848, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'terms.html': { budget: 78848, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  // Relevé 17/10/2026 : 80 324 o / 15 759 o gzip / 1083 règles / sha f5da31364d5a2964.
+  // (Relevé 11/10/2026 : 76 533 o / 15 115 o gzip / 1044 règles / sha 41d0f2e82d7950d9 ;
+  //  09/10/2026 : 69 276 o / 13 111 o gzip / 936 règles / sha d8c74e2cb457a497.)
+  'index.html': { budget: 82944, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'about.html': { budget: 82944, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'app.html': { budget: 82944, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'contact.html': { budget: 82944, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'forgot-password.html': { budget: 82944, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'how-it-works.html': { budget: 82944, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'jobs.html': { budget: 82944, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'login.html': { budget: 82944, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'payment.html': { budget: 82944, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'privacy.html': { budget: 82944, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'register.html': { budget: 82944, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'support.html': { budget: 82944, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'terms.html': { budget: 82944, plancher: 61440, blocs: 1, feuille: 'index.html' },
   // Le document minimal n'a pas la feuille critique : il a la sienne, et courte.
   // Relevé 09/10/2026 : 392 o / 6 règles / sha 8108c4546aacc8b6.
   '404.html': { budget: 2048, plancher: 256, blocs: 1, feuille: '404.html' },

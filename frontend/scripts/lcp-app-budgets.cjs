@@ -28,11 +28,76 @@
  *   /jobs/:id      mobile    30 361 ×3                <p> « L’argent est bloqué sur le compte séquestre… »
  *   /jobs/:id      desktop  142 848 ×3                <p> « Nous recherchons un électricien qualifié… »
  *
+ * ── RE-MESURE DU 17/10/2026, APRÈS LE BANDEAU D'IDENTITÉ DE /profile ────────
+ * Le fond orange plein de /profile est devenu le `.bande-app` du tableau de
+ * bord, donc son `<h1>` passe de `.titre-heros` (56 px en desktop) à
+ * `.titre-page` (44 px) : l'élément ÉLU ne change pas, son AIRE si. Trois runs
+ * de nouveau, protocole de `e2e/lcp-app.spec.js`, 412×823 et 1350×940 :
+ *   • /profile mobile  : 11 211 ×3 — INCHANGÉ, et c'est ce qu'il fallait
+ *     vérifier : le plus grand peintre mobile est la phrase d'état vide des
+ *     avis, pas l'en-tête, donc retoucher le bandeau ne pouvait pas déplacer
+ *     l'élection mobile (la mesure le dit, elle ne le suppose pas) ;
+ *   • /profile desktop : 13 392 ×3 (contre 21 012 avant) — même `<h1>` « Demo
+ *     Worker », boîte 245,97 × 45,75 px. C'est une BAISSE de l'aire du même
+ *     élément, pas un changement de peintre : elle reste dans la bande dérivée
+ *     (plancher 60 %).
+ * Le run de la CI (16 215) de la cellule mobile est conservé : il décrit
+ * toujours la MÊME phrase du MÊME élément.
+ *
+ * ── RE-MESURE DU 17/10/2026, APRÈS L'ALIGNEMENT DE /create-job ET /jobs/:id ──
+ * Le formulaire de publication est passé d'UNE carte de quinze champs à quatre
+ * cartes titrées (`.titre-carte-app`), et la fiche d'annonce a reçu les tuiles
+ * de mesure, les étiquettes d'état et les filets des écrans d'application. Trois
+ * runs de nouveau, protocole inchangé, 412×823 et 1350×940 :
+ *   • /create-job mobile : 11 792 ×3 — INCHANGÉ, et c'est ce qu'il fallait
+ *     vérifier : le plus grand peintre mobile est le chapeau du formulaire, qui
+ *     est AU-DESSUS des quatre cartes ; desktop 13 446 ×3, le `<h1>` « Publier
+ *     un job » : les cartes n'ont pas déplacé l'élection, elles ont déplacé ce
+ *     qui la suit ;
+ *   • /jobs/:id mobile : 30 361 ×3 — INCHANGÉ (l'encart du séquestre) ; desktop
+ *     183 024 ×3 au lieu de 142 848, MÊME `<p>` et MÊME phrase. La tranche
+ *     VISIBLE du paragraphe a grandi parce que le bloc commence plus haut — le
+ *     commentaire de la cellule dit ce que la mesure ne démêle pas (les hauteurs
+ *     du relevé de référence n'ont pas été conservées).
+ * Le CLS des deux routes, relevé au même passage (`e2e/cadres-app.spec.js`,
+ * budgets 0,02 pour /create-job et 0,04 pour /jobs/:id) : /create-job 0,0000
+ * mobile / 0,0048 desktop, et 0,0000 / 0,0039 pendant le chunk de sa route ;
+ * /jobs/:id annonce LONGUE 0,0000 / 0,0039, annonce COURTE 0,0000 / 0,0127
+ * (0,0164 le 09/10/2026 sur ce même cas court : la mécanique du pied de page
+ * réservé n'a pas bougé, et elle reste sous son budget dans les deux cas).
+ *
  * LES TRENTE RELEVÉS SONT IDENTIQUES AU PX², et le MÊME élément est élu à chaque
- * run (le relevé publie les deux, `e2e/lcp-app.spec.js`) : l'aire LCP de ces
- * pages est de la GÉOMÉTRIE — un fait de DOM et de CSS, comme le CLS, et pour la
- * même raison. La conséquence règle la marge ci-dessous : il n'y a AUCUN bruit de
- * machine à couvrir, donc la marge ne peut pas être justifiée comme telle.
+ * run (le relevé publie les deux, `e2e/lcp-app.spec.js`). Cette stabilité-là est
+ * celle du POSTE — et le même protocole, rejoué le 11/10/2026 sur le runner de la
+ * CI, ne redonne pas les mêmes aires :
+ *
+ *   route        taille   poste partagé   runner de la CI   bande du poste
+ *   /dashboard   mobile    8 626 ×3       8 588  (−0,44 %)  5 200–10 800  DANS
+ *   /profile     mobile   11 211 ×3      16 215  (+44,6 %)  6 700–14 000  AU-DESSUS
+ *
+ * La cause est celle que le dépôt a DÉJÀ mesurée ailleurs (angle du 26/09/2026 de
+ * CI-COVERAGE.md, PR #152 : « l'aire de l'ENCRE de l'élément élu suit les polices
+ * de l'hôte », jusqu'à −18 % sur le runner À BOÎTE D'ÉLÉMENT IDENTIQUE) : ces
+ * cellules ne bornent pas un cadre mais une AIRE DE TEXTE, et le repli du texte
+ * suit la police appliquée. Sur /profile mobile, la phrase d'état vide du profil
+ * tient sur DEUX lignes ici et sur TROIS là-bas — la classe a été reproduite sur
+ * ce poste en élargissant la police de l'élément élu (une police étrangère, comme
+ * la sonde d'atelier de la PR #152) : la même phrase passe à trois lignes et
+ * l'aire de 11 211 monte à ~15 000–16 000 px², du même ordre que le relevé du
+ * runner. Même élément, même phrase, une ligne de plus.
+ *
+ * CE QUI REMPLACE LA PHRASE QUI ÉTAIT ICI (« il n'y a AUCUN bruit de machine à
+ * couvrir, donc la marge ne peut pas être justifiée comme telle ») : c'était vrai
+ * du POSTE, faux de la MACHINE. La cellule de /profile mobile porte donc le relevé
+ * du runner COMME UN RUN, à côté des trois du poste, et ses deux bornes se
+ * dérivent de ce run-là — le remède déjà appliqué aux planchers de
+ * `e2e/lcp-geometrie-declaree.spec.js` (≈ 70 % du plus PETIT des relevés connus,
+ * les chiffres des deux hôtes en commentaire). La règle de dérivation, elle, ne
+ * change pas d'un cran (plancher 60 %, plafond ×1,25 du pire) : c'est la MESURE
+ * qui s'élargit, jamais le calcul. Une cellule dont le texte peut se replier
+ * autrement se re-mesure — elle ne s'élargit pas en silence — et le message
+ * d'échec nomme l'élément élu VIVANT et sa boîte (voir `e2e/lcp-app.spec.js`),
+ * pour que le prochain hôte se diagnostique tout seul.
  *
  * ── Ce qui est asserté, et sur quelle grandeur ─────────────────────────────
  * Ces routes ne sont PAS pré-rendues (`src/config/app-cadres.js` : aucun HTML
@@ -117,11 +182,22 @@ const LCP_APP_BUDGETS = {
   },
   '/profile': {
     mobile: {
-      runs: [11211, 11211, 11211],
+      // LE 4e RUN VIENT D'UN AUTRE HÔTE, et il n'est pas moyenné : c'est le
+      // runner de la CI (11/10/2026) qui peint la MÊME phrase du MÊME élément sur
+      // TROIS lignes au lieu de deux (voir l'en-tête — « l'aire de l'ENCRE de
+      // l'élément élu suit les polices de l'hôte »). C'est ce relevé qui porte le
+      // plafond : sans lui, le run du runner rougissait sur une phrase justifiée
+      // autrement — un rouge de police, pas de page. Les trois premiers sont les
+      // runs du poste partagé (09/10/2026), identiques au px².
+      runs: [11211, 11211, 11211, 16215],
       element: '<p> « Aucun avis pour le moment. Les notes app… »',
     },
     desktop: {
-      runs: [21012, 21012, 21012],
+      // RE-MESURÉ LE 17/10/2026 avec le bandeau d'identité : le même `<h1>`,
+      // dont `.titre-page` réduit l'aire de 21 012 à 13 392 px² (voir l'en-tête).
+      // Le plancher dérivé (60 %) reste au-dessus de zéro contenu, donc la
+      // cellule continue de refuser une page qui aurait perdu son titre.
+      runs: [13392, 13392, 13392],
       element: '<h1> « Demo Worker »',
     },
   },
@@ -156,7 +232,19 @@ const LCP_APP_BUDGETS = {
       element: '<p> « L’argent est bloqué sur le compte séquestre… »',
     },
     desktop: {
-      runs: [142848, 142848, 142848],
+      // RE-MESURÉ LE 17/10/2026 (trois runs, protocole de `e2e/lcp-app.spec.js`) :
+      // MÊME élément, MÊME phrase, mais 183 024 px² au lieu de 142 848. L'aire
+      // comptée n'est pas l'encre du paragraphe : c'en est la TRANCHE VISIBLE
+      // (743,4 × 246,3 px), et cette tranche a grandi parce que le bloc commence
+      // à y=692,5 au lieu d'environ 748 — donc parce que ce qui le précède est
+      // plus court. Ce qui le précède, mesuré le même jour : carte d'en-tête
+      // 211 px, encart de séquestre 156,3 px. Le relevé de référence ne
+      // conservait pas ces hauteurs : la mesure ci-dessus ne dit donc PAS lequel
+      // des deux a bougé, et c'est écrit plutôt que supposé. Ce qu'elle permet
+      // de dire : l'élément élu est inchangé, sa largeur est inchangée, et une
+      // page qui peindrait une SECTION entière à la place de ce paragraphe
+      // (l'ancien plafond, 178 600) rougirait toujours.
+      runs: [183024, 183024, 183024],
       element: '<p> « Nous recherchons un électricien qualifié… » (la description de l’annonce)',
     },
   },

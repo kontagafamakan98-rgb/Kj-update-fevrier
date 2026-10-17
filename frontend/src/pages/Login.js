@@ -128,6 +128,11 @@ export default function Login() {
   return (
     <div className={pagePlan.frameClass}>
       <div className={pagePlan.colonneClass}>
+        {/* La CARTE du formulaire (17/10/2026) : /login était la seule page
+            publique sans carte, un formulaire nu posé sur le sable. La classe
+            est déclarée dans le plan et publiée par la coquille, donc la
+            bascule coquille → React ne change ni le fond ni le filet. */}
+        <div className={pagePlan.carteClass}>
         <div>
           {/* La marque : un tracé partagé, pas la lettre « K » du dictionnaire
               (voir src/config/marque-kojo.js). Même pastille, même boîte. */}
@@ -144,7 +149,7 @@ export default function Login() {
 
         <form className={pagePlan.formClass} onSubmit={handleSubmit}>
           {displayedError && (
-            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {displayedError}
             </div>
           )}
@@ -170,7 +175,7 @@ export default function Login() {
                   <div className="w-full border-t border-gray-200" />
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="fond-sable px-3 text-gray-400">{t('orSeparator') || 'ou'}</span>
+                  <span className="bg-white px-3 text-sm text-stone-400">{t('orSeparator') || 'ou'}</span>
                 </div>
               </div>
             </>
@@ -218,7 +223,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-gray-600"
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-stone-400 hover:text-stone-700"
                   aria-label={showPassword ? t('hidePassword') : t('showPassword')}
                   tabIndex={-1}
                 >
@@ -258,6 +263,7 @@ export default function Login() {
             </span>
           </div>
         </form>
+        </div>
       </div>
     </div>
   );

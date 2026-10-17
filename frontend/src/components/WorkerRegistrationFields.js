@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { HardHat, Wrench, CalendarDays, Info } from 'lucide-react';
+// Le dessin du champ (filet chaud, fond papier, anneau orange) a UN
+// propriétaire : src/config/classes-champ.js, celui de /login, /register et
+// /profile. Le sélecteur d'expérience et la compétence personnalisée
+// peignaient encore un bleu qui n'existe nulle part ailleurs sur le site.
+import { CHAMP_SANS_MARGE } from '../config/classes-champ';
 
 const WorkerRegistrationFields = ({ formData, setFormData, errors }) => {
   const [showSkillInput, setShowSkillInput] = useState(false);
@@ -195,17 +200,17 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors }) => {
                   value={newSkill}
                   onChange={(e) => setNewSkill(e.target.value)}
                   placeholder={t('customSkillPlaceholder')}
-                  className="flex-1 px-3 py-2 border border-blue-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                  className={`${CHAMP_SANS_MARGE} flex-1 min-w-0`}
                   onKeyDown={(e) => e.key === 'Enter' && handleAddCustomSkill()}
                 />
-                <button type="button" onClick={handleAddCustomSkill} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">{t('add')}</button>
+                <button type="button" onClick={handleAddCustomSkill} className="bouton bouton-encre shrink-0">{t('add')}</button>
                 <button
                   type="button"
                   onClick={() => {
                     setShowSkillInput(false);
                     setNewSkill('');
                   }}
-                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  className="bouton bouton-clair shrink-0"
                 >
                   {t('cancel')}
                 </button>
@@ -232,7 +237,8 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors }) => {
                 worker_experience_years: nextValue === '' ? null : parseInt(nextValue, 10)
               }));
             }}
-            className={`block w-full px-4 py-3 border rounded-lg shadow-xs focus:outline-hidden focus:ring-2 focus:ring-blue-500 ${errors.worker_experience_years ? 'border-red-300 focus:border-red-500' : 'border-blue-300 focus:border-blue-500'}`}
+            className={CHAMP_SANS_MARGE}
+            aria-invalid={errors.worker_experience_years ? 'true' : undefined}
           >
             <option value="">{t('selectExperience')}</option>
             <option value="0">{t('beginner')}</option>

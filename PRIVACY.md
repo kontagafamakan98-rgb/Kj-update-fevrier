@@ -26,6 +26,7 @@ n'ont pas cette garantie, et les écarts connus sont nommés en section 6.
 | Appareil | jeton push (Android / web) | `push_tokens` |
 | Support | nom, téléphone, email, motif, message libre | `support_tickets` |
 | Vérification | code OTP (haché), date de péremption ; jeton d'accès révoqué (identifiant seul) | `email_otps`, `revoked_tokens` |
+| Livraison email | adresse email, fait de livraison reçu du fournisseur (rebond, plainte, livraison réussie), identifiant d'événement | `email_delivery_events`, `email_suppressions` |
 
 La liste fait autorité dans le code : `USER_DATA_SOURCES`, `USER_DATA_BY_EMAIL`
 et `NO_USER_DATA_COLLECTIONS` (`backend/kojo_routers_users.py`) classent
@@ -90,6 +91,7 @@ est donc, par construction, celle que la base applique.
 | `users` | `purge_at` | 90 jours | `DELETED_ACCOUNT_RETENTION_DAYS` | `deleted` = `True` et `purge_at` présent | le document d'un compte SUPPRIMÉ (anonymisé : plus aucune PII, mais l'identifiant interne qui référence les paiements) — un compte actif ne porte pas `purge_at` et n'est jamais purgé |
 | `support_tickets` | `created_at` (date de création) | 365 jours | `SUPPORT_TICKET_RETENTION_DAYS` | aucun (toute la collection) | tout ticket support, résolu ou non — nom, téléphone, email et message libre, la donnée la plus identifiante du dépôt |
 | `messages` | `timestamp` (date de création) | 730 jours | `MESSAGE_RETENTION_DAYS` | aucun (toute la collection) | tout message envoyé — il appartient aussi au destinataire, donc il survit à la suppression de compte, mais pas indéfiniment |
+| `email_delivery_events` | `recu_le` (date de création) | 90 jours | `EMAIL_DELIVERY_EVENT_RETENTION_DAYS` | aucun (toute la collection) | tout fait de livraison reçu du fournisseur (rebond, plainte, livraison réussie) — la trace qui explique pourquoi une adresse a été retenue, et qui n'a plus à être conservée ensuite : l'état (`email_suppressions`) lui survit et ne périme pas |
 <!-- CONSERVATION:FIN -->
 
 Quatre précisions que le tableau ne dit pas :
@@ -117,6 +119,13 @@ Quatre précisions que le tableau ne dit pas :
   `push_tokens` ne disparaissent qu'avec le compte qui les porte (section 2), et
   un avis REÇU survit même à la suppression du compte qui l'a reçu — c'est le
   prix du choix de la section 2 : la note d'un travailleur doit rester vraie.
+  `email_suppressions` en fait partie, et c'est DÉLIBÉRÉ : c'est la liste des
+  adresses auxquelles le service a cessé d'écrire (rebond définitif, ou
+  signalement comme indésirable). Elle ne périme pas parce qu'une adresse
+  redevenue joignable est une **décision** — le propriétaire la lève
+  (`POST /api/owner/email-suppressions/lever`) —, là où une horloge remettrait
+  le service à écrire dans le vide, ce qui est exactement ce qu'elle existe
+  pour empêcher.
 
 ## 4. Journalisation
 
