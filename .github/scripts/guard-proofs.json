@@ -4367,6 +4367,26 @@
       ]
     },
     {
+      "id": "session-cookie: hote du cookie suppose au lieu d'etre lu",
+      "garde": "frontend/scripts/check-session-reload-production.js",
+      "cible": "frontend/scripts/check-session-reload-production.js",
+      "trouve": "  const porteur = cookies.length === 1 ? origineDuCookie(cookies[0], originesConnues) : '';",
+      "remplace": "  const porteur = '';",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-session-reload-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-session-reload-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "lit l’hôte du cookie"
+      ]
+    },
+    {
       "id": "token-exposure: une cle de justificatif toleree",
       "garde": "frontend/scripts/check-token-exposure-production.js",
       "cible": "frontend/scripts/check-token-exposure-production.js",

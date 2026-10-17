@@ -30,6 +30,7 @@ import {
   RENVOI_EXPOSITION,
   contextOptions,
   libelleSonde,
+  origineDuCookie,
   runSessionReloadProbe,
   parseArgs,
 } from '../check-session-reload-production.js';
@@ -196,7 +197,9 @@ describe('check-session-reload-production — attributs du cookie servi', () => 
   it('observe les attributs après connexion et rechargement, sans publier la valeur', async () => {
     const { result, journal } = await sonder({ states: [etat(401), etat(200), etat(200)] });
     expect(result.ok).toBe(true);
-    expect(journal.cookieTargets).toEqual([`${API}${AUTH_ME_PATH}`, `${API}${AUTH_ME_PATH}`]);
+    // La lecture porte sur le CONTEXTE, plus sur une URL supposée : la sonde
+    // demande tous les cookies puis lit l'hôte qui porte la session.
+    expect(journal.cookieTargets).toEqual([undefined, undefined]);
     expect(result.verdicts.sessionCookies).toEqual({
       afterLogin: { httpOnly: true, secure: true, sameSite: 'None' },
       afterReload: { httpOnly: true, secure: true, sameSite: 'None' },
@@ -223,11 +226,61 @@ describe('check-session-reload-production — attributs du cookie servi', () => 
     }
   }
 
+  it('lit l’hôte du cookie au lieu de supposer le proxy (production cross-site)', async () => {
+    // Mesuré le 17/10/2026 : le build de production porte
+    // VITE_USE_SAME_ORIGIN_API=false, donc le navigateur range kojo_session sur
+    // l'hôte de l'API. La sonde doit juger LÀ — supposer le proxy refusait une
+    // production saine sur sa propre prémisse.
+    const direct = { ...COOKIE, domain: 'api.kojo-sonde.test' };
+    // La sonde part de l'hypothèse du proxy (--base sans --api) : c'est l'hôte
+    // du cookie qui doit la CORRIGER, pas une option de l'appelant.
+    const { result, journal } = await sonder({
+      states: [etat(401), etat(200), etat(200)], cookies: [[direct], [direct]],
+    }, { api: BASE });
+
+    expect(result.ok).toBe(true);
+    // Le départ est jugé sur l'hypothèse (le proxy répond 401 : la sonde part
+    // vierge) ; c'est APRÈS la connexion que l'hôte du cookie décide.
+    expect(journal.targets).toEqual([
+      `${BASE}${AUTH_ME_PATH}`,
+      'https://api.kojo-sonde.test/api/auth/me',
+      'https://api.kojo-sonde.test/api/auth/me',
+    ]);
+    expect(result.checked.join('\n')).toContain('topologie lue : le cookie de session est rangé sur https://api.kojo-sonde.test');
+    expect(JSON.stringify(result)).not.toContain(COOKIE.value);
+  });
+
+  it('garde le SCHÉMA et le PORT de l’origine connue, pas le seul domaine du cookie', () => {
+    // Le rouge de la pile locale (e2e/session-proxy.spec.js) : `domain` ne
+    // porte ni schéma ni port, donc refaire l'URL à partir de lui seul donnait
+    // `https://127.0.0.2` pour une page servie en `http://127.0.0.2:45235` —
+    // port 443, HTTP 0. L'hôte est donc rapproché des origines CONNUES.
+    expect(origineDuCookie(
+      { domain: '127.0.0.2' }, ['http://127.0.0.2:45235']
+    )).toBe('http://127.0.0.2:45235');
+    // Le cross-site local : le cookie est chez l'API, qui a son propre port.
+    expect(origineDuCookie(
+      { domain: '127.0.0.1' }, ['http://127.0.0.2:33979', 'https://127.0.0.1:45213']
+    )).toBe('https://127.0.0.1:45213');
+    // Production : l'hôte de l'API n'est AUCUNE des origines fournies (--base
+    // seul, sans --api), et elle est sur le port par défaut.
+    expect(origineDuCookie(
+      { domain: 'api.kojo-sonde.test' }, ['https://kojo-sonde.test']
+    )).toBe('https://api.kojo-sonde.test');
+    // Cookie de DOMAINE PARENT : il couvre l'hôte de la page.
+    expect(origineDuCookie(
+      { domain: '.kojo-sonde.test' }, ['https://kojo-sonde.test']
+    )).toBe('https://kojo-sonde.test');
+    // Un domaine absent ne désigne aucun hôte : la sonde retombe sur l'origine
+    // qu'elle juge, elle n'invente pas `https://`.
+    expect(origineDuCookie({}, ['https://kojo-sonde.test'])).toBe('');
+  });
+
   it('refuse un cookie absent même si /auth/me répond 200', async () => {
     const { result } = await sonder({
       states: [etat(401), etat(200), etat(200)], cookies: [[], []],
     });
-    expect(result.errors.join('\n')).toContain('cookie kojo_session : 0 cookie(s) applicable(s), 1 attendu');
+    expect(result.errors.join('\n')).toContain('cookie kojo_session : 0 cookie(s) kojo_session dans le contexte, 1 attendu');
     expect(result.ok).toBe(false);
   });
 
@@ -235,7 +288,7 @@ describe('check-session-reload-production — attributs du cookie servi', () => 
     const { result } = await sonder({
       states: [etat(401), etat(200), etat(200)], cookies: [[COOKIE, COOKIE], [COOKIE]],
     });
-    expect(result.errors.join('\n')).toContain('cookie kojo_session : 2 cookie(s) applicable(s), 1 attendu');
+    expect(result.errors.join('\n')).toContain('cookie kojo_session : 2 cookie(s) kojo_session dans le contexte, 1 attendu');
     expect(result.ok).toBe(false);
   });
 
