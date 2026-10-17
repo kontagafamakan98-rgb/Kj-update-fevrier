@@ -415,7 +415,7 @@ jobs:
           # glob qui ne résout plus (zéro fichier lu) serait un vert qui ne repose
           # sur rien. C'est la règle des planchers de lecture du dépôt, et le rapport
           # publie le compte lu.
-          FICHIERS=$(ls kojo_*.py server.py | wc -l)
+          FICHIERS=$(find . -maxdepth 1 \( -name 'kojo_*.py' -o -name 'server.py' \) | wc -l)
           if [ "$FICHIERS" -lt 20 ]; then
             echo "::error::pyflakes n'a lu que $FICHIERS fichier(s) (plancher 20) — le corpus est cassé, ce contrôle ne prouve rien"
             exit 1

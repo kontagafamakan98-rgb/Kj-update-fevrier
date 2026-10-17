@@ -71,7 +71,6 @@ import {
 // source (le module que le build appelle), jamais recopiées.
 import { buildRouteShells } from '../../vite-plugins/prerender/shells-routes.js';
 import { makeScopedTranslator as makeJobsTranslator } from '../../src/utils/pack2PageI18n/jobs.js';
-import { PAGE_SECTIONS } from '../../src/config/page-sections.js';
 
 const FRONTEND_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SCRIPT = path.join(FRONTEND_DIR, 'scripts', 'check-prerender-shells.js');
