@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-17",
-    "motif": "Budget de CSS inline reporté sur la mesure du 17/10/2026 (80 324 o), qui inclut le vocabulaire des écrans d'application ajouté à frontend/src/index.css.",
+    "motif": "Deux gardes frontend suivent desormais la source qu'ils jugent : check-prerender-shells.js lit les classes du plan (titre, bouton) au lieu de retenir bg-orange-600, et classes-coquilles.js retire six exemptions devenues des classes partagees ; la refonte de /login et /register avait fait rougir une coquille juste sur une teinte que la page avait quittee.",
     "fichiers": {
       ".githooks/pre-push": "57a57605381510b531a2653226add8b0cd3f1f5879cc2adeead186342a2b44a9",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -93,7 +93,6 @@
       "frontend/scripts/check-pack2-chunks.js": "953f86f71a0f61e8f446727a41e83097ccbb0ecb7f118dc7571bc6b413c6caef",
       "frontend/scripts/check-pack2-i18n-hygiene.js": "692a809c06b036b51536bf1810317ced7e77d7ee10d777188b00bf78b4389d58",
       "frontend/scripts/check-page-meta.js": "abbdc46403a4e2ce8b06fc9b76c652a98958bc23c8155f973029c600d3ce281b",
-      "frontend/scripts/check-prerender-shells.js": "0aea611e4977d2888f2931145859318a45f8d144f4278a634c985bbe9cc08b02",
       "frontend/scripts/check-pwa-manifest.js": "7840560638e9bb25d11c87e729640fc7208a1e60e0ed521dcfa4e3dc2652ad95",
       "frontend/scripts/check-reliquats-css.js": "afc399893d24bf9831bc9c0094b695746bb0a7ddbe5c06e7f65f9adde936a219",
       "frontend/scripts/check-retard-main.js": "b9c98e4c23382b24d1ce361acc7ea5d0cc6dc166d83ab288402f76436d205e61",
@@ -105,7 +104,6 @@
       "frontend/scripts/check-spa-routes.js": "5beaa42d2616c3c568817f06312b12a7b2887dbddd2b37d1dca1d6d8e06efe1e",
       "frontend/scripts/check-test-environment.js": "7a3610e18bfe6b6eb63e26b6fe5031b50cf7fda606aa944faedfe69e89e1310c",
       "frontend/scripts/check-token-exposure-production.js": "a3a2f33c36bc0bb2b11f0f32a1f6539c2a9641f60469eadeb006625aa44205bb",
-      "frontend/scripts/classes-coquilles.js": "446df51b162e576f1a7039b32a7d3c6a2bdc9cf66af9c27d63d77b6b49c42947",
       "frontend/scripts/corpus-missions.js": "81c74865485808ecc2efa5902ab56b112a2bc7b5bb0077f2bebb24279a34e1ad",
       "frontend/scripts/couverture-tiers.js": "9a92379977dc3c3e93b2ceb90a144014bbdcf8df858146333819ce85700bd820",
       "frontend/scripts/juges-de-temps.js": "cc5c96201448b02743d566272a88109b0e1a3efded2846c0f361f529835e265f",
@@ -118,7 +116,9 @@
       ".github/scripts/check-fly-env-drift.py": "55c919507e2d8e502dcce744341ba36d6f08b1ad1182c932b0fbf496d65308b3",
       "backend/server.py": "ddcb03c43c1256fb690a4da623b48e7f234b39552ba1d211a9260e9fbdb700c4",
       "backend/scripts/check_health_probe.py": "136d30b9c6461d473042782a6d0ed70e649901cd27ba7fd555d74544e39f7e4d",
-      "frontend/scripts/check-css-inline-budget.js": "f2ec08e78600460fbc3ca8536b7e18f404d8190a0487ba8c41515e3ce8ad5bff"
+      "frontend/scripts/check-css-inline-budget.js": "f2ec08e78600460fbc3ca8536b7e18f404d8190a0487ba8c41515e3ce8ad5bff",
+      "frontend/scripts/check-prerender-shells.js": "ffd6369bb81d6489226c74015c1d7aba7e567ce03151355e5ec487e4ab775e02",
+      "frontend/scripts/classes-coquilles.js": "94a2b644525375b0cabc8bfb71b5fb42e4beb90080e9f196cda01dc4ed94509d"
     }
   },
   "hors_perimetre": [

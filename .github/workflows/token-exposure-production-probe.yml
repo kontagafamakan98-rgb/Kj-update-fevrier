@@ -97,7 +97,7 @@ jobs:
       # `run:` est publiée dans les journaux du run). Les valeurs de jeton, elles,
       # ne sont publiées par AUCUN message : le relevé est calculé dans la page et
       # ne remonte que des couples (réservoir, clé, forme).
-      - name: Vérifier le jeton sur les deux surfaces (web : invisible ; natif : il survit au redémarrage)
+      - name: "Vérifier le jeton sur les deux surfaces (web : invisible ; natif : il survit au redémarrage)"
         working-directory: frontend
         env:
           LHCI_CI_EMAIL: ${{ secrets.LHCI_CI_EMAIL }}
