@@ -24,6 +24,7 @@ import hashlib
 import hmac
 import logging
 import time
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -399,16 +400,37 @@ class TestEnregistrement:
 
     @pytest.mark.asyncio
     async def test_une_livraison_reussie_remet_le_compteur_a_zero(self):
+        """L'ORDRE des faits est donné, il n'est pas laissé à l'horloge.
+
+        MongoDB ne conserve une date qu'à la MILLISECONDE. Quatre faits ingérés
+        d'affilée tombent dans le même milliseconde, et « postérieur à la
+        dernière livraison » (`recu_le` > livraison) ne peut alors plus les
+        ordonner : mesuré en CI le 17/10/2026, `rebonds_consecutifs` valait 0
+        au lieu de 1, la livraison et le rebond suivant partageant le même
+        `recu_le` tronqué. Les instants sont donc explicites et espacés : ce
+        cas juge la RÈGLE de remise à zéro, pas la résolution du stockage.
+        """
+        depart = datetime(2026, 10, 17, 9, 0, tzinfo=timezone.utc)
         with patch("kojo_email_suppressions.EMAIL_SOFT_BOUNCE_ALERT_THRESHOLD", 3):
             await enregistrer_fait(
-                _fait("email.bounced", bounce={"type": "Transient"}), id_evenement="evt-r1"
+                _fait("email.bounced", bounce={"type": "Transient"}),
+                id_evenement="evt-r1",
+                quand=depart,
             )
             await enregistrer_fait(
-                _fait("email.bounced", bounce={"type": "Transient"}), id_evenement="evt-r2"
+                _fait("email.bounced", bounce={"type": "Transient"}),
+                id_evenement="evt-r2",
+                quand=depart + timedelta(seconds=1),
             )
-            await enregistrer_fait(_fait("email.delivered"), id_evenement="evt-r3")
+            await enregistrer_fait(
+                _fait("email.delivered"),
+                id_evenement="evt-r3",
+                quand=depart + timedelta(seconds=2),
+            )
             apres = await enregistrer_fait(
-                _fait("email.bounced", bounce={"type": "Transient"}), id_evenement="evt-r4"
+                _fait("email.bounced", bounce={"type": "Transient"}),
+                id_evenement="evt-r4",
+                quand=depart + timedelta(seconds=3),
             )
 
         # Rien n'a été remis à zéro à la main : la réussite est la borne.
