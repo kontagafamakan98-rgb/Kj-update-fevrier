@@ -879,7 +879,7 @@ export default function Register() {
             <LoadingButton
               type="submit"
               loading={loading}
-              className="bouton bouton-encre w-full"
+              className={pagePlan.boutonClass}
             >
               {pageT('continueButton')}
             </LoadingButton>

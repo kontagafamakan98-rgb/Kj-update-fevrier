@@ -746,7 +746,12 @@ export const PAGE_SECTIONS = {
     // La place de l'œil (quarante-quatre pixels à droite) s'ajoute au champ
     // partagé : c'est la seule différence, et elle est lisible ici.
     champMotDePasseClass: `${CHAMP} pr-11`,
-    boutonClass: 'bouton bouton-encre w-full',
+    // `relative` n'est pas décoratif : LoadingButton monte son spinner dans une
+    // couche `absolute inset-0`, qui prend le bouton pour référence. React
+    // l'ajoute lui-même à la racine du bouton, la coquille n'a que ce plan —
+    // l'omettre faisait diverger les classes de la MÊME boîte sur /login et
+    // /register (sonde e2e/classes-coquille-react.spec.js, 17/10/2026).
+    boutonClass: 'relative bouton bouton-encre w-full',
     encadreLegalClass: 'encart space-y-2',
     legalNoticeClass: 'text-sm font-semibold text-stone-900',
     legalLienClass: 'inline-flex items-center text-sm font-medium text-orange-700 underline underline-offset-2 hover:text-orange-800',
@@ -772,6 +777,9 @@ export const PAGE_SECTIONS = {
     champTelephoneClass: CHAMP_TELEPHONE,
     champPrefixeClass: CHAMP_PREFIXE,
     selecteurPaysClass: CHAMP_SELECTEUR,
+    // Même plan de bouton que /login : la coquille publie le même `<button>`
+    // que React, `relative` compris (spinner de LoadingButton).
+    boutonClass: 'relative bouton bouton-encre w-full',
     titleKey: 'title',
     subtitleKey: 'subtitle',
     detectingLocationKey: 'detectingLocation',

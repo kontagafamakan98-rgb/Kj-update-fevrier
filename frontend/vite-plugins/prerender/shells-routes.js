@@ -380,7 +380,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<label class="flex items-start gap-3 cursor-pointer"><input type="checkbox" readonly class="mt-1 h-4 w-4 rounded-sm border-gray-300 text-orange-600" /><span class="text-sm text-gray-700">${esc(registerT('legalConsentLabel'))}</span></label>`
       + `<p class="text-xs text-stone-600">${esc(registerT('legalContactLine'))}</p>`
       + `</div>`
-      + `<div class="bloc-differe-envoi"><button type="submit" class="bouton bouton-encre w-full">${esc(registerT('continueButton'))}</button></div>`
+      + `<div class="bloc-differe-envoi"><button type="submit" class="${registerPlan.boutonClass}">${esc(registerT('continueButton'))}</button></div>`
       + `<div class="bloc-differe-lien text-center"><span class="text-sm text-stone-600">${esc(registerT('signInPrompt'))} <span class="font-semibold text-orange-700 underline underline-offset-2 hover:text-orange-600 transition-colors">${esc(T('signIn'))}</span></span></div>`
       + `</form>`
       + `</div></div></div>`,

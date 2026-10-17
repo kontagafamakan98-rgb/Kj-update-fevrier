@@ -327,10 +327,11 @@ if (register) {
     );
   }
   // Le bouton d'envoi lit `.bouton` depuis le 17/10/2026 (même dessin que le
-  // bouton de /login) : la chaîne suit le balisage LIVRÉ, comme pour le h1 —
-  // retenir `bg-orange-600` ferait rougir la coquille sur une teinte que la
-  // page a quittée.
-  if (!register.includes(`class="bouton bouton-encre w-full">${registerT('continueButton')}</button>`)) {
+  // bouton de /login) et ses classes viennent du PLAN de /register, lu par la
+  // page comme par la coquille : les deux canaux ne peuvent plus diverger (un
+  // `relative` manquant côté coquille faisait rougir la sonde des classes
+  // calculées sur /login ET /register).
+  if (!register.includes(`class="${PAGE_SECTIONS['/register'].boutonClass}">${registerT('continueButton')}</button>`)) {
     errors.push('register.html : bouton submit (classes du site) absent du shell');
   }
   // Champs du formulaire (les LCP/paint du formulaire complet avant React) :
