@@ -292,11 +292,13 @@ Garde : `tests/test_live_stream.py` (serveur), `frontend/src/services/__tests__/
 
 ## 6. Ce qui casse *avant* le CPU (à corriger en premier)
 
-1. **`fly.toml` : une seule machine, 1 vCPU, 256 Mo, `min_machines_running = 1`.**
+1. **`fly.toml` : une seule machine, 1 vCPU, 512 Mo, `min_machines_running = 1`.**
    `hard_limit` valait **50 connexions** simultanées par machine — avec le flux
    SSE, chaque session en tient une, donc 50 aurait plafonné le produit à ~50
-   utilisateurs connectés. Relevé à **800** (`soft_limit` 400) en même temps
-   que le passage au push. Pour 100k comptes : `min_machines_running ≥ 2`, et
+   utilisateurs connectés. Il a été relevé à **800** au passage au push… sur
+   **256 Mo**, c'est-à-dire une promesse que la RAM ne tenait pas (voir
+   §6.1bis). Il vaut aujourd'hui **400** (`soft_limit` 200) sur 512 Mo. Pour
+   100k comptes : `min_machines_running ≥ 2`, et
    **`WEB_CONCURRENCY > 1` exige `REDIS_URL`** (garde de démarrage dans
    `kojo_settings.py` : sans Redis le rate-limit serait multiplié par le nombre
    de workers — et le bus SSE, lui, ne franchirait pas la frontière du process).
@@ -318,6 +320,47 @@ Garde : `tests/test_live_stream.py` (serveur), `frontend/src/services/__tests__/
    connexions (pool Motor par défaut) ; les index de `kojo_db` doivent être
    vérifiés sur le palier réel (le banc ne les mesure pas).
 
+### 6.1bis. Ce que la RAM tient vraiment — mesuré le 18/10/2026
+
+Une limite de connexions n'est pas une opinion : c'est
+`(RAM × 0,75 − base) ÷ coût mesuré d'une session`. Le banc
+`scripts/charge/mesure_memoire_flux.py` relève le RSS du serveur à 0, 100, 200
+et 400 flux **ouverts** (`serveur_mesure.py`, base en mémoire) :
+
+| Flux ouverts | RSS |
+|---:|---:|
+| 0 | 166,6 Mo |
+| 100 | 182,9 Mo |
+| 200 | 220,5 Mo |
+| 400 | 243,6 Mo |
+
+Le coût **marginal** est de **276 Ko** en moyenne pondérée, **385 Ko au pire
+palier** — et c'est le pire qui décide (l'allocateur ne rend pas la mémoire
+d'un palier fermé, une moyenne effacerait le palier qui a coûté cher). La base
+de 166 Mo vient d'un poste Windows, donc c'est un **majorant** : l'interpréteur
+Linux de l'image est plus léger.
+
+| Config | Calcul | Verdict |
+|---|---|---|
+| 256 Mo / 800 | 166,6 + 800 × 0,385 = **474 Mo** pour 192 Mo | impossible (état d'avant le 18/10) |
+| 512 Mo / 800 | 474 Mo pour 384 Mo | encore au-dessus |
+| **512 Mo / 400** | 166,6 + 400 × 0,385 = **320 Mo** pour 384 Mo | **retenu** (83 % du budget) |
+
+D'où `memory_mb = 512`, `hard_limit = 400`, `soft_limit = 200`, et
+`KOJO_SSE_MAX_TOTAL = 400` **dans `[env]`** : le plafond applicatif ne promet
+plus 1000 flux à un process que la plateforme arrête à 400. Le refus devient
+alors le 503 nommé du produit (`Retry-After`), pas un OOM choisi par Fly — et
+comme `soft_limit` fait ajouter une machine avant la limite dure, l'échelle
+vient de l'horizontal, pas d'une promesse plus grosse.
+
+Ce que cette mesure ne dit pas : le coût d'un flux qui **reçoit** des
+événements (le banc mesure des flux immobiles), le RSS de l'image Linux
+elle-même (majorant), et la mémoire de MongoDB. La mesure est écrite dans
+`backend/scripts/charge/mesure_memoire.json` et **relue** par
+`backend/tests/test_dimensionnement_machine.py` : un `hard_limit` au-dessus de
+la RAM fait rougir le test (vérifié en sens inverse le 18/10 : 800/256 →
+« la machine ne tiendra pas ce qu'elle annonce »).
+
 ---
 
 ## 7. Ce que le banc a changé dans le produit
@@ -333,7 +376,9 @@ Garde : `tests/test_live_stream.py` (serveur), `frontend/src/services/__tests__/
 | `kojo_routers_notifications.py`, `kojo_routers_messages.py` | `GET /notifications/stream` et `GET /messages/stream` ; le message est poussé à l'envoi |
 | `kojo_shared.py` | `store_notification` publie la ligne APRÈS l'avoir stockée (identifiant serveur dans le flux) |
 | `NotificationContext.js`, `Messages.js` | sondages de 30 s / 15 s / 5 s remplacés par un flux ; repli à 60 s seulement s'il tombe |
-| `fly.toml` | `hard_limit` 50 → 800 connexions (une session SSE en tient une) |
+| `fly.toml` | `hard_limit` 50 → 800 → **400 sur 512 Mo** (une session SSE tient une connexion), dimensionné par `mesure_memoire_flux.py` (§6.1bis) |
+| `scripts/charge/mesure_memoire_flux.py` | banc : RSS par palier de flux ouverts, coût marginal et pire palier, `mesure_memoire.json` |
+| `tests/test_dimensionnement_machine.py` | garde : la config ne promet pas plus que `base + hard_limit × coût_pire ≤ RAM × 0,75` |
 | `scripts/charge/mesure_push.py` | banc : débit et p95 avec/sans 200 connexions ouvertes, flux muets ou publiés, bus actif ou non (§5) |
 | `scripts/charge/serveur_mesure.py` | `--bus memoire` (pub/sub en mémoire, protocole `redis.asyncio`), `POST /_mesure/publier`, `GET /_mesure/bus` (§5) |
 
