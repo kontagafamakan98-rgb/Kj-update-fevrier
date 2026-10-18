@@ -1342,10 +1342,24 @@ export const PAGE_SECTIONS = {
     sectionTitleClass: 'titre-entree mb-2',
     sectionBodyClass: 'text-stone-600',
     sectionWrapClass: 'bloc-de-section',
+    // Trois sections AJOUTÉES le 18/10/2026, toutes dérivées du comportement
+    // réel du produit, pas d'un modèle de document :
+    //   * cookies — les seuls cookies posés sont la session httpOnly et le
+    //     jeton CSRF (cf. `set_auth_cookies`), et la mesure d'audience est
+    //     désormais CONDITIONNÉE au consentement (`src/utils/consent.js`) ;
+    //   * annulation et remboursement — `DELETE /jobs/{id}` rembourse le
+    //     séquestre tant que le versement n'est pas parti, et refuse ensuite
+    //     (409) : la page dit exactement cette règle ;
+    //   * âge minimum — 18 ans, la politique que l'inscription applique.
+    // La coquille pré-rendue lit CES sections (shells-routes.js) : les ajouter
+    // ici les publie aussi sans JavaScript. Aucun texte n'est recopié ailleurs.
     sections: [
       { titleKey: 'termsServiceTitle', bodyKey: 'termsServiceBody' },
       { titleKey: 'termsAccountTitle', bodyKey: 'termsAccountBody' },
       { titleKey: 'termsPaymentTitle', bodyKey: 'termsPaymentBody' },
+      { titleKey: 'termsRefundTitle', bodyKey: 'termsRefundBody' },
+      { titleKey: 'termsCookiesTitle', bodyKey: 'termsCookiesBody' },
+      { titleKey: 'termsAgeTitle', bodyKey: 'termsAgeBody' },
       { titleKey: 'termsLiabilityTitle', bodyKey: 'termsLiabilityBody' },
     ],
     links: [

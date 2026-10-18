@@ -108,6 +108,11 @@ SENSITIVE_KEYS = {
 # non vide dans le code, donc posable sans être exigée).
 OPTIONAL_KEYS = {
     "SENTRY_DSN", "PAYMENT_COMMISSION_RATE", "CORS_ORIGINS", "REDIS_URL",
+    # Bus temps réel (Redis pub/sub) : les deux réglages ont un défaut de repli
+    # dans `kojo_live` (canal `kojo:live`, tampon de 1000). Le bus lui-même
+    # n'existe que si `REDIS_URL` est posé — leur absence sur Fly n'est donc
+    # pas une divergence doc↔prod, seulement un réglage laissé au défaut.
+    "KOJO_LIVE_BUS_CHANNEL", "KOJO_LIVE_BUS_QUEUE",
     "BREVO_SENDER_NAME", "BREVO_REPLY_TO_EMAIL",
     "EMAIL_OTP_EXPIRY_MINUTES", "EMAIL_OTP_MAX_ATTEMPTS",
     "EMAIL_OTP_RESEND_COOLDOWN_SECONDS", "EMAIL_VERIFICATION_TOKEN_MINUTES",

@@ -1,0 +1,205 @@
+# -*- coding: utf-8 -*-
+"""La sonde de sauvegardes Atlas juge des FAITS, et refuse de juger sans eux.
+
+Ce que ces cas verrouillent, et pourquoi chacun existe :
+
+  * `backupEnabled` seul ne suffit pas — un cluster peut sauvegarder par
+    snapshots et n'avoir AUCUNE restauration continue (PITR). C'est le cas
+    piégeux : la case « Cloud Backup » est cochée, le RPO est de plusieurs
+    heures ;
+  * un palier partagé (M0/M2/M5) ne fournit pas PITR : dire « activez PITR »
+    serait un remède impossible. Le message doit nommer le palier ;
+  * une réponse sans les deux champs (schéma déplacé, corps tronqué) ne vaut
+    PAS « sauvegarde désactivée » : la sonde doit se taire et sortir en 2,
+    sinon elle crierait au loup — ou, pire, passerait pour un vert ;
+  * 401/403/404/réseau = prémisse, aucun verdict. Une surface aveugle se
+    déclare ;
+  * le workflow quotidien lance bien cette sonde, sans `continue-on-error`
+    (une étape qui ne peut pas échouer ne surveille rien) ;
+  * le runbook est DATÉ et dit ce qu'il ne prouve pas.
+"""
+import importlib.util
+import os
+from pathlib import Path
+
+import pytest
+
+RACINE = Path(__file__).resolve().parents[2]
+SCRIPT = RACINE / "backend" / "scripts" / "check_atlas_backups.py"
+WORKFLOW = RACINE / ".github" / "workflows" / "atlas-backups-probe.yml"
+RUNBOOK = RACINE / "backend" / "SAUVEGARDES_ATLAS.md"
+
+
+def _charger():
+    spec = importlib.util.spec_from_file_location("check_atlas_backups", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.fixture(scope="module")
+def sonde():
+    return _charger()
+
+
+def _cluster(backup=True, pit=True, palier="M10"):
+    return {
+        "name": "kojo-prod",
+        "backupEnabled": backup,
+        "pitEnabled": pit,
+        "replicationSpecs": [
+            {"regionConfigs": [{"electableSpecs": {"instanceSize": palier}}]}
+        ],
+    }
+
+
+# ── Ce que la sonde juge ────────────────────────────────────────────────────
+
+def test_sauvegardes_et_pitr_actives_donnent_un_vert(sonde):
+    code, lignes = sonde.analyser(200, _cluster())
+    texte = "\n".join(lignes)
+    assert code == 0
+    assert "backupEnabled=True" in texte and "pitEnabled=True" in texte
+    assert "PITR" in texte
+
+
+def test_pitr_desactivee_fait_echouer_en_la_nommant(sonde):
+    code, lignes = sonde.analyser(200, _cluster(pit=False))
+    texte = "\n".join(lignes)
+    assert code == 1
+    assert "CONTINUE" in texte and "PITR" in texte
+    assert "M10" in texte  # le palier qui la permet est nommé
+
+
+def test_un_palier_partage_est_nomme_au_lieu_de_recevoir_un_remède_impossible(sonde):
+    code, lignes = sonde.analyser(200, _cluster(pit=False, palier="M0"))
+    texte = "\n".join(lignes)
+    assert code == 1
+    assert "M0" in texte
+    assert "ne la fournit pas" in texte
+
+
+def test_sauvegardes_desactivees_font_echouer(sonde):
+    code, lignes = sonde.analyser(200, _cluster(backup=False))
+    assert code == 1
+    assert "DÉSACTIVÉES" in "\n".join(lignes)
+
+
+def test_un_champ_absent_ne_se_lit_pas_desactive_mais_illisible(sonde):
+    """Un schéma déplacé rend la sonde muette ET bruyante, jamais verte."""
+    code, lignes = sonde.analyser(200, {"name": "kojo-prod"})
+    assert code == 2
+    assert "refuse de conclure" in "\n".join(lignes)
+
+
+def test_un_booleen_sous_forme_de_chaine_est_refuse(sonde):
+    """`"true"` n'est pas `true` : deviner ferait un faux vert."""
+    document = _cluster()
+    document["pitEnabled"] = "true"
+    code, _ = sonde.analyser(200, document)
+    assert code == 2
+
+
+def test_cle_refusee_est_une_premisse(sonde):
+    code, lignes = sonde.analyser(401, {})
+    texte = "\n".join(lignes)
+    assert code == 2
+    assert "prémisse" in texte.lower() or "PREMISSE" in texte
+    assert "aucun verdict" in texte.lower()
+
+
+def test_cluster_introuvable_est_une_premisse(sonde):
+    code, lignes = sonde.analyser(404, {})
+    assert code == 2
+    assert "introuvable" in "\n".join(lignes)
+
+
+def test_atlas_injoignable_est_une_premisse(sonde):
+    code, lignes = sonde.analyser(None, "Connection refused")
+    assert code == 2
+    assert "injoignable" in "\n".join(lignes)
+
+
+def test_corps_non_json_est_une_premisse(sonde):
+    code, _ = sonde.analyser(200, "<html>403</html>")
+    assert code == 2
+
+
+# ── Le point d'entrée ───────────────────────────────────────────────────────
+
+VARIABLES = ("ATLAS_PUBLIC_KEY", "ATLAS_PRIVATE_KEY", "ATLAS_PROJECT_ID", "ATLAS_CLUSTER")
+
+
+def test_sans_cles_la_sonde_sort_en_2_en_nommant_ce_qui_manque(sonde, monkeypatch, capsys):
+    for nom in VARIABLES:
+        monkeypatch.delenv(nom, raising=False)
+    monkeypatch.setattr("sys.argv", ["check_atlas_backups.py"])
+    code = sonde.main()
+    capture = capsys.readouterr()
+    assert code == 2
+    assert "ATLAS_PUBLIC_KEY" in capture.err
+    assert "aucun verdict" in capture.err.lower()
+
+
+def test_avec_cles_le_verdict_de_l_api_est_rendu(sonde, monkeypatch, capsys):
+    for nom in VARIABLES:
+        monkeypatch.setenv(nom, "valeur-de-test")
+    monkeypatch.setattr("sys.argv", ["check_atlas_backups.py"])
+    monkeypatch.setattr(sonde, "lire_cluster", lambda *a, **k: (200, _cluster(pit=False), ""))
+    code = sonde.main()
+    capture = capsys.readouterr()
+    assert code == 1
+    assert "::error title=Sauvegardes Atlas désactivées::" in capture.out
+
+
+def test_le_chemin_interroge_porte_le_projet_et_le_cluster(sonde):
+    """Le projet et le cluster viennent de l'environnement, pas d'une valeur en dur."""
+    url = sonde.url_cluster("projet-42", "cluster-kojo")
+    assert url == (
+        "https://cloud.mongodb.com/api/atlas/v2/groups/projet-42/clusters/cluster-kojo"
+    )
+
+
+# ── Le câblage : le workflow et le runbook ──────────────────────────────────
+
+def test_le_workflow_lance_la_sonde_chaque_jour_et_peut_echouer():
+    texte = WORKFLOW.read_text(encoding="utf-8")
+    assert "schedule:" in texte and "cron:" in texte
+    assert "backend/scripts/check_atlas_backups.py" in texte
+    assert "continue-on-error" not in texte, (
+        "une étape qui ne peut pas échouer ne surveille rien"
+    )
+    assert "ATLAS_PUBLIC_KEY" in texte and "secrets." in texte
+    assert "workflow_dispatch" in texte
+
+
+def test_le_workflow_epingle_ses_actions_a_une_version():
+    import re
+    texte = WORKFLOW.read_text(encoding="utf-8")
+    references = re.findall(r"uses:\s*([^\s#]+)", texte)
+    assert references, "aucune action référencée : le câblage ne tournerait pas"
+    for reference in references:
+        assert re.search(r"@v?\d+(\.\d+)*$|@[0-9a-f]{7,40}$", reference), (
+            f"référence non épinglée : {reference}"
+        )
+
+
+def test_le_runbook_est_date_et_dit_ce_qu_il_ne_prouve_pas():
+    texte = RUNBOOK.read_text(encoding="utf-8")
+    assert "18/10/2026" in texte, "un exercice sans date ne prouve rien"
+    assert "exit" in texte.lower() or "code" in texte.lower()
+    for code in ("**0**", "**1**", "**2**"):
+        assert code in texte, f"sortie {code} non documentée"
+    assert "n'a pas été exécuté" in texte, (
+        "le runbook doit dire que le chemin Atlas/PITR n'a pas été exercé"
+    )
+    assert "mongorestore" in texte and "mongodump" in texte
+    for nom in VARIABLES:
+        assert nom in texte, f"secret {nom} non documenté"
+
+
+def test_le_runbook_ne_contient_aucun_secret():
+    """Un runbook qui cite une clé est une fuite, même en exemple crédible."""
+    texte = RUNBOOK.read_text(encoding="utf-8")
+    assert "mongodb+srv://" not in texte, "une URL Atlas réelle ne se documente pas ici"
+    assert not os.environ.get("ATLAS_PRIVATE_KEY"), "prémisse de test : aucune clé ne doit être posée"

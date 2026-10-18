@@ -1,13 +1,25 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { notificationAPI } from '../services/api';
+import { openLiveStream } from '../services/liveStream';
 import { useAuth } from './AuthContext';
 import { devLog, safeLog } from '../utils/env';
 import { VERS_LE_BAS } from '../components/notificationPanelPlacement';
 
 const NotificationContext = createContext();
 
-// Intervalle de polling pour le compteur non-lus (en ms)
-const POLL_INTERVAL_MS = 30_000; // 30 secondes
+// ── Le compteur n'est plus interrogé à l'horloge ────────────────────────────
+// Chaque session connectée appelait `/notifications/unread-count` toutes les
+// 30 s, soit 2 requêtes par minute et par session, pour ne rien apprendre la
+// plupart du temps (mesuré : `SCALING.md` §5). Le serveur POUSSE désormais
+// (/notifications/stream, voir `kojo_live.py`) : le premier événement `ready`
+// porte le compteur exact, et chaque notification est ensuite annoncée.
+//
+// FALLBACK_POLL_MS ne sert QUE si le flux est tombé ou refusé (503, proxy qui
+// tamponne, réseau). Il est délibérément BASSE FRÉQUENCE : un repli aussi
+// bavard que l'ancien sondage rendrait le remplacement inutile le jour où le
+// flux ne passe pas. Une seconde après la coupure, le repli relit une fois —
+// l'utilisateur ne voit pas de trou — puis il se tait une minute.
+const FALLBACK_POLL_MS = 60_000; // 1 minute, seulement sans flux
 
 /**
  * Le serveur dit-il « je n'ai pas cette ligne » (404) ?
@@ -56,7 +68,16 @@ export function NotificationProvider({ children }) {
   // échoue en silence laissait l'utilisateur devant une liste qui ne bouge
   // pas, sans savoir s'il a mal visé ou si le serveur a refusé.
   const [actionError, setActionError] = useState(null);
-  const pollRef = useRef(null);
+  // Identifiants DÉJÀ vus par un canal temps réel (SSE) ou push. Sans ce
+  // registre, la même notification arrivée par les DEUX canaux (push du service
+  // worker et flux ouvert) serait comptée deux fois : les deux événements
+  // peuvent tomber dans le même rendu, et `notifications` n'est alors pas encore
+  // à jour. Le registre rend la déduplication vraie même dans cette course.
+  const vusRef = useRef(new Set());
+  // Dernière liste connue, lue par `addLocalNotification` sans en faire une
+  // dépendance : une dépendance sur `notifications` changeait l'identité de la
+  // fonction à chaque liste reçue, donc ROUVRAIT le flux à chaque événement.
+  const notificationsRef = useRef([]);
 
   // ----- Chargement de toutes les notifications -----
   const fetchNotifications = useCallback(async () => {
@@ -73,33 +94,32 @@ export function NotificationProvider({ children }) {
     }
   }, [user]);
 
-  // ----- Polling léger du compteur non-lus -----
+  // ----- Repli : lecture du compteur non-lus quand le flux est indisponible -----
   const pollUnreadCount = useCallback(async () => {
     if (!user) return;
     try {
       const res = await notificationAPI.getUnreadCount();
       setUnreadCount(res.unread_count ?? 0);
     } catch (_) {
-      // Silencieux — ne pas perturber l'UI pour un polling
+      // Silencieux — un repli qui échoue ne doit pas perturber l'UI
     }
   }, [user]);
 
-  // Démarre / arrête le polling selon la présence d'un utilisateur connecté
+  // La liste affichée est la dernière reçue (lue hors dépendances).
+  useEffect(() => {
+    notificationsRef.current = notifications;
+  }, [notifications]);
+
+  // Déconnexion : rien du compte précédent ne doit rester à l'écran (ni le
+  // registre des identifiants vus, sinon une notification du même identifiant
+  // serait ignorée après reconnexion).
   useEffect(() => {
     if (!user) {
       setNotifications([]);
       setUnreadCount(0);
-      if (pollRef.current) clearInterval(pollRef.current);
-      return;
+      vusRef.current.clear();
     }
-
-    fetchNotifications();
-    pollRef.current = setInterval(pollUnreadCount, POLL_INTERVAL_MS);
-
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, [user, fetchNotifications, pollUnreadCount]);
+  }, [user]);
 
   // ----- Ouvrir le panneau → marquer le fetch comme frais -----
   const openPanel = useCallback((conteneur, sensDeclare) => {
@@ -240,10 +260,22 @@ export function NotificationProvider({ children }) {
   // serveur) remplace l'entrée existante au lieu d'en créer une deuxième, sinon
   // supprimer la ligne en laisserait une copie à l'écran.
   const addLocalNotification = useCallback((notif) => {
+    if (!notif?.id) return;
+    // Le registre décide AVANT les setters : deux canaux (push + SSE) peuvent
+    // annoncer la même ligne dans le même rendu, où `notifications` n'a pas
+    // encore bougé — une comparaison sur la liste la compterait deux fois.
+    const dejaVue = vusRef.current.has(notif.id);
+    vusRef.current.add(notif.id);
+    if (vusRef.current.size > 200) {
+      // Borne : la plus ancienne entrée sort (l'ordre d'insertion est garanti).
+      const plusAncienne = vusRef.current.values().next().value;
+      vusRef.current.delete(plusAncienne);
+    }
+
     // Le compteur se règle EN DEHORS de l'updater : React exige des updaters
     // purs (il les rejoue en mode strict), et un état modifié depuis l'un d'eux
     // compterait deux fois.
-    const existante = notifications.find(n => n.id === notif.id);
+    const existante = notificationsRef.current.find(n => n.id === notif.id);
     setNotifications(prev => {
       const index = prev.findIndex(n => n.id === notif.id);
       if (index === -1) return [notif, ...prev];
@@ -251,10 +283,73 @@ export function NotificationProvider({ children }) {
       suite[index] = { ...suite[index], ...notif };
       return suite;
     });
-    if (!notif.is_read && !existante?.is_read) {
+    if (!dejaVue && !notif.is_read && !existante?.is_read) {
       setUnreadCount(prev => prev + 1);
     }
-  }, [notifications]);
+  }, []);
+
+  // ----- PUSH (SSE) : le temps réel remplace le sondage -----------------------
+  // Le flux est ouvert UNE fois par session connectée et refermé au démontage
+  // ou à la déconnexion. Tant qu'il vit, aucune requête périodique ne part :
+  // c'est le serveur qui annonce. S'il tombe (ou est refusé), on relit le
+  // compteur une fois tout de suite, puis à basse fréquence — le produit
+  // continue de fonctionner sans flux, il ne se tait pas.
+  useEffect(() => {
+    if (!user) return undefined;
+
+    let demonte = false;
+    let repli = null;
+
+    const arreterRepli = () => {
+      if (repli !== null) {
+        clearInterval(repli);
+        repli = null;
+      }
+    };
+
+    const demarrerRepli = () => {
+      if (repli !== null || demonte) return;
+      pollUnreadCount();
+      repli = setInterval(pollUnreadCount, FALLBACK_POLL_MS);
+    };
+
+    // La liste complète se charge à l'ouverture de session : le flux ne porte
+    // que le compteur et les nouvelles lignes, pas l'historique.
+    fetchNotifications();
+
+    const fermer = openLiveStream('/notifications/stream', {
+      onStatus: (statut) => {
+        if (demonte) return;
+        if (statut === 'open') arreterRepli();
+        else if (statut === 'down') demarrerRepli();
+        else if (statut === 'closed') arreterRepli();
+      },
+      onEvent: (nom, data) => {
+        if (demonte) return;
+        if (nom === 'ready') {
+          // État EXACT au branchement : pas besoin d'un appel de compteur.
+          if (typeof data?.unread_count === 'number') setUnreadCount(data.unread_count);
+          return;
+        }
+        if (nom === 'resync') {
+          // Le flux a pris du retard (file pleine) : on relit la vérité au lieu
+          // de deviner ce qui a été manqué.
+          fetchNotifications();
+          return;
+        }
+        if (nom === 'notification' && data?.notification) {
+          addLocalNotification(data.notification);
+          if (typeof data.unread_count === 'number') setUnreadCount(data.unread_count);
+        }
+      },
+    });
+
+    return () => {
+      demonte = true;
+      arreterRepli();
+      fermer();
+    };
+  }, [user, fetchNotifications, pollUnreadCount, addLocalNotification]);
 
   const value = {
     notifications,

@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { messagesAPI } from '../services/apiEndpoints';
 import { handleApiError } from '../services/api';
+import { openLiveStream } from '../services/liveStream';
 import { MessagesSkeleton } from '../components/SkeletonLoader';
 import Link from '../components/LienVue';
 // Le cadre de page (largeur, gouttière, pas) a UN propriétaire —
@@ -32,6 +33,13 @@ export default function Messages() {
   const messagesEndRef = useRef(null);
   const lastMessageCountRef = useRef(0);
   const messagesCountRef = useRef(0);
+  // Lu par l'écouteur du flux SSE : un événement peut arriver n'importe quand,
+  // et il doit voir l'état du DERNIER rendu (fil ouvert, liste chargée), pas
+  // celui du rendu où le flux a été ouvert.
+  const activeConversationRef = useRef(null);
+  const activeConversationDataRef = useRef(null);
+  const conversationsRef = useRef([]);
+  const operationsRef = useRef({});
 
   const { user } = useAuth();
   const { t, currentLanguage } = useLanguage();
@@ -52,32 +60,6 @@ export default function Messages() {
     }
     lastMessageCountRef.current = messages.length;
   }, [messages]);
-
-  // Rafraîchissement automatique (polling) : sans ça, un message envoyé par
-  // l'autre personne pendant que la conversation est ouverte n'apparaissait
-  // jamais tant qu'on ne rechargeait pas la page manuellement.
-  useEffect(() => {
-    if (!activeConversation) return undefined;
-    const intervalId = setInterval(() => {
-      loadMessages(activeConversation, activeConversationData, {
-        silent: true,
-        offset: 0,
-        order: 'desc',
-        refresh: true
-      });
-    }, 5000);
-    return () => clearInterval(intervalId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeConversation]);
-
-  // Rafraîchit la liste des conversations (aperçus + ordre) même quand
-  // aucune conversation n'est ouverte, pour voir arriver un nouveau message.
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      loadConversations({ silent: true });
-    }, 15000);
-    return () => clearInterval(intervalId);
-  }, []);
 
   const loadConversations = async ({ silent = false } = {}) => {
     try {
@@ -138,6 +120,146 @@ export default function Messages() {
     setMoreError('');
     await loadMessages(activeConversation, activeConversationData, { silent: true, offset: messages.length, order: 'desc', append: true });
   };
+
+  // ── PUSH (SSE) : le fil et la liste ne sont plus relus à l'horloge ────────
+  // Avant : le fil ouvert toutes les 5 s (12 requêtes/min) et la liste des
+  // conversations toutes les 15 s (4/min), pour un utilisateur qui lit ses
+  // messages — jusqu'à 16 requêtes par minute pour ne rien apprendre
+  // (`SCALING.md` §5). Le serveur pousse maintenant chaque message
+  // (`/messages/stream`, voir `kojo_live.py`) : le client ne paie que ce qui
+  // arrive.
+  //
+  // FALLBACK_POLL_MS n'existe que pour le cas où le flux ne passe pas (proxy
+  // qui tamponne, plafond de connexions, réseau) : le produit doit continuer de
+  // fonctionner, à basse fréquence, sans redevenir bavard.
+  const FALLBACK_POLL_MS = 60_000;
+
+  // Le registre des chargements suit chaque rendu : un écouteur d'événement lit
+  // TOUJOURS la version à jour, sans recréer le flux à chaque changement d'état
+  // (une reconnexion par événement serait pire que l'ancien sondage).
+  useEffect(() => {
+    operationsRef.current = { loadConversations, loadMessages };
+  });
+
+  useEffect(() => {
+    activeConversationRef.current = activeConversation;
+    activeConversationDataRef.current = activeConversationData;
+  }, [activeConversation, activeConversationData]);
+
+  useEffect(() => {
+    conversationsRef.current = conversations;
+  }, [conversations]);
+
+  /**
+   * Un message poussé : soit le fil est ouvert (on le relit — c'est CETTE
+   * lecture qui marque les messages lus, donc le badge de l'interlocuteur se
+   * met à jour), soit la liste se met à jour SUR PLACE (aperçu, ordre,
+   * non-lus).
+   *
+   * L'événement part aussi à l'EXPÉDITEUR (autres appareils du même compte) :
+   * là, l'aperçu se met à jour mais le compteur non-lus NE BOUGE PAS — un
+   * message qu'on a écrit n'est pas un message reçu.
+   *
+   * Une conversation encore inconnue (premier message d'une nouvelle relation)
+   * n'a pas d'interlocuteur à afficher localement : la liste se relit une fois,
+   * à ce moment-là seulement.
+   */
+  const appliquerMessage = (message) => {
+    const ouvert = activeConversationRef.current;
+    if (ouvert && ouvert === message.conversation_id) {
+      operationsRef.current.loadMessages(
+        ouvert,
+        activeConversationDataRef.current,
+        { silent: true, order: 'desc', refresh: true }
+      );
+      return;
+    }
+
+    const recu = message.receiver_id === user.id;
+    const connue = (conversationsRef.current || []).some(
+      (conversation) => conversation._id === message.conversation_id
+    );
+    if (!connue) {
+      operationsRef.current.loadConversations({ silent: true });
+      return;
+    }
+
+    setConversations((prev) => {
+      const cible = prev.find((conversation) => conversation._id === message.conversation_id);
+      if (!cible) return prev;
+      const misAJour = {
+        ...cible,
+        last_message: message.content,
+        last_timestamp: message.timestamp,
+        unread_count: recu ? Number(cible.unread_count || 0) + 1 : Number(cible.unread_count || 0),
+      };
+      // La conversation qui vient de parler remonte en tête, comme le fait le
+      // serveur (`GET /messages/conversations` trie par activité) : sans ça, la
+      // liste cesserait d'être triée jusqu'au prochain rechargement.
+      return [misAJour, ...prev.filter((conversation) => conversation._id !== message.conversation_id)];
+    });
+  };
+
+  useEffect(() => {
+    if (!user) return undefined;
+
+    let demonte = false;
+    let repli = null;
+
+    const arreterRepli = () => {
+      if (repli !== null) {
+        clearInterval(repli);
+        repli = null;
+      }
+    };
+
+    const relireTout = () => {
+      operationsRef.current.loadConversations({ silent: true });
+      const ouvert = activeConversationRef.current;
+      if (ouvert) {
+        operationsRef.current.loadMessages(
+          ouvert,
+          activeConversationDataRef.current,
+          { silent: true, order: 'desc', refresh: true }
+        );
+      }
+    };
+
+    const demarrerRepli = () => {
+      if (repli !== null || demonte) return;
+      relireTout(); // tout de suite : l'utilisateur ne voit pas de trou
+      repli = setInterval(relireTout, FALLBACK_POLL_MS);
+    };
+
+    const fermer = openLiveStream('/messages/stream', {
+      onStatus: (statut) => {
+        if (demonte) return;
+        if (statut === 'open') arreterRepli();
+        else if (statut === 'down') demarrerRepli();
+        else if (statut === 'closed') arreterRepli();
+      },
+      onEvent: (nom, data) => {
+        if (demonte) return;
+        if (nom === 'resync') {
+          relireTout();
+          return;
+        }
+        if (nom !== 'message' || !data?.conversation_id) return;
+        // Le message peut venir d'un AUTRE appareil du même compte :
+        // `appliquerMessage` distingue reçu et envoyé pour le compteur.
+        appliquerMessage(data);
+      },
+    });
+
+    return () => {
+      demonte = true;
+      arreterRepli();
+      fermer();
+    };
+    // `appliquerMessage` ne lit que des refs et des setters stables : il
+    // n'est PAS une dépendance, et l'ajouter rouvrirait le flux à chaque rendu.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   // Conserve la taille affichée pour calculer l'offset de la prochaine page
   // de messages plus anciens.

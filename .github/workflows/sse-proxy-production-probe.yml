@@ -1,0 +1,99 @@
+name: SSE proxy production probe (daily)
+
+# ─── Pourquoi cette sonde est PUBLIÉE, et pas seulement écrite ───────────────
+# Le temps réel du produit passe par deux flux SSE (`/api/notifications/stream`,
+# `/api/messages/stream`). Tout est mesuré SAUF l'intermédiaire qu'ils
+# traversent : en production la page est servie par Vercel et `/api/:path*` est
+# réécrit vers Fly (`frontend/vercel.json`). Un proxy qui TAMPONNE ne casse
+# aucun test du dépôt — le 200 arrive, les octets arrivent, seulement ils
+# arrivent tous à la fin — tandis que le client, lui, juge un flux muet après
+# 15 s sans un octet (`liveStream.js`, `silenceTimeoutMs`) et bascule sur le
+# repli à 60 s. Le produit aurait perdu le temps réel sans un seul rouge.
+#
+# La sonde fait ce qu'un client fait : connexion (`POST /api/auth/login`, le
+# flux accepte `Authorization: Bearer`, donc aucun cookie n'est nécessaire),
+# puis lecture du corps EN FLUX à travers l'origine jugée. Elle rougit si le
+# premier événement arrive au-delà du budget — DÉRIVÉ de l'aller-retour mesuré
+# par le même proxy, et toujours sous la fenêtre de silence du client — ou si le
+# premier battement de cœur est livré dans le même vidage que lui, ce qui est la
+# signature d'un tampon.
+#
+# Elle tourne une fois par jour au lieu de chaque push, à dessein : elle dépend
+# d'un compte réel et d'un réseau public, donc elle ne bloque aucune PR. Mais
+# elle ÉCHOUE (code 1) au lieu de publier une note, parce que ce qu'elle
+# vérifie est un invariant. Code 2 = prémisse (aucun verdict rendu) : compte CI
+# ou secret de contournement absent, connexion refusée.
+#
+# Aucune écriture : la sonde ouvre une session existante et ferme sa connexion.
+on:
+  schedule:
+    # 06:58 UTC : après la sonde de session (06:47), hors des heures pleines.
+    - cron: '58 6 * * *'
+  # Le dispatch sert à juger une AUTRE surface que la production : la même
+  # sonde, la même commande, un `--base` de plus (une preview Vercel).
+  #
+  # PRÉPRODUCTION : une preview du projet est DERRIÈRE l'authentification
+  # Vercel ; sans le jeton « Protection Bypass for Automation », sa page de
+  # connexion répond à la place de l'API. Ce jeton vient d'un SECRET
+  # (`VERCEL_AUTOMATION_BYPASS_SECRET`), jamais d'une entrée de dispatch : une
+  # entrée est publiée dans les journaux du run.
+  #
+  # Sur le cron, les entrées sont vides : la surface jugée reste la production.
+  workflow_dispatch:
+    inputs:
+      site:
+        description: "Origine à traverser (défaut : vide = production)"
+        required: false
+        default: ""
+      direct:
+        description: "Origine de l'API pour le relevé SANS proxy (facultatif, aucun verdict)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Flux SSE à travers le proxy (production)
+    runs-on: ubuntu-latest
+    # Plafond : une origine qui ne répond plus doit rougir, pas patienter
+    # jusqu'à l'abandon du runner (360 min). La sonde s'arrête d'elle-même
+    # après `--attente` (battement + fenêtre client), soit ~35 s par tentative.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      # La sonde refuse de conclure (code 2) en NOMMANT les secrets absents : un
+      # run rouge doit dire quelle variable poser. Le secret de contournement et
+      # le jeton de session ne sont jamais écrits dans une commande (une commande
+      # de `run:` est publiée dans les journaux du run) : la sonde les lit de
+      # l'environnement et n'en publie aucune valeur.
+      - name: Mesurer la traversée du flux SSE (premier événement et battement)
+        working-directory: frontend
+        env:
+          LHCI_CI_EMAIL: ${{ secrets.LHCI_CI_EMAIL }}
+          LHCI_CI_PASSWORD: ${{ secrets.LHCI_CI_PASSWORD }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          SITE_A_JUGER: ${{ inputs.site }}
+          ACCES_DIRECT: ${{ inputs.direct }}
+        run: |
+          arguments=()
+          if [ -n "$SITE_A_JUGER" ]; then
+            arguments+=(--base "$SITE_A_JUGER")
+          fi
+          if [ -n "$ACCES_DIRECT" ]; then
+            arguments+=(--direct "$ACCES_DIRECT")
+          fi
+          node scripts/check-sse-proxy-production.js ${arguments[@]+"${arguments[@]}"}

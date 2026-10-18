@@ -40,6 +40,8 @@
 // Aucun identifiant n'est codé en dur : sans variable d'environnement, ces
 // fonctions sont des no-op stricts (aucune requête, aucune erreur console).
 
+import { hasAnalyticsConsent } from './consent';
+
 const normalize = (value) => String(value || '').trim();
 
 const isEnabled = (value) => normalize(value).length > 0;
@@ -153,6 +155,32 @@ const initGoogleAnalytics = (measurementId) => {
   wrap('pushState');
   wrap('replaceState');
   window.addEventListener('popstate', trackGaPageView);
+};
+
+/**
+ * L'éditeur a-t-il configuré une mesure d'audience ?
+ *
+ * Sert au BANDEAU de consentement : sans fournisseur configuré, il n'y a rien
+ * à demander, donc rien à afficher. Ne dit pas si le chargement est autorisé —
+ * c'est `hasAnalyticsConsent()` (utils/consent.js) qui le décide, et
+ * `initAnalytics` n'est appelé qu'après un accord explicite.
+ */
+export const isAnalyticsConfigured = () =>
+  isEnabled(getPlausibleDomain()) || isEnabled(getGaMeasurementId());
+
+/**
+ * Initialise la mesure d'audience SI ET SEULEMENT SI l'utilisateur a accepté.
+ *
+ * Point d'entrée utilisé par `src/index.js` : le refus (ou l'absence de
+ * décision) n'injecte aucun script tiers. Exporté séparément pour que la règle
+ * soit testable sans monter l'application entière.
+ *
+ * @returns {boolean} vrai si l'analytics a été initialisé.
+ */
+export const initAnalyticsIfConsented = () => {
+  if (!hasAnalyticsConsent()) return false;
+  initAnalytics();
+  return true;
 };
 
 export const initAnalytics = () => {

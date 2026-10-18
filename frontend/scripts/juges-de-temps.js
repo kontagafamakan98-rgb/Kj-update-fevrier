@@ -136,6 +136,19 @@ export const SURFACES = [
     quoi: 'délai global et délais des serveurs de test e2e',
   },
   {
+    // La sonde SSE DÉCIDE sur un temps (le premier événement est-il arrivé à
+    // temps ?), donc elle appartient à cette surface — et sa déclaration est
+    // VIDE parce qu'elle n'a aucun plafond littéral : son budget se DÉRIVE du
+    // contrôle mesuré dans le même passage (aller-retour du MÊME proxy ×6,
+    // plancher 1,5 s, plafond 8 s, toujours sous la fenêtre de silence du
+    // client). Un `timeout: N` ajouté ici demain serait une borne non déclarée,
+    // donc refusé : c'est ce qui empêche le budget dérivé de redevenir un
+    // nombre choisi à la main.
+    chemin: 'frontend/scripts/check-sse-proxy-production.js',
+    motifs: ['timeout'],
+    quoi: 'la sonde de traversée du flux SSE — budget DÉRIVÉ, aucun littéral',
+  },
+  {
     chemin: 'frontend/scripts/check-job-og-contract.js',
     motifs: ['timeout'],
     quoi: 'plafond HTTP de la sonde de contrat OG',
@@ -203,6 +216,14 @@ export const JUGES = {
           "Les trois occurrences sont le délai du test et celui du démarrage des serveurs (coquille + API de fixture). Le verdict d'un cas porte sur une propriété (URL, sélecteur, géométrie), donc la forme est portable ; seule la TAILLE suit la machine, et elle est ici un plafond de vivacité, pas une mesure.",
       },
     ],
+  },
+  'frontend/scripts/check-sse-proxy-production.js': {
+    // VIDE, et c'est le résultat : le budget du premier événement n'est pas
+    // écrit ici, il est DÉRIVÉ du contrôle mesuré par la sonde elle-même
+    // (`budgetDuPremierEvenement`). Il n'y a donc aucune valeur littérale à
+    // déclarer — et la déclaration vide est ce qui empêche un plafond écrit à
+    // la main de revenir en silence.
+    timeout: [],
   },
   'frontend/scripts/check-job-og-contract.js': {
     timeout: [

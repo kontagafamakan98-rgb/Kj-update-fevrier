@@ -47,10 +47,17 @@ primary_region = 'fra'
   min_machines_running = 1
   processes = ['app']
 
+  # CONNEXIONS et non requêtes : les notifications et les messages passent
+  # désormais par un flux SSE (kojo_live.py), donc chaque session connectée
+  # TIENT une connexion au lieu d'envoyer une requête toutes les 30 s. Une
+  # limite à 50 plafonnerait le produit à ~50 utilisateurs simultanés — elle a
+  # été relevée en même temps que le passage au push. `soft_limit` déclenche
+  # l'ajout d'une machine, `hard_limit` refuse au-delà (`KOJO_SSE_MAX_TOTAL`,
+  # 1000 par défaut, est le garde applicatif correspondant).
   [services.concurrency]
     type = 'connections'
-    hard_limit = 50
-    soft_limit = 20
+    hard_limit = 800
+    soft_limit = 400
 
   [[services.ports]]
     port = 80

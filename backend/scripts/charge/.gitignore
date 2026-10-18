@@ -1,0 +1,3 @@
+# Relevés JSON produits par mesure_charge.py : des sorties de mesure, pas des
+# livrables. Les chiffres qui comptent sont recopiés dans backend/SCALING.md.
+resultats/

@@ -352,6 +352,14 @@
       "motif": "la SEULE sonde du dépôt qui juge ce que le NAVIGATEUR garde d'une session : toutes les autres lisent des faits de serveur (HTML servi, /health, préflight CORS). Elle se connecte par le formulaire servi avec le compte CI, recharge la page, puis refuse séparément le justificatif qui n'a pas survécu (correction côté cookie : AUTH_COOKIE_SAMESITE / périmètre) et l'application qui ne le restaure pas (correction côté garde d'amorçage). Les attributs réels de kojo_session sont lus par context.cookies sur /auth/me après connexion et rechargement : HttpOnly=true, Secure=true, SameSite=None, cookie applicable unique ; toute dérive est un refus indépendant du 200. La valeur du cookie n'est jamais publiée. Le relevé de stockage et de cookie lisible reste informatif"
     },
     {
+      "chemin": "frontend/scripts/check-sse-proxy-production.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-sse-proxy-production.test.js",
+      "runner": "vitest",
+      "motif": "la SEULE sonde du dépôt qui juge la TRAVERSÉE du flux SSE, c'est-à-dire l'intermédiaire que tout le reste laisse hors de vue : côté serveur, test_live_stream.py, test_live_bus_deux_workers.py (deux uvicorn réels, un Redis réel) et mesure_push.py exigent le même identifiant des deux côtés du bus ; côté client, liveStream.test.js garde la lecture des octets. Entre les deux, la production fait passer /api/:path* par la réécriture Vercel (frontend/vercel.json), et un proxy qui TAMPONNE ne casse aucun test du dépôt : le 200 arrive, les octets arrivent, seulement à la fin — pendant que le client juge le flux muet après 15 s (liveStream.js, silenceTimeoutMs) et bascule sur le repli à 60 s. La sonde ouvre une session (POST /api/auth/login, le flux accepte Authorization: Bearer, donc aucun cookie n'est requis), lit le corps EN FLUX (jamais response.text(), qui mesurerait le tampon), puis refuse sur trois faits mesurés : le premier événement `ready` au-delà d'un budget DÉRIVÉ de l'aller-retour du même proxy (budgetDuPremierEvenement : contrôle x6, plancher 1,5 s, plafond 8 s, toujours sous la fenêtre de silence du client), le premier `: keepalive` livré dans le MÊME vidage que lui (le serveur les écrit pourtant à KOJO_SSE_HEARTBEAT_SECONDS d'intervalle — c'est la signature du tampon), et un content-encoding non identity (un intermédiaire qui recompresse lit tout). Le statut et le content-type sont jugés aussi, une réponse 503 (plafond du compte) ou une page de protection Vercel ne passant pas pour un flux. Sans compte CI ou sans secret de contournement, elle refuse de conclure (code 2, marque « prémisse (aucun verdict rendu ici) ») au lieu de rendre un vert qu'elle n'a pas mesuré. Une tentative ratée seule ne conclut pas : la sonde réessaie, et un relevé SANS proxy (--direct) est publié comme comparaison, jamais comme verdict. Aucune valeur de jeton n'est publiée. Ce qu'elle ne juge pas est écrit : la lecture côté client, la reconnexion et le plafond du compte ont leurs propres preuves."
+    },
+    {
       "chemin": "frontend/scripts/check-spa-routes.js",
       "role": "garde",
       "invoque_par": "ci",
@@ -687,6 +695,13 @@
       "role": "garde",
       "invoque_par": "ci",
       "preuve": "backend/tests/test_health_probe.py",
+      "runner": "pytest"
+    },
+    {
+      "chemin": "backend/scripts/check_atlas_backups.py",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "backend/tests/test_atlas_backups_probe.py",
       "runner": "pytest"
     },
     {
@@ -2003,6 +2018,27 @@
       "cwd": "backend",
       "attend": [
         "FAILED tests/test_deployed_revision.py::TestVerdict::test_refuse_une_revision_differente_en_nommant_les_deux"
+      ]
+    },
+    {
+      "id": "atlas-backups: pit desactive tolere",
+      "garde": "backend/scripts/check_atlas_backups.py",
+      "cible": "backend/scripts/check_atlas_backups.py",
+      "trouve": "    if not continu:",
+      "remplace": "    if False and not continu:",
+      "runner": "python",
+      "preuve": "backend/tests/test_atlas_backups_probe.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_atlas_backups_probe.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_atlas_backups_probe.py::test_pitr_desactivee_fait_echouer_en_la_nommant"
       ]
     },
     {
@@ -5270,6 +5306,26 @@
       "cwd": "backend",
       "attend": [
         "FAILED tests/test_etat_reference.py::TestPlancher::test_sous_le_plancher_le_garde_refuse_de_conclure"
+      ]
+    },
+    {
+      "id": "sse-proxy: un premier evenement tardif tolere",
+      "garde": "frontend/scripts/check-sse-proxy-production.js",
+      "cible": "frontend/scripts/check-sse-proxy-production.js",
+      "trouve": "premier.aMs > budgetMs",
+      "remplace": "premier.aMs > budgetMs * 1000",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-sse-proxy-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-sse-proxy-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "au-delà du budget de 4000 ms"
       ]
     }
   ]

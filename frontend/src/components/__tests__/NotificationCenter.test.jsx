@@ -55,6 +55,14 @@ vi.mock('../../services/api', () => ({
   },
   handleApiError: (error) => (error?.message || 'Erreur'),
   safeLog: { error: vi.fn(), warn: vi.fn() },
+  // Le provider lit le jeton pour le flux natif : cette doublure n'en porte pas.
+  getAuthToken: () => '',
+}));
+
+// Le temps réel est mesuré par `NotificationStream.test.jsx` : ici le flux ne
+// doit ni se connecter ni réessayer, sinon ce fichier éprouverait le réseau.
+vi.mock('../../services/liveStream', () => ({
+  openLiveStream: () => () => {},
 }));
 
 // Référence STABLE : le vrai `useAuth` rend l'objet `user` de son état, dont

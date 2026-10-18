@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import io
 import jwt
@@ -98,13 +99,21 @@ async def _exchange_google_code(code: str, origin: Optional[str] = None) -> dict
 
     token_url = "https://oauth2.googleapis.com/token"
     try:
-        resp = requests.post(token_url, data={
-            "code": code,
-            "client_id": GOOGLE_CLIENT_ID,
-            "client_secret": GOOGLE_CLIENT_SECRET,
-            "redirect_uri": redirect_uri,
-            "grant_type": "authorization_code",
-        }, timeout=15)
+        # Deux appels `requests` SYNCHRONES (15 s de timeout chacun) : hors de
+        # la boucle, sinon une lenteur Google gèle tout le worker (même défaut
+        # que les envois d'emails, mesuré par backend/scripts/charge).
+        resp = await asyncio.to_thread(
+            requests.post,
+            token_url,
+            data={
+                "code": code,
+                "client_id": GOOGLE_CLIENT_ID,
+                "client_secret": GOOGLE_CLIENT_SECRET,
+                "redirect_uri": redirect_uri,
+                "grant_type": "authorization_code",
+            },
+            timeout=15,
+        )
         resp.raise_for_status()
         token_data = resp.json()
     except requests.RequestException as exc:
@@ -118,7 +127,8 @@ async def _exchange_google_code(code: str, origin: Optional[str] = None) -> dict
     # Vérification de l'id_token via l'endpoint tokeninfo de Google (vérifie
     # la signature ET l'audience). On n'utilise pas le payload du client.
     try:
-        verify_resp = requests.get(
+        verify_resp = await asyncio.to_thread(
+            requests.get,
             GOOGLE_TOKENINFO_URL,
             params={"id_token": id_token},
             timeout=15,

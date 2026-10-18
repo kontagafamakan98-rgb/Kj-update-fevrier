@@ -4,16 +4,20 @@ import "./index.css";
 import App from "./App";
 import * as serviceWorkerRegistration from "./serviceWorkerRegistration";
 import { initSentryOnInteraction } from "./utils/sentry";
-import { initAnalytics } from "./utils/analytics";
+import { initAnalyticsIfConsented } from "./utils/analytics";
 
 // Sentry : armé tout de suite (tampon des erreurs précoces + écouteurs
 // passifs) mais le SDK n'est TÉLÉCHARGÉ qu'à la première interaction, pour ne
 // pas concurrencer le premier rendu. No-op si VITE_SENTRY_ENABLED != 'true'.
 // Détail et contreparties : utils/sentry.js.
 initSentryOnInteraction();
-// Analytics (no-op si VITE_PLAUSIBLE_DOMAIN non défini — script externe
-// chargé via src, compatible CSP script-src 'self')
-initAnalytics();
+// Analytics : CHARGÉ SEULEMENT APRÈS UN ACCORD explicite (bandeau de
+// consentement, `src/components/ConsentBanner.js`). Sans accord — première
+// visite, refus, stockage illisible — aucun script tiers n'est injecté, même
+// si l'éditeur a configuré un fournisseur. Le tag GA4 déclaré dans le HTML
+// statique reste INERTE (il n'a pas de `src`) : la sonde SEO continue de le
+// voir, l'utilisateur ne le charge pas.
+initAnalyticsIfConsented();
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 

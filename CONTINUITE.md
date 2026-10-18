@@ -49,6 +49,7 @@ est la seule façon de fermer cet écart ; d'ici là, le tableau dit ce qu'il di
 | `OWNER_EMAIL`, `OWNER_USER_ID` | Secrets Fly | Voir la section 4 (identifiant du compte propriétaire). |
 | `FLY_API_TOKEN` | Secrets GitHub Actions | Régénérer avec `flyctl tokens create deploy` puis remplacer le secret GitHub. |
 | `KOJO_PROBE_IMAP_USER`, `KOJO_PROBE_IMAP_PASSWORD` | Secrets GitHub Actions | Mot de passe d'application Gmail : le révoquer et en créer un nouveau. |
+| `ATLAS_PUBLIC_KEY`, `ATLAS_PRIVATE_KEY`, `ATLAS_PROJECT_ID`, `ATLAS_CLUSTER` | Secrets GitHub Actions (sonde `check_atlas_backups.py`) | Rôle **Project Read Only** sur le projet Atlas, ni plus ni moins — la sonde lit, elle ne modifie rien. Une rotation sans mise à jour rend la sonde muette : elle sort en 2 (**prémisse**), le workflow `atlas-backups-probe.yml` est rouge, et personne ne sait plus si les sauvegardes sont actives. Procédure et exercice : `backend/SAUVEGARDES_ATLAS.md`. |
 | `VITE_API_URL` et autres `VITE_*` | Variables d'environnement Vercel | Rebuild du frontend requis après changement. |
 
 Les valeurs ne figurent **ni dans le dépôt, ni dans les logs, ni dans ce document**.
