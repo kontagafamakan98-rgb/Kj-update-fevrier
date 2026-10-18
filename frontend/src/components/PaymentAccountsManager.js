@@ -5,6 +5,7 @@ import PaymentAccountService from '../services/paymentAccountService';
 import { detectUserCountry, getPhoneExampleForCountry, getPhonePrefixByCountry, getPopularBanksByCountry } from '../services/geolocationService';
 import { mapPaymentAccountErrorToField } from '../utils/paymentAccountErrors';
 import { devLog, safeLog } from '../utils/env';
+import { CHAMP } from '../config/classes-champ';
 import { Landmark } from 'lucide-react';
 
 const PaymentAccountsManager = ({ onSuccess }) => {
@@ -336,14 +337,12 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                 value={accounts.orange_money}
                 onChange={(e) => setAccounts({...accounts, orange_money: e.target.value})}
                 placeholder={`${t('examplePrefix')} ${phoneExample}`}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-hidden focus:ring-2 focus:ring-orange-500 ${
-                  validationErrors.orange_money ? 'border-red-500' : 'border-gray-300'
-                }`}
+                className={`${CHAMP}${validationErrors.orange_money ? ' border-red-500' : ''}`}
               />
               {validationErrors.orange_money && (
-                <p className="text-red-500 text-sm mt-1">{validationErrors.orange_money}</p>
+                <p className="mt-1 text-sm text-red-600">{validationErrors.orange_money}</p>
               )}
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="mt-1 text-sm text-gray-500">
                 {supportedOrangeMoneyCountries}
               </p>
             </div>
@@ -368,7 +367,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
           </div>
           
           {isEditing && isWaveUnavailable ? (
-            <p className="text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
+            <p className="rounded-[3px] border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-600">
               {t('waveUnavailableInYourCountry')}
             </p>
           ) : isEditing ? (
@@ -382,14 +381,12 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                 value={accounts.wave}
                 onChange={(e) => setAccounts({...accounts, wave: e.target.value})}
                 placeholder={`${t('examplePrefix')} ${phoneExample}`}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-hidden focus:ring-2 focus:ring-blue-500 ${
-                  validationErrors.wave ? 'border-red-500' : 'border-gray-300'
-                }`}
+                className={`${CHAMP}${validationErrors.wave ? ' border-red-500' : ''}`}
               />
               {validationErrors.wave && (
-                <p className="text-red-500 text-sm mt-1">{validationErrors.wave}</p>
+                <p className="mt-1 text-sm text-red-600">{validationErrors.wave}</p>
               )}
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="mt-1 text-sm text-gray-500">
                 {t('availableAcrossWestAfrica')}
               </p>
             </div>
@@ -416,7 +413,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
           {isEditing ? (
             <div className="space-y-3">
               <div>
-                <label htmlFor="payment_accounts_bank_account_number" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="payment_accounts_bank_account_number" className="block text-sm font-semibold text-stone-800">
                   {t('accountNumberLabel')} *
                 </label>
                 <input
@@ -430,12 +427,12 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                     bank_account: {...accounts.bank_account, account_number: e.target.value}
                   })}
                   placeholder="123456789012"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-2 focus:ring-gray-500"
+                  className={CHAMP}
                 />
               </div>
               
               <div>
-                <label htmlFor="payment_accounts_bank_name" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="payment_accounts_bank_name" className="block text-sm font-semibold text-stone-800">
                   {t('bankNameLabel')} *
                 </label>
                 <select
@@ -447,7 +444,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                     ...accounts, 
                     bank_account: {...accounts.bank_account, bank_name: e.target.value}
                   })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-2 focus:ring-gray-500"
+                  className={CHAMP}
                 >
                   <option value="">{t('selectBank')}</option>
                   {popularBanks.map((bank, index) => (
@@ -458,7 +455,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
               </div>
               
               <div>
-                <label htmlFor="payment_accounts_bank_account_holder" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="payment_accounts_bank_account_holder" className="block text-sm font-semibold text-stone-800">
                   {t('accountHolderLabel')} *
                 </label>
                 <input
@@ -472,13 +469,13 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                     bank_account: {...accounts.bank_account, account_holder: e.target.value}
                   })}
                   placeholder={t('fullHolderName')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-2 focus:ring-gray-500"
+                  className={CHAMP}
                 />
               </div>
               
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="payment_accounts_bank_code" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="payment_accounts_bank_code" className="block text-sm font-semibold text-stone-800">
                     {t('bankCodeOptional')}
                   </label>
                   <input
@@ -492,12 +489,12 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                       bank_account: {...accounts.bank_account, bank_code: e.target.value}
                     })}
                     placeholder={t('bankCodeOptional')}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-2 focus:ring-gray-500"
+                    className={CHAMP}
                   />
                 </div>
                 
                 <div>
-                  <label htmlFor="payment_accounts_bank_branch" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="payment_accounts_bank_branch" className="block text-sm font-semibold text-stone-800">
                     {t('branchOptional')}
                   </label>
                   <input
@@ -511,13 +508,13 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                       bank_account: {...accounts.bank_account, branch: e.target.value}
                     })}
                     placeholder={t('branchLabel')}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-hidden focus:ring-2 focus:ring-gray-500"
+                    className={CHAMP}
                   />
                 </div>
               </div>
               
               {validationErrors.bank_account && (
-                <p className="text-red-500 text-sm">{validationErrors.bank_account}</p>
+                <p className="mt-1 text-sm text-red-600">{validationErrors.bank_account}</p>
               )}
             </div>
           ) : (
