@@ -17,6 +17,10 @@
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { openLiveStream, isLiveStreamSupported } from '../liveStream';
+import {
+  BATTEMENT_SERVEUR_MS,
+  SILENCE_TIMEOUT_MS,
+} from '../../config/flux-temps-reel';
 
 // Tout flux ouvert est refermé, MÊME si une assertion échoue : un flux laissé
 // vivant relance indéfiniment et retiendrait le worker de test.
@@ -55,6 +59,9 @@ afterEach(() => {
       // déjà fermé
     }
   }
+  // Les cas de silence installent des horloges simulées : sans ce retour, un
+  // cas plus loin hériterait du temps figé et ne mesurerait plus rien.
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -212,6 +219,100 @@ describe('flux SSE — reconnexion', () => {
     expect(statuts).toContain('connecting');
     expect(delais[0]).toBe(1000);
     stop();
+  });
+});
+
+describe('flux SSE — battement du serveur et fenêtre de silence', () => {
+  /** Un corps dont le test pousse les octets lui-même (aucune horloge réelle). */
+  const corpsPilotable = () => {
+    let pousser = () => {};
+    const body = new ReadableStream({
+      start(controller) {
+        pousser = (texte) => controller.enqueue(encodeur.encode(texte));
+      },
+    });
+    return { body, pousser: (texte) => pousser(texte) };
+  };
+
+  it('un flux INACTIF qui reçoit le battement du serveur ne se reconnecte JAMAIS', async () => {
+    vi.useFakeTimers();
+    try {
+      const statuts = [];
+      const { body, pousser } = corpsPilotable();
+      const fetchImpl = vi.fn(async () => ({ ok: true, status: 200, body }));
+      const stop = ouvrir('/notifications/stream', {
+        fetchImpl,
+        onStatus: (statut) => statuts.push(statut),
+      });
+
+      // Neuf battements à l'intervalle EXACT du serveur : 180 s de flux inactif.
+      // C'est le cas réel (personne n'écrit, le serveur n'annonce rien) ; avec
+      // la fenêtre de 15 s d'avant, la première avance de 20 s l'aurait déjà
+      // condamné. La marge doit tenir SANS un seul événement.
+      for (let i = 0; i < 9; i += 1) {
+        await vi.advanceTimersByTimeAsync(BATTEMENT_SERVEUR_MS);
+        pousser(': keepalive\n\n');
+        await vi.advanceTimersByTimeAsync(0);
+      }
+
+      expect(statuts).toEqual(['connecting', 'open']);
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('une fenêtre plus COURTE que le battement déclarait tombé un flux vivant (le défaut mesuré)', async () => {
+    vi.useFakeTimers();
+    try {
+      const statuts = [];
+      const { body } = corpsPilotable();
+      const fetchImpl = vi.fn(async () => ({ ok: true, status: 200, body }));
+      const ANCIENNE_FENETRE_MS = 15000;
+      const stop = ouvrir('/notifications/stream', {
+        fetchImpl,
+        onStatus: (statut) => statuts.push(statut),
+        // L'ANCIENNE valeur, face au battement du serveur : le flux est coupé
+        // AVANT le premier signe de vie, donc rouvert pour rien. Ce cas est là
+        // pour que l'inégalité cassée ne puisse pas revenir sans rouge.
+        silenceTimeoutMs: ANCIENNE_FENETRE_MS,
+        random: () => 0.5,
+      });
+
+      // La fenêtre expire avant le battement : c'est la reconnexion par flux
+      // inactif, et c'est exactement ce que l'alignement supprime.
+      await vi.advanceTimersByTimeAsync(ANCIENNE_FENETRE_MS);
+      expect(BATTEMENT_SERVEUR_MS).toBeGreaterThan(ANCIENNE_FENETRE_MS);
+      expect(statuts).toContain('down');
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('sans aucun octet, le flux est TOUT DE MÊME jugé tombé (la fenêtre reste bornée)', async () => {
+    vi.useFakeTimers();
+    try {
+      const statuts = [];
+      const { body } = corpsPilotable();
+      const fetchImpl = vi.fn(async () => ({ ok: true, status: 200, body }));
+      const stop = ouvrir('/notifications/stream', {
+        fetchImpl,
+        onStatus: (statut) => statuts.push(statut),
+        schedule: () => 0, // on n'exécute pas la reconnexion pendant la mesure
+      });
+
+      // Un proxy qui tamponne rend un 200 puis plus RIEN : allonger la fenêtre
+      // ne doit pas la rendre infinie, sinon le repli ne s'armerait jamais.
+      await vi.advanceTimersByTimeAsync(SILENCE_TIMEOUT_MS);
+
+      expect(statuts).toContain('down');
+      stop();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

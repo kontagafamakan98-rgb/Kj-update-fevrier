@@ -15,9 +15,9 @@
  * Fly (`frontend/vercel.json`) — et un proxy qui TAMPONNE la réponse ne casse
  * aucun test du dépôt : le 200 arrive, les octets arrivent, seulement ils
  * arrivent tous à la fin. Le client de production, lui, juge un flux MUET après
- * 15 s sans un octet (`liveStream.js`, `silenceTimeoutMs = 15000`) : il
- * basculerait alors sur le repli à 60 s, et le produit aurait perdu le temps
- * réel sans qu'un seul rouge ne soit tombé.
+ * `SILENCE_TIMEOUT_MS` sans un octet (`liveStream.js`, 45 s : deux battements
+ * du serveur plus une marge) : il basculerait alors sur le repli à 60 s, et le
+ * produit aurait perdu le temps réel sans qu'un seul rouge ne soit tombé.
  *
  * ─── Ce qu'elle mesure, et à quel endroit ──────────────────────────────────
  * Elle fait ce qu'un client fait : `POST /api/auth/login` pour obtenir un jeton
@@ -37,7 +37,8 @@
  *       littéral choisi à la main : il est DÉRIVÉ du contrôle mesuré dans le
  *       même passage — l'aller-retour de `/api/auth/login` par le MÊME proxy
  *       (`budgetDuPremierEvenement`) — et reste sous la fenêtre de silence du
- *       client (15 s), sinon la sonde serait plus tolérante que le produit.
+ *       client (`SILENCE_TIMEOUT_MS`), sinon la sonde serait plus tolérante que
+ *       le produit.
  *
  *   (B) LE FLUX N'EST PAS TAMPONNÉ. Si le proxy retient la réponse, `ready` et
  *       le premier `: keepalive` sont livrés dans le MÊME vidage : l'écart entre
@@ -52,7 +53,8 @@
  *
  * ─── Ce qu'elle ne juge PAS (et pourquoi c'est écrit) ──────────────────────
  * Ce que le CLIENT fait de ces octets (réassemblage des trames, repli à 60 s,
- * chien de garde à 15 s) est `frontend/src/services/liveStream.js` et ses tests :
+ * chien de garde à `SILENCE_TIMEOUT_MS`) est `frontend/src/services/liveStream.js`
+ * et ses tests :
  * la sonde mesure la TRAVERSÉE, pas la lecture. La reconnexion, le plafond du
  * compte (503 + `Retry-After`) et le fan-out entre workers sont prouvés côté
  * backend. Et si la session manque, la sonde ne juge rien : elle refuse de
@@ -77,13 +79,17 @@
  *   --chemin /api/notifications/stream   flux jugé (défaut)
  *   --direct https://api.kojoforafrica.cc.cd   même flux SANS proxy (comparaison)
  *   --battement 20000                    intervalle du serveur (KOJO_SSE_HEARTBEAT_SECONDS)
- *   --attente 35000                      plafond d'attente du premier battement
+ *   --attente 65000                      plafond d'attente (battement + fenêtre client)
  *   --budget 4000                        force le budget (défaut : DÉRIVÉ du contrôle)
  *   --tentatives 2                       une mesure ratée seule ne conclut pas
  * Codes de sortie : 0 vert, 1 rouge, 2 prémisse (aucun verdict rendu).
  */
 import { pathToFileURL } from 'node:url';
 import { SITE_ORIGIN } from './site-meta.js';
+import {
+  BATTEMENT_SERVEUR_MS,
+  SILENCE_TIMEOUT_MS,
+} from '../src/config/flux-temps-reel.js';
 
 /** La famille de refus, écrite DANS les messages : le journal de CI se relit seul. */
 export const FAMILLE = 'traversée du flux SSE';
@@ -97,16 +103,20 @@ export const BYPASS_HEADER = 'x-vercel-protection-bypass';
 /** Le flux jugé par défaut : `ready` y porte le compteur non lus, sans état préalable. */
 export const CHEMIN_DEFAUT = '/api/notifications/stream';
 
-/** La valeur de `kojo_live.HEARTBEAT_SECONDS` en production (aucune surcharge dans fly.toml). */
-export const BATTEMENT_DEFAUT_MS = 20000;
+/**
+ * La valeur de `kojo_live.HEARTBEAT_SECONDS` en production (aucune surcharge
+ * dans fly.toml). LUE du propriétaire partagé, jamais recopiée : la sonde et le
+ * client ne peuvent pas se mettre à jour l'un sans l'autre.
+ */
+export const BATTEMENT_DEFAUT_MS = BATTEMENT_SERVEUR_MS;
 
 /**
- * La fenêtre de silence du CLIENT (`liveStream.js`, `silenceTimeoutMs`).
- * Le budget du premier événement reste SOUS cette valeur : une sonde plus
- * tolérante que le produit laisserait passer un flux que l'utilisateur, lui,
- * aurait déjà vu tomber.
+ * La fenêtre de silence du CLIENT (`liveStream.js`, `silenceTimeoutMs`), LUE du
+ * propriétaire partagé (`src/config/flux-temps-reel.js`). Le budget du premier
+ * événement reste SOUS cette valeur : une sonde plus tolérante que le produit
+ * laisserait passer un flux que l'utilisateur, lui, aurait déjà vu tomber.
  */
-export const FENETRE_CLIENT_MS = 15000;
+export const FENETRE_CLIENT_MS = SILENCE_TIMEOUT_MS;
 
 /** Plancher et plafond du budget DÉRIVÉ (voir `budgetDuPremierEvenement`). */
 export const PLANCHER_BUDGET_MS = 1500;

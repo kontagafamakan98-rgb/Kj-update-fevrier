@@ -23,7 +23,9 @@ import http from 'node:http';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
+  BATTEMENT_DEFAUT_MS,
   FAMILLE,
+  FENETRE_CLIENT_MS,
   MARQUE_PREMISSE,
   TITRE_ERREUR,
   analyserFlux,
@@ -31,6 +33,10 @@ import {
   jugeDuTransfert,
   runSseProxyProbe,
 } from '../check-sse-proxy-production.js';
+import {
+  BATTEMENT_SERVEUR_MS,
+  SILENCE_TIMEOUT_MS,
+} from '../../src/config/flux-temps-reel.js';
 
 /* ─────────────────────── 1. l'analyse des trames ────────────────────────── */
 
@@ -93,7 +99,15 @@ describe('budgetDuPremierEvenement — un budget dérivé, jamais choisi au hasa
   it('plafond : un contrôle lent ne rend pas la sonde plus tolérante que le client', () => {
     const budget = budgetDuPremierEvenement({ controleMs: 5000 });
     expect(budget.budgetMs).toBe(8000);
-    expect(budget.budgetMs).toBeLessThan(15000);
+    expect(budget.budgetMs).toBeLessThan(SILENCE_TIMEOUT_MS);
+  });
+
+  it('la sonde lit la fenêtre du CLIENT et le battement du SERVEUR, sans les recopier', () => {
+    // Deux copies d'un même délai divergent au premier correctif : la sonde
+    // aurait alors jugé « à temps » ce que le client avait déjà déclaré muet.
+    expect(FENETRE_CLIENT_MS).toBe(SILENCE_TIMEOUT_MS);
+    expect(BATTEMENT_DEFAUT_MS).toBe(BATTEMENT_SERVEUR_MS);
+    expect(FENETRE_CLIENT_MS).toBeGreaterThan(BATTEMENT_DEFAUT_MS);
   });
 
   it('sans contrôle, le plafond décide et la dérivation est DITE', () => {

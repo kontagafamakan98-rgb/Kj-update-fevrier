@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-18",
-    "motif": "cible de mutation arrivee avec la fusion de #164 (moteurs de gestes) : son etat de reference manquait a la branche rebasee, il est pose ici",
+    "motif": "la sonde SSE lit le battement du serveur et la fenetre de silence du client dans frontend/src/config/flux-temps-reel.js au lieu de recopier 20000 et 15000 : l'alignement (45 s contre 20 s) est lu d'un proprietaire unique",
     "fichiers": {
       ".githooks/pre-push": "57a57605381510b531a2653226add8b0cd3f1f5879cc2adeead186342a2b44a9",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -120,8 +120,8 @@
       ".github/scripts/check-fly-env-drift.py": "f1599bb967089e93bf1b72000d82e98f125a6da3bddcdba2b00bd6933bb55f95",
       "backend/server.py": "98ac7e99c63a77d7eeb36d63a0cfe318dea5b798d789665b85e5d4caede1a6bf",
       "frontend/scripts/juges-de-temps.js": "f77642cb38faa55bda29910fa9976120f06be893ce58d905cf3c4180ca6a18dc",
-      "frontend/scripts/check-sse-proxy-production.js": "c71fcd75374b8a83168eb6256c47edecbcf82a91a559eabc8483c1944d4a0ca2",
-      "frontend/scripts/check-moteurs-gestes.js": "d092df072526de8c1c4f8f31ed9849c287b78f09d056de2bccc2ce48b3a41a0e"
+      "frontend/scripts/check-moteurs-gestes.js": "d092df072526de8c1c4f8f31ed9849c287b78f09d056de2bccc2ce48b3a41a0e",
+      "frontend/scripts/check-sse-proxy-production.js": "8d92c0c3f0b44f442837621f9618f55e8c2794126a85667ac31ed562dbfca3a3"
     }
   },
   "hors_perimetre": [

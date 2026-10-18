@@ -28,6 +28,7 @@
  */
 
 import { buildApiUrl } from '../utils/backendUrl';
+import { SILENCE_TIMEOUT_MS } from '../config/flux-temps-reel';
 import { getAuthToken } from './api';
 
 export const STREAM_STATUS = {
@@ -126,7 +127,11 @@ const readFrames = async (body, emit, signal, onActivity = () => {}) => {
  *   flux TOMBÉ (0 désactive). Un proxy qui tamponne la réponse rend un 200 puis
  *   plus rien : sans ce chien de garde, le client croirait le flux vivant et
  *   n'armerait jamais son repli — le pire des deux mondes (aucun événement, et
- *   aucun sondage non plus).
+ *   aucun sondage non plus). La valeur par défaut vient de
+ *   `config/flux-temps-reel.js`, SEUL propriétaire du battement du serveur et
+ *   de cette fenêtre : une fenêtre plus courte que le battement déclarait
+ *   tombé un flux vivant mais inactif, donc une reconnexion à chaque battement
+ *   manqué — le défaut mesuré le 18/10/2026 (15 s contre 20 s).
  * @returns {() => void} Ferme le flux (et annule une reconnexion en attente).
  */
 export function openLiveStream(
@@ -138,7 +143,7 @@ export function openLiveStream(
     schedule = defaultSchedule,
     initialDelayMs = 1000,
     maxDelayMs = 30000,
-    silenceTimeoutMs = 15000,
+    silenceTimeoutMs = SILENCE_TIMEOUT_MS,
     random = Math.random,
   } = {},
 ) {

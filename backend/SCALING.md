@@ -278,9 +278,15 @@ retombe sur le repli.
 - **Le shell natif suit la même route** : le flux est lu par `fetch` (en-têtes
   `Authorization`), jamais par `EventSource` — donc aucun jeton dans l'URL.
 - **Un flux muet est une panne, pas un calme.** Le client coupe et retombe sur
-  le repli après 15 s sans un octet (battement compris). Sans ce chien de
-  garde, un proxy qui tamponne la réponse (200 puis rien) laisserait croire au
-  flux vivant : aucun événement ET aucun sondage — le pire état possible.
+  le repli après `SILENCE_TIMEOUT_MS` sans un octet — **45 s**, soit deux
+  battements du serveur (20 s) plus une marge de gigue, déclarés ensemble dans
+  `frontend/src/config/flux-temps-reel.js`. La fenêtre est forcément PLUS LONGUE
+  que le battement : à 15 s contre 20 s (le 18/10/2026), un flux **vivant mais
+  inactif** était déclaré tombé 5 s avant son premier `: keepalive`, donc rouvert
+  à chaque cycle — plus d'allers-retours que le sondage qu'il remplaçait.
+  Sans ce chien de garde, un proxy qui tamponne la réponse (200 puis rien)
+  laisserait croire au flux vivant : aucun événement ET aucun sondage — le pire
+  état possible. La borne haute (90 s) est là pour que ce filet morde encore.
   Le passage par le proxy Vercel en production n'a pas été mesuré ici ; le
   chien de garde est ce qui rend ce cas visible au lieu de silencieux.
 

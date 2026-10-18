@@ -7,8 +7,9 @@ name: SSE proxy production probe (daily)
 # réécrit vers Fly (`frontend/vercel.json`). Un proxy qui TAMPONNE ne casse
 # aucun test du dépôt — le 200 arrive, les octets arrivent, seulement ils
 # arrivent tous à la fin — tandis que le client, lui, juge un flux muet après
-# 15 s sans un octet (`liveStream.js`, `silenceTimeoutMs`) et bascule sur le
-# repli à 60 s. Le produit aurait perdu le temps réel sans un seul rouge.
+# `SILENCE_TIMEOUT_MS` sans un octet (`liveStream.js`, 45 s : deux battements du
+# serveur plus une marge) et bascule sur le repli à 60 s. Le produit aurait
+# perdu le temps réel sans un seul rouge.
 #
 # La sonde fait ce qu'un client fait : connexion (`POST /api/auth/login`, le
 # flux accepte `Authorization: Bearer`, donc aucun cookie n'est nécessaire),
@@ -59,7 +60,8 @@ jobs:
     runs-on: ubuntu-latest
     # Plafond : une origine qui ne répond plus doit rougir, pas patienter
     # jusqu'à l'abandon du runner (360 min). La sonde s'arrête d'elle-même
-    # après `--attente` (battement + fenêtre client), soit ~35 s par tentative.
+    # après `--attente` (battement + fenêtre client, lus du propriétaire
+    # partagé `src/config/flux-temps-reel.js`), soit ~65 s par tentative.
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
