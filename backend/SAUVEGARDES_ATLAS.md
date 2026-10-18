@@ -170,8 +170,11 @@ Ce qui a été livré à la place, et qui rend l'exercice rejouable en UNE
 commande : `backend/scripts/exercice_restauration.py`.
 
 ```bash
-# le propriétaire, une fois, avec une URI de LECTURE sur le cluster :
-MONGO_URL='mongodb+srv://…/kojo_db?retryWrites=true' \
+# L'URI de LECTURE du cluster vient de l'environnement du propriétaire, JAMAIS
+# de ce fichier : une adresse Atlas citée dans un runbook est refusée par son
+# propre garde (`test_atlas_backups_probe.py`). `:?` échoue bruyamment si elle
+# n'est pas posée, plutôt que de lancer un exercice sans base.
+MONGO_URL="${KOJO_ATLAS_READ_URI:?poser l'URI de lecture Atlas hors dépôt}" \
   python backend/scripts/exercice_restauration.py \
   --base kojo_db --rapport "restauration-$(date +%F).json"
 ```
