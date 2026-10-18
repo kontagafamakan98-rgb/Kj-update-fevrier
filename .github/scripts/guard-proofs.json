@@ -3200,7 +3200,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-moteurs-gestes.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
@@ -3240,7 +3240,7 @@
         "vitest",
         "run",
         "scripts/__tests__/check-moteurs-gestes.test.js",
-        "--reporter=basic"
+        "--reporter=default"
       ],
       "cwd": "frontend",
       "attend": [
