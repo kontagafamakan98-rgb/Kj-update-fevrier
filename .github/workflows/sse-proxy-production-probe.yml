@@ -85,8 +85,14 @@ jobs:
       - name: Mesurer la traversée du flux SSE (premier événement et battement)
         working-directory: frontend
         env:
+          # Les DEUX noms du compte, comme les deux autres sondes de production :
+          # ne transmettre que `LHCI_CI_*` (absents ici) faisait refuser la sonde
+          # en « compte CI absent » alors que le compte existait sous
+          # `LHCI_TEST_*`.
           LHCI_CI_EMAIL: ${{ secrets.LHCI_CI_EMAIL }}
           LHCI_CI_PASSWORD: ${{ secrets.LHCI_CI_PASSWORD }}
+          LHCI_TEST_EMAIL: ${{ secrets.LHCI_TEST_EMAIL }}
+          LHCI_TEST_PASSWORD: ${{ secrets.LHCI_TEST_PASSWORD }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           SITE_A_JUGER: ${{ inputs.site }}
           ACCES_DIRECT: ${{ inputs.direct }}

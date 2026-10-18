@@ -20,6 +20,9 @@
  * rend un jeton bidon, et le flux est écrit par un serveur `node:http` du test.
  */
 import http from 'node:http';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
@@ -246,7 +249,94 @@ describe('runSseProxyProbe — une prémisse ne se confond pas avec un rouge', (
     // autre sonde.
     expect(TITRE_ERREUR).toMatch(/flux sse/i);
   });
+
+  // Ce dépôt fournit le compte sous `LHCI_TEST_*` ; un compte CI dédié se
+  // déclarerait sous `LHCI_CI_*`. Ne lire que le second nom rendait une prémisse
+  // « compte absent » ALORS QUE le compte existait : la sonde aurait été rouge
+  // chaque jour sans jamais juger le flux, et personne n'aurait su que la
+  // traversée du proxy n'était plus mesurée.
+  it('lit le compte fourni sous LHCI_TEST_*, et juge au lieu de refuser l’absence', async () => {
+    const avant = {
+      ciEmail: process.env.LHCI_CI_EMAIL,
+      ciPassword: process.env.LHCI_CI_PASSWORD,
+      testEmail: process.env.LHCI_TEST_EMAIL,
+      testPassword: process.env.LHCI_TEST_PASSWORD,
+    };
+    delete process.env.LHCI_CI_EMAIL;
+    delete process.env.LHCI_CI_PASSWORD;
+    process.env.LHCI_TEST_EMAIL = 'sonde@kojo.test';
+    process.env.LHCI_TEST_PASSWORD = 'mot-de-passe-sonde';
+    // Un port FERMÉ : la connexion échoue tout de suite, sans réseau ni attente.
+    const port = await portFerme();
+    try {
+      const resultat = await runSseProxyProbe({
+        base: `http://127.0.0.1:${port}`,
+        tentatives: 1,
+        quiet: true,
+      });
+      const message = resultat.errors.join(' ');
+      // Le compte a été LU : le refus porte sur la connexion, pas sur les
+      // variables. C'est la distinction qui compte — un refus de prémisse pour
+      // un compte présent est un mensonge sur l'état du dépôt.
+      expect(message).not.toMatch(/absent\(s\)/);
+      expect(message).toContain(MARQUE_PREMISSE);
+      expect(message).toContain('connexion impossible');
+    } finally {
+      for (const [cle, valeur] of [
+        ['LHCI_CI_EMAIL', avant.ciEmail],
+        ['LHCI_CI_PASSWORD', avant.ciPassword],
+        ['LHCI_TEST_EMAIL', avant.testEmail],
+        ['LHCI_TEST_PASSWORD', avant.testPassword],
+      ]) {
+        if (valeur === undefined) delete process.env[cle];
+        else process.env[cle] = valeur;
+      }
+    }
+  });
+
+  // Le nom d'un secret est écrit DEUX fois : dans la sonde (qui le lit) et dans
+  // le workflow (qui le transmet). Une divergence ne casse rien — l'un des deux
+  // vaut `undefined`, la sonde rend une prémisse « absent » —, donc rien ne la
+  // verrait sans ce cas.
+  it('transmet, dans le workflow, chaque nom de compte que la sonde lit', () => {
+    // La racine se résout depuis CE fichier (jamais depuis le cwd, que le
+    // lanceur choisit) : sous vitest, `import.meta.url` n'est pas toujours un
+    // `file:` — `fileURLToPath` refuse une autre forme au lieu de deviner.
+    const racine = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+    const sonde = readFileSync(
+      path.join(racine, 'frontend/scripts/check-sse-proxy-production.js'), 'utf8',
+    );
+    const workflow = readFileSync(
+      path.join(racine, '.github/workflows/sse-proxy-production-probe.yml'), 'utf8',
+    );
+    const noms = [...new Set(
+      [...sonde.matchAll(/process\.env\.(LHCI_[A-Z_]+)/g)].map((trouve) => trouve[1]),
+    )].sort();
+    // Plancher de lecture : un fichier illisible ou une expression réécrite
+    // rendrait la liste vide, et une boucle vide serait verte sans rien juger.
+    expect(noms.length).toBeGreaterThanOrEqual(2);
+    expect(noms).toEqual(expect.arrayContaining(['LHCI_CI_EMAIL', 'LHCI_TEST_EMAIL']));
+    for (const nom of noms) {
+      // La forme est assemblée par concaténation : `${{` dans un gabarit serait
+      // lu comme une interpolation par le transformeur, pas comme le texte Vercel
+      // attendu.
+      const attendu = `${nom}: ` + '${{ secrets.' + nom + ' }}';
+      expect(workflow, `${nom} est lu par la sonde mais absent du workflow`).toContain(attendu);
+    }
+  });
 });
+
+/** Un port que personne n’écoute : la connexion est refusée sans attente. */
+function portFerme() {
+  return new Promise((resolve, reject) => {
+    const serveur = http.createServer();
+    serveur.on('error', reject);
+    serveur.listen(0, '127.0.0.1', () => {
+      const { port } = serveur.address();
+      serveur.close(() => resolve(port));
+    });
+  });
+}
 
 /* ──────── 5. la mesure, contre deux proxies locaux RÉELS ────────────────── */
 

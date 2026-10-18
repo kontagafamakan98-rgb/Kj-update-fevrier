@@ -520,8 +520,14 @@ export async function runSseProxyProbe({
   base = SITE_ORIGIN,
   chemin = CHEMIN_DEFAUT,
   direct = '',
-  email = process.env.LHCI_CI_EMAIL || '',
-  password = process.env.LHCI_CI_PASSWORD || '',
+  // Les DEUX noms, dans le même ordre que les autres sondes de production
+  // (`check-session-reload-production.js`, `check-token-exposure-production.js`) :
+  // ce dépôt fournit le compte sous `LHCI_TEST_*`, un compte CI dédié se
+  // déclarerait sous `LHCI_CI_*`. Ne lire que le second nom rendait une prémisse
+  // « aucun compte » ALORS QUE le compte existait — une surface aveugle qui se
+  // déclarait aveugle, donc rouge chaque jour sans jamais juger le flux.
+  email = process.env.LHCI_CI_EMAIL || process.env.LHCI_TEST_EMAIL || '',
+  password = process.env.LHCI_CI_PASSWORD || process.env.LHCI_TEST_PASSWORD || '',
   bypass = process.env[BYPASS_ENV] || '',
   battementMs = Number(process.env.KOJO_SSE_HEARTBEAT_SECONDS || 0) * 1000 || BATTEMENT_DEFAUT_MS,
   attenteMs = 0,
@@ -543,8 +549,8 @@ export async function runSseProxyProbe({
 
   if (!email || !password) {
     const manque = [
-      !email ? 'LHCI_CI_EMAIL' : null,
-      !password ? 'LHCI_CI_PASSWORD' : null,
+      !email ? 'LHCI_CI_EMAIL / LHCI_TEST_EMAIL' : null,
+      !password ? 'LHCI_CI_PASSWORD / LHCI_TEST_PASSWORD' : null,
     ].filter(Boolean);
     refus(
       `${libelleSonde(base)} — ${MARQUE_PREMISSE} : ${manque.join(' et ')} absent(s), ` +
