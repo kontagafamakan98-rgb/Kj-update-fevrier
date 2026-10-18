@@ -123,8 +123,10 @@ import {
   PASSWORD_SELECTOR,
   RESTORE_TIMEOUT_MS,
   RETRY_DELAY_MS,
+  SESSION_COOKIE_NAME,
   SUBMIT_SELECTOR,
   contextOptions,
+  origineDuCookie,
 } from './check-session-reload-production.js';
 
 /**
@@ -510,6 +512,35 @@ const etatDeSession = (page, cible) =>
   }, cible);
 
 /**
+ * L'hôte qui PORTE la session, lu dans le navigateur — jamais supposé.
+ *
+ * La production servie est CROSS-SITE (`VITE_USE_SAME_ORIGIN_API=false`) : la
+ * page est sur un hôte, l'API sur un autre, et le cookie de session est rangé
+ * chez l'API. Interroger `/api/auth/me` sur l'origine de la PAGE y répond 401 —
+ * mesuré en production le 18/10/2026 : la sonde refusait sur une prémisse
+ * fausse (« session non ouverte ») pendant que la session vivait, et la sonde
+ * de session, elle, était verte une minute plus tôt sur le même compte. Le
+ * proxy même-origine range au contraire le cookie sur l'origine de la page.
+ *
+ * `context.cookies()` SANS URL rend ce que Chromium garde, domaine compris :
+ * c'est la seule lecture qui distingue les deux topologies. La valeur du cookie
+ * ne quitte jamais cette fonction — seule l'origine est rendue.
+ *
+ * @param {object} context Contexte Playwright (ou sa doublure).
+ * @param {string} base Origine servie, pour rapprocher une origine complète.
+ * @returns {Promise<string>} Origine de l'API portant la session, ou chaîne vide
+ *   si le contexte n'en porte aucune (contexte vierge, doublure sans cookie).
+ */
+export async function origineDeLaSession(context, base) {
+  if (typeof context?.cookies !== 'function') return '';
+  const cookies = (await context.cookies()).filter(
+    (cookie) => cookie?.name === SESSION_COOKIE_NAME
+  );
+  if (cookies.length !== 1) return '';
+  return origineDuCookie(cookies[0], [base]);
+}
+
+/**
  * Lance Chromium. Import PARESSEUX : le test companion injecte son propre
  * `launch` et n'a donc jamais à charger Playwright (ni un navigateur) sous jsdom.
  *
@@ -546,7 +577,11 @@ async function uneTentative({
   const checked = [];
   const verdicts = { anonymous: null, afterLogin: null, appObserved: false, seen: 0, requests: 0, findings: 0, preBootFindings: 0, native: null };
   let natif = null;
-  const authMeUrl = `${base}${AUTH_ME_PATH}`;
+  // L'URL jugée n'est pas figée sur l'origine de la page : elle est RE-LUE après
+  // la connexion, à l'hôte qui porte réellement le cookie de session (voir
+  // `origineDeLaSession`). Avant connexion, le contexte est vierge : c'est
+  // l'origine de la page qui doit répondre 401.
+  let authMeUrl = `${base}${AUTH_ME_PATH}`;
 
   const browser = await launch();
   try {
@@ -616,6 +651,22 @@ async function uneTentative({
         )
       );
       return { ok: false, errors, checked, verdicts };
+    }
+
+    // La topologie se LIT, elle ne se suppose pas : le cookie dit où vit la
+    // session, donc où `/auth/me` dit la vérité. Sans cette lecture, une
+    // production cross-site était jugée sur l'origine de la page (401) et la
+    // sonde refusait sur une prémisse fausse.
+    const porteur = await origineDeLaSession(context, base);
+    if (porteur) {
+      const pageAuthMeUrl = authMeUrl;
+      authMeUrl = `${porteur}${AUTH_ME_PATH}`;
+      if (authMeUrl !== pageAuthMeUrl) {
+        checked.push(
+          `topologie lue : le cookie ${SESSION_COOKIE_NAME} est rangé sur ${porteur} — ` +
+            "`/auth/me` est jugé là, pas sur l'origine de la page"
+        );
+      }
     }
 
     verdicts.afterLogin = await etatDeSession(page, authMeUrl);

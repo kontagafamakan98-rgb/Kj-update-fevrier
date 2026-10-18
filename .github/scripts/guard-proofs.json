@@ -4558,6 +4558,26 @@
       ]
     },
     {
+      "id": "token-exposure: la topologie du cookie non lue (session jugee sur l'origine de la page)",
+      "garde": "frontend/scripts/check-token-exposure-production.js",
+      "cible": "frontend/scripts/check-token-exposure-production.js",
+      "trouve": "    if (porteur) {",
+      "remplace": "    if (false && porteur) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-token-exposure-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-token-exposure-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "topologie lue"
+      ]
+    },
+    {
       "id": "token-exposure: une surface aveugle prise pour un vert",
       "garde": "frontend/scripts/check-token-exposure-production.js",
       "cible": "frontend/scripts/check-token-exposure-production.js",
