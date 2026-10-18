@@ -155,6 +155,50 @@ qui compte pour un RTO, pas la taille de l'archive.
 
 ---
 
+## 3bis. Exercice Atlas rejouable — préparé le 18/10/2026, **non exécuté**
+
+L'exercice du §3 prouve les commandes du repli sur une base **locale**. Le
+chemin **Atlas** restait non exécuté, et c'était écrit. Le 18/10/2026, la
+tentative d'exercice Atlas a été faite et s'est arrêtée sur une **prémisse** :
+ni URI de connexion (`MONGO_URL`) ni droit de créer un namespace sur le
+cluster ne sont disponibles depuis l'hôte qui a lancé la commande, et les
+binaires `mongodump`/`mongorestore` n'y sont plus installés. Aucun verdict n'a
+donc été rendu — et c'est le résultat honnête : un exercice « réussi » sans
+base lue serait le pire des deux mondes.
+
+Ce qui a été livré à la place, et qui rend l'exercice rejouable en UNE
+commande : `backend/scripts/exercice_restauration.py`.
+
+```bash
+# le propriétaire, une fois, avec une URI de LECTURE sur le cluster :
+MONGO_URL='mongodb+srv://…/kojo_db?retryWrites=true' \
+  python backend/scripts/exercice_restauration.py \
+  --base kojo_db --rapport "restauration-$(date +%F).json"
+```
+
+Ce que le script fait, et qui est la moitié vérifiable sans privilège de
+cluster : il lit la base réelle, calcule pour chaque collection le nombre exact
+de documents, une empreinte **SHA-256 du contenu complet** (documents encodés
+BSON, ordonnés par `_id`) et les noms d'index, **restaure** dans une base de
+travail `<base>_restauration_<AAAAMMJJ>` du **même** serveur, recalcule la même
+empreinte, **compare**, puis détruit la base de travail (ou la garde avec
+`--garder`). Codes : 0 identique, 1 écart mesuré, 2 prémisse. Il refuse
+`--cible` égale à `--base` : un exercice ne restaure jamais par-dessus la
+source.
+
+Ce qu'il **ne** prouve toujours pas, et qui reste le vrai exercice Atlas à
+faire : la restauration d'un **snapshot** ou d'un **point PITR** depuis
+l'interface/API Atlas (elle exige le palier et les clés API, cf. §1). Le script
+compare une copie restaurée à la source ; il ne restaure pas une sauvegarde
+Atlas. Le premier exercice PITR daté reste donc **à planifier** — c'est le
+seul risque du dépôt qui ne se répare pas après coup.
+
+Preuve du script : `backend/tests/test_exercice_restauration.py` (comparaison
+réelle : collection absente, document en moins, contenu altéré au bon compte,
+index perdu, collection en trop ; prémisse réelle : sans URI et cible = source).
+
+---
+
 ## 4. Vérification après restauration (à copier telle quelle)
 
 ```bash

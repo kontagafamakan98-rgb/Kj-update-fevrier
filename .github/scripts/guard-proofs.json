@@ -977,6 +977,15 @@
       "preuve": "backend/tests/test_gate_perimetre.py",
       "runner": "pytest",
       "motif": "LA RÈGLE, pure et sans E/S (comme frontend/scripts/css-selecteurs-morts.js et corpus-missions.js) : ce qu'est un job de ci.yml dans le texte du workflow — son nom de check-run est celui du JOB, jamais le `- name:` d'une étape (à SIX espaces, quand le nom d'un job est à QUATRE) —, la déclaration unique du périmètre lue comme un fait, l'AUDIT de l'une contre l'autre (nom dérivé, job disparu ou non couvert, exemption périmée, muette ou menteuse, strict non déclaré, planchers de lecture) et la COMPARAISON EN LIGNE de la protection de branche (désaccord dans les deux sens, et le `strict`). Elle est importée par le garde qui prononce le verdict et par le pré-vol de livrer.py : c'est ce seul import partagé qui garantit que la protection et la livraison attendent la même liste, au lieu de deux définitions qui divergent — l'asymétrie mesurée du 12/10/2026. Le chemin en ligne (`lire_protection`) rend un refus nommé plutôt qu'une exception : il est prouvé sans réseau, par injection de la charge utile, et sa lecture réelle appartient à la livraison."
+    },
+    {
+      "chemin": "backend/scripts/exercice_restauration.py",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "backend/tests/test_exercice_restauration.py",
+      "runner": "pytest",
+      "motif": "outil d'ops : il restaure une base dans un namespace de travail puis COMPARE documents et index à la source, et rend un RTO daté. Son verdict porte sur un SERVEUR MongoDB (Atlas ou local), pas sur un fichier du dépôt — c'est un exercice, pas un garde de CI.",
+      "hors_mutation": "muté par sa PROPRE preuve, pas par la table : test_exercice_restauration.py appelle la comparaison réelle sur des empreintes construites (collection absente, document en moins, contenu altéré au bon compte, index perdu, collection en trop) et la prémisse réelle (sans URI, cible = source), qui rend 2 et l'écrit dans son rapport. La table ne rejoue que les gardes qui portent un verdict sur le dépôt"
     }
   ],
   "rejeux": [
