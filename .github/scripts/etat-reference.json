@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-18",
-    "motif": "garde du perimetre multi-moteurs : registre des gestes, testMatch des deux projets, publication par moteur, installation des trois binaires et planchers de lecture (cible de mutations declarees)",
+    "motif": "la sonde d'exposition lit l'hote qui porte le cookie de session avant de juger /auth/me : en production cross-site, l'origin de la page repondait 401 et la sonde refusait sur une premisse fausse (rouge du 18/10/2026)",
     "fichiers": {
       ".githooks/pre-push": "57a57605381510b531a2653226add8b0cd3f1f5879cc2adeead186342a2b44a9",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -100,26 +100,28 @@
       "frontend/scripts/check-seo-production.js": "670ff721139154e94372f48c5cbd95cefcce85f9e8df9df078069c9df3f84484",
       "frontend/scripts/check-shell-remote-resources.js": "892f772d7c2ab1a41b03b0dc05d29b470d7c0c9bc6ce0355599b5a8c020d2822",
       "frontend/scripts/check-shell-text-provenance.js": "eedaecfb08a9586588fa1bbf94285b807898ca49e2f98c3090dcaed921747fc6",
-      "frontend/scripts/check-spa-routes.js": "5beaa42d2616c3c568817f06312b12a7b2887dbddd2b37d1dca1d6d8e06efe1e",
       "frontend/scripts/check-test-environment.js": "7a3610e18bfe6b6eb63e26b6fe5031b50cf7fda606aa944faedfe69e89e1310c",
-      "frontend/scripts/check-token-exposure-production.js": "a3a2f33c36bc0bb2b11f0f32a1f6539c2a9641f60469eadeb006625aa44205bb",
       "frontend/scripts/corpus-missions.js": "81c74865485808ecc2efa5902ab56b112a2bc7b5bb0077f2bebb24279a34e1ad",
       "frontend/scripts/couverture-tiers.js": "9a92379977dc3c3e93b2ceb90a144014bbdcf8df858146333819ce85700bd820",
-      "frontend/scripts/juges-de-temps.js": "cc5c96201448b02743d566272a88109b0e1a3efded2846c0f361f529835e265f",
       "frontend/scripts/keyframes-animations.js": "481323507562f68225bbb42ea5fb691a1d6d9b0c3993bf76360b618127ae386e",
       "frontend/scripts/marque-kojo-mesures.js": "5923f80e425fa67b88a5b1d66a8e9f3ad0fd904f99055b40a1ab83e108d913a2",
       "frontend/scripts/reliquats-css.js": "c666810887c48e5c8aa3a13f87667adae9f68f91cc2e630c88679ce23d526e44",
       "frontend/scripts/retard-main.js": "eef5724dae66bc8e17fbb50e0be1c426b9eba4ceb24c04808c8fdb0f8dacad37",
       "frontend/scripts/style-layout-budgets.cjs": "db93353a147d9be6e84999ea065d3b3df5d08871a62fe943f3346bc80d68ede9",
       "frontend/scripts/validate-vercel-json.mjs": "16a56835e1fb299821c3a1dd7fa4d0957982a970a493e98ed8855d06fc563518",
-      ".github/scripts/check-fly-env-drift.py": "55c919507e2d8e502dcce744341ba36d6f08b1ad1182c932b0fbf496d65308b3",
-      "backend/server.py": "ddcb03c43c1256fb690a4da623b48e7f234b39552ba1d211a9260e9fbdb700c4",
       "backend/scripts/check_health_probe.py": "136d30b9c6461d473042782a6d0ed70e649901cd27ba7fd555d74544e39f7e4d",
       "frontend/scripts/check-css-inline-budget.js": "f2ec08e78600460fbc3ca8536b7e18f404d8190a0487ba8c41515e3ce8ad5bff",
       "frontend/scripts/classes-coquilles.js": "94a2b644525375b0cabc8bfb71b5fb42e4beb90080e9f196cda01dc4ed94509d",
       "frontend/scripts/check-prerender-shells.js": "2ea6bf7d3635b045f0413b6a35e9105845960d46a5ecf4184c2bd5ee2f611077",
       "frontend/scripts/check-session-reload-production.js": "30f3d15481f689f73579c618c92728755d60fa5b55f53dc91d80577c9e853217",
-      "frontend/scripts/check-moteurs-gestes.js": "d092df072526de8c1c4f8f31ed9849c287b78f09d056de2bccc2ce48b3a41a0e"
+      "backend/scripts/check_atlas_backups.py": "e04c1c8f3bad4dc9948deb050f451278da5b72af4d2863d46100530a3baadc9d",
+      ".github/scripts/check-fly-env-drift.py": "f1599bb967089e93bf1b72000d82e98f125a6da3bddcdba2b00bd6933bb55f95",
+      "backend/server.py": "98ac7e99c63a77d7eeb36d63a0cfe318dea5b798d789665b85e5d4caede1a6bf",
+      "frontend/scripts/juges-de-temps.js": "f77642cb38faa55bda29910fa9976120f06be893ce58d905cf3c4180ca6a18dc",
+      "frontend/scripts/check-moteurs-gestes.js": "d092df072526de8c1c4f8f31ed9849c287b78f09d056de2bccc2ce48b3a41a0e",
+      "frontend/scripts/check-sse-proxy-production.js": "8d92c0c3f0b44f442837621f9618f55e8c2794126a85667ac31ed562dbfca3a3",
+      "frontend/scripts/check-spa-routes.js": "e071e01d1291fc61fe4ac5dfb83c4609ccccd7d5f542cba1044988ae107e27bf",
+      "frontend/scripts/check-token-exposure-production.js": "0fd396ac948eae4f23de5bf608df4f2cbdc91c0998d509d4eb75ea1ba89b8fd4"
     }
   },
   "hors_perimetre": [

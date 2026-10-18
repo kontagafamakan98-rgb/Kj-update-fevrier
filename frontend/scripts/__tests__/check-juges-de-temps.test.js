@@ -51,6 +51,12 @@ const FICHIERS_DECLARES = {
   'frontend/vite.config.js': 'testTimeout: 20000\n',
   'frontend/playwright.config.js': 'timeout: 30000\ntimeout: 30000\ntimeout: 30000\n',
   'frontend/scripts/check-job-og-contract.js': 'timeout: 20000\n',
+  // La sonde SSE DÉCIDE sur un temps, mais son budget est DÉRIVÉ du contrôle
+  // mesuré (`budgetDuPremierEvenement`), donc la déclaration réelle de cette
+  // surface est VIDE : la racine témoin ne doit y porter aucun `timeout:`
+  // littéral, sinon elle décrirait un autre dépôt que le nôtre.
+  'frontend/scripts/check-sse-proxy-production.js':
+    'const budget = budgetDuPremierEvenement({ controleMs });\n',
   // Le dossier e2e est une surface : la racine temporaire doit en contenir un
   // fichier, sinon le garde refuse une surface INTROUVABLE (ce qu'il doit faire).
   // Son contenu ne porte AUCUNE attente fixe — c'est la déclaration VIDE du

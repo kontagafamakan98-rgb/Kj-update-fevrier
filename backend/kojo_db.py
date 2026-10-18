@@ -66,6 +66,10 @@ async def create_database_indexes():
         # Jobs collection indexes
         await db.jobs.create_index("id", unique=True)
         await db.jobs.create_index("client_id")
+        # `GET /jobs?mine=assigned` filtre là-dessus : sans cet index, chaque
+        # ouverture de « mes missions » balayait toute la collection (mesuré
+        # au banc de charge, cf. backend/SCALING.md §6).
+        await db.jobs.create_index("assigned_worker_id")
         await db.jobs.create_index("status")
         await db.jobs.create_index("category")
         await db.jobs.create_index("country")

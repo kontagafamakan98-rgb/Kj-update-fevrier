@@ -12,6 +12,9 @@ import Navbar from "./components/Navbar";
 import { MarqueKojo } from "./config/marque-kojo";
 import NotificationPanel from "./components/NotificationPanel";
 import CountryChangePopup from "./components/CountryChangePopup";
+// Bandeau de consentement à la mesure d'audience : ne s'affiche que si un
+// fournisseur est configuré ET qu'aucune décision n'est enregistrée.
+import ConsentBanner from "./components/ConsentBanner";
 import OfflineIndicator from "./components/OfflineIndicator";
 import MobileBottomNav from "./components/MobileBottomNav";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -54,6 +57,10 @@ const Privacy = lazy(() => import("./pages/Privacy"));
 // Les CGU, en page citable (le pied de page et les écrans d'inscription y
 // renvoyaient par un .docx fusionné : un crawler n'en lisait rien).
 const Terms = lazy(() => import("./pages/Terms"));
+// La 404 DANS l'application : la page statique `404.html` couvre l'URL inconnue
+// (Vercel la sert avec un statut 404), mais pas le lien mort INTERNE — sans
+// cette route, React Router ne rendait rien : le chrome seul, un `<main>` vide.
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Lazy load protected pages (loaded only when needed after authentication)
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -345,6 +352,10 @@ function AppRoutes() {
       {/* Geolocation Popup */}
       <CountryChangePopup />
 
+      {/* Consentement analytics : monté une seule fois, ici, comme le panneau
+          de notifications — deux montages afficheraient deux bandeaux. */}
+      <ConsentBanner />
+
       {/* Main Content with Suspense for lazy loaded routes.
           flex-1 : le contenu s'étire pour combler l'espace libre sous la
           navbar. Combiné au flex-col du conteneur, le LegalFooter reste
@@ -488,6 +499,10 @@ function AppRoutes() {
                 </OwnerOnlyRoute>
               </ProtectedRoute>
             } />
+            {/* Attrape-tout : EN DERNIER, sinon il masquerait les routes qui le
+                suivent. Une URL qu'aucune route ne déclare rend la 404 de
+                l'application au lieu d'un écran vide sous le chrome. */}
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
       </main>

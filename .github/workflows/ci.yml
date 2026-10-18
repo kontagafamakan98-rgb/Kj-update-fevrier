@@ -383,11 +383,20 @@ jobs:
     # Vrai MongoDB : la suite s'exécute contre une vraie instance (mode
     # TEST_MONGO_URL), ce qui couvre l'atomicité, les indexes et les
     # opérateurs réels que la FakeDB locale ne reproduit pas.
+    #
+    # Vrai Redis : il ne sert qu'à UNE étape, celle qui prouve la traversée du
+    # bus temps réel entre deux workers (`tests/test_live_bus_deux_workers.py`).
+    # Le reste de la suite garde `REDIS_URL=""` — c'est-à-dire le produit SANS
+    # bus, que ses cas éprouvent —, donc ce service ne change leur verdict.
     services:
       mongodb:
         image: mongo:7
         ports:
           - 27017:27017
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
 
     steps:
       - uses: actions/checkout@v4
@@ -512,6 +521,26 @@ jobs:
         # test_import_health.py tourne déjà à l'étape précédente (celle qui publie
         # le verdict en annotation) : on ne paie pas deux fois la même preuve.
         run: python -m pytest tests/ -q --tb=short --ignore=tests/test_import_health.py
+
+      # ── Temps réel : la traversée du bus, DEUX workers et un VRAI Redis ─────
+      # `tests/test_live_bus.py` porte le protocole du bus avec un double ; il ne
+      # peut pas dire ce que le bus promet : qu'un événement publié dans un
+      # process atteigne un flux servi par un AUTRE process. Ce fichier-là le
+      # dit, sans double : deux `uvicorn` sur deux ports, `POST /api/messages`
+      # sur l'un, `GET /api/messages/stream` sur l'autre, et le MÊME identifiant
+      # de message des deux côtés.
+      #
+      # Étape à part, et pas dans la suite principale : `TEST_REDIS_URL` est le
+      # mandat (posé = le test juge ; absent = il se déclare inapplicable). Le
+      # fichier vérifie LUI-MÊME que cette étape existe encore (dernier cas),
+      # pour qu'une étape supprimée rougisse au lieu de laisser un test que
+      # personne n'exécute.
+      - name: Temps réel — bus partagé, deux workers uvicorn et vrai Redis
+        working-directory: backend
+        env:
+          TEST_MONGO_URL: mongodb://localhost:27017
+          TEST_REDIS_URL: redis://127.0.0.1:6379/0
+        run: python -m pytest tests/test_live_bus_deux_workers.py -q --tb=short
 
       # Les refus du générateur de cartes OG (frontend/scripts/gen-og-images.py)
       # sont ce qui empêche une carte d'annoncer autre chose que sa page, et

@@ -7,6 +7,7 @@ lui — un commutateur qui n'en déplacerait que la moitié laisserait l'autre
 moitié dépendre d'une clé Brevo qu'on vient de retirer.
 """
 
+import asyncio
 import base64
 import hashlib
 import secrets
@@ -824,11 +825,20 @@ async def send_email_via_active_provider(to_email: str, subject: str, text_body:
             mask_email_address(to_email),
         )
         return None
-    if provider == 'gmail':
-        return send_email_via_gmail_api(to_email, subject, text_body, html_body)
-    if provider == 'resend':
-        return send_email_via_resend_api(to_email, subject, text_body, html_body)
-    return send_email_via_brevo_api(to_email, subject, text_body, html_body)
+    # L'ENVOI SE FAIT DANS UN THREAD, et c'est un choix de disponibilité, pas
+    # de style : les trois fournisseurs appellent `requests` en SYNCHRONE, avec
+    # un timeout de 15 à 30 s. Appelés depuis la boucle, ils la gèlent pour
+    # toute la durée du timeout — mesuré sur le banc de charge (`scripts/charge`) :
+    # un envoi de 2 s faisait passer le p99 des AUTRES requêtes de 22 ms à
+    # 1 988 ms et coupait le débit de moitié. Avec 100 000 utilisateurs, un
+    # fournisseur email lent ne ralentit pas les emails : il arrête l'API.
+    # `to_thread` garde l'appel synchrone (donc les tests et les doublures de
+    # `requests` continuent de marcher) sans bloquer la boucle.
+    envoyer = {
+        'gmail': send_email_via_gmail_api,
+        'resend': send_email_via_resend_api,
+    }.get(provider, send_email_via_brevo_api)
+    return await asyncio.to_thread(envoyer, to_email, subject, text_body, html_body)
 
 
 def build_email_otp_email(purpose: str, otp_code: str) -> dict:

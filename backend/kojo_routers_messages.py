@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+import kojo_live
 from kojo_core import db
 from kojo_models import (
     Message, MessageCreate, User,
@@ -53,6 +54,18 @@ async def send_message(
     )
 
     await db.messages.insert_one(message.model_dump())
+    # PUSH TEMPS RÉEL : le message est stocké AVANT d'être annoncé, donc le
+    # destinataire peut l'afficher sans relire l'API (et sans le voir deux fois
+    # s'il relit quand même : le client déduplique par identifiant). Un envoi
+    # sans flux ouvert est le cas normal — l'événement part dans le vide et le
+    # message reste lisible par `GET /messages/{conversation_id}`.
+    charge = message.model_dump(mode="json")
+    kojo_live.publish(message_data.receiver_id, "message", charge)
+    # Le MÊME événement part à l'expéditeur : ses autres appareils suivent la
+    # conversation ouverte sans sondage. L'appareil qui vient d'envoyer
+    # déduplique par identifiant (il relit son propre fil au plus une fois),
+    # et le client n'incrémente le compteur non-lus que si le message est REÇU.
+    kojo_live.publish(current_user.id, "message", charge)
     return message.model_dump()
 
 @router.get("/messages")
@@ -174,6 +187,39 @@ async def get_conversations(current_user: User = Depends(get_current_user)):
         result.append(conv)
 
     return result
+
+@router.get("/messages/stream")
+async def stream_messages(current_user: User = Depends(get_current_user)):
+    """Flux SSE des messages REÇUS par le compte connecté (remplace le sondage).
+
+    Chaque événement `message` porte le message complet (identifiant,
+    conversation, contenu, horodatage) : la liste des conversations et le fil
+    ouvert se mettent à jour sans aucune requête. Le fil reste relu quand il est
+    ouvert, parce que c'est CETTE lecture qui marque les messages comme lus —
+    une fois par message reçu, plus toutes les 5 secondes.
+
+    Déclarée AVANT `/messages/{conversation_id}` : l'ordre d'enregistrement
+    décide, et `stream` serait sinon pris pour un identifiant de conversation.
+
+    Raises:
+        HTTPException: 503 quand un des deux plafonds est atteint — celui du
+            process, ou celui du COMPTE (tous workers confondus). Le client
+            retombe alors sur son sondage dégradé.
+
+    Returns:
+        StreamingResponse: `text/event-stream`.
+    """
+    try:
+        return await kojo_live.sse_response(
+            current_user.id,
+            initial=(('ready', {"ok": True}),),
+        )
+    except kojo_live.StreamCapacityExceeded as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Flux temps réel momentanément indisponible : réessayez dans un instant.",
+            headers={"Retry-After": "60"},
+        ) from exc
 
 @router.get("/messages/{conversation_id}")
 async def get_conversation_messages(

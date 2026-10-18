@@ -8,6 +8,7 @@ des compteurs. Les collections sont indexées sur les champs filtrés, donc les
 count_documents restent bon marché même à volume.
 """
 
+import asyncio
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, HTTPException, Response
@@ -149,11 +150,20 @@ def _render_job_og_card(job: dict, square: bool = False) -> bytes:
     (WhatsApp/Telegram/LinkedIn/aperçus Twitter) : composition CENTRÉE dans
     la zone sûre, un recadrage central conserve le contenu essentiel.
 
+    SYNCHRONE ET COÛTEUX (95 à 130 ms mesurés sur ce poste, dessin + encodage
+    PNG) : c'est du CPU, pas de l'attente. Appelé directement depuis une route
+    `async def`, il gelait le worker entier — mesuré, 4 rendus simultanés
+    faisaient monter `/api/health` à 305 ms, et 8 rendus « parallèles »
+    n'étaient que ×1,27 plus rapides que 8 rendus séquentiels. Les routes
+    l'appellent donc par `asyncio.to_thread` (`test_event_loop_non_blocage.py`
+    le verrouille). Un crawler qui parcourt les fiches ne doit pas arrêter l'API.
+
     Retourne les octets PNG."""
     from io import BytesIO
 
-    from PIL import Image, ImageDraw
-
+    # Pas d'import de `PIL.Image` ici : `_draw_og_background` porte le dessin et
+    # l'image revient déjà construite. Un import inutilisé faisait sortir ce
+    # fichier en avertissement pyflakes sans rien dire de plus.
     W, H = (1200, 1200) if square else (1200, 630)
     img, draw = _draw_og_background(W, H)
 
@@ -244,7 +254,12 @@ def _render_job_og_card(job: dict, square: bool = False) -> bytes:
     draw.rectangle([0, 0, W - 1, H - 1], outline=(200, 70, 10), width=4)
 
     buf = BytesIO()
-    img.convert("RGB").save(buf, "PNG", optimize=True)
+    # `compress_level=6` plutôt que `optimize=True` : mesuré sur une 1200×630,
+    # `optimize=True` coûte 34,8 ms pour 9,5 ms ici, POUR LA MÊME TAILLE de
+    # fichier — il essaie des stratégies zlib supplémentaires qui ne gagnent
+    # rien sur une image de ce genre. Le gain de poids ne se paierait qu'en
+    # CPU sur la boucle d'un worker à 1 vCPU.
+    img.convert("RGB").save(buf, "PNG", compress_level=6)
     return buf.getvalue()
 
 
@@ -293,7 +308,8 @@ async def get_job_og_image_square(job_id: str):
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     try:
-        png = _render_job_og_card(job, square=True)
+        # Hors de la boucle : le rendu est du CPU (cf. docstring du rendu).
+        png = await asyncio.to_thread(_render_job_og_card, job, square=True)
     except Exception as exc:  # Pillow absent ou erreur de rendu : 500 propre
         logger.error("OG square image render failed for job %s: %s", job_id, exc)
         raise HTTPException(status_code=500, detail="OG image rendering failed") from exc
@@ -320,7 +336,8 @@ async def get_job_og_image(job_id: str):
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     try:
-        png = _render_job_og_card(job)
+        # Hors de la boucle : le rendu est du CPU (cf. docstring du rendu).
+        png = await asyncio.to_thread(_render_job_og_card, job)
     except Exception as exc:  # Pillow absent ou erreur de rendu : 500 propre
         logger.error("OG image render failed for job %s: %s", job_id, exc)
         raise HTTPException(status_code=500, detail="OG image rendering failed") from exc

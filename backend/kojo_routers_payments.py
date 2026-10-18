@@ -546,7 +546,10 @@ async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_
         }
     }
 
-    invoice_data = create_paydunya_invoice(payload)
+    # Synchrone (requests, timeout 30 s) : hors de la boucle. Un checkout
+    # PayDunya lent gèlerait TOUTES les requêtes du worker — c'est exactement
+    # le défaut mesuré sur l'envoi d'emails (cf. backend/SCALING.md).
+    invoice_data = await asyncio.to_thread(create_paydunya_invoice, payload)
     invoice_token = invoice_data.get('token')
     checkout_url = invoice_data.get('response_text')
 

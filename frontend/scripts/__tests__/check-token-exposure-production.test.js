@@ -38,6 +38,7 @@ import {
   sourceMarqueurNatif,
   sourceReleveAvantBoot,
 } from '../check-token-exposure-production.js';
+import { SESSION_COOKIE_NAME } from '../check-session-reload-production.js';
 
 const BASE = 'https://kojo-exposition.test';
 const COMPTE = { email: 'sonde@kojo.test', password: 'mot-de-passe-sonde' };
@@ -289,6 +290,7 @@ function navigateur({
   finalUrl = `${BASE}/dashboard`,
   avantBoot = RELEVE_VIDE,
   natif = {},
+  sessionCookies = [],
 }) {
   const natifScript = { ...NATIF_SAIN, ...natif };
   const ordinaires = trafic ?? [
@@ -304,6 +306,7 @@ function navigateur({
     contextOptions: [],
     initScripts: [],
     ordre: [],
+    evaluations: [],
     contextes: 0,
     connexionsNatives: 0,
     redemarrages: 0,
@@ -342,6 +345,9 @@ function navigateur({
       // de fenêtre passée en argument (le relevé du statut de session, lui, reçoit
       // une URL : les deux appels ont deux arguments, un compte ne suffit pas).
       if (arguments_[0] === CLE_RELEVE_AVANT_BOOT) return avantBoot;
+      // URL jugée par le relevé de session : journalisée pour prouver SUR QUEL
+      // hôte la sonde a demandé l'état de la session.
+      if (typeof arguments_[0] === 'string') journal.evaluations.push(arguments_[0]);
       const valeur = states[index];
       index += 1;
       if (valeur === undefined) throw new Error('évaluation demandée plus de fois que le scénario n’en prévoit');
@@ -412,10 +418,13 @@ function navigateur({
     close: async () => {},
   };
 
-  const contexteDe = (page, cookies = 0) => ({
+  const contexteDe = (page, cookies = 0, extra = []) => ({
     newPage: async () => page,
     close: async () => {},
-    cookies: async () => Array.from({ length: cookies }, (_, rang) => ({ name: `cookie-${rang}` })),
+    cookies: async () => [
+      ...Array.from({ length: cookies }, (_, rang) => ({ name: `cookie-${rang}` })),
+      ...extra,
+    ],
     storageState: async () => ({
       cookies: [],
       origins: [
@@ -435,7 +444,7 @@ function navigateur({
       journal.contextOptions.push(options);
       journal.contextes += 1;
       // L'ORDRE est le contrat : web, puis connexion native, puis redémarrage.
-      if (journal.contextes === 1) return contexteDe(pageWeb);
+      if (journal.contextes === 1) return contexteDe(pageWeb, 0, sessionCookies);
       if (journal.contextes === 2) return contexteDe(pageNatif);
       return contexteDe(pageRedemarrage, natifScript.cookies);
     },
@@ -617,6 +626,50 @@ describe('check-token-exposure — la sonde', () => {
     expect(result.ok).toBe(false);
     expect(result.errors.join('\n')).toContain('session non ouverte après la connexion');
     expect(result.errors.join('\n')).toContain('Rien ne peut être jugé');
+  });
+
+  it('juge la session LÀ OÙ LE COOKIE EST RANGÉ (production cross-site), pas sur l’origine de la page', async () => {
+    // Le cas réel du 18/10/2026 : la page est sur un hôte, l'API sur un autre
+    // (`VITE_USE_SAME_ORIGIN_API=false`), le cookie de session chez l'API.
+    // Interrogé sur l'origine de la page, `/auth/me` répond 401 et la sonde
+    // refusait sur une prémisse fausse — pendant que la session vivait.
+    const api = 'https://api.kojo-sonde.test';
+    const { result, journal } = await sonder({
+      states: [401, 200, RELEVE_VIDE],
+      sessionCookies: [
+        {
+          name: SESSION_COOKIE_NAME,
+          domain: 'api.kojo-sonde.test',
+          httpOnly: true,
+          secure: true,
+          sameSite: 'None',
+        },
+      ],
+    });
+
+    // L'assertion de TOPOLOGIE vient en premier : c'est elle que la mutation
+    // « topologie non lue » doit faire rougir, et un `ok: false` obtenu pour
+    // une autre raison ne doit pas la remplacer.
+    expect(result.checked.join('\n')).toContain('topologie lue');
+    expect(result.errors).toEqual([]);
+    expect(result.ok).toBe(true);
+    // Le premier relevé part de l'origine de la page (contexte vierge) ; le
+    // second est jugé sur l'hôte qui porte la session.
+    expect(journal.evaluations).toEqual([`${BASE}/api/auth/me`, `${api}/api/auth/me`]);
+    expect(result.checked.join('\n')).toContain('il y a un jeton à exposer');
+  });
+
+  it('le proxy même-origine ne déplace RIEN : le cookie est sur l’origine de la page', async () => {
+    const { result, journal } = await sonder({
+      states: [401, 200, RELEVE_VIDE],
+      sessionCookies: [
+        { name: SESSION_COOKIE_NAME, domain: 'kojo-exposition.test', httpOnly: true, secure: true, sameSite: 'Lax' },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(journal.evaluations).toEqual([`${BASE}/api/auth/me`, `${BASE}/api/auth/me`]);
+    expect(result.checked.join('\n')).not.toContain('topologie lue');
   });
 
   it('refuse AVANT de lancer un navigateur quand le compte CI manque', async () => {

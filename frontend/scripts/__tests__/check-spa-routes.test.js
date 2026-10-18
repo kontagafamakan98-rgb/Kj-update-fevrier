@@ -13,6 +13,7 @@ import {
   parseAppRoutes,
   patternToRegex,
   privateRoutesOf,
+  robotsTxtFor,
   runSpaRoutesCheck,
 } from '../check-spa-routes';
 
@@ -66,6 +67,7 @@ function R() {
         </>
       )}
       <Route path="/photo-debug" element={<PhotoTest />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }
@@ -346,12 +348,27 @@ describe('matching des motifs Vercel', () => {
     expect(matchesPattern('/login', '/dashboard')).toBe(false);
   });
 
-  it('parseAppRoutes sépare production et développement', () => {
-    const { routes, devOnly } = parseAppRoutes(APP_SOURCE);
+  it('parseAppRoutes sépare production, développement et route de secours', () => {
+    const { routes, devOnly, fallbackRoutes } = parseAppRoutes(APP_SOURCE);
     expect(routes).toContain('/support');
     expect(routes).toContain('/jobs/:id');
     expect(routes).not.toContain('/mobile-test');
     expect(devOnly).toEqual(['/mobile-test', '/photo-test']);
+    // La route de secours n'a AUCUNE URL : elle est relevée à part, ni routée
+    // ni classée privée (voir le cas suivant).
+    expect(fallbackRoutes).toEqual(['*']);
+    expect(routes).not.toContain('*');
+    expect(devOnly).not.toContain('*');
+  });
+
+  it('la route de secours n’entre NI dans les routes privées NI dans robots.txt', () => {
+    // Le défaut que cette exclusion empêche est mesuré : versée dans les routes
+    // privées, `path="*"` écrivait `Disallow: *` — l'interdiction du site
+    // ENTIER aux crawlers, publiée par le build.
+    const { routes } = parseAppRoutes(APP_SOURCE);
+    const privees = privateRoutesOf(routes, CONFORMING_REWRITES);
+    expect(privees).not.toContain('*');
+    expect(robotsTxtFor(privees, 'https://kojoforafrica.cc.cd')).not.toContain('Disallow: *');
   });
 });
 

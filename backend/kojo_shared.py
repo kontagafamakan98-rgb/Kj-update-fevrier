@@ -10,6 +10,7 @@ from typing import Any, Dict, Optional
 
 
 from kojo_core import db
+import kojo_live
 from kojo_models import Message, Notification, NotificationType
 from kojo_settings import (
     VAPID_CLAIMS_EMAIL,
@@ -46,6 +47,16 @@ async def store_notification(
         related_type=related_type,
     )
     await db.notifications.insert_one(notif.model_dump())
+    # PUSH TEMPS RÉEL (SSE) : la ligne est stockée AVANT l'annonce, donc un
+    # client qui la reçoit peut la marquer lue / la supprimer sans 404. Aucun
+    # flux ouvert n'est le cas normal (application fermée) : l'événement est
+    # alors simplement déposé dans le vide, et la notification reste lisible
+    # par l'API. `publish` ne lève pas et ne fait aucune I/O.
+    kojo_live.publish(
+        user_id,
+        "notification",
+        {"notification": notif.model_dump(mode="json")},
+    )
     return notif
 
 async def send_web_push_to_user(user_id: str, title: str, body: str, data: Optional[dict] = None):

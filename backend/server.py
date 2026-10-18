@@ -51,6 +51,7 @@ from kojo_payments import (
     paydunya_circuit_state,
     refresh_paydunya_circuit_from_db,
 )
+import kojo_live
 from kojo_scheduler import (
     email_provider_alert_loop,
     payout_stuck_sweeper_loop,
@@ -618,6 +619,14 @@ async def lifespan(application: FastAPI):
     # sonde de /monitor/email, et prévient le propriétaire UNE FOIS PAR PANNE.
     # La sonde externe du dépôt reste un second témoin, jamais le seul.
     email_alert_task = asyncio.create_task(email_provider_alert_loop())
+    # BUS TEMPS RÉEL (Redis pub/sub) : le fan-out reste en mémoire, le bus le
+    # PROLONGE aux autres workers et machines. Sans REDIS_URL, rien ne change
+    # (le process publie et sert ses propres flux) — et `start_bus` DIT la perte
+    # quand plusieurs workers tournent sans bus, au lieu de la taire.
+    try:
+        await kojo_live.start_bus()
+    except Exception as exc:  # noqa: BLE001 - un bus optionnel ne bloque pas le boot
+        logger.error(f"⚠️ start_bus() a échoué, démarrage poursuivi quand même: {exc}")
     logger.info("✅ API Kojo prête!")
 
     yield  # l'application tourne ici
@@ -633,7 +642,26 @@ async def lifespan(application: FastAPI):
         )
     except asyncio.CancelledError:
         pass
+    # Les flux SSE vivent dans le process : couper le bus ici ferme ses deux
+    # tâches AVANT la fermeture du client Mongo, dans le même ordre qu'au boot.
+    try:
+        await kojo_live.stop_bus()
+    except Exception as exc:  # noqa: BLE001 - l'arrêt ne doit pas masquer le reste
+        logger.error(f"⚠️ stop_bus() a échoué: {exc}")
     client.close()
+
+
+# ATTACHEMENT DU CYCLE DE VIE. `app = FastAPI(...)` est construit plus haut,
+# AVANT que `lifespan` n'existe (le module est découpé en domaines, et le
+# constructeur est en tête) : le cycle de vie doit donc être branché ici, après
+# la définition. Sans cette ligne, le démarrage ne fait RIEN — ni index, ni
+# planificateurs (décaissements bloqués, conservation, auto-alerte email), ni
+# bus temps réel : chaque pièce s'exécute correctement quand on l'appelle, et
+# aucune n'est appelée. Mesuré le 18/10/2026 par
+# `tests/test_live_bus_deux_workers.py` : le worker répondait sur /api/health
+# sans que son bus soit jamais attaché. L'attachement direct est la forme que
+# `scripts/charge/serveur_mesure.py` emploie déjà pour ÉTENDRE ce cycle.
+app.router.lifespan_context = lifespan
 
 
 # Exports utilisés par les tests (tests/conftest.py) et par uvicorn

@@ -16,6 +16,7 @@
 | `push` sur `main` | **oui**, 11 jobs |
 | `pull_request` vers `main` | **oui**, 11 jobs (dont `deploy-fly` *skipped*) |
 | `workflow_dispatch` (manuel) | **oui** ; `deploy-fly` déploie même sans changement backend |
+| `schedule` de `.github/workflows/atlas-backups-probe.yml` | **oui**, 1 job, cron 06:45 — `backupEnabled` ET `pitEnabled` lus dans l'API Atlas. Rouge sur sauvegarde absente (cause nommée) comme sur prémisse (clés/API illisibles) : une surface aveugle se déclare. Aucun budget : ce n'est pas une mesure de performance mais un fait de configuration. |
 | `workflow_dispatch` de `.github/workflows/lighthouse-mesure-locale.yml` | **oui**, 1 job — et **sans aucun budget** : la mesure Lighthouse locale sur les trois routes (`/,/jobs,/contact`), ses LHR run par run publiés en artifact. Rien n'y échoue sur une performance ; ce qui bloque reste `lighthouse-ci` (`lighthouserc*.cjs`) |
 | `push` sur une branche de travail | **non** — aucun run n'est déclenché |
 

@@ -47,10 +47,27 @@ primary_region = 'fra'
   min_machines_running = 1
   processes = ['app']
 
+  # CONNEXIONS et non requêtes : les notifications et les messages passent
+  # désormais par un flux SSE (kojo_live.py), donc chaque session connectée
+  # TIENT une connexion au lieu d'envoyer une requête toutes les 30 s.
+  #
+  # DIMENSIONNÉ SUR LA MESURE, pas sur une envie (18/10/2026) : le banc
+  # `scripts/charge/mesure_memoire_flux.py` relève le RSS du serveur à 0, 100,
+  # 200 et 400 flux ouverts — +166 Ko par session, 374 Ko au pire palier, pour
+  # une base de 166 Mo (poste Windows : majorant, l'interpréteur Linux est plus
+  # léger). Avec 512 Mo et 75 % pour les sessions, la formule
+  # `base + hard_limit × coût_pire ≤ RAM × 0,75` donnait 166 + 400×0,374 ≈ 316 Mo
+  # des 384 Mo disponibles : c'est POURQUOI 400, et 800 ne tenaient pas (les
+  # 256 Mo d'avant n'en tenaient que ~130). `soft_limit` fait ajouter une
+  # machine avant que la limite dure ne refuse : la promesse par machine reste
+  # honnête, l'échelle vient de l'horizontal.
+  # Source unique : `backend/scripts/charge/mesure_memoire.json`, relue par
+  # `backend/tests/test_dimensionnement_machine.py` (un `hard_limit` au-dessus
+  # de la RAM fait rougir le test au lieu d'attendre un OOM en production).
   [services.concurrency]
     type = 'connections'
-    hard_limit = 50
-    soft_limit = 20
+    hard_limit = 400
+    soft_limit = 200
 
   [[services.ports]]
     port = 80
@@ -70,6 +87,9 @@ primary_region = 'fra'
 
 [[vm]]
   size = 'shared-cpu-1x'
-  memory = '256mb'
+  # 512 Mo et non 256 : à 256, la base (166 Mo) plus 400 sessions (150 Mo)
+  # dépassait la RAM disponible, et une machine Fly ne refuse pas proprement —
+  # elle se fait tuer. La mesure et le calcul vivent dans SCALING.md §« machine ».
+  memory = '512mb'
   cpus = 1
-  memory_mb = 256
+  memory_mb = 512
