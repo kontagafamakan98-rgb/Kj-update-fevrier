@@ -1989,6 +1989,26 @@
       ]
     },
     {
+      "id": "spa-routes: route de secours traitee comme une route de production",
+      "garde": "frontend/scripts/check-spa-routes.js",
+      "cible": "frontend/scripts/check-spa-routes.js",
+      "trouve": "    } else if (route === APP_FALLBACK_ROUTE) {",
+      "remplace": "    } else if (false && route === APP_FALLBACK_ROUTE) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-spa-routes.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-spa-routes.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "aucune règle pour « */ »"
+      ]
+    },
+    {
       "id": "validate-vercel-json: propriete interdite dans un item rewrites toleree",
       "garde": "frontend/scripts/validate-vercel-json.mjs",
       "cible": "frontend/scripts/validate-vercel-json.mjs",

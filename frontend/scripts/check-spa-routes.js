@@ -189,6 +189,25 @@ export function disallowPathsOf(body) {
 }
 
 export const APP_JS = 'src/App.js';
+
+// La route de SECOURS de l'application (`path="*"`), rendue par React Router
+// quand un lien mort INTERNE ne correspond à aucune route — l'URL inconnue,
+// elle, est servie par `404.html` avec un statut 404, sans aucune règle Vercel.
+//
+// Elle n'est donc PAS une route de production, et le garde la RECONNAÎT au lieu
+// de la lire comme un chemin littéral :
+//   • exiger une règle Vercel pour « * » rouvrirait le catch-all que le point 4
+//     refuse (toute URL inconnue répondrait 200, un soft 404) ;
+//   • la classer publique ou privée n'a pas d'objet (elle ne publie aucune
+//     adresse) — et surtout, la verser dans les routes privées DÉRIVÉES ferait
+//     écrire `Disallow: *` dans robots.txt, c'est-à-dire l'interdiction du site
+//     ENTIER aux crawlers. Mesuré le 18/10/2026 : la route ajoutée à App.js
+//     sans cette reconnaissance produisait exactement ces deux refus.
+//
+// L'ignorer en silence serait l'autre erreur : elle est RELEVÉE à part
+// (`parseAppRoutes().fallbackRoutes`) et publiée en notice par le garde.
+export const APP_FALLBACK_ROUTE = '*';
+
 // Routes volontairement NON routées : elles n'existent qu'en développement
 // (bloc `import.meta.env.DEV` de App.js) — les router en production exposerait
 // des pages de test absentes du build.
@@ -268,14 +287,15 @@ export function findShadowedRules(rewrites) {
 }
 
 /**
- * Routes déclarées par App.js, séparées en production / développement.
+ * Routes déclarées par App.js, séparées en production / développement / secours.
  *
  * @param {string} source Contenu de src/App.js.
- * @returns {{routes: string[], devOnly: string[]}}
+ * @returns {{routes: string[], devOnly: string[], fallbackRoutes: string[]}}
  */
 export function parseAppRoutes(source) {
   const routes = [];
   const devOnly = [];
+  const fallbackRoutes = [];
   // Le bloc de développement est délimité par `import.meta.env.DEV && ( … )` :
   // on le reconnaît en comptant les parenthèses (indentation indépendante),
   // et si la fermeture est INTROUVABLE on ne devine rien — tout le fichier
@@ -313,11 +333,15 @@ export function parseAppRoutes(source) {
       match.index < devBlockStart + devBlock.length;
     if (inDevBlock) {
       if (!devOnly.includes(route)) devOnly.push(route);
+    } else if (route === APP_FALLBACK_ROUTE) {
+      // Aucune URL ne la produit : elle ne doit entrer dans AUCUNE liste
+      // dérivée du routage (règles Vercel, routes privées, robots.txt).
+      if (!fallbackRoutes.includes(route)) fallbackRoutes.push(route);
     } else if (!routes.includes(route)) {
       routes.push(route);
     }
   }
-  return { routes, devOnly };
+  return { routes, devOnly, fallbackRoutes };
 }
 
 /**
@@ -453,10 +477,17 @@ export function runSpaRoutesCheck(options = {}) {
   if (!existsSync(appPath)) {
     errors.push(`${APP_JS} introuvable : impossible de vérifier que chaque route React est routée`);
   } else {
-    const { routes, devOnly } = parseAppRoutes(readFileSync(appPath, 'utf8'));
+    const { routes, devOnly, fallbackRoutes } = parseAppRoutes(readFileSync(appPath, 'utf8'));
     productionRoutes = routes;
     if (routes.length === 0) {
       errors.push(`${APP_JS} : aucune route extraite — le garde ne prouve rien (format des <Route> changé ?)`);
+    }
+    if (fallbackRoutes.length > 0) {
+      notices.push(
+        `route de secours « ${APP_FALLBACK_ROUTE} » reconnue : elle rend un lien mort INTERNE, ` +
+          `n'exige aucune règle Vercel (l'URL inconnue reste le 404.html statique) et n'entre ` +
+          'dans aucune liste dérivée (routes privées, robots.txt)'
+      );
     }
     for (const route of routes) {
       const pathname = route === '/' ? '' : route.replace(/\/$/, '');
@@ -514,7 +545,10 @@ export function runSpaRoutesCheck(options = {}) {
         );
       }
     }
-    notices.push(`${routes.length} routes React de production routées (${devOnly.length} route(s) de développement exclue(s))`);
+    notices.push(
+      `${routes.length} routes React de production routées (${devOnly.length} route(s) de développement ` +
+        `et ${fallbackRoutes.length} route(s) de secours exclue(s))`
+    );
   }
 
   // ── 6. Aucune règle exacte rendue inatteignable par une règle à motif ─────

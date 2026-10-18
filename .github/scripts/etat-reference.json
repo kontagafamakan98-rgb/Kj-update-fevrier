@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-18",
-    "motif": "la sonde SSE lit le battement du serveur et la fenetre de silence du client dans frontend/src/config/flux-temps-reel.js au lieu de recopier 20000 et 15000 : l'alignement (45 s contre 20 s) est lu d'un proprietaire unique",
+    "motif": "le garde reconnait la route de secours path=* et l'exclut de toute liste derivee : sans cela, une route ajoutee a App.js exigeait une regle Vercel (le catch-all refuse) et ecrivait Disallow: * dans robots.txt, interdisant le site entier",
     "fichiers": {
       ".githooks/pre-push": "57a57605381510b531a2653226add8b0cd3f1f5879cc2adeead186342a2b44a9",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -100,7 +100,6 @@
       "frontend/scripts/check-seo-production.js": "670ff721139154e94372f48c5cbd95cefcce85f9e8df9df078069c9df3f84484",
       "frontend/scripts/check-shell-remote-resources.js": "892f772d7c2ab1a41b03b0dc05d29b470d7c0c9bc6ce0355599b5a8c020d2822",
       "frontend/scripts/check-shell-text-provenance.js": "eedaecfb08a9586588fa1bbf94285b807898ca49e2f98c3090dcaed921747fc6",
-      "frontend/scripts/check-spa-routes.js": "5beaa42d2616c3c568817f06312b12a7b2887dbddd2b37d1dca1d6d8e06efe1e",
       "frontend/scripts/check-test-environment.js": "7a3610e18bfe6b6eb63e26b6fe5031b50cf7fda606aa944faedfe69e89e1310c",
       "frontend/scripts/check-token-exposure-production.js": "a3a2f33c36bc0bb2b11f0f32a1f6539c2a9641f60469eadeb006625aa44205bb",
       "frontend/scripts/corpus-missions.js": "81c74865485808ecc2efa5902ab56b112a2bc7b5bb0077f2bebb24279a34e1ad",
@@ -121,7 +120,8 @@
       "backend/server.py": "98ac7e99c63a77d7eeb36d63a0cfe318dea5b798d789665b85e5d4caede1a6bf",
       "frontend/scripts/juges-de-temps.js": "f77642cb38faa55bda29910fa9976120f06be893ce58d905cf3c4180ca6a18dc",
       "frontend/scripts/check-moteurs-gestes.js": "d092df072526de8c1c4f8f31ed9849c287b78f09d056de2bccc2ce48b3a41a0e",
-      "frontend/scripts/check-sse-proxy-production.js": "8d92c0c3f0b44f442837621f9618f55e8c2794126a85667ac31ed562dbfca3a3"
+      "frontend/scripts/check-sse-proxy-production.js": "8d92c0c3f0b44f442837621f9618f55e8c2794126a85667ac31ed562dbfca3a3",
+      "frontend/scripts/check-spa-routes.js": "e071e01d1291fc61fe4ac5dfb83c4609ccccd7d5f542cba1044988ae107e27bf"
     }
   },
   "hors_perimetre": [
