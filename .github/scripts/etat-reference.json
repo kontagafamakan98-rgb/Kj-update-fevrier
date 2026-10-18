@@ -34,8 +34,8 @@
     "Preuve : backend/tests/test_etat_reference.py"
   ],
   "reference": {
-    "etablie_le": "2026-10-17",
-    "motif": "l'origine jugee garde le schema et le port des origines connues (page, API) : le domaine seul du cookie referait https://127.0.0.2 et la sonde interrogeait le port 443 — rouge mesure par e2e/session-proxy.spec.js",
+    "etablie_le": "2026-10-18",
+    "motif": "garde du perimetre multi-moteurs : registre des gestes, testMatch des deux projets, publication par moteur, installation des trois binaires et planchers de lecture (cible de mutations declarees)",
     "fichiers": {
       ".githooks/pre-push": "57a57605381510b531a2653226add8b0cd3f1f5879cc2adeead186342a2b44a9",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -118,7 +118,8 @@
       "frontend/scripts/check-css-inline-budget.js": "f2ec08e78600460fbc3ca8536b7e18f404d8190a0487ba8c41515e3ce8ad5bff",
       "frontend/scripts/classes-coquilles.js": "94a2b644525375b0cabc8bfb71b5fb42e4beb90080e9f196cda01dc4ed94509d",
       "frontend/scripts/check-prerender-shells.js": "2ea6bf7d3635b045f0413b6a35e9105845960d46a5ecf4184c2bd5ee2f611077",
-      "frontend/scripts/check-session-reload-production.js": "30f3d15481f689f73579c618c92728755d60fa5b55f53dc91d80577c9e853217"
+      "frontend/scripts/check-session-reload-production.js": "30f3d15481f689f73579c618c92728755d60fa5b55f53dc91d80577c9e853217",
+      "frontend/scripts/check-moteurs-gestes.js": "d092df072526de8c1c4f8f31ed9849c287b78f09d056de2bccc2ce48b3a41a0e"
     }
   },
   "hors_perimetre": [

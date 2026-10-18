@@ -1,6 +1,17 @@
 /**
  * LES ATTENTES DE CONDITION DU HARNAIS e2e — et pourquoi il n'y a ici AUCUNE horloge.
  *
+ * ── La SEULE exception, et elle est déclarée (28/09/2026) ───────────────────
+ * `attendreLaCondition`, en bas de ce module, n'attend PAS une grandeur neutre :
+ * elle attend la condition que le cas JUGE, et elle rend sa DURÉE. C'est
+ * l'inverse de la règle ci-dessous, et c'est délibéré : la preuve multi-moteurs
+ * compare ce que trois moteurs font du MÊME geste, donc il lui faut une durée —
+ * et une durée ne s'obtient pas d'une attente neutre. Ce qui protège le cas est
+ * ailleurs : `attendreLaCondition` ne lève jamais, elle rend `atteinte: false`
+ * avec la DERNIÈRE valeur lue, et l'appelant DOIT l'asserter. Sans cette
+ * assertion, la faute que la règle ci-dessous interdit rentrerait par la porte
+ * de derrière (un rouge d'attente au lieu d'un rouge de fond).
+ *
  * ── Le défaut que ce module remplace ────────────────────────────────────────
  * Un `page.waitForTimeout(N)` ne dit pas ce qu'on attend : il dit combien de
  * temps on espère. La mesure prise après lui porte donc sur l'HÔTE autant que
@@ -159,4 +170,81 @@ export async function attendreLeSilenceDesRequetes(
     if (Date.now() - depuis >= calmeMs) return true;
   }
   return false;
+}
+
+/**
+ * Pas de sondage d'une MESURE DE GESTE, en millisecondes.
+ *
+ * Il est distinct de `PAS_SONDAGE_MS` (50 ms) et c'est une mesure, pas un
+ * goût : une bascule de point de rupture dure quelques millisecondes, donc un pas
+ * de 50 ms ne la mesurerait pas — il la déciderait. 25 ms est assez fin pour que
+ * la borne haute d'une bascule de ~3 ms reste du même ordre.
+ */
+export const PAS_SONDAGE_GESTE_MS = 25;
+
+/** Plafond par défaut de `attendreLaCondition`, en millisecondes. */
+export const PLAFOND_ATTENTE_MS = 3000;
+
+/**
+ * Attend qu'un prédicat soit vrai sur la valeur d'une sonde, ET REND LA DURÉE.
+ *
+ * ── Pourquoi cette fonction existe, alors que le module s'interdit d'attendre le fait jugé ──
+ * Parce que la preuve multi-moteurs (28/09/2026) a besoin des deux choses à la
+ * fois : attendre un FAIT observable, et PUBLIER le temps qu'il a fallu — c'est
+ * cette durée qui se compare d'un moteur à l'autre (Firefox inertiel pour une
+ * molette, WebKit attentif au premier rendu), et un délai fixe ne la mesure pas,
+ * il la décide. La condition de sortie est donc celle que le cas juge, et
+ * l'appelant l'asserte (`atteinte`), ce qui est la contrepartie exigée : sans
+ * l'assertion, un fait jamais arrivé passerait pour un succès muet.
+ *
+ * ── Ce que la durée est, et pourquoi elle est rendue en DEUX bornes ─────────
+ * Un sondage mesure un INTERVALLE, pas un point : la condition a été vue VRAIE à
+ * `ms`, et elle était fausse à la fin de la lecture précédente (`borneBasseMs`).
+ * Une lecture de page peut durer des secondes sur un hôte chargé (re-mise en
+ * page, `evaluate` retardé), et cette latence entre ENTIÈRE dans `ms` sans que
+ * le fait ait mis ce temps-là — relevé du 28/09/2026 : une bascule publiée à
+ * 6 283 ms sur Firefox dont ~6 s étaient une seule lecture, soit un « écart » de
+ * 104 616 % entre moteurs qui ne mesurait que la lenteur d'une sonde. C'est donc
+ * `fourchetteMs[0]` qu'un tableau d'écarts compare, `ms` restant la borne haute
+ * lue, et `latenceMaxMs` nommant le bruit de la sonde.
+ *
+ * @template T
+ * @param {import('@playwright/test').Page} page Page ouverte.
+ * @param {() => T} sonde Fonction évaluée DANS la page (donc sérialisable : une
+ *   fonction qui prend un `page` en argument ne peut pas s'exécuter là-bas).
+ * @param {(valeur: T) => boolean} predicat Condition d'arrêt.
+ * @param {{plafondMs?: number, pasMs?: number}} [options]
+ * @returns {Promise<{atteinte: boolean, ms: number, dernier: T, borneBasseMs: number, latenceMaxMs: number, lectures: number, fourchetteMs: [number, number]}>}
+ */
+export async function attendreLaCondition(page, sonde, predicat, options = {}) {
+  const plafondMs = options.plafondMs ?? PLAFOND_ATTENTE_MS;
+  const pasMs = options.pasMs ?? PAS_SONDAGE_GESTE_MS;
+  const debut = Date.now();
+  let borneBasseMs = 0;
+  let latenceMaxMs = 0;
+  let lectures = 0;
+  const lire = async () => {
+    const avant = Date.now();
+    const valeur = await page.evaluate(sonde);
+    latenceMaxMs = Math.max(latenceMaxMs, Date.now() - avant);
+    lectures += 1;
+    return valeur;
+  };
+
+  let dernier = await lire();
+  while (!predicat(dernier)) {
+    const ecoule = Date.now() - debut;
+    if (ecoule >= plafondMs) {
+      return resultat({ atteinte: false, ms: ecoule, dernier, borneBasseMs, latenceMaxMs, lectures });
+    }
+    borneBasseMs = Date.now() - debut;
+    await dormir(pasMs);
+    dernier = await lire();
+  }
+  return resultat({ atteinte: true, ms: Date.now() - debut, dernier, borneBasseMs, latenceMaxMs, lectures });
+}
+
+/** Met la lecture en forme : les deux bornes de la durée, côte à côte. */
+function resultat({ atteinte, ms, dernier, borneBasseMs, latenceMaxMs, lectures }) {
+  return { atteinte, ms, dernier, borneBasseMs, latenceMaxMs, lectures, fourchetteMs: [borneBasseMs, ms] };
 }
