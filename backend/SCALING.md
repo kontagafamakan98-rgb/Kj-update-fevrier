@@ -347,8 +347,12 @@ Linux de l'image est plus léger.
 | **512 Mo / 400** | 166,6 + 400 × 0,385 = **320 Mo** pour 384 Mo | **retenu** (83 % du budget) |
 
 D'où `memory_mb = 512`, `hard_limit = 400`, `soft_limit = 200`, et
-`KOJO_SSE_MAX_TOTAL = 400` **dans `[env]`** : le plafond applicatif ne promet
-plus 1000 flux à un process que la plateforme arrête à 400. Le refus devient
+`MAX_STREAMS_TOTAL = 400` comme **défaut du code** (`kojo_live.py`) : le plafond
+applicatif ne promet plus 1000 flux à un process que la plateforme arrête à
+400. Il n'est PAS dans `[env]` de fly.toml, et c'est voulu : la sonde de drift
+lit une clé `[env]` pas encore déployée comme une configuration non appliquée,
+si bien qu'une variable ajoutée dans une PR rendrait le job rouge jusqu'au
+déploiement. Le refus devient
 alors le 503 nommé du produit (`Retry-After`), pas un OOM choisi par Fly — et
 comme `soft_limit` fait ajouter une machine avant la limite dure, l'échelle
 vient de l'horizontal, pas d'une promesse plus grosse.

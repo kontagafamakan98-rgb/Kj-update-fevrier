@@ -86,8 +86,17 @@ PARTAGE_TIMEOUT_SECONDS = float(
 # SSE ne coûte presque rien) mais une borne explicite, pour que la ressource
 # « connexions » reste comptée quelque part : au-delà, le flux répond 503 et le
 # client retombe sur le sondage dégradé au lieu de saturer la machine en
-# silence. La borne de Fly (`fly.toml`, [services.concurrency]) est plus haute.
-MAX_STREAMS_TOTAL = int(os.environ.get("KOJO_SSE_MAX_TOTAL", "1000") or 1000)
+# silence.
+#
+# 400 = le `hard_limit` de `fly.toml`, et pas 1000 : une promesse applicative
+# au-dessus de ce que la machine tient n'est jamais tenue, c'est la plateforme
+# qui refuse en premier — et ce n'est plus le produit qui décide où. Le chiffre
+# est DÉRIVÉ de la mesure (`backend/SCALING.md` §6.1bis), et
+# `backend/tests/test_dimensionnement_machine.py` refuse qu'il repasse au-dessus.
+# Il vit ICI (défaut de code) et non dans `[env]` de fly.toml : la sonde de drift
+# Fly lit une clé `[env]` non encore déployée comme une config non appliquée, ce
+# qui rendrait le job rouge entre la PR et le déploiement.
+MAX_STREAMS_TOTAL = int(os.environ.get("KOJO_SSE_MAX_TOTAL", "400") or 400)
 
 # File d'un abonné. Une notification par seconde pendant une rafale tient
 # largement ; au-delà, le client est plus lent que le produit et on lui demande

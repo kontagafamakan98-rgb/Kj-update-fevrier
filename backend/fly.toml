@@ -31,12 +31,6 @@ primary_region = 'fra'
   # TRUSTED_HOSTS : le trafic public (Vercel, moniteurs UptimeRobot/Render)
   # arrive via le proxy Fly avec Host *.fly.dev → servi normalement.
   TRUSTED_HOSTS = '*.internal,*.flycast.internal,kojo-backend.fly.dev,api.kojoforafrica.cc.cd'
-  # Plafond des flux SSE du PROCESSUS. Il vaut le `hard_limit` de la machine et
-  # pas le défaut du code (1000) : une promesse applicative au-dessus de ce que
-  # la plateforme et la RAM tiennent n'est jamais tenue — c'est la plateforme
-  # qui refuse, sans que le produit ait décidé où. Mesure et dérivation :
-  # backend/SCALING.md §« machine », garde : backend/tests/test_dimensionnement_machine.py.
-  KOJO_SSE_MAX_TOTAL = '400'
 
 # Syntaxe complète [[services]] (et non [http_service]) : le raccourci
 # [http_service] ne sait exprimer QUE des checks HTTP (protocol http/https),

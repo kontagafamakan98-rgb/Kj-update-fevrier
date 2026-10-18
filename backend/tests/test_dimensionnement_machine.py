@@ -32,6 +32,8 @@ import json
 import re
 from pathlib import Path
 
+import kojo_live
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FLY_TOML = REPO_ROOT / "backend" / "fly.toml"
 MESURE = REPO_ROOT / "backend" / "scripts" / "charge" / "mesure_memoire.json"
@@ -56,14 +58,15 @@ def _nombre(text: str, motif: str, quoi: str) -> float:
 def _fly_toml() -> dict:
     texte = _lire(FLY_TOML)
     assert len(texte) > MIN_OCTETS_FLY_TOML, "fly.toml sous son plancher de lecture"
-    env_max = re.search(r"KOJO_SSE_MAX_TOTAL\s*=\s*'(\d+)'", texte)
     return {
         "hard_limit": _nombre(texte, r"hard_limit\s*=\s*(\d+)", "de limite dure"),
         "soft_limit": _nombre(texte, r"soft_limit\s*=\s*(\d+)", "de limite souple"),
         "memory_mb": _nombre(texte, r"memory_mb\s*=\s*(\d+)", "de RAM"),
-        # Le plafond applicatif est DÉCLARÉ dans [env] : s'il manquait, le code
-        # retomberait à 1000, au-dessus de ce que la plateforme laisse entrer.
-        "max_total": float(env_max.group(1)) if env_max else None,
+        # Le plafond applicatif vit dans le CODE (`kojo_live.MAX_STREAMS_TOTAL`),
+        # pas dans `[env]` : une clé `[env]` non encore déployée est lue comme une
+        # dérive par la sonde Fly, ce qui rougirait le job entre la PR et le
+        # déploiement. C'est donc le défaut du module que ce garde confronte.
+        "max_total": float(kojo_live.MAX_STREAMS_TOTAL),
     }
 
 
@@ -127,10 +130,6 @@ class TestLaPromesseTientDansLaRam:
         assert config["soft_limit"] < config["hard_limit"], (
             "soft_limit (%d) ≥ hard_limit (%d) : aucune machine ne serait ajoutée avant le refus"
             % (config["soft_limit"], config["hard_limit"])
-        )
-        assert config["max_total"] is not None, (
-            "KOJO_SSE_MAX_TOTAL absent de [env] : le code retombe sur 1000, au-dessus du "
-            "hard_limit de la plateforme, donc une promesse que rien ne tient"
         )
         assert config["max_total"] <= config["hard_limit"], (
             "KOJO_SSE_MAX_TOTAL (%d) dépasse hard_limit (%d) : l'application promet des flux "
