@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-18",
-    "motif": "la sonde d'exposition lit l'hote qui porte le cookie de session avant de juger /auth/me : en production cross-site, l'origin de la page repondait 401 et la sonde refusait sur une premisse fausse (rouge du 18/10/2026)",
+    "motif": "la sonde SSE ne lisait que LHCI_CI_* (absents du depot) : elle rendait une premisse « compte absent » alors que le compte existe sous LHCI_TEST_*, donc rouge chaque jour sans jamais juger la traversee du proxy",
     "fichiers": {
       ".githooks/pre-push": "57a57605381510b531a2653226add8b0cd3f1f5879cc2adeead186342a2b44a9",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -119,9 +119,9 @@
       "backend/server.py": "98ac7e99c63a77d7eeb36d63a0cfe318dea5b798d789665b85e5d4caede1a6bf",
       "frontend/scripts/juges-de-temps.js": "f77642cb38faa55bda29910fa9976120f06be893ce58d905cf3c4180ca6a18dc",
       "frontend/scripts/check-moteurs-gestes.js": "d092df072526de8c1c4f8f31ed9849c287b78f09d056de2bccc2ce48b3a41a0e",
-      "frontend/scripts/check-sse-proxy-production.js": "8d92c0c3f0b44f442837621f9618f55e8c2794126a85667ac31ed562dbfca3a3",
       "frontend/scripts/check-spa-routes.js": "e071e01d1291fc61fe4ac5dfb83c4609ccccd7d5f542cba1044988ae107e27bf",
-      "frontend/scripts/check-token-exposure-production.js": "0fd396ac948eae4f23de5bf608df4f2cbdc91c0998d509d4eb75ea1ba89b8fd4"
+      "frontend/scripts/check-token-exposure-production.js": "0fd396ac948eae4f23de5bf608df4f2cbdc91c0998d509d4eb75ea1ba89b8fd4",
+      "frontend/scripts/check-sse-proxy-production.js": "2031baeb402c738c7c5c28d252a8004a7dbde6d0d754b6d99e31bfa1559278d3"
     }
   },
   "hors_perimetre": [
