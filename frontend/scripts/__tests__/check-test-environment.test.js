@@ -331,6 +331,29 @@ describe('check-test-environment — publication, sur un vrai dépôt', () => {
   }, 60_000);
 });
 
+// Un checkout de BRANCHE (CI, clone partiel) n'a pas de `main` LOCALE : la base
+// est alors publiée, et `origin/main` est la base — pas un résidu. Sans cette
+// lecture, la branche COURANTE devenait la base (dernier candidat) et
+// `origin/main`, dont le contenu est dans la branche, était désigné comme
+// résidu : `git push origin --delete main`. Mesuré le 18/10/2026 sur un
+// `workflow_dispatch` lancé sur une branche.
+describe('check-test-environment — la base lue dans les réfs distantes', () => {
+  it('ne prend pas `origin/main` pour un résidu quand la base n’existe que sur le distant', () => {
+    const { issues, distantes } = mesurer(
+      ['refonte\torigin/refonte\t\t*'],
+      {
+        // Le contenu de la base est DANS la branche courante — le cas réel d'une
+        // branche partie de `main`.
+        'rev-list --left-right --count origin/refonte...origin/main': { lignes: ['0\t0'] },
+        'rev-list --count refonte --not --remotes': { lignes: ['0'] },
+      },
+      ['origin/HEAD\trefs/remotes/origin/main', 'origin/main\t', 'origin/refonte\t'],
+    );
+    expect(issues).toEqual([]);
+    expect(distantes).toBe(0);
+  });
+});
+
 describe('check-test-environment — branches locales', () => {
   it('nomme une branche fusionnée par squash dont la réf distante a disparu', () => {
     const { issues, examinees } = mesurer(

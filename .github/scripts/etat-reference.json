@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-18",
-    "motif": "la sonde SSE ne lisait que LHCI_CI_* (absents du depot) : elle rendait une premisse « compte absent » alors que le compte existe sous LHCI_TEST_*, donc rouge chaque jour sans jamais juger la traversee du proxy",
+    "motif": "un checkout de branche n'a pas de main locale : la base se lit desormais dans les refs DISTANTES avant de retomber sur la branche courante, sinon origin/main etait designe comme residu a supprimer (git push origin --delete main, mesure le 18/10/2026 sur un workflow_dispatch lance sur une branche)",
     "fichiers": {
       ".githooks/pre-push": "57a57605381510b531a2653226add8b0cd3f1f5879cc2adeead186342a2b44a9",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -78,7 +78,6 @@
       "frontend/scripts/check-drapeaux-emoji.js": "43c50d9cbc0693221ebfa973e136c0577c3082a4288c93c4d4b73bb04f7da732",
       "frontend/scripts/check-formulaire-differe.js": "793bb7255fb90f25baf7703dca0f4b87b801be837831cab6fdde862a1abd327f",
       "frontend/scripts/check-generated-icons.js": "77a863dfbfa23145f74528e1a04489802fd4bc03dd4db0eaeeb44883ffec9e69",
-      "frontend/scripts/check-git-branches.js": "334284b09a45de7a7a558812316c8c1284bf12eeca1b149e665ab11875c3afbc",
       "frontend/scripts/check-hero-images.js": "c6f263a3744dde61ca954a943cca3b0f0253ff52d918618d1aac915c90512a2e",
       "frontend/scripts/check-home-shell.js": "d146088dc555deda0993924a4b4f5d7697d3c05a4107a7d9575cee6fd37ce080",
       "frontend/scripts/check-job-form-canari.js": "569dc5b9b68b04b615b014b4be72929cd15d78535044dbaa2a8fab84f5b589ce",
@@ -121,7 +120,8 @@
       "frontend/scripts/check-moteurs-gestes.js": "d092df072526de8c1c4f8f31ed9849c287b78f09d056de2bccc2ce48b3a41a0e",
       "frontend/scripts/check-spa-routes.js": "e071e01d1291fc61fe4ac5dfb83c4609ccccd7d5f542cba1044988ae107e27bf",
       "frontend/scripts/check-token-exposure-production.js": "0fd396ac948eae4f23de5bf608df4f2cbdc91c0998d509d4eb75ea1ba89b8fd4",
-      "frontend/scripts/check-sse-proxy-production.js": "2031baeb402c738c7c5c28d252a8004a7dbde6d0d754b6d99e31bfa1559278d3"
+      "frontend/scripts/check-sse-proxy-production.js": "2031baeb402c738c7c5c28d252a8004a7dbde6d0d754b6d99e31bfa1559278d3",
+      "frontend/scripts/check-git-branches.js": "ca59cb244f206e5461769d290c3d10165a34d025a05b47d8463cb30a4accbc87"
     }
   },
   "hors_perimetre": [

@@ -75,12 +75,28 @@ export function lireObligatoire(args, cwd, lire) {
   return lecture.lignes;
 }
 
-export function brancheDeBase(branches, cwd, lire) {
+export function brancheDeBase(branches, cwd, lire, refsDistantes = []) {
   const tete = lire(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], cwd);
   const duDistant = tete.ok ? tete.lignes[0]?.replace(/^[^/]+\//, '') : null;
-  return [duDistant, 'main', 'master', branches.find((b) => b.courante)?.nom].find(
-    (nom) => nom && branches.some((branche) => branche.nom === nom),
-  ) || null;
+  const noms = [duDistant, 'main', 'master'];
+  const locale = noms.find((nom) => nom && branches.some((branche) => branche.nom === nom));
+  if (locale) return locale;
+  // Une base PUBLIÉE tient lieu de base : un checkout de branche (CI, clone
+  // partiel) n'a pas de `main` locale, et `origin/main` EST alors la base. Sans
+  // cette lecture, la branche COURANTE devenait la base et `origin/main` un
+  // résidu — la sonde conseillait « git push origin --delete main », c'est-à-dire
+  // la suppression de la branche par défaut du dépôt (mesuré le 18/10/2026 sur
+  // un `workflow_dispatch` lancé sur une branche). La lecture des réfs distantes
+  // est déjà faite par l'appelant : aucune commande git de plus.
+  const publiee = noms.find(
+    (nom) => nom && refsDistantes.some((ref) => !ref.symbolique && ref.nom === nom),
+  );
+  if (publiee) return publiee;
+  // Dernier recours : un dépôt dont la branche de base porte un AUTRE nom
+  // (`trunk`, `develop`) — c'est la branche courante, et ce repli doit rester
+  // APRÈS la base publiée : la branche courante, dans un checkout de branche,
+  // n'est pas la base (c'est précisément le défaut corrigé ici).
+  return branches.find((branche) => branche.courante)?.nom || null;
 }
 
 export function raisonDuContenu(ref, base, cwd, lire) {
@@ -246,7 +262,7 @@ export function mesurerBranches({
     const coupe = ref.indexOf('/');
     return { ref, distant: ref.slice(0, coupe), nom: ref.slice(coupe + 1), symbolique: Boolean(symref) };
   });
-  const base = brancheDeBase(branches, cwd, lire);
+  const base = brancheDeBase(branches, cwd, lire, refsDistantes);
   const baseDistante = base ? refsDistantes.find((ref) => ref.nom === base) : null;
   const distant = baseDistante?.distant
     ?? refsDistantes.find((ref) => !ref.symbolique)?.distant
