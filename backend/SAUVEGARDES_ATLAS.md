@@ -260,10 +260,17 @@ Trois choses doivent tenir, dans cet ordre :
 3. **Exécuter un vrai exercice PITR daté** et l'écrire ici (même tableau, même
    empreinte), au moins une fois avant la mise en service à volume.
 4. **Cadence** : un exercice par trimestre, daté dans ce fichier. Une procédure
-   jamais rejouée est une intention, pas une capacité.
+   jamais rejouée est une intention, pas une capacité — et cette cadence n'est
+   pas une intention non plus : `.github/scripts/check-exercice-restauration.py`
+   lit le titre daté du §3 et **refuse** un exercice plus vieux que 100 jours
+   (90 de cadence + 10 de marge, étape de `workflow-lint`). Le runbook ne peut
+   donc pas rester « prêt à restaurer » sur une preuve périmée. Ce que le garde
+   ne fait pas : rejouer l'exercice à ta place — il rougit, il ne restaure pas.
 5. **Le propriétaire doit pouvoir restaurer seul** : la règle des deux personnes
    de `CONTINUITE.md` §1 (écart connu) s'applique aussi ici — une sauvegarde
    dont une seule personne détient les clés reste un point de défaillance.
 
-Garde : `backend/tests/test_atlas_backups_probe.py` (verdicts de la sonde et
-câblage du workflow).
+Gardes : `backend/tests/test_atlas_backups_probe.py` (verdicts de la sonde et
+câblage du workflow) ; `.github/scripts/check-exercice-restauration.py` juge la
+FRAÎCHEUR de l'exercice daté du §3 (un titre « non exécuté » n'est pas une
+preuve), preuve `backend/tests/test_exercice_restauration_fraicheur.py`.

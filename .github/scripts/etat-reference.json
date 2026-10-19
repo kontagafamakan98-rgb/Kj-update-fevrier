@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-19",
-    "motif": "la sonde juge la FRAICHEUR d'une sauvegarde externe verifiee quand le palier partage n'offre aucune sauvegarde Atlas : le cluster de production est un M0 sans backupEnabled ni pitEnabled (releve du 19/10/2026), donc exiger un Cloud Backup y etait un remede impossible et un vert sans mesure un mensonge",
+    "motif": "nouveau garde de fraicheur de l'exercice de restauration date : sa cible de mutation entre dans le perimetre derive",
     "fichiers": {
       ".githooks/pre-push": "57a57605381510b531a2653226add8b0cd3f1f5879cc2adeead186342a2b44a9",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -121,7 +121,8 @@
       "frontend/scripts/check-sse-proxy-production.js": "2031baeb402c738c7c5c28d252a8004a7dbde6d0d754b6d99e31bfa1559278d3",
       "frontend/scripts/check-git-branches.js": "ca59cb244f206e5461769d290c3d10165a34d025a05b47d8463cb30a4accbc87",
       ".github/scripts/check-fly-env-drift.py": "626ff760af805d2c5210657505723d91f16ccc4d4c9db8264e38c56b92313c61",
-      "backend/scripts/check_atlas_backups.py": "4267bdbd40226f47c5454e9c72def56a4cf119cf36fc5816b05e0a4160223441"
+      "backend/scripts/check_atlas_backups.py": "4267bdbd40226f47c5454e9c72def56a4cf119cf36fc5816b05e0a4160223441",
+      ".github/scripts/check-exercice-restauration.py": "54de4cd7521a19c5c4bcdd0a78e7ef9ef0fc87d3a62f15facf1b63323f0b5728"
     }
   },
   "hors_perimetre": [

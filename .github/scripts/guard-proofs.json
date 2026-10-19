@@ -390,6 +390,14 @@
       "runner": "pytest"
     },
     {
+      "chemin": ".github/scripts/check-exercice-restauration.py",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "backend/tests/test_exercice_restauration_fraicheur.py",
+      "runner": "pytest",
+      "motif": "refuse un exercice de restauration daté devenu plus vieux que la cadence que le runbook annonce lui-même (trimestre, plus dix jours de marge) : le §3 de backend/SAUVEGARDES_ATLAS.md est ce qui autorise à dire « prêt à restaurer », et une preuve jamais rejouée ne décrit plus une capacité mais une intention. Lit le SEUL repère stable (titre ##/### nommant un exercice ET portant une date JJ/MM/AAAA), écarte un titre « non exécuté » (préparé n'est pas fait), refuse une date illisible, impossible ou future, et refuse de conclure sous son plancher de lecture"
+    },
+    {
       "chemin": ".github/scripts/check-exec-bits.py",
       "role": "garde",
       "invoque_par": "ci",
@@ -5418,6 +5426,27 @@
       "cwd": "backend",
       "attend": [
         "FAILED tests/test_etat_reference.py::TestPlancher::test_sous_le_plancher_le_garde_refuse_de_conclure"
+      ]
+    },
+    {
+      "id": "exercice-restauration: une preuve perimee acceptee",
+      "garde": ".github/scripts/check-exercice-restauration.py",
+      "cible": ".github/scripts/check-exercice-restauration.py",
+      "trouve": "    if age > seuil_jours:",
+      "remplace": "    if False and age > seuil_jours:",
+      "runner": "python",
+      "preuve": "backend/tests/test_exercice_restauration_fraicheur.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_exercice_restauration_fraicheur.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_exercice_restauration_fraicheur.py::TestLaRegle::test_un_exercice_plus_vieux_que_la_cadence_est_refuse"
       ]
     },
     {
