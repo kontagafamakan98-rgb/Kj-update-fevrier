@@ -9,10 +9,10 @@ import { Icone } from './chrome-icons';
  *
  * Elles étaient écrites dans un `switch` qui composait `baseStyles` avec un
  * gabarit, lu par un appel (`className={getToastStyles(toast.type)}`), et le
- * verdict de la feuille LIVRÉE les déclarait MORTES : `border-l-4`,
- * `border-green-500`, `border-yellow-500`, `transform`, `ease-in-out`. Le corpus
- * ne lit pas une valeur de RETOUR de fonction — et il a raison : rien, dans un
- * `switch`, ne DIT que ces chaînes sont des classes.
+ * verdict de la feuille LIVRÉE les déclarait MORTES : le filet de gauche de
+ * 4 px, la teinte 500 du type, `transform`, `ease-in-out`. Le corpus ne lit pas
+ * une valeur de RETOUR de fonction — et il a raison : rien, dans un `switch`, ne
+ * DIT que ces chaînes sont des classes.
  *
  * Le registre est donc lu DIRECTEMENT dans le `className` (cf. plus bas), ce qui
  * fait deux choses à la fois : la composition est visible à l'endroit qui peint,
@@ -24,13 +24,31 @@ import { Icone } from './chrome-icons';
  * La valeur rendue est IDENTIQUE à ce que rendait le `switch` : `base` d'un côté,
  * la teinte du type de l'autre, `info` en repli — la même concaténation, dans le
  * même ordre.
+ *
+ * ── LE VERRE CHAUD EST ARRIVÉ ICI LE 19/10/2026, ET LA COULEUR D'ÉTAT EST
+ *    RESTÉE ─────────────────────────────────────────────────────────────────
+ * La surface, le filet de gauche, le rayon, l'ombre et le flou sont désormais
+ * DÉCLARÉS dans la feuille (`.verre-toast`, puis une classe d'état par type) :
+ * ce sont des propriétés de la MATIÈRE, et un utilitaire de fond opaque posé
+ * ici ne peindrait RIEN — la feuille est écrite hors couche, elle l'écraserait
+ * sans erreur, et la teinte du verre serait perdue en silence un jour sur deux.
+ * Ce qui reste dans le JSX est ce qui appartient à ce composant : la
+ * disposition, et la TEINTE de l'icône, qui n'est pas un fond.
+ *
+ * La couleur d'état n'a donc pas bougé de famille : un succès reste vert, une
+ * erreur rouge, un avertissement jaune, une information bleue. Elle est
+ * seulement descendue d'un cran dans la palette (icône en teinte 700, texte en
+ * 800) pour rester mesurable sur la surface teintée — la teinte 500 du filet
+ * d'origine ne tenait que 1,84:1, c'est-à-dire qu'il ne se voyait pas.
+ * Le détail des mesures est dans `scripts/verre-contraste.js`, qui lit ces
+ * règles dans `src/index.css`.
  */
 const CLASSES_TOAST = {
-  base: 'flex items-center gap-3 p-4 rounded-lg shadow-lg backdrop-blur-xs transition-all duration-300 ease-in-out transform',
-  success: 'bg-green-50 border-l-4 border-green-500 text-green-800',
-  error: 'bg-red-50 border-l-4 border-red-500 text-red-800',
-  warning: 'bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800',
-  info: 'bg-blue-50 border-l-4 border-blue-500 text-blue-800',
+  base: 'flex items-center gap-3 p-4 verre-toast transition-all duration-300 ease-in-out transform',
+  success: 'verre-toast-succes',
+  error: 'verre-toast-erreur',
+  warning: 'verre-toast-avertissement',
+  info: 'verre-toast-information',
 };
 
 const ToastContainer = () => {
@@ -44,14 +62,14 @@ const ToastContainer = () => {
   const getIcon = (type) => {
     switch (type) {
       case 'success':
-        return <Icone nom="succes" classe="w-6 h-6 text-green-600" />;
+        return <Icone nom="succes" classe="w-6 h-6 text-green-700" />;
       case 'error':
-        return <Icone nom="erreur" classe="w-6 h-6 text-red-600" />;
+        return <Icone nom="erreur" classe="w-6 h-6 text-red-700" />;
       case 'warning':
-        return <Icone nom="avertissement" classe="w-6 h-6 text-yellow-600" />;
+        return <Icone nom="avertissement" classe="w-6 h-6 text-yellow-700" />;
       case 'info':
       default:
-        return <Icone nom="information" classe="w-6 h-6 text-blue-600" />;
+        return <Icone nom="information" classe="w-6 h-6 text-blue-700" />;
     }
   };
 
@@ -99,7 +117,7 @@ const ToastContainer = () => {
 
           <button
             onClick={() => removeToast(toast.id)}
-            className="shrink-0 ml-2 text-gray-400 hover:text-gray-600 transition-colors"
+            className="shrink-0 ml-2 text-stone-500 hover:text-stone-700 transition-colors"
             aria-label={t('toastCloseAria')}
           >
             <Icone nom="fermer" classe="w-5 h-5" />

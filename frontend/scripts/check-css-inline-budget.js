@@ -37,6 +37,19 @@
  * documents. Le budget n'est PAS élargi : il reste 82 944 o, et la marge tombe à
  * 494 o — c'est elle qui fera rougir la prochaine règle ajoutée sans re-mesure.
  *
+ * ── Le même jour, le VERRE DES MESSAGES : 82 059 o / 16 246 o gzip / 1 108
+ *    règles / sha d527f629095b171b ───────────────────────────────────────────
+ * Étendre le verre chaud aux toasts et au panneau de notifications ajoute
+ * QUATORZE règles au bloc des effets (quatre surfaces d'état, leurs filets, le
+ * repli sans `backdrop-filter`, l'en-tête, l'alerte et les deux lignes du
+ * panneau) — et le compte NET ne bouge que d'UNE règle (1 107 → 1 108), les
+ * octets BAISSANT de 391. Ce n'est pas une erreur : les utilitaires de fond
+ * opaque que posait le JSX des toasts (quatre teintes 50, trois filets 500,
+ * l'ombre, le flou) ne sont plus POSÉS, donc Tailwind ne les génère plus. C'est
+ * le seul cas connu où déclarer une surface coûte moins que l'utilitaire
+ * qu'elle remplace. Le budget n'est pas touché : la marge remonte de 494 o à
+ * 885 o.
+ *
  * ── Le relevé a bougé le 17/10/2026 : 80 324 o / 15 759 o gzip / 1 083 règles /
  *    sha f5da31364d5a2964 ────────────────────────────────────────────────────
  * Le vocabulaire des ÉCRANS D'APPLICATION (bandeau d'accueil, tuiles de mesure
@@ -136,6 +149,8 @@ export const FEUILLE_DE_REFERENCE = 'index.html';
  * le dire — au lieu de dériver en silence.
  */
 export const CSS_INLINE_BUDGETS = {
+  // Relevé 19/10/2026 (verre des messages) : 82 059 o / 16 246 o gzip / 1108
+  // règles / sha d527f629095b171b — budget inchangé, marge 885 o.
   // Relevé 19/10/2026 : 82 450 o / 16 144 o gzip / 1107 règles / sha 7f189b682b8d6eec
   // (les trois effets : +24 règles, +2 126 o — budget inchangé, marge 494 o).
   // Relevé 17/10/2026 : 80 324 o / 15 759 o gzip / 1083 règles / sha f5da31364d5a2964.

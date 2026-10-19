@@ -182,10 +182,10 @@ export default function NotificationPanel() {
       style={{ maxHeight: 'calc(100vh - 80px)' }}
     >
       {/* En-tête */}
-      <div className="flex items-center justify-between border-b border-stone-200 fond-sable px-4 py-3 shrink-0">
+      <div className="flex items-center justify-between verre-panneau-entete px-4 py-3 shrink-0">
         <div className="flex items-center gap-2">
           <Icone nom="cloche" classe="w-5 h-5 text-orange-600" />
-          <span className="font-semibold text-stone-800 text-sm">{t('notificationsTitle')}</span>
+          <span className="font-semibold text-sm">{t('notificationsTitle')}</span>
           {/* Un COMPTE, pas un bouton : carré, il se lit comme une donnée. */}
           {unreadCount > 0 && (
             <span className="rounded-[3px] bg-orange-100 text-orange-800 text-xs font-semibold px-2 py-0.5">
@@ -198,7 +198,7 @@ export default function NotificationPanel() {
             <button
               onClick={markAllAsRead}
               title={t('markAllRead')}
-              className="p-1.5 rounded-[3px] text-stone-500 hover:text-orange-700 hover:bg-orange-50 transition-colors"
+              className="p-1.5 rounded-[3px] text-stone-500 hover:text-orange-700 hover:bg-orange-50/70 transition-colors"
             >
               <Icone nom="cocheDouble" classe="w-4 h-4" />
             </button>
@@ -240,7 +240,7 @@ export default function NotificationPanel() {
         {actionError && (
           <div
             role="alert"
-            className="flex items-start gap-2 px-4 py-3 bg-red-50 border-b border-red-100 text-red-700"
+            className="flex items-start gap-2 px-4 py-3 panneau-alerte"
           >
             <span className="text-sm flex-1">
               {t(MESSAGE_ECHEC[actionError.action] || 'notifDeleteFailed')}
@@ -270,7 +270,7 @@ export default function NotificationPanel() {
               à 2 unités sur la grille de 24, un dessin agrandi épaissit avec lui. */}
           <Icone nom="cloche" classe="mb-3 h-9 w-9 text-stone-300" epaisseur={1.75} />
             <p className="text-stone-600 text-sm font-medium">{t('noNotifications')}</p>
-            <p className="text-stone-500 text-xs mt-1">{t('notifEmptyHint')}</p>
+            <p className="text-xs mt-1">{t('notifEmptyHint')}</p>
           </div>
         ) : (
           <ul role="list" className="divide-y divide-stone-100">
@@ -279,8 +279,8 @@ export default function NotificationPanel() {
                 <div
                   className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors group ${
                     notif.is_read
-                      ? 'hover:bg-stone-50'
-                      : 'bg-orange-50/60 hover:bg-orange-50'
+                      ? 'panneau-ligne-lue'
+                      : 'panneau-ligne-non-lue'
                   }`}
                   onClick={() => handleNotificationClick(notif)}
                   role="button"
@@ -312,10 +312,10 @@ export default function NotificationPanel() {
                     <p className={`text-sm font-medium truncate ${notif.is_read ? 'text-stone-600' : 'text-stone-900'}`}>
                       {notif.title}
                     </p>
-                    <p className="text-xs text-stone-500 mt-0.5 line-clamp-2 leading-relaxed">
+                    <p className="text-xs mt-0.5 line-clamp-2 leading-relaxed">
                       {notif.body}
                     </p>
-                    <p className="text-[11px] text-stone-500 mt-1">
+                    <p className="text-[11px] mt-1">
                       {relativeTime(notif.created_at, t)}
                     </p>
                   </div>
@@ -330,7 +330,7 @@ export default function NotificationPanel() {
                   <button
                     onClick={(e) => { e.stopPropagation(); deleteNotification(notif.id); }}
                     aria-label={t('deleteNotification')}
-                    className="shrink-0 inline-flex items-center justify-center w-11 h-11 -my-2 -mr-2 rounded-[3px] text-stone-400 hover:text-red-600 hover:bg-red-50 active:bg-red-100 transition-all focus:outline-hidden focus:ring-2 focus:ring-red-400 sm:w-9 sm:h-9 sm:-my-1 sm:-mr-1 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
+                    className="shrink-0 inline-flex items-center justify-center w-11 h-11 -my-2 -mr-2 rounded-[3px] text-stone-500 hover:text-red-600 hover:bg-red-50 active:bg-red-100 transition-all focus:outline-hidden focus:ring-2 focus:ring-red-400 sm:w-9 sm:h-9 sm:-my-1 sm:-mr-1 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
                   >
                     <Icone nom="croix" classe="w-5 h-5 sm:w-4 sm:h-4" />
                   </button>

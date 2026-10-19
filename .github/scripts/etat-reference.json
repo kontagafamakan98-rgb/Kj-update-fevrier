@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-19",
-    "motif": "les trois contrats de temps du flux sont juges hors ligne sur une PR : battement declare, bail qui en decoule et repli du client ; et le releve du budget CSS inline re-mesure le 19/10/2026 (couche des trois effets) est declare, pour que l'empreinte du fichier suive la mesure",
+    "motif": "le verre des messages declare ses surfaces d'etat dans la feuille et son garde de contraste mesure ; check-css-inline-budget re-mesure et le garde entre au perimetre des mutations",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -123,7 +123,8 @@
       "frontend/scripts/style-layout-budgets.cjs": "db93353a147d9be6e84999ea065d3b3df5d08871a62fe943f3346bc80d68ede9",
       "frontend/scripts/validate-vercel-json.mjs": "16a56835e1fb299821c3a1dd7fa4d0957982a970a493e98ed8855d06fc563518",
       ".github/scripts/check-fly-env-drift.py": "34d5475512295ca57ca19ad37a6acb04ba63ffc5cb5c504913d9fcaff103a5e9",
-      "frontend/scripts/check-css-inline-budget.js": "54e924ad265800a95b0c85a6fb1a9cede28f9f0252d9c059de363c29bb867d74"
+      "frontend/scripts/check-css-inline-budget.js": "c3a93055a10dacce95259ec4758ebcae1948eb2278d1806368e78197bc96bb5a",
+      "frontend/scripts/verre-contraste.js": "f344515d9368b16b19437aea23b0917ff6704693661d358100f64dbeab28abf2"
     }
   },
   "hors_perimetre": [

@@ -1002,6 +1002,14 @@
       "runner": "pytest",
       "motif": "outil d'ops : il restaure une base dans un namespace de travail puis COMPARE documents et index à la source, et rend un RTO daté. Son verdict porte sur un SERVEUR MongoDB (Atlas ou local), pas sur un fichier du dépôt — c'est un exercice, pas un garde de CI.",
       "hors_mutation": "muté par sa PROPRE preuve, pas par la table : test_exercice_restauration.py appelle la comparaison réelle sur des empreintes construites (collection absente, document en moins, contenu altéré au bon compte, index perdu, collection en trop) et la prémisse réelle (sans URI, cible = source), qui rend 2 et l'écrit dans son rapport. La table ne rejoue que les gardes qui portent un verdict sur le dépôt"
+    },
+    {
+      "chemin": "frontend/scripts/verre-contraste.js",
+      "role": "garde",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/verre-contraste.test.js",
+      "runner": "vitest",
+      "motif": "le VERRE DES MESSAGES ne se juge pas a l'oeil : ce module lit les regles REELLES de src/index.css (pas une fixture), compose chaque pile de couches avec son alpha reel par-dessus le sable ET par-dessus l'encre du site (le pire fond d'une surface flottante), retient le pire des deux et le compare aux seuils WCAG (4,5:1 pour le texte, 3:1 pour un objet graphique). Mesure du 19/10/2026 : l'encre secondaire du panneau (stone-500) tenait 4,56:1 sur le papier mais 3,17:1 sur le verre compose, sous le seuil d'un petit texte, et le filet jaune 500 ne tenait que 1,84:1 — d'ou --kojo-encre-douce et les teintes 700. Il REFUSE une exigence dont la regle a disparu (supprimer une surface la rendrait plus verte en la rendant plus courte), une couleur qu'il ne sait pas composer (var() non declare, currentColor, degrade : il ne devine rien), et de conclure sous son plancher de paires mesurees."
     }
   ],
   "rejeux": [
@@ -5705,6 +5713,26 @@
       "cwd": "frontend",
       "attend": [
         "au-delà du budget de 4000 ms"
+      ]
+    },
+    {
+      "id": "verre-contraste: la formule de contraste neutralisee",
+      "garde": "frontend/scripts/verre-contraste.js",
+      "cible": "frontend/scripts/verre-contraste.js",
+      "trouve": "  return (clair + 0.05) / (sombre + 0.05);",
+      "remplace": "  return (clair + 0.5) / (sombre + 0.5);",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/verre-contraste.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/verre-contraste.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "paires en défaut"
       ]
     }
   ]

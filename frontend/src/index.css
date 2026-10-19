@@ -2927,6 +2927,13 @@ form label {
 
 .verre-panneau {
   background-color: rgba(253, 250, 244, 0.82);
+  /* L'ENCRE NEUTRE DU PANNEAU est portée par la MATIÈRE, pas par chaque texte
+     qui s'y pose (19/10/2026). C'est une mesure : le corps d'une notification
+     est du PETIT texte (12-14 px), et l'ancien `stone-500` (#78716c) ne tenait
+     que 4,56:1 sur le papier — 3,17:1 sur le verre composé au-dessus d'un
+     contenu sombre, donc sous le seuil de 4,5:1. L'encre douce du site #5c554d
+     tient 4,84:1 dans ce même pire cas. Un titre non lu garde `stone-900`. */
+  color: var(--kojo-encre-douce);
   border: 1px solid rgba(240, 220, 195, 0.95);
   border-radius: 0.75rem;
   box-shadow:
@@ -2936,13 +2943,139 @@ form label {
   backdrop-filter: blur(20px) saturate(1.3);
 }
 
+/* ── LE VERRE DES MESSAGES : LES TOASTS ─────────────────────────────────────
+
+   Un toast est la surface où le verre était le plus RISQUÉ, et c'est pour ça
+   qu'il recevait jusqu'ici un fond opaque de la palette d'état. Trois raisons,
+   mesurées le 19/10/2026 :
+
+     • son texte est PETIT (14 px) — il demande 4,5:1, pas 3:1 ;
+     • il flotte au-dessus de N'IMPORTE QUEL contenu, en haut à droite, là où
+       une photo ou une carte sombre peut passer sous lui ;
+     • sa teinte d'état doit rester LISIBLE, sinon un avertissement se lit comme
+       une information.
+
+   D'où la règle qui distingue ce bloc du verre neutre : les surfaces d'ÉTAT
+   sont plus OPAQUES (0,94 contre 0,82) ET teintées d'un cinquième de la teinte
+   d'état, mélangée au papier chaud du verre. Ce cinquième suffit à nommer l'état
+   (vert, rouge, jaune, bleu) sans repeindre une pastille froide : le fond reste
+   du papier, la teinte ne fait que le traverser. À 0,94, ce qu'il y a derrière
+   ne décide plus du contraste — mesuré, texte compris, sur le pire fond.
+
+   LE FILET D'ÉTAT reste à gauche, en 4 px, et c'est le SEUL élément qui garde
+   la teinte SATURÉE de la palette : la teinte 700 et non 500, parce qu'un filet
+   jaune 500 (#eab308) ne tient que 1,84:1 sur le papier — invisible, donc un
+   état qui existe pour être vu ne l'était pas. Les quatre filets tiennent 4,2:1
+   au moins sur le pire fond composé.
+
+   Les valeurs de fond sont des LITTÉRAUX, et c'est voulu : `rgba()` ne sait pas
+   lire une variable de type couleur, et une teinte d'état calculée au runtime
+   échapperait à `scripts/verre-contraste.js`, qui lit ce fichier pour mesurer.
+   Chaque surface est le papier du verre (253, 250, 244 — un demi-ton plus chaud
+   que `--kojo-papier`) mélangé à 22 % de la teinte 50 de son état. */
+.verre-toast {
+  background-color: rgba(253, 250, 244, 0.94);
+  border: 1px solid rgba(240, 220, 195, 0.95);
+  border-left-width: 4px;
+  border-radius: 0.75rem;
+  color: var(--kojo-encre);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 20px 44px -28px rgba(120, 53, 15, 0.5);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  backdrop-filter: blur(14px) saturate(1.2);
+}
+
+.verre-toast-succes {
+  background-color: rgba(243, 252, 244, 0.94);
+  border-left-color: #15803d;
+  color: #166534;
+}
+
+.verre-toast-erreur {
+  background-color: rgba(254, 244, 242, 0.94);
+  border-left-color: #b91c1c;
+  color: #991b1b;
+}
+
+.verre-toast-avertissement {
+  background-color: rgba(254, 252, 235, 0.94);
+  border-left-color: #a16207;
+  color: #854d0e;
+}
+
+.verre-toast-information {
+  background-color: rgba(242, 247, 253, 0.94);
+  border-left-color: #1d4ed8;
+  color: #1e40af;
+}
+
+/* ── LE VERRE DES ÉTATS DANS LE PANNEAU DE NOTIFICATIONS ────────────────────
+
+   Le panneau porte `.verre-panneau` depuis la première livraison des effets ;
+   ce qui n'était pas encore du verre, ce sont ses SURFACES D'ÉTAT, peintes en
+   utilitaires opaques : un en-tête de sable plein (une bande qui coupait la
+   matière en deux), la ligne non lue en orange 50, et le bandeau d'échec en
+   rouge 50. Elles sont ici pour la même raison que les cartes : une surface
+   d'état déclarée dans la feuille ne peut pas être écrasée en silence par un
+   utilitaire, et elle se MESURE (`scripts/verre-contraste.js` lit ce fichier).
+
+   La ligne non lue reste à 0,72 : elle est posée SUR le panneau, donc son fond
+   est déjà du papier à 82 % — le pire composite garde 6,29:1 pour l'encre
+   douce, et 14,98:1 pour un titre non lu. Le bandeau d'échec, lui, monte à
+   0,94 et garde son rouge : c'est une ALERTE, elle ne doit pas se lire comme
+   une notification ordinaire, et son rouge 700 tient 5,8:1 au pire. */
+.verre-panneau-entete {
+  background-color: rgba(247, 243, 236, 0.6);
+  border-bottom: 1px solid rgba(240, 220, 195, 0.9);
+  color: var(--kojo-encre);
+}
+
+.panneau-alerte {
+  background-color: rgba(254, 242, 242, 0.94);
+  border-bottom: 1px solid #fecaca;
+  color: #b91c1c;
+}
+
+.panneau-ligne-non-lue {
+  background-color: rgba(255, 247, 237, 0.72);
+}
+
+.panneau-ligne-non-lue:hover {
+  background-color: rgba(255, 247, 237, 0.85);
+}
+
+.panneau-ligne-lue:hover {
+  background-color: rgba(247, 243, 236, 0.5);
+}
+
 /* Le repli : un navigateur sans `backdrop-filter` ne doit pas peindre une vitre
    À MOITIÉ (un fond à 78 % sans flou laisse lire le contenu derrière). Il
-   reçoit le papier PLEIN, et la barre comme le panneau restent lisibles. */
+   reçoit le papier PLEIN, et la barre comme le panneau restent lisibles. Les
+   toasts reçoivent leur teinte d'état PLEINE, pas le papier : un avertissement
+   qui perdrait sa couleur dans le repli serait un état qui s'efface selon le
+   navigateur. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .verre-barre,
-  .verre-panneau {
+  .verre-panneau,
+  .verre-toast {
     background-color: var(--kojo-papier);
+  }
+
+  .verre-toast-succes {
+    background-color: rgb(243, 252, 244);
+  }
+
+  .verre-toast-erreur {
+    background-color: rgb(254, 244, 242);
+  }
+
+  .verre-toast-avertissement {
+    background-color: rgb(254, 252, 235);
+  }
+
+  .verre-toast-information {
+    background-color: rgb(242, 247, 253);
   }
 }
 
