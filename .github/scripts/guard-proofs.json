@@ -1407,6 +1407,48 @@
       ]
     },
     {
+      "id": "fly-env-drift: un bail qui survit au verdict du client tolere",
+      "garde": ".github/scripts/check-fly-env-drift.py",
+      "cible": ".github/scripts/check-fly-env-drift.py",
+      "trouve": "    if bail_s > fenetre_s + battement_s:",
+      "remplace": "    if False and bail_s > fenetre_s + battement_s:",
+      "runner": "python",
+      "preuve": "backend/tests/test_fly_env_drift.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_fly_env_drift.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_fly_env_drift.py::TestReglagesDeTempsDuFlux::test_un_bail_qui_survit_au_verdict_du_client_est_refuse"
+      ]
+    },
+    {
+      "id": "fly-env-drift: un repli aussi bavard que le sondage remplace tolere",
+      "garde": ".github/scripts/check-fly-env-drift.py",
+      "cible": ".github/scripts/check-fly-env-drift.py",
+      "trouve": "    if valeur <= ANCIEN_SONDAGE_MS:",
+      "remplace": "    if False and valeur <= ANCIEN_SONDAGE_MS:",
+      "runner": "python",
+      "preuve": "backend/tests/test_fly_env_drift.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_fly_env_drift.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_fly_env_drift.py::TestReglagesDeTempsDuFlux::test_un_repli_aussi_bavard_que_l_ancien_sondage_est_refuse"
+      ]
+    },
+    {
       "id": "fly-env-drift: variable absente du runtime toleree",
       "garde": ".github/scripts/check-fly-env-drift.py",
       "cible": ".github/scripts/check-fly-env-drift.py",

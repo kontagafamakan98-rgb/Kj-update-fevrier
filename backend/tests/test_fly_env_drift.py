@@ -686,5 +686,177 @@ class TestBattementDeploye:
         assert code == 1, sortie
 
 
+class TestReglagesDeTempsDuFlux:
+    """Les DEUX autres délais qui décident de la vie d'un flux.
+
+    Le battement est jugé depuis le 19/10/2026 ; le BAIL du registre Redis et
+    le REPLI du client ne l'étaient pas. Ce sont pourtant eux qui décident
+    quand une place se libère, et à quelle cadence on redemande quand le flux
+    est tombé — deux contrats que rien ne regardait.
+
+    Le bail n'existe pas comme variable : il est CALCULÉ depuis le battement.
+    C'est pourquoi ces cas éprouvent aussi le CALCUL (formule lue dans
+    `kojo_live.py`, évaluée avec le battement réellement déployé) : juger le
+    défaut du code pendant qu'une surcharge existe serait juger une autre
+    machine.
+    """
+
+    def test_le_bail_est_calcule_comme_le_code_avec_le_battement_du_defaut(self, check):
+        contrats = check.contrats_du_serveur()
+        assert contrats is not None, "formule du bail illisible dans kojo_live.py"
+        defaut, bail = contrats
+        assert defaut == 20.0
+        # Ni 20 ni 60 ne sont recopiés ici : la formule du code est évaluée.
+        assert bail(20) == 60.0
+        assert bail(30) == 90.0
+
+    def test_une_formule_hors_vocabulaire_est_refusee(self, check, tmp_path):
+        # `eval` borné : un nom inconnu, un appel, un attribut — refusés. Une
+        # formule qu'on ne sait pas lire n'est pas un contrat.
+        assert check.bail_depuis_battement("max(60.0, AUTRE_CHOSE * 3)") is None
+        assert check.bail_depuis_battement("open('/etc/passwd').read()") is None
+        # Et un fichier sans la formule ne rend pas un contrat par défaut.
+        sans = tmp_path / "kojo_live.py"
+        sans.write_text("HEARTBEAT_SECONDS = 20\n", encoding="utf-8")
+        assert check.contrats_du_serveur(sans) is None
+        assert check.contrats_du_serveur(tmp_path / "absent.py") is None
+
+    def test_le_bail_du_defaut_tient_ses_deux_contrats(self, check):
+        check.errors, check.checked = [], []
+        check.check_lease_contract(
+            False, "", check.contrat_du_client(), check.contrats_du_serveur()
+        )
+        assert check.errors == [], check.errors
+        ligne = [l for l in check.checked if "PARTAGE_LEASE_SECONDS" in l][0]
+        # Les TROIS nombres du verdict sont publiés : bail, plancher de
+        # renouvellement et borne du verdict client.
+        assert "60" in ligne and "40" in ligne and "65" in ligne, ligne
+
+    def test_un_battement_deploye_calcule_le_bail_reel(self, check):
+        check.errors, check.checked = [], []
+        check.check_lease_contract(
+            True, "22", check.contrat_du_client(), check.contrats_du_serveur()
+        )
+        assert check.errors == [], check.errors
+        # 3 × 22 s = 66 s : c'est le bail de CETTE machine, pas celui du défaut.
+        assert "66" in "".join(check.checked), check.checked
+
+    def test_un_bail_trop_court_pour_un_battement_perdu_est_refuse(self, check):
+        contrats = (20.0, lambda battement: battement * 1.5)
+        check.errors, check.checked = [], []
+        check.check_lease_contract(False, "", check.contrat_du_client(), contrats)
+        assert len(check.errors) == 1, check.errors
+        refus = check.errors[0]
+        assert "30" in refus and "40" in refus, refus
+        assert "VIVANTE" in refus, refus
+
+    def test_un_bail_qui_survit_au_verdict_du_client_est_refuse(self, check):
+        contrats = (20.0, lambda battement: 600.0)
+        check.errors, check.checked = [], []
+        check.check_lease_contract(False, "", check.contrat_du_client(), contrats)
+        assert len(check.errors) == 1, check.errors
+        refus = check.errors[0]
+        assert "600" in refus and "65" in refus, refus
+        # Sans surcharge, le remède est la FORMULE : nommer la surcharge
+        # enverrait l'exploitant retirer un secret qui n'existe pas.
+        assert "Ramener PARTAGE_LEASE_SECONDS" in refus, refus
+
+    def test_un_bail_allonge_par_une_surcharge_nomme_la_surcharge(self, check):
+        # 30 s de battement allonge le bail à 90 s : deux contrats tombent, et
+        # celui du bail nomme la SURCHARGE, puisqu'il en découle.
+        check.errors, check.checked = [], []
+        check.check_lease_contract(
+            True, "30", check.contrat_du_client(), check.contrats_du_serveur()
+        )
+        assert len(check.errors) == 1, check.errors
+        assert "fly secrets unset KOJO_SSE_HEARTBEAT_SECONDS" in check.errors[0]
+
+    def test_une_formule_illisible_refuse_de_conclure(self, check):
+        check.errors, check.checked = [], []
+        check.check_lease_contract(False, "", check.contrat_du_client(), None)
+        assert len(check.errors) == 1, check.errors
+        assert "kojo_live.py" in check.errors[0] and "ILLISIBLE" in check.errors[0]
+
+    def test_un_battement_deploye_illisible_ne_donne_pas_de_bail(self, check):
+        check.errors, check.checked = [], []
+        check.check_lease_contract(
+            True, "trente", check.contrat_du_client(), check.contrats_du_serveur()
+        )
+        assert len(check.errors) == 1, check.errors
+        assert "ILLISIBLE" in check.errors[0]
+        assert "trente" not in check.errors[0], "la valeur déployée ne se cite pas"
+
+    def test_un_battement_non_lu_est_un_angle_mort_declare(self, check):
+        check.errors, check.checked = [], []
+        check.check_lease_contract(
+            True, "", check.contrat_du_client(), check.contrats_du_serveur()
+        )
+        assert check.errors == [], check.errors
+        assert any(
+            "[AUCUN VERDICT]" in ligne and "PARTAGE_LEASE_SECONDS" in ligne
+            for ligne in check.checked
+        ), check.checked
+
+    # ── Le repli du client ─────────────────────────────────────────────────
+
+    def test_le_repli_est_lu_dans_ses_deux_declarations(self, check):
+        valeur, raison = check.contrat_du_repli()
+        assert raison is None, raison
+        assert valeur == 60000.0
+
+    def test_deux_replis_qui_divergent_sont_refuses(self, check, tmp_path):
+        notifications = tmp_path / "NotificationContext.js"
+        notifications.write_text("const FALLBACK_POLL_MS = 60_000;\n", encoding="utf-8")
+        messages = tmp_path / "Messages.js"
+        messages.write_text("const FALLBACK_POLL_MS = 30_000;\n", encoding="utf-8")
+        valeur, raison = check.contrat_du_repli((notifications, messages))
+        assert valeur is None
+        assert "DIVERGENTES" in raison and "60" in raison and "30" in raison, raison
+        check.errors, check.checked = [], []
+        check.check_fallback_contract(valeur, raison)
+        assert len(check.errors) == 1, check.errors
+        assert "NON JUGEABLE" in check.errors[0]
+
+    def test_un_repli_absent_refuse_de_conclure(self, check, tmp_path):
+        muet = tmp_path / "NotificationContext.js"
+        muet.write_text("// aucun repli\n", encoding="utf-8")
+        valeur, raison = check.contrat_du_repli((muet,))
+        assert valeur is None
+        assert "ne déclare pas FALLBACK_POLL_MS" in raison, raison
+
+    def test_un_repli_aussi_bavard_que_l_ancien_sondage_est_refuse(self, check):
+        check.errors, check.checked = [], []
+        # 30 s, c'est exactement les 2 req/min du sondage que le flux remplace :
+        # le remplacement n'aurait remplacé qu'un aller-retour par un autre.
+        check.check_fallback_contract(30000.0, None)
+        assert len(check.errors) == 1, check.errors
+        assert "sondage" in check.errors[0] and "30000" in check.errors[0]
+
+    def test_le_repli_actuel_est_moins_bavard_que_le_sondage(self, check):
+        check.errors, check.checked = [], []
+        check.check_fallback_contract(*check.contrat_du_repli())
+        assert check.errors == [], check.errors
+        assert any(
+            "FALLBACK_POLL_MS" in ligne and "moins bavard" in ligne
+            for ligne in check.checked
+        ), check.checked
+
+    def test_les_deux_regles_sont_cablees_dans_main(self, check, monkeypatch):
+        """Sans ce cas, les deux règles pourraient exister sans être appelées."""
+        monkeypatch.setattr(check, "API_TOKEN", "jeton-factice")
+        monkeypatch.setattr(
+            check,
+            "fetch_json",
+            lambda url, token: [{"id": "m", "state": "started", "config": {"env": {}}}],
+        )
+        monkeypatch.setattr(check, "list_fly_secrets", lambda token: {})
+        monkeypatch.setattr(check, "read_secrets_via_ssh", lambda keys: {})
+        check.errors, check.checked = [], []
+        check.main([])
+        sortie = "\n".join(check.checked)
+        assert "PARTAGE_LEASE_SECONDS" in sortie, sortie
+        assert "FALLBACK_POLL_MS" in sortie, sortie
+
+
 def quantite(lignes, motif):
     return sum(1 for ligne in lignes if motif in ligne)

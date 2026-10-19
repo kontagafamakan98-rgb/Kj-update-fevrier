@@ -322,7 +322,17 @@ Le check valide :
 - **`TRUSTED_HOSTS`** : CSV d'hôtes, motifs joker `*.` autorisés (trafic
   interne Fly des health checks) ;
 - **`REDIS_URL`** : URI `redis://` ou `rediss://` (vide = mémoire, accepté) ;
-- **`MONGO_URL`** : URI `mongodb://` ou `mongodb+srv://` (Atlas).
+- **`MONGO_URL`** : URI `mongodb://` ou `mongodb+srv://` (Atlas) ;
+- **les trois délais du flux temps réel**, chacun contre le contrat qu'il sert :
+  le battement déployé (`KOJO_SSE_HEARTBEAT_SECONDS`, deux battements doivent
+  tenir dans la fenêtre de silence du client), le bail du registre Redis — qui
+  n'est pas une variable mais un CALCUL de `backend/kojo_live.py` depuis ce
+  battement : il doit tolérer un battement perdu (`≥ 2 × battement`) sans
+  survivre au verdict du client (`≤ fenêtre + un battement`) —, et le repli du
+  client (`FALLBACK_POLL_MS`, lu dans ses deux déclarations), qui doit rester
+  moins bavard que les 2 req/min du sondage remplacé. Les valeurs sont lues et
+  le calcul refait, jamais recopiés : si la formule change, c'est elle qui est
+  jugée.
 
 Valeurs de référence contrôlées : `backend/fly.toml [env]` (config de prod),
 `backend/.env.example` (template dev — les valeurs vides et `http://localhost`

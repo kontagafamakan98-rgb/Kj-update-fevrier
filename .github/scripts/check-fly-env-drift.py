@@ -43,6 +43,19 @@ donc ce qui l'est réellement :
      battements doivent tenir dans cette fenêtre, sinon un flux vivant mais
      inactif serait déclaré tombé. C'est la seule valeur qu'aucun garde hors
      ligne ne peut voir — elle n'existe que sur la machine déployée.
+  9. LES AUTRES RÉGLAGES DE TEMPS DU FLUX, chacun contre SON contrat :
+     * le BAIL du registre Redis (`PARTAGE_LEASE_SECONDS`) n'existe pas comme
+       variable : il est CALCULÉ depuis le battement déployé par une formule
+       lue dans `kojo_live.py`. Le bail calculé doit tolérer un battement
+       perdu (`≥ 2 × battement`) et ne pas survivre au verdict du client
+       (`≤ fenêtre de silence + un battement`), sinon les places d'un worker
+       tué resteraient comptées au plafond du compte ;
+     * le REPLI du client (`FALLBACK_POLL_MS`) doit rester moins bavard que le
+       sondage qu'il remplace (2 req/min, soit 30 s) et n'avoir qu'UNE valeur
+       pour ses deux déclarations (`NotificationContext.js`, `Messages.js`)
+       — deux valeurs divergentes sont refusées, pas arbitrées. Cette valeur
+       part dans le bundle : ce qui est jugé est la source dont il est bâti,
+       et le message le dit.
 
 Usage :
     FLY_API_TOKEN=<deploy_token> python .github/scripts/check-fly-env-drift.py
@@ -525,6 +538,285 @@ def check_heartbeat_contract(deploye, valeur, contrat=None):
     )
 
 
+# ── LES AUTRES RÉGLAGES DE TEMPS DU FLUX, JUGÉS CONTRE LEUR CONTRAT ─────────
+# Le battement n'est pas le seul délai qui décide de la vie d'un flux : le BAIL
+# du registre Redis décide QUAND une place se libère, et le REPLI décide à
+# quelle cadence le client redemande quand le flux est tombé. Tous deux ont un
+# contrat, et aucun des deux n'était jugé — le bail n'existait même pas comme
+# valeur déployée, puisqu'il est CALCULÉ depuis le battement.
+KOJO_LIVE = REPO_ROOT / "backend" / "kojo_live.py"
+BAIL_CONSTANTE = "PARTAGE_LEASE_SECONDS"
+# Un flux vivant peut manquer un battement (réseau mobile, proxy lent) : le bail
+# est repoussé PAR le battement, donc il doit valoir au moins DEUX intervalles.
+# À un intervalle, une seule arrivée tardive expirerait une place VIVANTE et le
+# compte admettrait un cinquième flux.
+BAIL_RENOUVELLEMENTS = 2
+
+REPLI_CONSTANTE = "FALLBACK_POLL_MS"
+# Les DEUX déclarations du repli : notifications et messagerie. Une seule
+# valeur, deux consommateurs — c'est cette unanimité qu'on juge, pas l'une des
+# deux copies (le batail du 18/10/2026 était justement deux sources qui avaient
+# divergé en silence).
+REPLI_FICHIERS = (
+    REPO_ROOT / "frontend" / "src" / "contexts" / "NotificationContext.js",
+    REPO_ROOT / "frontend" / "src" / "pages" / "Messages.js",
+)
+# Le sondage que le flux REMPLACE : 2 requêtes par minute et par session
+# (AGENTS.md, « Temps réel »). Un repli à 30 s ou plus rapide rendrait le
+# remplacement inutile — un aller-retour pour un autre.
+ANCIEN_SONDAGE_MS = 30000.0
+
+
+def _nombre_js(texte, constante):
+    """Valeur d'une constante JS numérique (`60_000`, `60000`), ou None."""
+    trouve = re.search(rf"\bconst\s+{constante}\s*=\s*([\d_.]+)\s*;", texte)
+    if not trouve:
+        return None
+    try:
+        return float(trouve.group(1).replace("_", ""))
+    except ValueError:
+        return None
+
+
+def bail_depuis_battement(expression):
+    """La formule du bail LUE dans le code, rendue comme `f(battement_s)`.
+
+    `None` si la formule n'est pas lisible. L'évaluation est BORNÉE : seuls
+    `max`, `min` et `HEARTBEAT_SECONDS` existent, aucun attribut, aucun appel,
+    aucun nom du module — une expression qui sort de ce vocabulaire est
+    REFUSÉE plutôt que devinée, et le refus dit quoi rétablir.
+
+    Pourquoi évaluer au lieu de recopier : `max(60.0, HEARTBEAT_SECONDS * 3)`
+    n'est pas un nombre, c'est une POLITIQUE. La recopier ici en ferait une
+    seconde source, et le bail jugé ne serait plus celui que la machine calcule.
+    """
+    noms = set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", expression))
+    if not noms <= {"max", "min", "HEARTBEAT_SECONDS"}:
+        return None
+    if re.search(r"[^A-Za-z0-9_.,+*()\s]", expression):
+        return None
+
+    def calcul(battement_s):
+        try:
+            return float(
+                eval(  # noqa: S307 - vocabulaire clos, aucun nom hors max/min/battement
+                    expression,
+                    {"__builtins__": {}},
+                    {
+                        "HEARTBEAT_SECONDS": float(battement_s),
+                        "max": max,
+                        "min": min,
+                    },
+                )
+            )
+        except Exception:  # noqa: BLE001 - une formule qui ne calcule pas n'est pas un contrat
+            return None
+
+    return calcul
+
+
+def contrats_du_serveur(chemin=None):
+    """`(battement par défaut, formule du bail)` LUS dans `kojo_live.py`, ou None.
+
+    Les deux valeurs sont lues, jamais recopiées : un `20` ou un `60.0` écrit
+    ici serait une seconde source, et c'est la divergence de deux sources qui a
+    coûté une reconnexion par flux inactif (cf. `battement-coeur-aligne.test.js`).
+    `None` = lecteur cassé : l'appelant refuse de conclure au lieu de supposer.
+    """
+    chemin = KOJO_LIVE if chemin is None else chemin
+    try:
+        texte = Path(chemin).read_text(encoding="utf-8")
+    except OSError:
+        return None
+    defaut = re.search(
+        r'HEARTBEAT_SECONDS\s*=\s*float\(\s*os\.environ\.get\(\s*'
+        r'"KOJO_SSE_HEARTBEAT_SECONDS"\s*,\s*"([\d.]+)"',
+        texte,
+    )
+    formule = re.search(rf"^{BAIL_CONSTANTE}\s*=\s*(.+)$", texte, re.MULTILINE)
+    if not defaut or not formule:
+        return None
+    bail = bail_depuis_battement(formule.group(1).strip())
+    if bail is None:
+        return None
+    return float(defaut.group(1)), bail
+
+
+def check_lease_contract(deploye, valeur, contrat_client, contrats):
+    """Le bail CALCULÉ depuis le battement déployé, jugé contre ses contrats.
+
+    Deux invariants, chacun pour une panne réelle :
+
+      * `bail ≥ 2 × battement` — le bail est repoussé par chaque battement : un
+        battement perdu ne doit pas expirer une place VIVANTE, sinon le compte
+        admet un cinquième flux pendant que les quatre premiers vivent ;
+      * `bail ≤ fenêtre de silence du client + un battement` — un worker tué
+        sans `finally` garde ses places jusqu'à expiration : au-delà du moment
+        où TOUS ses clients ont renoncé, ces places fantômes refuseraient un
+        flux légitime.
+
+    `valeur` est le battement DÉPLOYÉ (brut) : le bail réel en découle, donc le
+    juger sur le défaut du code alors qu'une surcharge existe serait juger une
+    autre machine. Sans surcharge, c'est le défaut qui décide — et la formule
+    est quand même jugée, ce qui attrape une dérive de la formule elle-même.
+    """
+    if contrats is None:
+        errors.append(
+            f"[{BAIL_CONSTANTE}] formule ILLISIBLE ({KOJO_LIVE.name}) : le bail réel "
+            "n'est pas calculable, donc ses contrats ne sont pas jugés. Rétablir "
+            "`HEARTBEAT_SECONDS = float(os.environ.get(\"KOJO_SSE_HEARTBEAT_SECONDS\"...))` "
+            f"et `{BAIL_CONSTANTE} = max(..., HEARTBEAT_SECONDS * N)`."
+        )
+        return
+    if contrat_client is None:
+        errors.append(
+            f"[{BAIL_CONSTANTE}] la fenêtre de silence du client est ILLISIBLE "
+            f"({FLUX_CONFIG.name}) : le bail ne peut pas être jugé contre le verdict "
+            "du client — aucun verdict n'est rendu."
+        )
+        return
+
+    _, fenetre_ms = contrat_client
+    defaut_s, bail_de = contrats
+    brut = str(valeur or "").strip()
+
+    if deploye and not brut:
+        # Même angle mort que le battement : le secret se lit par SSH, absent
+        # en CI. Le bail dépend de cette valeur, donc il n'est pas calculable —
+        # et un bail calculé sur le défaut ne serait pas celui de la machine.
+        checked.append(
+            f"  [AUCUN VERDICT] {BAIL_CONSTANTE} DÉRIVÉ d'un battement DÉPLOYÉ dont la "
+            "valeur est illisible (SSH indisponible) — le bail réel n'a pas été calculé"
+        )
+        return
+
+    if deploye:
+        try:
+            battement_s = float(brut)
+        except ValueError:
+            errors.append(
+                f"[{BAIL_CONSTANTE}] le battement DÉPLOYÉ est ILLISIBLE : le bail en "
+                "découle, donc il n'est pas calculable. Corriger ou retirer la "
+                f"surcharge (fly secrets unset {BATTEMENT_KEY})."
+            )
+            return
+        if battement_s <= 0:
+            # La règle du battement refuse déjà ce cas : ne pas doubler le bruit.
+            return
+        origine = f"battement déployé {battement_s:g} s"
+    else:
+        battement_s = defaut_s
+        origine = f"battement par défaut {battement_s:g} s"
+
+    bail_s = bail_de(battement_s)
+    if bail_s is None or bail_s <= 0:
+        errors.append(
+            f"[{BAIL_CONSTANTE}] la formule du bail ne donne pas une valeur exploitable "
+            f"pour {origine} — le bail réel n'est pas connaissable."
+        )
+        return
+
+    if bail_s < BAIL_RENOUVELLEMENTS * battement_s:
+        errors.append(
+            f"[{BAIL_CONSTANTE}] bail {bail_s:g} s ({origine}) sous "
+            f"{BAIL_RENOUVELLEMENTS} × battement "
+            f"({BAIL_RENOUVELLEMENTS * battement_s:g} s) : un battement PERDU "
+            "expirerait une place VIVANTE, et le compte admettrait un flux de plus. "
+            f"Relever {BAIL_CONSTANTE} dans backend/kojo_live.py."
+        )
+        return
+
+    fenetre_s = fenetre_ms / 1000.0
+    if bail_s > fenetre_s + battement_s:
+        # Le remède dépend de l'ORIGINE du bail : surchargé, il vient du
+        # battement déployé (formule = 3 × battement) ; par défaut, il vient de
+        # la formule elle-même. Nommer le mauvais fichier ferait perdre le
+        # prochain lecteur.
+        remede = (
+            f"Retirer la surcharge du battement (fly secrets unset {BATTEMENT_KEY}) : "
+            f"le bail en découle."
+            if deploye
+            else f"Ramener {BAIL_CONSTANTE} dans backend/kojo_live.py."
+        )
+        errors.append(
+            f"[{BAIL_CONSTANTE}] bail {bail_s:g} s ({origine}) au-delà du verdict du "
+            f"client ({fenetre_s:g} s) plus un battement ({battement_s:g} s), soit "
+            f"{fenetre_s + battement_s:g} s : les "
+            "places d'un worker tué resteraient comptées au plafond du compte après "
+            f"que tous ses clients ont renoncé, et un flux légitime serait refusé. {remede}"
+        )
+        return
+
+    checked.append(
+        f"  {OK} {BAIL_CONSTANTE} = {bail_s:g} s ({origine}) — au moins "
+        f"{BAIL_RENOUVELLEMENTS} × battement "
+        f"({BAIL_RENOUVELLEMENTS * battement_s:g} s) et au plus fenêtre client "
+        f"+ un battement ({fenetre_s + battement_s:g} s)"
+    )
+
+
+def contrat_du_repli(chemins=None):
+    """`(repli_ms, raison)` — le repli lu dans CHAQUE déclaration.
+
+    `(valeur, None)` quand toutes les déclarations s'accordent ; `(None, raison)`
+    sinon. L'absence ET la divergence sont des refus : une valeur lue dans un
+    fichier puis recopiée dans l'autre est exactement la duplication qui a coûté
+    une reconnexion par flux inactif au battement.
+    """
+    chemins = REPLI_FICHIERS if chemins is None else tuple(chemins)
+    trouvees = []
+    for chemin in chemins:
+        try:
+            texte = Path(chemin).read_text(encoding="utf-8")
+        except OSError:
+            return None, f"{Path(chemin).name} illisible"
+        valeur = _nombre_js(texte, REPLI_CONSTANTE)
+        if valeur is None:
+            return None, f"{Path(chemin).name} ne déclare pas {REPLI_CONSTANTE}"
+        trouvees.append((Path(chemin).name, valeur))
+    valeurs = {valeur for _, valeur in trouvees}
+    if len(valeurs) != 1:
+        detail = ", ".join(f"{nom} {valeur:g} ms" for nom, valeur in trouvees)
+        return None, f"valeurs DIVERGENTES ({detail})"
+    return trouvees[0][1], None
+
+
+def check_fallback_contract(valeur, raison):
+    """Le repli du client, jugé contre le sondage qu'il REMPLACE.
+
+    Ce n'est pas une valeur de Fly : elle part dans le bundle du client, sans
+    surcharge d'exécution. Ce qui est jugé est donc la SOURCE dont ce bundle est
+    bâti — et le message le dit, pour qu'un vert ici ne se lise pas comme une
+    mesure de la machine.
+
+    Contrat : le repli ne doit pas être aussi bavard que les 2 requêtes par
+    minute du sondage qu'il remplace. À 60 s il divise la charge par deux ; à
+    30 s il ne remplace qu'un aller-retour par un autre.
+    """
+    if valeur is None:
+        errors.append(
+            f"[{REPLI_CONSTANTE}] repli NON JUGEABLE : {raison}. Les deux "
+            "déclarations doivent porter la MÊME valeur — deux valeurs qui "
+            "divergent font deux cadences selon la page ouverte, et aucune ne "
+            "peut être jugée contre le sondage remplacé."
+        )
+        return
+    if valeur <= ANCIEN_SONDAGE_MS:
+        errors.append(
+            f"[{REPLI_CONSTANTE}] repli de {valeur:g} ms : aussi bavard que le sondage "
+            f"remplacé ({ANCIEN_SONDAGE_MS:g} ms = 2 req/min par session) — le flux "
+            "n'aurait remplacé qu'un aller-retour par un autre. Allonger le repli "
+            "dans frontend/src/contexts/NotificationContext.js ET "
+            "frontend/src/pages/Messages.js."
+        )
+        return
+    checked.append(
+        f"  {OK} {REPLI_CONSTANTE} = {valeur:g} ms — moins bavard que le sondage "
+        f"remplacé ({ANCIEN_SONDAGE_MS:g} ms), même valeur dans ses deux "
+        "déclarations (valeur du bundle, aucune surcharge d'exécution)"
+    )
+
+
 def _mask(value):
     """Masque une valeur secrète : ne garde que le préfixe du schéma et la
     longueur (ex. 'redis://... [55 car.]'). JAMAIS la valeur complète dans la
@@ -920,7 +1212,18 @@ def main(argv=None):
     valeur_battement = live_env.get(BATTEMENT_KEY, "")
     if deploye and not valeur_battement and BATTEMENT_KEY in fly_secrets:
         valeur_battement = read_secrets_via_ssh([BATTEMENT_KEY]).get(BATTEMENT_KEY, "")
-    check_heartbeat_contract(deploye, valeur_battement, contrat_du_client())
+    contrat_client = contrat_du_client()
+    check_heartbeat_contract(deploye, valeur_battement, contrat_client)
+
+    # 4f) LES AUTRES RÉGLAGES DE TEMPS DU FLUX : le bail du registre Redis
+    # (CALCULÉ depuis le battement, donc jamais une clé Fly à lire) et le repli
+    # du client (une valeur du bundle, pas de la machine). Chacun a son contrat,
+    # et aucun des deux n'était jugé : un bail trop court expire une place
+    # vivante, un bail trop long garde les places d'un worker mort, un repli
+    # aussi bavard que le sondage remplacé annule le remplacement.
+    check_lease_contract(deploye, valeur_battement, contrat_client, contrats_du_serveur())
+    valeur_repli, raison_repli = contrat_du_repli()
+    check_fallback_contract(valeur_repli, raison_repli)
 
     # 5) FORMAT : références du dépôt (déterministe) PUIS valeurs déployées
     _auditer_references()
