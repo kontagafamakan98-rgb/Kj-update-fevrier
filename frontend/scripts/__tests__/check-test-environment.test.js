@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { createServer } from 'node:http';
@@ -691,6 +691,147 @@ describe('check-test-environment — le pré-vol de push', () => {
     const paquet = JSON.parse(readFileSync(path.join(FRONTEND_DIR, 'package.json'), 'utf8'));
     expect(paquet.scripts.prepare).toContain('core.hooksPath .githooks');
   });
+});
+
+// ── Le pré-vol lance le MÊME lint que la CI, et le prouve par un push refusé ──
+// Le défaut mesuré le 19/10/2026 : un `$(date +%F)` non quoté dans un workflow
+// neuf est parti en CI, où `workflow-lint` l'a refusé APRÈS le push. Ces cas
+// rejouent ce geste sur un vrai dépôt, avec le hook versionné : le refus doit
+// arriver avant que la réf ne quitte la machine.
+const SHELLCHECK_DU_POSTE = (() => {
+  try {
+    execFileSync(process.env.KOJO_SHELLCHECK || 'shellcheck', ['--version'], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+})();
+
+const WORKFLOW_DEFECTUEUX = [
+  'name: pousse',
+  'on: workflow_dispatch',
+  'jobs:',
+  '  j:',
+  '    runs-on: ubuntu-latest',
+  '    steps:',
+  '      - name: rapport',
+  '        run: |',
+  '          python outil.py --rapport /tmp/r-$(date +%F).json',
+].join('\n');
+
+const WORKFLOW_SAIN = [
+  'name: pousse',
+  'on: workflow_dispatch',
+  'jobs:',
+  '  j:',
+  '    runs-on: ubuntu-latest',
+  '    steps:',
+  '      - name: rapport',
+  '        run: |',
+  '          python outil.py --rapport "/tmp/r-$(date +%F).json"',
+].join('\n');
+
+describe('le pré-vol de push — le même lint que la CI', () => {
+  /** Un dépôt avec son distant, `main` déjà poussée, hooks sur le vrai `.githooks`. */
+  async function depotPret(prefixe) {
+    const { racine, travail } = await decorDeFusion(prefixe);
+    await git(travail, 'config', 'core.hooksPath', PRE_PUSH_DIR.replaceAll(path.sep, '/'));
+    await git(travail, 'switch', 'main');
+    return { racine, travail };
+  }
+
+  /** Commit qui touche (ou non) `.github/workflows/`, prêt à être poussé. */
+  async function committer(travail, { workflow: contenu = null, fichier = 'depart.txt' } = {}) {
+    if (contenu !== null) {
+      const dossier = path.join(travail, '.github', 'workflows');
+      mkdirSync(dossier, { recursive: true });
+      writeFileSync(path.join(dossier, 'pousse.yml'), contenu);
+      await git(travail, 'add', '.github');
+      await git(travail, 'commit', '-m', 'workflow');
+      return;
+    }
+    writeFileSync(path.join(travail, fichier), 'suite\n');
+    await git(travail, 'commit', '-am', 'suite');
+  }
+
+  async function avecEnv(valeurs, action) {
+    const avant = {};
+    for (const [cle, valeur] of Object.entries(valeurs)) {
+      avant[cle] = process.env[cle];
+      process.env[cle] = valeur;
+    }
+    try {
+      return await action();
+    } finally {
+      for (const [cle, valeur] of Object.entries(avant)) {
+        if (valeur === undefined) delete process.env[cle];
+        else process.env[cle] = valeur;
+      }
+    }
+  }
+
+  const avecShellcheck = SHELLCHECK_DU_POSTE ? it : it.skip;
+
+  avecShellcheck('refuse le push qui publierait un SC2046, en nommant la ligne', async () => {
+    const { racine, travail } = await depotPret('kojo-lint-refus-');
+    try {
+      await committer(travail, { workflow: WORKFLOW_DEFECTUEUX });
+      const refuse = await pousser(travail, 'origin', 'main');
+      expect(refuse.ok, refuse.sortie).toBe(false);
+      expect(refuse.sortie).toContain('SC2046');
+      expect(refuse.sortie).toContain('pousse.yml:9');
+      expect(refuse.sortie).toContain('push ANNULÉ par le pré-vol');
+      // Le remède explicite reste nommé : contourner doit rester un choix.
+      expect(refuse.sortie).toContain('git push --no-verify');
+    } finally {
+      await nettoyer(racine);
+    }
+  }, 60_000);
+
+  avecShellcheck('laisse passer un workflow sain', async () => {
+    const { racine, travail } = await depotPret('kojo-lint-vert-');
+    try {
+      await committer(travail, { workflow: WORKFLOW_SAIN });
+      const pousse = await pousser(travail, 'origin', 'main');
+      expect(pousse.ok, pousse.sortie).toBe(true);
+      expect(pousse.sortie).toContain('[OK]');
+    } finally {
+      await nettoyer(racine);
+    }
+  }, 60_000);
+
+  it('ne demande PAS shellcheck quand le push ne touche aucun workflow', async () => {
+    // Exiger l'outil pour publier du code React serait un péage sans rapport
+    // avec ce qui est publié — et un pré-vol qu'on désactive.
+    const { racine, travail } = await depotPret('kojo-lint-sans-workflow-');
+    try {
+      await committer(travail, { fichier: 'depart.txt' });
+      const pousse = await avecEnv({ KOJO_SHELLCHECK: '/introuvable/shellcheck' }, () =>
+        pousser(travail, 'origin', 'main'),
+      );
+      expect(pousse.ok, pousse.sortie).toBe(true);
+      expect(pousse.sortie).toContain('aucun workflow dans ce push');
+    } finally {
+      await nettoyer(racine);
+    }
+  }, 60_000);
+
+  it('refuse un workflow poussé sans shellcheck, en nommant l’installation', async () => {
+    // La moitié qui ferme le trou : un pré-vol qui laisserait partir le
+    // workflow sans rien juger reproduirait exactement le défaut du 19/10/2026.
+    const { racine, travail } = await depotPret('kojo-lint-sans-outil-');
+    try {
+      await committer(travail, { workflow: WORKFLOW_SAIN });
+      const refuse = await avecEnv({ KOJO_SHELLCHECK: '/introuvable/shellcheck' }, () =>
+        pousser(travail, 'origin', 'main'),
+      );
+      expect(refuse.ok, refuse.sortie).toBe(false);
+      expect(refuse.sortie).toContain('shellcheck introuvable');
+      expect(refuse.sortie).toContain("n'a pas pu juger");
+    } finally {
+      await nettoyer(racine);
+    }
+  }, 60_000);
 });
 
 // ── Exécution directe : main() refuse si git est illisible ────────────────────

@@ -139,7 +139,7 @@ Historique (mesures, incidents) : `git log -p -- AGENTS.md`.
 
 ## Git et outillage
 
-- `.githooks/pre-push` lance `frontend/scripts/check-test-environment.js --avant-push`.
+- `.githooks/pre-push` lance `frontend/scripts/check-test-environment.js --avant-push`, et AVANT lui `frontend/scripts/check-workflows-lint.mjs --from-push` : le MÊME lint que `workflow-lint` (actionlint s'il est installé — c'est lui que la CI lance —, sinon shellcheck sur les blocs `run:` extraits avec les exclusions d'actionlint et `set -e` ajouté avant de déléguer, sinon `cd ../frontend` remonte en SC2164 fantôme). Il ne juge QUE si le push touche un workflow (les réfs du hook lui sont passées par `KOJO_REFS_DU_PUSH`, base inconnue = tout) : sans shellcheck il REFUSE ce push-là en nommant l'installation, et ne juge jamais à moitié — un `$(date +%F)` non quoté est parti en CI le 19/10/2026 (SC2046, `backup-db.yml`) faute de ce pré-vol. Preuve : `frontend/scripts/__tests__/check-workflows-lint.test.js` (extraction et ligne absolue, `${{ }}` substitué, SC2046 réel, parité mesurée sur les 125 blocs du dépôt) et un push REFUSÉ pour de vrai dans `check-test-environment.test.js`.
 - `git branch -d` refuse une branche fusionnée par squash : utiliser `-D`. Hygiène : `frontend/scripts/check-git-branches.js`.
 - `fetch.prune=true` posé localement ; `fetch.pruneTags` volontairement non.
 - Retard de `main` sur la production : `frontend/scripts/check-retard-main.js`.

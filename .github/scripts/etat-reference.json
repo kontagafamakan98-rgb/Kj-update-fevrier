@@ -35,9 +35,8 @@
   ],
   "reference": {
     "etablie_le": "2026-10-19",
-    "motif": "la sonde Fly juge aussi les deux autres reglages de temps du flux : bail du registre derive du battement deploye et repli du client lu dans ses deux declarations",
+    "motif": "le pre-push lance le meme lint que le workflow-lint requis : garde de lint des blocs run: ajoute, et cablage dans le hook (refs du push par KOJO_REFS_DU_PUSH)",
     "fichiers": {
-      ".githooks/pre-push": "57a57605381510b531a2653226add8b0cd3f1f5879cc2adeead186342a2b44a9",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
       ".github/scripts/check-exec-bits.py": "92e00bbb66f78f7e06d186ef57a93559d1d3818b446edcdaf006244773690fe6",
       ".github/scripts/check-gate-perimetre.py": "875db0af3fad7e867eff7115e42d104c30c8f505e6c4c2bc63ac255d8e411e82",
@@ -122,7 +121,9 @@
       "frontend/scripts/check-git-branches.js": "ca59cb244f206e5461769d290c3d10165a34d025a05b47d8463cb30a4accbc87",
       "backend/scripts/check_atlas_backups.py": "4267bdbd40226f47c5454e9c72def56a4cf119cf36fc5816b05e0a4160223441",
       ".github/scripts/check-exercice-restauration.py": "54de4cd7521a19c5c4bcdd0a78e7ef9ef0fc87d3a62f15facf1b63323f0b5728",
-      ".github/scripts/check-fly-env-drift.py": "650437bf61fe067b946dc7de8138735ce934bf3071f2d69fd5879f63187de2c3"
+      ".github/scripts/check-fly-env-drift.py": "650437bf61fe067b946dc7de8138735ce934bf3071f2d69fd5879f63187de2c3",
+      ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
+      "frontend/scripts/check-workflows-lint.mjs": "b89553ec473008f22732a0ee7460ff697e52da8dd35425812c9bf530c0ab6db0"
     }
   },
   "hors_perimetre": [

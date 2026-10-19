@@ -60,8 +60,15 @@ fi
 publication=0
 lignes=0
 branches_poussees=''
+# Les mêmes réfs sont RE-PASSÉES au lint des workflows : c'est par elles qu'il
+# sait quels fichiers ce push publie, donc s'il a quelque chose à juger. Elles
+# voyagent par l'environnement, pas par un argument : la ligne d'appel du
+# pré-vol reste le sujet d'une mutation déclarée (cf. KOJO_BRANCHES_POUSEES).
+refs_du_push=''
 while read -r ref_locale oid_local _ref_distante _oid_distante; do
   lignes=$((lignes + 1))
+  refs_du_push="$refs_du_push$ref_locale $oid_local $_ref_distante $_oid_distante
+"
   case "${ref_locale:-}" in
     refs/heads/*) branches_poussees="$branches_poussees ${ref_locale#refs/heads/}" ;;
   esac
@@ -95,6 +102,44 @@ fi
 
 KOJO_BRANCHES_POUSEES="$branches_poussees"
 export KOJO_BRANCHES_POUSEES
+
+# ── LE MÊME LINT QUE LA CI, AVANT QUE LE PUSH NE PARTE ──────────────────────
+# `workflow-lint` délègue les blocs `run:` des workflows à shellcheck, présent
+# sur le runner et absent d'un poste de développement : un `$(date +%F)` non
+# quoté (SC2046) partait donc en CI et rougissait le job APRÈS le push — mesuré
+# le 19/10/2026 sur `.github/workflows/backup-db.yml`. C'est cette classe de
+# défaut que ce pré-vol attrape, avec le MÊME moteur et les MÊMES exclusions
+# (frontend/scripts/check-workflows-lint.mjs, qui explique l'ordre actionlint
+# puis shellcheck et pourquoi `set -e` est ajouté avant de déléguer).
+#
+# Ce qu'il ne refuse PAS : un push qui ne touche aucun workflow — les réfs sont
+# passées au garde, qui juge alors RIEN et le dit. Exiger shellcheck pour
+# publier du code React serait un péage sans rapport avec ce qui est publié.
+#
+# Ce qu'il refuse quand même : un push qui TOUCHE un workflow sans shellcheck ;
+# la sortie nomme l'installation, et `--no-verify` reste le contournement
+# explicite (le sachant, pas par accident).
+script_lint="$hooks/../frontend/scripts/check-workflows-lint.mjs"
+if [ ! -f "$script_lint" ]; then
+  echo "pré-vol de push : $script_lint introuvable — push REFUSÉ (le lint des workflows ne peut pas tourner)" >&2
+  exit 1
+fi
+
+KOJO_REFS_DU_PUSH="$refs_du_push"
+export KOJO_REFS_DU_PUSH
+
+node "$script_lint" --from-push
+lint=$?
+if [ "$lint" -ne 0 ]; then
+  echo "" >&2
+  if [ "$lint" -eq 2 ]; then
+    echo "push ANNULÉ par le pré-vol : le lint des workflows n'a pas pu juger (prémisse ci-dessus)." >&2
+  else
+    echo "push ANNULÉ par le pré-vol : la CI refusera ces workflows (job workflow-lint)." >&2
+  fi
+  echo "Corriger, puis relancer le push — ou pousser en le sachant : git push --no-verify" >&2
+  exit 1
+fi
 
 if node "$script" --avant-push; then
   exit 0

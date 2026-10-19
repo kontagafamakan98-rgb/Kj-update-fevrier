@@ -290,6 +290,14 @@
       "motif": "refuse en fin de passe un serveur de test encore ouvert, une URL de Preview injoignable, et relaie l'hygiene git (branches locales fusionnees, refs distantes orphelines) deleguee a scripts/check-git-branches.js ; NOMME SANS BLOQUER le travail qui n'existe que sur ce disque — branche locale dont la tete n'est contenue dans AUCUNE ref distante, mesuree par une lecture par branche (`rev-list --count <branche> --not --remotes`), avec sa marche a suivre (git push, ou git branch -D si le contenu a ete livre autrement) — et nomme l'etat au lieu de juger quand aucune ref distante n'existe (plancher de lecture)la liste des ports vient de playwright.config.js et du serveur de rewrites"
     },
     {
+      "chemin": "frontend/scripts/check-workflows-lint.mjs",
+      "role": "garde",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/check-workflows-lint.test.js",
+      "runner": "vitest",
+      "motif": "refuse, AVANT le push, ce que le job requis workflow-lint refuserait apres : un bloc run: que shellcheck condamne (SC2046 mesure le 19/10/2026 sur backup-db.yml, parti en CI parce qu'aucun poste n'a shellcheck). Lit les blocs run: par indentation avec leur ligne absolue dans le YAML, remplace les ${{ }} par un jeton inerte (sinon faux positifs), ajoute set -e comme actionlint avant de deleguer (sinon SC2164 fantome), et n'exige l'outil que si le push touche un workflow"
+    },
+    {
       "chemin": "frontend/scripts/check-git-branches.js",
       "role": "garde",
       "invoque_par": "ci",
@@ -2674,6 +2682,26 @@
       "cwd": "frontend",
       "attend": [
         "laisse passer le nettoyage qu’il réclame"
+      ]
+    },
+    {
+      "id": "workflows-lint: expressions github non substituees",
+      "garde": "frontend/scripts/check-workflows-lint.mjs",
+      "cible": "frontend/scripts/check-workflows-lint.mjs",
+      "trouve": "  return script.replace(/\\$\\{\\{[^}]*\\}\\}/g, JETON_EXPRESSION);",
+      "remplace": "  return script;",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-workflows-lint.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-workflows-lint.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "remplace les expressions GitHub, jamais par du vide"
       ]
     },
     {
