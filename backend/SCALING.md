@@ -273,7 +273,20 @@ retombe sur le repli.
   enveloppes d’une fenêtre de 2 s parvenaient au bus, la manquante n’étant
   comptée NULLE PART (`perdus` restait à 0). Banc :
   `scripts/charge/mesure_panne_redis.py` (400 flux, 400 évt/s, panne réelle :
-  800/800 depuis la correction). Ce qu’il coûte :
+  800/800 depuis la correction). **Le second bout du bus perd, lui, vraiment :**
+  le pub/sub n’a aucun historique, donc ce qu’un autre worker publie pendant
+  qu’un process n’écoute pas ne lui sera jamais rejoué. C’est mesuré — douze
+  enveloppes publiées pendant la fenêtre, zéro livrée — et non caché : la
+  fenêtre est comptée (`bus_stats()['reprises']`) et chaque flux local reçoit
+  `resync` au rétablissement, c’est-à-dire RELIT la source de vérité. La
+  cadence des relectures est bornée (`RESYNC_MIN_INTERVAL_SECONDS`, 10 s) pour
+  ne pas redevenir plus bavarde que le sondage remplacé (2 req/min), avec une
+  relecture différée pour la dernière fenêtre d’une rafale. Et une lecture qui
+  expire n’est pas une panne : la lecture par `get_message` avec un délai
+  explicite rend `None` sur un canal calme ; `listen()`, lui, héritait du
+  `socket_timeout` du client (2 s) et rompait l’abonnement toutes les 2,2 s —
+  donc restait sourd près de la moitié du temps, la perte que ce paragraphe
+  décrit devenant permanente au repos (mesuré le 19/10/2026). Ce qu’il coûte :
   un message par événement par process abonné, et un tampon borné
   (`KOJO_LIVE_BUS_QUEUE`, 1000) dont le dépassement est compté (`perdus`) — le
   bus perd, jamais le flux local. **Mesuré** à 200 flux (§5) : non

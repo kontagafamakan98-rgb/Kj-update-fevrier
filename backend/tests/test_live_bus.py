@@ -49,12 +49,28 @@ class FauxPubSub:
         self.canal = canal
         self._bus.abonnements.append(canal)
 
-    async def listen(self):
-        while not self.ferme:
-            message = await self._bus.recus.get()
-            if message is None:
-                return
-            yield {"type": "message", "data": message}
+    async def get_message(self, ignore_subscribe_messages=True, timeout=None):
+        """Le protocole que `_abonnement` emploie : un message, ou `None` sur silence.
+
+        Un délai qui expire rend `None` (canal calme) et ne lève pas : c'est
+        exactement ce que la vraie bibliothèque fait avec un délai explicite, et
+        ce qui distingue une coupure d'un canal sans événement.
+        """
+        if self.ferme:
+            return None
+        try:
+            message = await asyncio.wait_for(self._bus.recus.get(), timeout=timeout)
+        except asyncio.TimeoutError:
+            return None
+        if message is None:
+            return None
+        # Coupure d'abonnement, UNE fois : le double d'une connexion arrachée.
+        # La vérification est APRÈS le `get` pour que la coupure réveille un
+        # abonnement déjà en attente, comme le ferait un reset TCP.
+        if self._bus._coupure:
+            self._bus._coupure = False
+            raise ConnectionError("abonnement rompu (double)")
+        return {"type": "message", "data": message}
 
     async def aclose(self):
         self.ferme = True
@@ -76,6 +92,17 @@ class FauxRedis:
         self.en_panne = en_panne
         self.bloque = bloque
         self.ferme = False
+        self._coupure = False
+
+    def couper_abonnement(self) -> None:
+        """Rompt l'écoute UNE fois, et réveille une attente déjà bloquée.
+
+        Le réveil est un message factice : le vrai serveur, lui, rend une erreur
+        de lecture dès que la connexion tombe. Il est consommé AVANT d'être
+        livré, donc aucun événement fantôme n'atteint les flux.
+        """
+        self._coupure = True
+        self.recus.put_nowait("__coupure__")
 
     async def publish(self, canal, charge):
         if self.bloque is not None:
@@ -192,6 +219,113 @@ async def test_un_evenement_d_un_autre_processus_est_livre_aux_flux_locaux():
     await attendre(lambda: not queue.empty(), "l'événement venu du bus n'est jamais arrivé")
     assert queue.get_nowait() == ("message", {"id": "m2"})
     assert kojo_live.bus_stats()["recus"] == 1
+
+
+@pytest.mark.asyncio
+async def test_une_fenetre_sans_ecoute_est_declaree_et_fait_relire_chaque_flux(monkeypatch):
+    """Ce que l'ABONNÉ perd quand Redis tombe, et la seule réparation possible.
+
+    Le pub/sub n'a aucun historique : une enveloppe publiée par un AUTRE worker
+    pendant que notre abonnement est rompu est perdue, définitivement. Le cas
+    fixe les deux moitiés du contrat :
+      * la fenêtre est COMPTÉE (`reprises`) — sans quoi la perte serait muette ;
+      * chaque flux OUVERT reçoit `resync` (`resyncs`) — la relecture répare
+        l'état du client, la seule chose réparable ici.
+    """
+    monkeypatch.setattr(kojo_live, "BUS_RECONNECT_SECONDS", 0.01)
+    faux = FauxRedis(echo=True)
+    # Les flux existent AVANT la première souscription : elle ne doit rien
+    # relire, aucun client n'ayant vécu sans écoute.
+    qa = kojo_live.subscribe("compte-a")
+    qb = kojo_live.subscribe("compte-b")
+    await kojo_live.start_bus(client=faux)
+
+    # Établissement prouvé par l'écho : le faux serveur n'envoie qu'à un
+    # abonné qui écoute réellement.
+    kojo_live.publish("compte-a", "message", {"id": "avant"})
+    await attendre(
+        lambda: kojo_live.bus_stats()["echo"] == 1, "l'abonnement n'écoutait pas"
+    )
+    assert _vider(qa) == [("message", {"id": "avant"})]
+    assert _vider(qb) == [], "un flux sans événement a reçu quelque chose"
+    assert kojo_live.bus_stats()["resyncs"] == 0, (
+        "la PREMIÈRE souscription a fait relire : ce n'est pas une fenêtre perdue"
+    )
+
+    # La fenêtre aveugle : l'abonnement tombe, une seule fois.
+    faux.couper_abonnement()
+    await attendre(
+        lambda: kojo_live.bus_stats()["repli"] >= 1,
+        "la coupure n'a jamais atteint l'abonnement : le cas ne prouverait rien",
+    )
+    await attendre(
+        lambda: kojo_live.bus_stats()["reprises"] >= 1,
+        "la reprise de l'abonnement n'est pas DÉCLARÉE (reprises) : la perte "
+        "serait muette",
+    )
+
+    attendu = [("resync", {"motif": "bus_reprise"})]
+    assert _vider(qa) == attendu, "le flux du compte A n'a pas été fait de relire"
+    assert _vider(qb) == attendu, (
+        "le compte B n'a pas été fait de relire alors qu'on ignore quelles "
+        "enveloppes la fenêtre a perdues : TOUS les flux ouverts doivent relire"
+    )
+    assert kojo_live.bus_stats()["reprises"] == 1
+    assert kojo_live.bus_stats()["resyncs"] == 1
+
+    # Un flux ouvert APRÈS la reprise n'a pas vécu la fenêtre : il ne doit pas
+    # relire pour rien (sinon chaque ouverture d'onglet coûterait une relecture).
+    qc = kojo_live.subscribe("compte-c")
+    assert qc.empty(), "un flux ouvert après la reprise a reçu un resync inutile"
+
+
+@pytest.mark.asyncio
+async def test_une_rafale_ne_laisse_pas_sa_derniere_fenetre_sans_relecture(monkeypatch):
+    """La cadence des relectures est bornée, mais la DERNIÈRE fenêtre est réparée.
+
+    Un Redis qui bat de l'aile ferait une reprise toutes les
+    `BUS_RECONNECT_SECONDS` ; relire à chacune serait plus bavard que le
+    sondage remplacé. Une relecture étant TOTALE, une seule couvre les fenêtres
+    qu'elle suit — mais si la dernière tombe dans la marge, elle doit être
+    rattrapée plus tard, sinon c'est justement celle qui resterait non relue.
+    """
+    monkeypatch.setattr(kojo_live, "BUS_RECONNECT_SECONDS", 0.01)
+    monkeypatch.setattr(kojo_live, "RESYNC_MIN_INTERVAL_SECONDS", 0.2)
+    faux = FauxRedis(echo=True)
+    queue = kojo_live.subscribe("compte-rafale")
+    await kojo_live.start_bus(client=faux)
+
+    kojo_live.publish("compte-rafale", "message", {"id": "temoin"})
+    await attendre(
+        lambda: kojo_live.bus_stats()["ecoutes"] >= 1, "l'abonnement n'écoutait pas"
+    )
+    _vider(queue)
+
+    # Première fenêtre : relecture immédiate.
+    faux.couper_abonnement()
+    await attendre(
+        lambda: kojo_live.bus_stats()["resyncs"] == 1,
+        "la première fenêtre n'a pas été réparée",
+    )
+    _vider(queue)
+
+    # Seconde fenêtre DANS la marge : rien tout de suite...
+    faux.couper_abonnement()
+    await attendre(
+        lambda: kojo_live.bus_stats()["reprises"] == 2,
+        "la seconde fenêtre n'a pas été déclarée",
+    )
+    assert queue.empty(), (
+        "une relecture a été relancée dans la marge : la cadence bornée ne "
+        "protège plus le sondage qu'elle remplace"
+    )
+    # ... mais une relecture DIFFÉRÉE rattrape la dernière fenêtre.
+    await attendre(
+        lambda: kojo_live.bus_stats()["resyncs"] == 2,
+        "la dernière fenêtre d'une rafale n'a jamais été réparée : c'est "
+        "précisément celle dont personne ne parlerait plus ensuite",
+    )
+    assert _vider(queue) == [("resync", {"motif": "bus_reprise"})]
 
 
 @pytest.mark.asyncio

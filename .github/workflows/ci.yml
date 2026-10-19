@@ -569,12 +569,19 @@ jobs:
       # fichier vérifie LUI-MÊME que cette étape existe encore (dernier cas),
       # pour qu'une étape supprimée rougisse au lieu de laisser un test que
       # personne n'exécute.
+      #
+      # Le SECOND fichier de cette étape garde la perte d'enveloppe EN VOL : le
+      # banc `scripts/charge/mesure_panne_redis.py` l'a mesurée (799/800 le
+      # 19/10/2026, la manquante comptée nulle part) mais un banc ne garde rien.
+      # Ici le chemin est celui du produit contre le VRAI Redis du job, avec un
+      # proxy TCP devant lui qui s'arrête : l'enveloppe retirée du tampon doit
+      # revenir au bus, ou être COMPTÉE perdue — jamais disparaître.
       - name: Temps réel — bus partagé, deux workers uvicorn et vrai Redis
         working-directory: backend
         env:
           TEST_MONGO_URL: mongodb://localhost:27017
           TEST_REDIS_URL: redis://127.0.0.1:6379/0
-        run: python -m pytest tests/test_live_bus_deux_workers.py -q --tb=short
+        run: python -m pytest tests/test_live_bus_deux_workers.py tests/test_live_bus_panne_redis.py -q --tb=short
 
       # Les refus du générateur de cartes OG (frontend/scripts/gen-og-images.py)
       # sont ce qui empêche une carte d'annoncer autre chose que sa page, et
