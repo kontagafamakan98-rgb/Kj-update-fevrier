@@ -35,9 +35,8 @@
   ],
   "reference": {
     "etablie_le": "2026-10-19",
-    "motif": "la sonde lit le palier des clusters PARTAGES (providerSettings.instanceSizeName) : sans cette lecture le cluster reel (M0) sortait « palier inconnu » et le remede publie etait « activer le Cloud Backup », impossible sur ce palier (releve du 19/10/2026 avec les cles ATLAS_* posees)",
+    "motif": "contrat des deux delais du bus : reprise bornee [1 s, un battement] et file >= MAX_STREAMS_TOTAL x delai, jugees sur la valeur deployee ou le defaut lu dans kojo_live.py, valeur vide de [env] retombant sur le defaut",
     "fichiers": {
-      ".githooks/pre-push": "57a57605381510b531a2653226add8b0cd3f1f5879cc2adeead186342a2b44a9",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
       ".github/scripts/check-exec-bits.py": "92e00bbb66f78f7e06d186ef57a93559d1d3818b446edcdaf006244773690fe6",
       ".github/scripts/check-gate-perimetre.py": "875db0af3fad7e867eff7115e42d104c30c8f505e6c4c2bc63ac255d8e411e82",
@@ -120,8 +119,11 @@
       "frontend/scripts/check-token-exposure-production.js": "0fd396ac948eae4f23de5bf608df4f2cbdc91c0998d509d4eb75ea1ba89b8fd4",
       "frontend/scripts/check-sse-proxy-production.js": "2031baeb402c738c7c5c28d252a8004a7dbde6d0d754b6d99e31bfa1559278d3",
       "frontend/scripts/check-git-branches.js": "ca59cb244f206e5461769d290c3d10165a34d025a05b47d8463cb30a4accbc87",
-      ".github/scripts/check-fly-env-drift.py": "626ff760af805d2c5210657505723d91f16ccc4d4c9db8264e38c56b92313c61",
-      "backend/scripts/check_atlas_backups.py": "f1faedbdf04960d13e4538922103196493c54617e64f2f1cd4b3ac3f68088c0f"
+      "backend/scripts/check_atlas_backups.py": "4267bdbd40226f47c5454e9c72def56a4cf119cf36fc5816b05e0a4160223441",
+      ".github/scripts/check-exercice-restauration.py": "54de4cd7521a19c5c4bcdd0a78e7ef9ef0fc87d3a62f15facf1b63323f0b5728",
+      ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
+      "frontend/scripts/check-workflows-lint.mjs": "f35fdf0b82e5aa7aa62ab638c69db028711615841a431665c1bc79f902742103",
+      ".github/scripts/check-fly-env-drift.py": "532f99217d266e6af04cd53a3c7e566d48e5a3ae0234a4f620c9f3f58b4598b1"
     }
   },
   "hors_perimetre": [

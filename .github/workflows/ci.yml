@@ -288,6 +288,28 @@ jobs:
       - name: Check no repo file drifted from its reference state (declared)
         run: python3 .github/scripts/check-etat-reference.py
 
+      # ── UNE PREUVE DATÉE NE VAUT QUE FRAÎCHE ──────────────────────────────
+      # `backend/SAUVEGARDES_ATLAS.md` est ce qui autorise à dire « on est prêt
+      # à restaurer » : son §3 porte un exercice DATÉ, et c'est la seule preuve
+      # que les commandes de restauration ont été lancées pour de vrai. Rien ne
+      # disait qu'elle PÉRIMAIT : un exercice d'il y a six mois reste « daté »,
+      # donc vert à la lecture, alors qu'il ne décrit plus une capacité mais une
+      # intention — le dépôt a changé, les commandes ont bougé, la personne qui
+      # les a lancées n'est plus forcément là. Même famille que F9/F17 : un fait
+      # qu'on croit mesuré parce qu'il est écrit.
+      #
+      # Le garde lit le SEUL repère stable — un titre `##`/`###` nommant un
+      # exercice ET portant une date JJ/MM/AAAA —, écarte un titre « non
+      # exécuté » (§3bis : préparé n'est pas fait), refuse une date illisible,
+      # impossible ou future, et juge l'âge contre la cadence que le runbook
+      # ANNONCE lui-même (trimestre) plus une marge. Un runbook tronqué le fait
+      # refuser de conclure : un lecteur cassé ne rend pas un vert.
+      #
+      # Aucune neutralisation ici : une étape qui ne peut pas rougir ne
+      # surveille rien (cf. check-informative-steps.py).
+      - name: Check the dated restoration drill is still recent
+        run: python3 .github/scripts/check-exercice-restauration.py
+
       # shellcheck (pré-installé sur ubuntu-latest) : analyse statique des
       # scripts shell du dépôt. Échoue sur les erreurs (les warnings restent
       # informatifs — comportement par défaut de shellcheck).

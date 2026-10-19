@@ -28,6 +28,7 @@
     "playtest:api": "node scripts/playtest-api-server.mjs",
     "check:test-environment": "node scripts/check-test-environment.js",
     "check:git-branches": "node scripts/check-git-branches.js",
+    "lint:workflows": "node scripts/check-workflows-lint.mjs",
     "test:e2e": "playwright test",
     "test": "vitest run",
     "test:watch": "vitest",

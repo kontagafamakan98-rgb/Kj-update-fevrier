@@ -290,6 +290,14 @@
       "motif": "refuse en fin de passe un serveur de test encore ouvert, une URL de Preview injoignable, et relaie l'hygiene git (branches locales fusionnees, refs distantes orphelines) deleguee a scripts/check-git-branches.js ; NOMME SANS BLOQUER le travail qui n'existe que sur ce disque — branche locale dont la tete n'est contenue dans AUCUNE ref distante, mesuree par une lecture par branche (`rev-list --count <branche> --not --remotes`), avec sa marche a suivre (git push, ou git branch -D si le contenu a ete livre autrement) — et nomme l'etat au lieu de juger quand aucune ref distante n'existe (plancher de lecture)la liste des ports vient de playwright.config.js et du serveur de rewrites"
     },
     {
+      "chemin": "frontend/scripts/check-workflows-lint.mjs",
+      "role": "garde",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/check-workflows-lint.test.js",
+      "runner": "vitest",
+      "motif": "refuse, AVANT le push, ce que le job requis workflow-lint refuserait apres : un bloc run: que shellcheck condamne (SC2046 mesure le 19/10/2026 sur backup-db.yml, parti en CI parce qu'aucun poste n'a shellcheck). Lit les blocs run: par indentation avec leur ligne absolue dans le YAML, remplace les ${{ }} par des soulignes de meme longueur comme actionlint (sinon faux positifs, et la colonne resterait alignee), lui donne son amorce set -eo pipefail et ses SEPT exclusions recopiees de rule_shellcheck.go v1.7.12 avec --norc (sinon SC2164 fantome, ou un pre-vol plus severe ou plus indulgent que la CI), et n'exige l'outil que si le push touche un workflow"
+    },
+    {
       "chemin": "frontend/scripts/check-git-branches.js",
       "role": "garde",
       "invoque_par": "ci",
@@ -388,6 +396,14 @@
       "invoque_par": "ci",
       "preuve": "backend/tests/test_email_auth_probe.py",
       "runner": "pytest"
+    },
+    {
+      "chemin": ".github/scripts/check-exercice-restauration.py",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "backend/tests/test_exercice_restauration_fraicheur.py",
+      "runner": "pytest",
+      "motif": "refuse un exercice de restauration daté devenu plus vieux que la cadence que le runbook annonce lui-même (trimestre, plus dix jours de marge) : le §3 de backend/SAUVEGARDES_ATLAS.md est ce qui autorise à dire « prêt à restaurer », et une preuve jamais rejouée ne décrit plus une capacité mais une intention. Lit le SEUL repère stable (titre ##/### nommant un exercice ET portant une date JJ/MM/AAAA), écarte un titre « non exécuté » (préparé n'est pas fait), refuse une date illisible, impossible ou future, et refuse de conclure sous son plancher de lecture"
     },
     {
       "chemin": ".github/scripts/check-exec-bits.py",
@@ -1399,6 +1415,90 @@
       ]
     },
     {
+      "id": "fly-env-drift: un bail qui survit au verdict du client tolere",
+      "garde": ".github/scripts/check-fly-env-drift.py",
+      "cible": ".github/scripts/check-fly-env-drift.py",
+      "trouve": "    if bail_s > fenetre_s + battement_s:",
+      "remplace": "    if False and bail_s > fenetre_s + battement_s:",
+      "runner": "python",
+      "preuve": "backend/tests/test_fly_env_drift.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_fly_env_drift.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_fly_env_drift.py::TestReglagesDeTempsDuFlux::test_un_bail_qui_survit_au_verdict_du_client_est_refuse"
+      ]
+    },
+    {
+      "id": "fly-env-drift: un repli aussi bavard que le sondage remplace tolere",
+      "garde": ".github/scripts/check-fly-env-drift.py",
+      "cible": ".github/scripts/check-fly-env-drift.py",
+      "trouve": "    if valeur <= ANCIEN_SONDAGE_MS:",
+      "remplace": "    if False and valeur <= ANCIEN_SONDAGE_MS:",
+      "runner": "python",
+      "preuve": "backend/tests/test_fly_env_drift.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_fly_env_drift.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_fly_env_drift.py::TestReglagesDeTempsDuFlux::test_un_repli_aussi_bavard_que_l_ancien_sondage_est_refuse"
+      ]
+    },
+    {
+      "id": "fly-env-drift: reconnexion du bus plus longue qu'un battement toleree",
+      "garde": ".github/scripts/check-fly-env-drift.py",
+      "cible": ".github/scripts/check-fly-env-drift.py",
+      "trouve": "    elif delai > battement:",
+      "remplace": "    elif False and delai > battement:",
+      "runner": "python",
+      "preuve": "backend/tests/test_fly_env_drift.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_fly_env_drift.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_fly_env_drift.py::TestDelaisDuBus::test_une_reconnexion_plus_longue_qu_un_battement_est_refusee"
+      ]
+    },
+    {
+      "id": "fly-env-drift: file du bus trop petite pour la reconnexion toleree",
+      "garde": ".github/scripts/check-fly-env-drift.py",
+      "cible": ".github/scripts/check-fly-env-drift.py",
+      "trouve": "    if file_bus < plancher_file:",
+      "remplace": "    if False and file_bus < plancher_file:",
+      "runner": "python",
+      "preuve": "backend/tests/test_fly_env_drift.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_fly_env_drift.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_fly_env_drift.py::TestDelaisDuBus::test_une_file_trop_petite_pour_la_reconnexion_est_refusee"
+      ]
+    },
+    {
       "id": "fly-env-drift: variable absente du runtime toleree",
       "garde": ".github/scripts/check-fly-env-drift.py",
       "cible": ".github/scripts/check-fly-env-drift.py",
@@ -2071,6 +2171,27 @@
       ]
     },
     {
+      "id": "atlas-backups: sauvegarde externe perimee toleree",
+      "garde": "backend/scripts/check_atlas_backups.py",
+      "cible": "backend/scripts/check_atlas_backups.py",
+      "trouve": "    if age > seuil_heures:",
+      "remplace": "    if False and age > seuil_heures:",
+      "runner": "python",
+      "preuve": "backend/tests/test_atlas_backups_probe.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_atlas_backups_probe.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_atlas_backups_probe.py::TestSauvegardeExterne::test_une_sauvegarde_perimee_est_refusee_en_nommant_les_deux_durees"
+      ]
+    },
+    {
       "id": "atlas-backups: palier partage invisible (remede impossible publie)",
       "garde": "backend/scripts/check_atlas_backups.py",
       "cible": "backend/scripts/check_atlas_backups.py",
@@ -2603,6 +2724,26 @@
       "cwd": "frontend",
       "attend": [
         "laisse passer le nettoyage qu’il réclame"
+      ]
+    },
+    {
+      "id": "workflows-lint: expressions github non substituees",
+      "garde": "frontend/scripts/check-workflows-lint.mjs",
+      "cible": "frontend/scripts/check-workflows-lint.mjs",
+      "trouve": "  return script.replace(/\\$\\{\\{[^}]*\\}\\}/g, (expression) => '_'.repeat(expression.length));",
+      "remplace": "  return script;",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-workflows-lint.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-workflows-lint.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "remplace les expressions GitHub par des soulignés de MÊME longueur"
       ]
     },
     {
@@ -5397,6 +5538,27 @@
       "cwd": "backend",
       "attend": [
         "FAILED tests/test_etat_reference.py::TestPlancher::test_sous_le_plancher_le_garde_refuse_de_conclure"
+      ]
+    },
+    {
+      "id": "exercice-restauration: une preuve perimee acceptee",
+      "garde": ".github/scripts/check-exercice-restauration.py",
+      "cible": ".github/scripts/check-exercice-restauration.py",
+      "trouve": "    if age > seuil_jours:",
+      "remplace": "    if False and age > seuil_jours:",
+      "runner": "python",
+      "preuve": "backend/tests/test_exercice_restauration_fraicheur.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_exercice_restauration_fraicheur.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_exercice_restauration_fraicheur.py::TestLaRegle::test_un_exercice_plus_vieux_que_la_cadence_est_refuse"
       ]
     },
     {

@@ -34,6 +34,8 @@ Usage :
 import argparse
 import os
 import sys
+import time
+from datetime import datetime, timezone
 
 BASE_API = "https://cloud.mongodb.com/api/atlas/v2"
 VARIABLES = ("ATLAS_PUBLIC_KEY", "ATLAS_PRIVATE_KEY", "ATLAS_PROJECT_ID", "ATLAS_CLUSTER")
@@ -161,6 +163,120 @@ def analyser(statut, corps):
     return 0, lignes
 
 
+# ── La sauvegarde EXTERNE : ce qui remplace l'impossible sur un palier partagé ─
+# M0/M2/M5 ne fournit AUCUNE sauvegarde continue : exiger « activez Cloud
+# Backup » y envoie l'exploitant dans un mur, et exiger un vert sans rien
+# mesurer serait le silence que ce dépôt refuse. Sur ce palier, la seule
+# restauration possible est donc une sauvegarde EXTERNE VÉRIFIÉE — et ce qui se
+# juge d'elle, c'est sa FRAÎCHEUR : une sauvegarde d'il y a trois jours n'est
+# pas une sauvegarde.
+WORKFLOW_SAUVEGARDE = os.environ.get("BACKUP_WORKFLOW", "backup-db.yml")
+FRAICHEUR_MAX_HEURES = float(os.environ.get("BACKUP_FRAICHEUR_MAX_HEURES", "36"))
+
+
+def _instant(texte):
+    """Instant epoch d'un horodatage ISO-8601 de GitHub, ou None."""
+    try:
+        valeur = datetime.fromisoformat(str(texte).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if valeur.tzinfo is None:
+        valeur = valeur.replace(tzinfo=timezone.utc)
+    return valeur.timestamp()
+
+
+def juger_sauvegarde_externe(dernier_succes, maintenant, seuil_heures=FRAICHEUR_MAX_HEURES):
+    """`(code, ligne)` — la fraîcheur d'une sauvegarde externe vérifiée.
+
+    PURE : l'horloge est un paramètre, donc « vieille de 40 h » se juge sans
+    attendre 40 h, et un horodatage illisible ne se lit jamais comme « récente ».
+    """
+    if not dernier_succes:
+        return 1, (
+            "[ERREUR] Aucune sauvegarde EXTERNE n'a jamais abouti : le workflow "
+            f"{WORKFLOW_SAUVEGARDE} n'a aucun run réussi. Rien ne permettrait de "
+            "restaurer — poser MONGO_URL et les accès du stockage (ou passer à un "
+            "palier dédié, M10 minimum)."
+        )
+    instant = _instant(dernier_succes)
+    if instant is None:
+        return 1, (
+            "[ERREUR] La date de la dernière sauvegarde externe est ILLISIBLE "
+            f"({dernier_succes!r}) : sa fraîcheur n'est pas jugeable, donc pas un vert. "
+            f"Vérifier la sortie du workflow {WORKFLOW_SAUVEGARDE}."
+        )
+    age = (maintenant - instant) / 3600.0
+    if age < -1:
+        return 1, (
+            f"[ERREUR] La dernière sauvegarde externe est datée dans le FUTUR "
+            f"({-age:.0f} h d'avance) : une horloge fausse rend la fraîcheur "
+            "invérifiable. Corriger l'horodatage, puis rejouer."
+        )
+    if age > seuil_heures:
+        return 1, (
+            f"[ERREUR] Dernière sauvegarde EXTERNE il y a {age:.0f} h (seuil "
+            f"{seuil_heures:.0f} h) : trop vieille pour être une sauvegarde. "
+            f"Vérifier le workflow {WORKFLOW_SAUVEGARDE}."
+        )
+    return 0, (
+        f"[OK] Sauvegarde EXTERNE vérifiée il y a {age:.0f} h (seuil "
+        f"{seuil_heures:.0f} h) — Atlas n'offre aucune sauvegarde continue sur ce "
+        "palier : celle-ci est la seule restauration possible."
+    )
+
+
+def dernier_succes_externe(depot=None, jeton=None):
+    """`(etat, valeur)` du dernier run RÉUSSI du workflow de sauvegarde.
+
+    `etat` vaut `ok` (alors `valeur` = horodatage ISO ou None si aucun run
+    réussi) ou `illisible` (alors `valeur` = la raison). Cette distinction est
+    le sujet : « aucun succès » est un fait à corriger, « API illisible » est une
+    prémisse — les confondre rendrait la sonde aveugle ou menteuse.
+    """
+    depot = depot or os.environ.get("GITHUB_REPOSITORY", "")
+    jeton = jeton or os.environ.get("GITHUB_TOKEN", "")
+    if not depot or not jeton:
+        return "illisible", (
+            "GITHUB_REPOSITORY / GITHUB_TOKEN absents : l'historique du workflow "
+            f"{WORKFLOW_SAUVEGARDE} n'a pas pu être lu."
+        )
+    url = (
+        "https://api.github.com/repos/"
+        f"{depot}/actions/workflows/{WORKFLOW_SAUVEGARDE}/runs"
+        "?status=success&per_page=1"
+    )
+    try:
+        import json
+        import urllib.request
+
+        requete = urllib.request.Request(
+            url,
+            headers={
+                "Authorization": f"Bearer {jeton}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+        )
+        with urllib.request.urlopen(requete, timeout=15) as reponse:
+            donnees = json.load(reponse)
+    except Exception as exc:  # noqa: BLE001 - toute panne est une prémisse nommée
+        return "illisible", f"API GitHub injoignable ({exc})"
+    runs = donnees.get("workflow_runs") or []
+    if not runs:
+        return "ok", None
+    return "ok", runs[0].get("created_at") or runs[0].get("run_started_at")
+
+
+def sans_sauvegarde_sur_palier_partage(corps):
+    """Le cas où la seule restauration possible est EXTERNE."""
+    if not isinstance(corps, dict):
+        return False
+    return (
+        _valeur_booleenne(corps, "backupEnabled") is False
+        and _palier(corps) in PALIERS_SANS_PITR
+    )
+
+
 def url_cluster(projet, cluster):
     """URL d'un cluster dans l'API d'administration — testable sans réseau."""
     return f"{BASE_API}/groups/{projet}/clusters/{cluster}"
@@ -236,14 +352,44 @@ def main():
         args.delai,
     )
     code, lignes = analyser(statut, corps if statut is not None else erreur)
+
+    # Sur un palier PARTAGÉ sans sauvegarde, la seule restauration possible est
+    # externe : on juge sa FRAÎCHEUR au lieu d'exiger un Cloud Backup impossible.
+    if code == 1 and sans_sauvegarde_sur_palier_partage(corps):
+        # La ligne qui demandait un Cloud Backup impossible cède la place au
+        # verdict EXTERNE : garder les deux ferait lire un refus et un vert sur
+        # la même situation.
+        lignes = [
+            ligne for ligne in lignes
+            if not ligne.startswith("[ERREUR] Sauvegardes DÉSACTIVÉES")
+        ]
+        etat, valeur = dernier_succes_externe()
+        if etat == "illisible":
+            lignes.append(
+                f"[PREMISSE] Sauvegarde EXTERNE non jugeable : {valeur} Aucun verdict "
+                "n'est rendu sur la restauration possible."
+            )
+            code = 2
+        else:
+            code, ligne = juger_sauvegarde_externe(valeur, time.time())
+            lignes.append(ligne)
+
     for ligne in lignes:
         print(ligne)
 
     if code == 1:
-        print(
-            "\n::error title=Sauvegardes Atlas désactivées::Les sauvegardes continues "
-            "ne sont pas actives — voir backend/SAUVEGARDES_ATLAS.md."
-        )
+        if any("EXTERNE" in ligne for ligne in lignes):
+            print(
+                "\n::error title=Sauvegarde externe absente ou périmée::Atlas n'offre "
+                "aucune sauvegarde continue sur ce palier, et aucune sauvegarde "
+                "externe vérifiée et fraîche n'existe — voir "
+                "backend/SAUVEGARDES_ATLAS.md."
+            )
+        else:
+            print(
+                "\n::error title=Sauvegardes Atlas désactivées::Les sauvegardes continues "
+                "ne sont pas actives — voir backend/SAUVEGARDES_ATLAS.md."
+            )
     elif code == 2:
         print(
             "\n::error title=Sauvegardes Atlas non vérifiables::La sonde n'a pas pu "

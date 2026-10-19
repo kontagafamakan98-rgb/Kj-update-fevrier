@@ -41,6 +41,31 @@ message, pour qu'on ne cherche pas une panne qui n'existe pas.
 Cluster → Backup**. Une case « Cloud Backup » cochée sans « Continuous Cloud
 Backup » est le cas piégeux que la sonde attrape.
 
+### Le cluster est en M0 : la sauvegarde est EXTERNE, et la sonde juge sa fraîcheur
+
+Relevé le 19/10/2026, clés `ATLAS_*` posées : le cluster de production `Kojo`
+est un **M0** (fournisseur TENANT), `backupEnabled=false`, `pitEnabled=false`.
+Un palier partagé ne fournit **aucune** sauvegarde continue : « activer le
+Cloud Backup » y est impossible, et la sonde le dit au lieu de le demander.
+La seule restauration possible est donc celle du workflow
+`.github/workflows/backup-db.yml` (cron 02:40 UTC) :
+
+1. `mongodump` de la production, archive unique compressée ;
+2. `mongorestore` de CETTE archive dans une base de travail `kojo_verif` ;
+3. comparaison source/archive par `backend/scripts/exercice_restauration.py`
+   (empreintes SHA-256 par collection, index compris) — une archive non
+   restaurée n'est pas une sauvegarde ;
+4. chiffrement AES-256 (les dumps contiennent des données personnelles) ;
+5. dépôt sur un bucket S3/R2 **privé**, avec empreinte et taille publiées.
+
+La sonde Atlas juge alors la **fraîcheur** du dernier run réussi de ce
+workflow — 36 h par défaut (`BACKUP_FRAICHEUR_MAX_HEURES`) — parce qu'une
+sauvegarde de trois jours n'est pas une sauvegarde. Six secrets sont
+nécessaires : `MONGO_URL`, `BACKUP_S3_BUCKET`, `BACKUP_S3_ENDPOINT`,
+`BACKUP_S3_ACCESS_KEY_ID`, `BACKUP_S3_SECRET_KEY`, `BACKUP_PASSPHRASE`.
+Sans eux le workflow rend **2** en nommant ce qui manque, et la sonde rougit en
+disant qu'aucune sauvegarde externe n'a jamais abouti.
+
 ---
 
 ## 2. Procédure de restauration (production)
@@ -235,10 +260,17 @@ Trois choses doivent tenir, dans cet ordre :
 3. **Exécuter un vrai exercice PITR daté** et l'écrire ici (même tableau, même
    empreinte), au moins une fois avant la mise en service à volume.
 4. **Cadence** : un exercice par trimestre, daté dans ce fichier. Une procédure
-   jamais rejouée est une intention, pas une capacité.
+   jamais rejouée est une intention, pas une capacité — et cette cadence n'est
+   pas une intention non plus : `.github/scripts/check-exercice-restauration.py`
+   lit le titre daté du §3 et **refuse** un exercice plus vieux que 100 jours
+   (90 de cadence + 10 de marge, étape de `workflow-lint`). Le runbook ne peut
+   donc pas rester « prêt à restaurer » sur une preuve périmée. Ce que le garde
+   ne fait pas : rejouer l'exercice à ta place — il rougit, il ne restaure pas.
 5. **Le propriétaire doit pouvoir restaurer seul** : la règle des deux personnes
    de `CONTINUITE.md` §1 (écart connu) s'applique aussi ici — une sauvegarde
    dont une seule personne détient les clés reste un point de défaillance.
 
-Garde : `backend/tests/test_atlas_backups_probe.py` (verdicts de la sonde et
-câblage du workflow).
+Gardes : `backend/tests/test_atlas_backups_probe.py` (verdicts de la sonde et
+câblage du workflow) ; `.github/scripts/check-exercice-restauration.py` juge la
+FRAÎCHEUR de l'exercice daté du §3 (un titre « non exécuté » n'est pas une
+preuve), preuve `backend/tests/test_exercice_restauration_fraicheur.py`.

@@ -1,0 +1,156 @@
+name: Sauvegarde externe vérifiée (quotidien)
+
+# ─── La sauvegarde que le palier Atlas ne fournit pas ──────────────────────
+# Le cluster de production est en M0 (palier PARTAGÉ) : Atlas n'y fournit ni
+# Cloud Backup ni restauration continue, quelle que soit la case cochée. Sans
+# sauvegarde, une suppression accidentelle ne se répare pas, et une perte est
+# définitive. Ce workflow tient donc la seule sauvegarde possible à ce palier,
+# et il est conçu pour qu'on puisse CROIRE son résultat :
+#
+#   1. il REFUSE de conclure (code 2) si une des entrées manque, en la nommant ;
+#   2. il DÉVERSE la base avec `mongodump` (archive unique, compressée) ;
+#   3. il RESTAURE cette archive dans une base de travail, puis délègue la
+#      comparaison à `backend/scripts/exercice_restauration.py` : empreinte
+#      SHA-256 par collection et index, identiques ou échec. Une archive non
+#      restaurée n'est pas une sauvegarde, c'est un fichier ;
+#   4. il CHIFFRE l'archive (AES-256, phrase secrète) avant de la sortir : un
+#      dump contient des données personnelles, il ne circule pas en clair ;
+#   5. il DÉPOSE l'archive chiffrée sur un stockage S3/R2 privé et publie sa
+#      taille, son empreinte et l'heure — ce que la sonde Atlas juge ensuite
+#      (`.github/scripts`-ci : `backend/scripts/check_atlas_backups.py`, règle
+#      « sauvegarde externe » via l'API Actions).
+#
+# Ce qu'il ne fait pas : supprimer les archives (la rétention est une POLITIQUE,
+# bornée dans `backend/SAUVEGARDES_ATLAS.md`, pas une ligne de shell qui
+# supprimerait la mauvaise chose un jour de fatigue).
+#
+# Secrets requis (Settings → Secrets and variables → Actions) :
+#   MONGO_URL                 chaîne de connexion de LECTURE de la production
+#   BACKUP_S3_BUCKET          nom du bucket privé (R2/S3)
+#   BACKUP_S3_ENDPOINT        URL S3 du fournisseur (R2 : https://<id>.r2.cloudflarestorage.com)
+#   BACKUP_S3_ACCESS_KEY_ID   identifiant d'accès du bucket
+#   BACKUP_S3_SECRET_KEY      clé secrète du bucket
+#   BACKUP_PASSPHRASE         phrase secrète de chiffrement (la perdre = perdre les archives)
+on:
+  schedule:
+    # 02:40 UTC : la sonde Atlas (06:45) juge ensuite la fraîcheur de ce run.
+    - cron: '40 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-db
+  cancel-in-progress: false
+
+jobs:
+  sauvegarde:
+    runs-on: ubuntu-latest
+    # Un dump de 61 Mo prend une minute ; au-delà de 20, quelque chose est
+    # cassé et doit rougir, pas patienter jusqu'à l'abandon du runner.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Installer les dépendances (pymongo, bson)
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      # Les outils officiels : `mongodump`/`mongorestore` sont ce que le runbook
+      # de restauration documente, donc ce que l'exercice doit exercer.
+      - name: Installer les outils MongoDB
+        run: |
+          curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc \
+            | sudo gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg
+          echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" \
+            | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq mongodb-database-tools
+
+      # PRÉMISSE : une entrée manquante est NOMMÉE, et le run s'arrête en 2.
+      # Faire tourner un dump sans destination, ou chiffrer sans phrase secrète,
+      # produirait un fichier qu'on croirait sauvegardé.
+      - name: Vérifier les entrées (prémisse nommée)
+        env:
+          MONGO_URL: ${{ secrets.MONGO_URL }}
+          BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+          BACKUP_S3_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+          BACKUP_S3_SECRET_KEY: ${{ secrets.BACKUP_S3_SECRET_KEY }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          manquantes=()
+          for nom in MONGO_URL BACKUP_S3_BUCKET BACKUP_S3_ENDPOINT \
+                     BACKUP_S3_ACCESS_KEY_ID BACKUP_S3_SECRET_KEY BACKUP_PASSPHRASE; do
+            if [ -z "${!nom:-}" ]; then manquantes+=("$nom"); fi
+          done
+          if [ ${#manquantes[@]} -gt 0 ]; then
+            echo "::error title=Sauvegarde externe impossible::Prémisse : ${manquantes[*]} absent(s). Aucune sauvegarde n'a été produite, et rien n'a été jugé."
+            exit 2
+          fi
+          echo "[OK] six entrées présentes (valeurs jamais affichées)"
+
+      - name: Déverser la base (archive unique, compressée)
+        env:
+          MONGO_URL: ${{ secrets.MONGO_URL }}
+        run: |
+          mongodump --uri "$MONGO_URL" --archive=/tmp/kojo.archive --gzip --quiet
+          ls -l /tmp/kojo.archive
+
+      # La restauration est la PREUVE. `--nsFrom/--nsTo` range la copie dans une
+      # base de travail : la production n'est jamais écrasée.
+      - name: Restaurer l'archive dans une base de travail
+        env:
+          MONGO_URL: ${{ secrets.MONGO_URL }}
+        run: |
+          mongorestore --uri "$MONGO_URL" --archive=/tmp/kojo.archive --gzip --quiet \
+            --nsFrom 'kojo_db.*' --nsTo 'kojo_verif.*' --drop
+
+      - name: Comparer source et archive restaurée (empreinte SHA-256)
+        working-directory: backend
+        env:
+          MONGO_URL: ${{ secrets.MONGO_URL }}
+        run: |
+          python scripts/exercice_restauration.py \
+            --base kojo_db --cible kojo_verif \
+            --rapport "/tmp/restauration-$(date +%F).json"
+
+      - name: Chiffrer l'archive (les dumps contiennent des données personnelles)
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          openssl enc -aes-256-cbc -pbkdf2 -salt \
+            -in /tmp/kojo.archive -out /tmp/kojo.archive.enc \
+            -pass env:BACKUP_PASSPHRASE
+          sha256sum /tmp/kojo.archive.enc | awk '{print $1}' > /tmp/kojo.archive.sha256
+
+      - name: Déposer l'archive chiffrée sur le stockage privé
+        env:
+          BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          cle="$(date -u +%Y/%m/%d)-kojo.archive.enc"
+          aws --endpoint-url "$BACKUP_S3_ENDPOINT" s3 cp \
+            /tmp/kojo.archive.enc "s3://$BACKUP_S3_BUCKET/$cle" --no-progress
+          echo "archive déposée : $cle"
+          echo "sha256 : $(cat /tmp/kojo.archive.sha256)"
+          echo "taille : $(stat -c%s /tmp/kojo.archive.enc) octets"
+          {
+            echo "### Sauvegarde externe vérifiée"
+            echo ""
+            echo "- archive : \`$cle\`"
+            echo "- empreinte SHA-256 (chiffrée) : \`$(cat /tmp/kojo.archive.sha256)\`"
+            echo "- taille : $(stat -c%s /tmp/kojo.archive.enc) octets"
+            echo "- restauration comparée à la source : identique (index compris)"
+          } >> "$GITHUB_STEP_SUMMARY"

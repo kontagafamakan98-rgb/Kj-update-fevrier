@@ -43,6 +43,32 @@ donc ce qui l'est réellement :
      battements doivent tenir dans cette fenêtre, sinon un flux vivant mais
      inactif serait déclaré tombé. C'est la seule valeur qu'aucun garde hors
      ligne ne peut voir — elle n'existe que sur la machine déployée.
+  9. LES AUTRES RÉGLAGES DE TEMPS DU FLUX, chacun contre SON contrat :
+     * le BAIL du registre Redis (`PARTAGE_LEASE_SECONDS`) n'existe pas comme
+       variable : il est CALCULÉ depuis le battement déployé par une formule
+       lue dans `kojo_live.py`. Le bail calculé doit tolérer un battement
+       perdu (`≥ 2 × battement`) et ne pas survivre au verdict du client
+       (`≤ fenêtre de silence + un battement`), sinon les places d'un worker
+       tué resteraient comptées au plafond du compte ;
+     * le REPLI du client (`FALLBACK_POLL_MS`) doit rester moins bavard que le
+       sondage qu'il remplace (2 req/min, soit 30 s) et n'avoir qu'UNE valeur
+       pour ses deux déclarations (`NotificationContext.js`, `Messages.js`)
+       — deux valeurs divergentes sont refusées, pas arbitrées. Cette valeur
+       part dans le bundle : ce qui est jugé est la source dont il est bâti,
+       et le message le dit.
+  10. LES DEUX DÉLAIS DU BUS, ET LEUR CONTRAT COMMUN :
+     * le DÉLAI DE RECONNEXION (`KOJO_LIVE_BUS_RECONNECT_SECONDS`) doit rester
+       dans [un plancher, UN BATTEMENT] : une reprise immédiate transforme une
+       panne de Redis en boucle qui republie sans répit (journal saturé, boucle
+       d'événements partagée avec les flux SSE), et au-delà d'un battement un
+       Redis revenu n'est pas rejoint avant plusieurs battements — or ce qui
+       est publié entre-temps n'est JAMAIS rejoué (pub/sub sans historique) ;
+     * la FILE DE PUBLICATION (`KOJO_LIVE_BUS_QUEUE`) doit absorber la rafale
+       produite pendant UNE fenêtre de reconnexion, au débit que la file d'un
+       abonné dimensionne déjà (`MAX_QUEUE_SIZE` : une notification par
+       seconde en rafale), soit `≥ MAX_STREAMS_TOTAL × délai`. Les deux
+       réglages se jugent ENSEMBLE : c'est la panne que l'un couvre que
+       l'autre doit encaisser.
 
 Usage :
     FLY_API_TOKEN=<deploy_token> python .github/scripts/check-fly-env-drift.py
@@ -114,11 +140,11 @@ SENSITIVE_KEYS = {
 # non vide dans le code, donc posable sans être exigée).
 OPTIONAL_KEYS = {
     "SENTRY_DSN", "PAYMENT_COMMISSION_RATE", "CORS_ORIGINS", "REDIS_URL",
-    # Bus temps réel (Redis pub/sub) : les deux réglages ont un défaut de repli
-    # dans `kojo_live` (canal `kojo:live`, tampon de 1000). Le bus lui-même
+    # Bus temps réel (Redis pub/sub) : les réglages ont un défaut de repli dans
+    # `kojo_live` (canal `kojo:live`, tampon de 1000, reprise à 2 s). Le bus lui-même
     # n'existe que si `REDIS_URL` est posé — leur absence sur Fly n'est donc
     # pas une divergence doc↔prod, seulement un réglage laissé au défaut.
-    "KOJO_LIVE_BUS_CHANNEL", "KOJO_LIVE_BUS_QUEUE",
+    "KOJO_LIVE_BUS_CHANNEL", "KOJO_LIVE_BUS_QUEUE", "KOJO_LIVE_BUS_RECONNECT_SECONDS",
     "BREVO_SENDER_NAME", "BREVO_REPLY_TO_EMAIL",
     "EMAIL_OTP_EXPIRY_MINUTES", "EMAIL_OTP_MAX_ATTEMPTS",
     "EMAIL_OTP_RESEND_COOLDOWN_SECONDS", "EMAIL_VERIFICATION_TOKEN_MINUTES",
@@ -525,6 +551,515 @@ def check_heartbeat_contract(deploye, valeur, contrat=None):
     )
 
 
+# ── LES AUTRES RÉGLAGES DE TEMPS DU FLUX, JUGÉS CONTRE LEUR CONTRAT ─────────
+# Le battement n'est pas le seul délai qui décide de la vie d'un flux : le BAIL
+# du registre Redis décide QUAND une place se libère, et le REPLI décide à
+# quelle cadence le client redemande quand le flux est tombé. Tous deux ont un
+# contrat, et aucun des deux n'était jugé — le bail n'existait même pas comme
+# valeur déployée, puisqu'il est CALCULÉ depuis le battement.
+KOJO_LIVE = REPO_ROOT / "backend" / "kojo_live.py"
+BAIL_CONSTANTE = "PARTAGE_LEASE_SECONDS"
+# Un flux vivant peut manquer un battement (réseau mobile, proxy lent) : le bail
+# est repoussé PAR le battement, donc il doit valoir au moins DEUX intervalles.
+# À un intervalle, une seule arrivée tardive expirerait une place VIVANTE et le
+# compte admettrait un cinquième flux.
+BAIL_RENOUVELLEMENTS = 2
+
+REPLI_CONSTANTE = "FALLBACK_POLL_MS"
+# Les DEUX déclarations du repli : notifications et messagerie. Une seule
+# valeur, deux consommateurs — c'est cette unanimité qu'on juge, pas l'une des
+# deux copies (le batail du 18/10/2026 était justement deux sources qui avaient
+# divergé en silence).
+REPLI_FICHIERS = (
+    REPO_ROOT / "frontend" / "src" / "contexts" / "NotificationContext.js",
+    REPO_ROOT / "frontend" / "src" / "pages" / "Messages.js",
+)
+# Le sondage que le flux REMPLACE : 2 requêtes par minute et par session
+# (AGENTS.md, « Temps réel »). Un repli à 30 s ou plus rapide rendrait le
+# remplacement inutile — un aller-retour pour un autre.
+ANCIEN_SONDAGE_MS = 30000.0
+
+
+def _nombre_js(texte, constante):
+    """Valeur d'une constante JS numérique (`60_000`, `60000`), ou None."""
+    trouve = re.search(rf"\bconst\s+{constante}\s*=\s*([\d_.]+)\s*;", texte)
+    if not trouve:
+        return None
+    try:
+        return float(trouve.group(1).replace("_", ""))
+    except ValueError:
+        return None
+
+
+def bail_depuis_battement(expression):
+    """La formule du bail LUE dans le code, rendue comme `f(battement_s)`.
+
+    `None` si la formule n'est pas lisible. L'évaluation est BORNÉE : seuls
+    `max`, `min` et `HEARTBEAT_SECONDS` existent, aucun attribut, aucun appel,
+    aucun nom du module — une expression qui sort de ce vocabulaire est
+    REFUSÉE plutôt que devinée, et le refus dit quoi rétablir.
+
+    Pourquoi évaluer au lieu de recopier : `max(60.0, HEARTBEAT_SECONDS * 3)`
+    n'est pas un nombre, c'est une POLITIQUE. La recopier ici en ferait une
+    seconde source, et le bail jugé ne serait plus celui que la machine calcule.
+    """
+    noms = set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", expression))
+    if not noms <= {"max", "min", "HEARTBEAT_SECONDS"}:
+        return None
+    if re.search(r"[^A-Za-z0-9_.,+*()\s]", expression):
+        return None
+
+    def calcul(battement_s):
+        try:
+            return float(
+                eval(  # noqa: S307 - vocabulaire clos, aucun nom hors max/min/battement
+                    expression,
+                    {"__builtins__": {}},
+                    {
+                        "HEARTBEAT_SECONDS": float(battement_s),
+                        "max": max,
+                        "min": min,
+                    },
+                )
+            )
+        except Exception:  # noqa: BLE001 - une formule qui ne calcule pas n'est pas un contrat
+            return None
+
+    return calcul
+
+
+def contrats_du_serveur(chemin=None):
+    """`(battement par défaut, formule du bail)` LUS dans `kojo_live.py`, ou None.
+
+    Les deux valeurs sont lues, jamais recopiées : un `20` ou un `60.0` écrit
+    ici serait une seconde source, et c'est la divergence de deux sources qui a
+    coûté une reconnexion par flux inactif (cf. `battement-coeur-aligne.test.js`).
+    `None` = lecteur cassé : l'appelant refuse de conclure au lieu de supposer.
+    """
+    chemin = KOJO_LIVE if chemin is None else chemin
+    try:
+        texte = Path(chemin).read_text(encoding="utf-8")
+    except OSError:
+        return None
+    defaut = re.search(
+        r'HEARTBEAT_SECONDS\s*=\s*float\(\s*os\.environ\.get\(\s*'
+        r'"KOJO_SSE_HEARTBEAT_SECONDS"\s*,\s*"([\d.]+)"',
+        texte,
+    )
+    formule = re.search(rf"^{BAIL_CONSTANTE}\s*=\s*(.+)$", texte, re.MULTILINE)
+    if not defaut or not formule:
+        return None
+    bail = bail_depuis_battement(formule.group(1).strip())
+    if bail is None:
+        return None
+    return float(defaut.group(1)), bail
+
+
+def check_lease_contract(deploye, valeur, contrat_client, contrats):
+    """Le bail CALCULÉ depuis le battement déployé, jugé contre ses contrats.
+
+    Deux invariants, chacun pour une panne réelle :
+
+      * `bail ≥ 2 × battement` — le bail est repoussé par chaque battement : un
+        battement perdu ne doit pas expirer une place VIVANTE, sinon le compte
+        admet un cinquième flux pendant que les quatre premiers vivent ;
+      * `bail ≤ fenêtre de silence du client + un battement` — un worker tué
+        sans `finally` garde ses places jusqu'à expiration : au-delà du moment
+        où TOUS ses clients ont renoncé, ces places fantômes refuseraient un
+        flux légitime.
+
+    `valeur` est le battement DÉPLOYÉ (brut) : le bail réel en découle, donc le
+    juger sur le défaut du code alors qu'une surcharge existe serait juger une
+    autre machine. Sans surcharge, c'est le défaut qui décide — et la formule
+    est quand même jugée, ce qui attrape une dérive de la formule elle-même.
+    """
+    if contrats is None:
+        errors.append(
+            f"[{BAIL_CONSTANTE}] formule ILLISIBLE ({KOJO_LIVE.name}) : le bail réel "
+            "n'est pas calculable, donc ses contrats ne sont pas jugés. Rétablir "
+            "`HEARTBEAT_SECONDS = float(os.environ.get(\"KOJO_SSE_HEARTBEAT_SECONDS\"...))` "
+            f"et `{BAIL_CONSTANTE} = max(..., HEARTBEAT_SECONDS * N)`."
+        )
+        return
+    if contrat_client is None:
+        errors.append(
+            f"[{BAIL_CONSTANTE}] la fenêtre de silence du client est ILLISIBLE "
+            f"({FLUX_CONFIG.name}) : le bail ne peut pas être jugé contre le verdict "
+            "du client — aucun verdict n'est rendu."
+        )
+        return
+
+    _, fenetre_ms = contrat_client
+    defaut_s, bail_de = contrats
+    brut = str(valeur or "").strip()
+
+    if deploye and not brut:
+        # Même angle mort que le battement : le secret se lit par SSH, absent
+        # en CI. Le bail dépend de cette valeur, donc il n'est pas calculable —
+        # et un bail calculé sur le défaut ne serait pas celui de la machine.
+        checked.append(
+            f"  [AUCUN VERDICT] {BAIL_CONSTANTE} DÉRIVÉ d'un battement DÉPLOYÉ dont la "
+            "valeur est illisible (SSH indisponible) — le bail réel n'a pas été calculé"
+        )
+        return
+
+    if deploye:
+        try:
+            battement_s = float(brut)
+        except ValueError:
+            errors.append(
+                f"[{BAIL_CONSTANTE}] le battement DÉPLOYÉ est ILLISIBLE : le bail en "
+                "découle, donc il n'est pas calculable. Corriger ou retirer la "
+                f"surcharge (fly secrets unset {BATTEMENT_KEY})."
+            )
+            return
+        if battement_s <= 0:
+            # La règle du battement refuse déjà ce cas : ne pas doubler le bruit.
+            return
+        origine = f"battement déployé {battement_s:g} s"
+    else:
+        battement_s = defaut_s
+        origine = f"battement par défaut {battement_s:g} s"
+
+    bail_s = bail_de(battement_s)
+    if bail_s is None or bail_s <= 0:
+        errors.append(
+            f"[{BAIL_CONSTANTE}] la formule du bail ne donne pas une valeur exploitable "
+            f"pour {origine} — le bail réel n'est pas connaissable."
+        )
+        return
+
+    if bail_s < BAIL_RENOUVELLEMENTS * battement_s:
+        errors.append(
+            f"[{BAIL_CONSTANTE}] bail {bail_s:g} s ({origine}) sous "
+            f"{BAIL_RENOUVELLEMENTS} × battement "
+            f"({BAIL_RENOUVELLEMENTS * battement_s:g} s) : un battement PERDU "
+            "expirerait une place VIVANTE, et le compte admettrait un flux de plus. "
+            f"Relever {BAIL_CONSTANTE} dans backend/kojo_live.py."
+        )
+        return
+
+    fenetre_s = fenetre_ms / 1000.0
+    if bail_s > fenetre_s + battement_s:
+        # Le remède dépend de l'ORIGINE du bail : surchargé, il vient du
+        # battement déployé (formule = 3 × battement) ; par défaut, il vient de
+        # la formule elle-même. Nommer le mauvais fichier ferait perdre le
+        # prochain lecteur.
+        remede = (
+            f"Retirer la surcharge du battement (fly secrets unset {BATTEMENT_KEY}) : "
+            f"le bail en découle."
+            if deploye
+            else f"Ramener {BAIL_CONSTANTE} dans backend/kojo_live.py."
+        )
+        errors.append(
+            f"[{BAIL_CONSTANTE}] bail {bail_s:g} s ({origine}) au-delà du verdict du "
+            f"client ({fenetre_s:g} s) plus un battement ({battement_s:g} s), soit "
+            f"{fenetre_s + battement_s:g} s : les "
+            "places d'un worker tué resteraient comptées au plafond du compte après "
+            f"que tous ses clients ont renoncé, et un flux légitime serait refusé. {remede}"
+        )
+        return
+
+    checked.append(
+        f"  {OK} {BAIL_CONSTANTE} = {bail_s:g} s ({origine}) — au moins "
+        f"{BAIL_RENOUVELLEMENTS} × battement "
+        f"({BAIL_RENOUVELLEMENTS * battement_s:g} s) et au plus fenêtre client "
+        f"+ un battement ({fenetre_s + battement_s:g} s)"
+    )
+
+
+def contrat_du_repli(chemins=None):
+    """`(repli_ms, raison)` — le repli lu dans CHAQUE déclaration.
+
+    `(valeur, None)` quand toutes les déclarations s'accordent ; `(None, raison)`
+    sinon. L'absence ET la divergence sont des refus : une valeur lue dans un
+    fichier puis recopiée dans l'autre est exactement la duplication qui a coûté
+    une reconnexion par flux inactif au battement.
+    """
+    chemins = REPLI_FICHIERS if chemins is None else tuple(chemins)
+    trouvees = []
+    for chemin in chemins:
+        try:
+            texte = Path(chemin).read_text(encoding="utf-8")
+        except OSError:
+            return None, f"{Path(chemin).name} illisible"
+        valeur = _nombre_js(texte, REPLI_CONSTANTE)
+        if valeur is None:
+            return None, f"{Path(chemin).name} ne déclare pas {REPLI_CONSTANTE}"
+        trouvees.append((Path(chemin).name, valeur))
+    valeurs = {valeur for _, valeur in trouvees}
+    if len(valeurs) != 1:
+        detail = ", ".join(f"{nom} {valeur:g} ms" for nom, valeur in trouvees)
+        return None, f"valeurs DIVERGENTES ({detail})"
+    return trouvees[0][1], None
+
+
+def check_fallback_contract(valeur, raison):
+    """Le repli du client, jugé contre le sondage qu'il REMPLACE.
+
+    Ce n'est pas une valeur de Fly : elle part dans le bundle du client, sans
+    surcharge d'exécution. Ce qui est jugé est donc la SOURCE dont ce bundle est
+    bâti — et le message le dit, pour qu'un vert ici ne se lise pas comme une
+    mesure de la machine.
+
+    Contrat : le repli ne doit pas être aussi bavard que les 2 requêtes par
+    minute du sondage qu'il remplace. À 60 s il divise la charge par deux ; à
+    30 s il ne remplace qu'un aller-retour par un autre.
+    """
+    if valeur is None:
+        errors.append(
+            f"[{REPLI_CONSTANTE}] repli NON JUGEABLE : {raison}. Les deux "
+            "déclarations doivent porter la MÊME valeur — deux valeurs qui "
+            "divergent font deux cadences selon la page ouverte, et aucune ne "
+            "peut être jugée contre le sondage remplacé."
+        )
+        return
+    if valeur <= ANCIEN_SONDAGE_MS:
+        errors.append(
+            f"[{REPLI_CONSTANTE}] repli de {valeur:g} ms : aussi bavard que le sondage "
+            f"remplacé ({ANCIEN_SONDAGE_MS:g} ms = 2 req/min par session) — le flux "
+            "n'aurait remplacé qu'un aller-retour par un autre. Allonger le repli "
+            "dans frontend/src/contexts/NotificationContext.js ET "
+            "frontend/src/pages/Messages.js."
+        )
+        return
+    checked.append(
+        f"  {OK} {REPLI_CONSTANTE} = {valeur:g} ms — moins bavard que le sondage "
+        f"remplacé ({ANCIEN_SONDAGE_MS:g} ms), même valeur dans ses deux "
+        "déclarations (valeur du bundle, aucune surcharge d'exécution)"
+    )
+
+
+# ── LE BUS TEMPS RÉEL : DEUX DÉLAIS, UN CONTRAT ─────────────────────────────
+# Le battement, le bail et le repli étaient jugés ; les deux réglages du BUS ne
+# l'étaient pas, alors que ce sont eux qui décident combien de temps un process
+# reste sourd et combien d'événements il peut perdre en attendant. Ils ont un
+# défaut dans `kojo_live.py`, donc leur absence sur Fly n'est PAS une divergence
+# — mais leur valeur (déployée ou par défaut) peut violer leur contrat.
+BUS_RECONNEXION_KEY = "KOJO_LIVE_BUS_RECONNECT_SECONDS"
+BUS_FILE_KEY = "KOJO_LIVE_BUS_QUEUE"
+# Plancher du délai de reprise : chaque tentative ratée coûte déjà un aller-retour
+# (le client Redis porte `socket_timeout=2`), donc la pause est le SEUL frein de
+# la boucle. Sous une seconde, une panne devient un incendie de journal — et la
+# boucle tourne dans la boucle d'événements qui sert les flux SSE.
+BUS_PLANCHER_S = 1.0
+# Débit déjà dimensionné pour la file d'UN abonné (`MAX_QUEUE_SIZE` : « une
+# notification par seconde pendant une rafale tient largement »). Le bus porte
+# une enveloppe par `publish`, donc une rafale qui sert tous les flux du process
+# pendant la fenêtre de reconnexion produit jusqu'à `flux_max × délai` enveloppes.
+DEBIT_BUS_PAR_FLUX = 1.0
+
+
+def contrats_du_bus(chemin=None):
+    """`(délai de reprise, taille de file, flux max)` LUS dans `kojo_live.py`.
+
+    Les trois sont lus, jamais recopiés : le contrat de la file se CALCULE à
+    partir du délai de reprise, et recopier l'un ou l'autre jugerait une autre
+    machine que celle qui tourne. `None` = lecteur cassé (constante renommée,
+    défaut retiré) : l'appelant refuse de conclure au lieu de supposer.
+    """
+    chemin = KOJO_LIVE if chemin is None else chemin
+    try:
+        texte = Path(chemin).read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+    def defaut(constante, cle, convertisseur):
+        trouve = re.search(
+            rf"{constante}\s*=\s*{convertisseur}\(\s*os\.environ\.get\(\s*"
+            rf'"{cle}"\s*,\s*"([\d.]+)"',
+            texte,
+        )
+        return float(trouve.group(1)) if trouve else None
+
+    delai = defaut("BUS_RECONNECT_SECONDS", BUS_RECONNEXION_KEY, "float")
+    file_bus = defaut("BUS_QUEUE_SIZE", BUS_FILE_KEY, "int")
+    flux_max = defaut("MAX_STREAMS_TOTAL", "KOJO_SSE_MAX_TOTAL", "int")
+    if delai is None or file_bus is None or flux_max is None:
+        return None
+    return delai, file_bus, flux_max
+
+
+def _battement_effectif(deploye, valeur, contrats_serveur):
+    """Le battement que la machine bat RÉELLEMENT (secondes), ou `None`.
+
+    `None` quand il n'est pas résolvable (déployé illisible ou nul) : la règle
+    du bail a déjà refusé ce cas, et la borne haute du bus se déclare alors non
+    jugée plutôt que d'être supposée sur le défaut du code.
+    """
+    if contrats_serveur is None:
+        return None
+    defaut, _ = contrats_serveur
+    if not deploye:
+        return defaut
+    try:
+        battement = float(str(valeur or "").strip())
+    except ValueError:
+        return None
+    return battement if battement > 0 else None
+
+
+def _delai_effectif(deployes, valeurs, cle, defaut):
+    """`(valeur, origine)` — la valeur déployée si elle existe, sinon le défaut.
+
+    `(None, "ILLISIBLE")` pour une valeur déployée qui n'est pas un nombre : un
+    réglage déployé qu'on ne sait pas lire ne retombe PAS sur le défaut du code,
+    ce qui jugerait une autre machine en croyant juger celle-ci.
+    """
+    if deployes.get(cle):
+        brut = str(valeurs.get(cle) or "").strip()
+        if not brut:
+            # Une valeur VIDE dans `[env]` est falsy dans le code
+            # (`os.environ.get(...) or défaut`) : le défaut s'applique. Un
+            # SECRET muet, lui, ne passe pas ici — le balayage des valeurs
+            # illisibles l'a déjà écarté, parce qu'on ne peut pas savoir ce
+            # qu'il porte.
+            return float(defaut), "défaut du code ([env] vide)"
+        try:
+            return float(brut), "valeur DÉPLOYÉE"
+        except ValueError:
+            return None, "ILLISIBLE"
+    return float(defaut), "défaut du code"
+
+
+def check_bus_contract(
+    battement_deploye, valeur_battement, contrats_serveur, contrats_bus,
+    deployes_bus, valeurs_bus,
+):
+    """Les deux délais du bus, jugés contre LEUR contrat — qui les lie.
+
+    Deux invariants, chacun pour une panne réelle :
+
+      * `BUS_PLANCHER_S ≤ délai ≤ battement` — sous le plancher la reprise est
+        une boucle sans frein (journal saturé, boucle d'événements partagée) ;
+        au-delà d'un battement, un Redis revenu n'est pas rejoint avant
+        plusieurs battements, et les événements publiés entre-temps ne sont
+        jamais rejoués : un pub/sub n'a pas d'historique ;
+      * `file ≥ MAX_STREAMS_TOTAL × délai × 1 évt/s` — pendant la fenêtre de
+        reconnexion, `publish` continue de remplir le tampon. En deçà, la rafale
+        déborde et le bus perd ces événements (`bus_stats()['perdus']`) : ils
+        restent locaux, donc invisibles des autres workers, sans rejeu.
+
+    Le second invariant est ce qui rend ces deux réglages UN contrat : allonger
+    la reconnexion sans agrandir la file déplace la panne, il ne la corrige pas.
+    """
+    if contrats_bus is None:
+        errors.append(
+            f"[{BUS_RECONNEXION_KEY}/{BUS_FILE_KEY}] réglages du bus ILLISIBLES "
+            f"({KOJO_LIVE.name}) : ni le délai de reprise ni la file ne sont "
+            "connaissables, donc leur contrat n'est pas jugé. Rétablir "
+            "`BUS_RECONNECT_SECONDS = float(os.environ.get(...))`, "
+            "`BUS_QUEUE_SIZE = int(os.environ.get(...))` et un "
+            "`MAX_STREAMS_TOTAL` numérique."
+        )
+        return
+
+    cles = (BUS_RECONNEXION_KEY, BUS_FILE_KEY)
+    # `deployes_bus` dit OÙ la valeur vit : `"secret"` (lisible seulement par
+    # SSH) ou `"env"` (lisible via l'API). Un secret muet n'a pas de valeur
+    # connaissable ; une entrée `[env]` VIDE, elle, laisse le défaut s'appliquer
+    # (`os.environ.get(...) or défaut`) et se juge comme tel.
+    muettes = [
+        cle for cle in cles
+        if deployes_bus.get(cle) == "secret" and not str(valeurs_bus.get(cle) or "").strip()
+    ]
+    if muettes:
+        # Même angle mort que le battement : un secret se lit par SSH, absent en
+        # CI. Le contrat lie les deux valeurs, donc aucun des deux n'est jugé.
+        checked.append(
+            f"  [AUCUN VERDICT] {', '.join(muettes)} DÉPLOYÉ(S) mais valeur(s) "
+            "illisible(s) (SSH indisponible) — les deux délais du bus ne sont "
+            "pas jugés"
+        )
+        return
+
+    delai_defaut, file_defaut, flux_max = contrats_bus
+    delai, origine_delai = _delai_effectif(
+        deployes_bus, valeurs_bus, BUS_RECONNEXION_KEY, delai_defaut
+    )
+    if delai is None:
+        errors.append(
+            f"[{BUS_RECONNEXION_KEY}] valeur DÉPLOYÉE ILLISIBLE : le délai de "
+            "reprise n'est pas un nombre, donc la fenêtre que la file doit couvrir "
+            "n'est pas calculable. Corriger ou retirer "
+            f"(fly secrets unset {BUS_RECONNEXION_KEY})."
+        )
+        return
+    file_bus, origine_file = _delai_effectif(
+        deployes_bus, valeurs_bus, BUS_FILE_KEY, file_defaut
+    )
+    if file_bus is None:
+        errors.append(
+            f"[{BUS_FILE_KEY}] valeur DÉPLOYÉE ILLISIBLE : une taille de file est "
+            "un nombre ENTIER d'événements. Corriger ou retirer "
+            f"(fly secrets unset {BUS_FILE_KEY})."
+        )
+        return
+    if file_bus != int(file_bus):
+        errors.append(
+            f"[{BUS_FILE_KEY}] {file_bus:g} : une taille de file est un nombre "
+            "ENTIER d'événements — une file décimale ne se crée pas."
+        )
+        return
+
+    if delai <= 0:
+        errors.append(
+            f"[{BUS_RECONNEXION_KEY}] {delai:g} s ({origine_delai}) : une reprise "
+            "sans répit republie en continu pendant une panne de Redis — journal "
+            "saturé, et boucle partagée avec les flux SSE. "
+            f"fly secrets unset {BUS_RECONNEXION_KEY} pour revenir au défaut."
+        )
+        return
+    if delai < BUS_PLANCHER_S:
+        errors.append(
+            f"[{BUS_RECONNEXION_KEY}] {delai:g} s ({origine_delai}) sous le plancher "
+            f"{BUS_PLANCHER_S:g} s : chaque tentative ratée coûte déjà un "
+            "aller-retour, donc la pause est le seul frein de la boucle — en deçà, "
+            "une panne devient un incendie de journal. "
+            f"fly secrets unset {BUS_RECONNEXION_KEY} pour revenir au défaut."
+        )
+        return
+
+    battement = _battement_effectif(battement_deploye, valeur_battement, contrats_serveur)
+    if battement is None:
+        checked.append(
+            f"  [AUCUN VERDICT] borne haute de {BUS_RECONNEXION_KEY} non jugée : "
+            "le battement réellement déployé est illisible (SSH indisponible)"
+        )
+    elif delai > battement:
+        errors.append(
+            f"[{BUS_RECONNEXION_KEY}] {delai:g} s ({origine_delai}) au-delà d'un "
+            f"battement ({battement:g} s) : après un redémarrage de Redis, le "
+            "process resterait sourd plusieurs battements — et ce qui est publié "
+            "entre-temps n'est JAMAIS rejoué (le pub/sub n'a pas d'historique). "
+            f"Ramener {BUS_RECONNEXION_KEY} sous le battement, ou retirer la "
+            "surcharge."
+        )
+        return
+
+    plancher_file = flux_max * delai * DEBIT_BUS_PAR_FLUX
+    if file_bus < plancher_file:
+        errors.append(
+            f"[{BUS_FILE_KEY}] file de {file_bus:g} ({origine_file}) sous "
+            f"{plancher_file:g} = {flux_max:g} flux × {delai:g} s × "
+            f"{DEBIT_BUS_PAR_FLUX:g} évt/s : la rafale produite pendant UNE "
+            "reconnexion déborderait le tampon, et le bus perdrait ces "
+            "événements (`bus_stats()['perdus']`) — déjà absents des autres "
+            "workers, sans rejeu. Les deux réglages se corrigent ENSEMBLE "
+            f"({BUS_FILE_KEY} plus grand, ou {BUS_RECONNEXION_KEY} plus court)."
+        )
+        return
+
+    borne_haute = (
+        f"un battement ({battement:g} s)" if battement is not None else "un battement ILLISIBLE"
+    )
+    checked.append(
+        f"  {OK} {BUS_RECONNEXION_KEY} = {delai:g} s ({origine_delai}) dans "
+        f"[{BUS_PLANCHER_S:g} s, {borne_haute}] ; {BUS_FILE_KEY} = {file_bus:g} "
+        f"({origine_file}) ≥ {plancher_file:g} = {flux_max:g} flux × {delai:g} s"
+    )
+
+
 def _mask(value):
     """Masque une valeur secrète : ne garde que le préfixe du schéma et la
     longueur (ex. 'redis://... [55 car.]'). JAMAIS la valeur complète dans la
@@ -920,7 +1455,39 @@ def main(argv=None):
     valeur_battement = live_env.get(BATTEMENT_KEY, "")
     if deploye and not valeur_battement and BATTEMENT_KEY in fly_secrets:
         valeur_battement = read_secrets_via_ssh([BATTEMENT_KEY]).get(BATTEMENT_KEY, "")
-    check_heartbeat_contract(deploye, valeur_battement, contrat_du_client())
+    contrat_client = contrat_du_client()
+    check_heartbeat_contract(deploye, valeur_battement, contrat_client)
+
+    # 4f) LES AUTRES RÉGLAGES DE TEMPS DU FLUX : le bail du registre Redis
+    # (CALCULÉ depuis le battement, donc jamais une clé Fly à lire) et le repli
+    # du client (une valeur du bundle, pas de la machine). Chacun a son contrat,
+    # et aucun des deux n'était jugé : un bail trop court expire une place
+    # vivante, un bail trop long garde les places d'un worker mort, un repli
+    # aussi bavard que le sondage remplacé annule le remplacement.
+    contrats_serveur = contrats_du_serveur()
+    check_lease_contract(deploye, valeur_battement, contrat_client, contrats_serveur)
+    valeur_repli, raison_repli = contrat_du_repli()
+    check_fallback_contract(valeur_repli, raison_repli)
+
+    # 4g) LES DEUX DÉLAIS DU BUS, jugés ENSEMBLE : le délai de reprise décide
+    # combien de temps le process reste sourd, la file de publication doit
+    # encaisser ce que cette fenêtre produit. Leurs valeurs se lisent là où
+    # elles vivent (runtime [env], secret par SSH), ou à défaut dans le code.
+    bus_keys = (BUS_RECONNEXION_KEY, BUS_FILE_KEY)
+    deployes_bus = {
+        cle: ("secret" if cle in fly_secrets else "env" if cle in live_env else None)
+        for cle in bus_keys
+    }
+    valeurs_bus = {cle: live_env.get(cle, "") for cle in bus_keys}
+    muettes = [
+        cle for cle in bus_keys if deployes_bus[cle] == "secret" and not valeurs_bus[cle]
+    ]
+    if muettes:
+        valeurs_bus.update(read_secrets_via_ssh(muettes))
+    check_bus_contract(
+        deploye, valeur_battement, contrats_serveur,
+        contrats_du_bus(), deployes_bus, valeurs_bus,
+    )
 
     # 5) FORMAT : références du dépôt (déterministe) PUIS valeurs déployées
     _auditer_references()
