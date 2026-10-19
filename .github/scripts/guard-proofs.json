@@ -2071,6 +2071,27 @@
       ]
     },
     {
+      "id": "atlas-backups: palier partage invisible (remede impossible publie)",
+      "garde": "backend/scripts/check_atlas_backups.py",
+      "cible": "backend/scripts/check_atlas_backups.py",
+      "trouve": "    provider = document.get(\"providerSettings\") or {}",
+      "remplace": "    provider = {}",
+      "runner": "python",
+      "preuve": "backend/tests/test_atlas_backups_probe.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_atlas_backups_probe.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_atlas_backups_probe.py::test_le_palier_d_un_cluster_partage_se_lit_dans_providerSettings"
+      ]
+    },
+    {
       "id": "atlas-backups: pit desactive tolere",
       "garde": "backend/scripts/check_atlas_backups.py",
       "cible": "backend/scripts/check_atlas_backups.py",
