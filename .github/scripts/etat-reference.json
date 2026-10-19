@@ -34,8 +34,8 @@
     "Preuve : backend/tests/test_etat_reference.py"
   ],
   "reference": {
-    "etablie_le": "2026-10-18",
-    "motif": "un checkout de branche n'a pas de main locale : la base se lit desormais dans les refs DISTANTES avant de retomber sur la branche courante, sinon origin/main etait designe comme residu a supprimer (git push origin --delete main, mesure le 18/10/2026 sur un workflow_dispatch lance sur une branche)",
+    "etablie_le": "2026-10-19",
+    "motif": "la sonde Fly juge desormais le battement de coeur DEPLOYE (KOJO_SSE_HEARTBEAT_SECONDS) contre la fenetre de silence du client, lue dans frontend/src/config/flux-temps-reel.js : une surcharge en secret Fly changeait le battement reel sans toucher les trois sources du garde hors ligne (mesure du 18/10/2026 : fenetre 15 s contre battement 20 s)",
     "fichiers": {
       ".githooks/pre-push": "57a57605381510b531a2653226add8b0cd3f1f5879cc2adeead186342a2b44a9",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -114,14 +114,14 @@
       "frontend/scripts/check-prerender-shells.js": "2ea6bf7d3635b045f0413b6a35e9105845960d46a5ecf4184c2bd5ee2f611077",
       "frontend/scripts/check-session-reload-production.js": "30f3d15481f689f73579c618c92728755d60fa5b55f53dc91d80577c9e853217",
       "backend/scripts/check_atlas_backups.py": "e04c1c8f3bad4dc9948deb050f451278da5b72af4d2863d46100530a3baadc9d",
-      ".github/scripts/check-fly-env-drift.py": "f1599bb967089e93bf1b72000d82e98f125a6da3bddcdba2b00bd6933bb55f95",
       "backend/server.py": "98ac7e99c63a77d7eeb36d63a0cfe318dea5b798d789665b85e5d4caede1a6bf",
       "frontend/scripts/juges-de-temps.js": "f77642cb38faa55bda29910fa9976120f06be893ce58d905cf3c4180ca6a18dc",
       "frontend/scripts/check-moteurs-gestes.js": "d092df072526de8c1c4f8f31ed9849c287b78f09d056de2bccc2ce48b3a41a0e",
       "frontend/scripts/check-spa-routes.js": "e071e01d1291fc61fe4ac5dfb83c4609ccccd7d5f542cba1044988ae107e27bf",
       "frontend/scripts/check-token-exposure-production.js": "0fd396ac948eae4f23de5bf608df4f2cbdc91c0998d509d4eb75ea1ba89b8fd4",
       "frontend/scripts/check-sse-proxy-production.js": "2031baeb402c738c7c5c28d252a8004a7dbde6d0d754b6d99e31bfa1559278d3",
-      "frontend/scripts/check-git-branches.js": "ca59cb244f206e5461769d290c3d10165a34d025a05b47d8463cb30a4accbc87"
+      "frontend/scripts/check-git-branches.js": "ca59cb244f206e5461769d290c3d10165a34d025a05b47d8463cb30a4accbc87",
+      ".github/scripts/check-fly-env-drift.py": "626ff760af805d2c5210657505723d91f16ccc4d4c9db8264e38c56b92313c61"
     }
   },
   "hors_perimetre": [

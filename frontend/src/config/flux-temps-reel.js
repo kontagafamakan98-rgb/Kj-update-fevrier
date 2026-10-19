@@ -37,7 +37,11 @@
 // Python, `fly.toml` et ce fichier, et refuse de conclure si l'un des trois a
 // bougé sans les autres. Un flux dont l'intervalle est surchargé sur la machine
 // déployée (`KOJO_SSE_HEARTBEAT_SECONDS`) reste hors de portée d'un test hors
-// ligne ; la sonde de production relève, elle, l'écart réellement observé.
+// ligne ; la surcharge déployée est jugée par la sonde Fly
+// (`.github/scripts/check-fly-env-drift.py`, règle « battement de cœur
+// déployé ») : elle lit `KOJO_SSE_HEARTBEAT_SECONDS` sur la machine réelle et
+// refuse deux battements qui déborderaient cette fenêtre. La sonde de
+// production relève, elle, l'écart réellement observé.
 
 /** Le battement de cœur du serveur (`kojo_live.HEARTBEAT_SECONDS`), en ms. */
 export const BATTEMENT_SERVEUR_MS = 20000;

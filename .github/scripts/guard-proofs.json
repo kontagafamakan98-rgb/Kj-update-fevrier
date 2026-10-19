@@ -1378,6 +1378,27 @@
       ]
     },
     {
+      "id": "fly-env-drift: battement deploye plus long que la fenetre du client tolere",
+      "garde": ".github/scripts/check-fly-env-drift.py",
+      "cible": ".github/scripts/check-fly-env-drift.py",
+      "trouve": "    if deploye_ms * 2 > fenetre_ms:",
+      "remplace": "    if False and deploye_ms * 2 > fenetre_ms:",
+      "runner": "python",
+      "preuve": "backend/tests/test_fly_env_drift.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_fly_env_drift.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_fly_env_drift.py::TestBattementDeploye::test_une_surcharge_plus_longue_que_la_fenetre_est_refusee"
+      ]
+    },
+    {
       "id": "fly-env-drift: variable absente du runtime toleree",
       "garde": ".github/scripts/check-fly-env-drift.py",
       "cible": ".github/scripts/check-fly-env-drift.py",
