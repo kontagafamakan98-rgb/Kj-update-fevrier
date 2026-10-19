@@ -3,6 +3,10 @@
 """Trajet complet de livraison automatisé — Kojo.
 
 Enchaîne sans rupture :
+  0. Arbre de travail PROPRE — la livraison publie des COMMITS : un fichier
+     modifié ou non suivi (non ignoré) n'entre dans aucune PR, et le refuser
+     est la seule façon de ne pas livrer autre chose que ce que l'auteur a
+     sous les yeux ;
   1. Pré-vol local (check-test-environment --avant-push, branches propres)
   2. Push de la branche de travail courante vers origin (sans fuite de secret)
   3. Détection ou ouverture de la Pull Request sur GitHub
@@ -178,6 +182,46 @@ def appel_github(methode: str, chemin: str, jeton: str, donnees: dict | None = N
         raise RuntimeError(f"GitHub API {methode} {chemin} -> HTTP {exc.code} : {msg}")
     except Exception as exc:
         raise RuntimeError(f"Erreur réseau GitHub API {methode} {chemin} : {exc}")
+
+
+def arbre_de_travail_sale() -> list[str]:
+    """Les changements NON COMMITÉS, lus par `git status --porcelain`.
+
+    La sortie inclut les fichiers modifiés, indexés ET non suivis non ignorés :
+    ce sont exactement ceux qu'un auteur croirait livrés, et qu'aucun commit ne
+    porte. Les fichiers ignorés (résultats de bancs, `.env`) n'en font pas
+    partie : ils ne sont pas destinés à la PR, et les refuser rendrait la
+    commande inutilisable sur un poste qui vient de mesurer.
+
+    Une liste vide = rien à signaler.
+    """
+    sortie = exec_cmd(["git", "status", "--porcelain"])
+    return [ligne for ligne in sortie.splitlines() if ligne.strip()]
+
+
+def verifier_arbre_propre() -> None:
+    """Refuse de livrer un arbre qui porte des changements non commités.
+
+    `npm run livrer` ouvre (ou reprend) une PR et la FUSIONNE quand elle est
+    verte : livrer depuis un disque sale produirait une PR verte qui ne contient
+    pas le travail visible de l'auteur, sans que rien ne le dise. La décision
+    reste à l'auteur — committer (ou retirer) —, pas à la commande : elle refuse,
+    en NOMMANT les chemins, et n'ajoute ni ne commite rien d'elle-même.
+
+    Refusé aussi en `--dry-run` : l'arbre sale est un FAIT, pas une simulation,
+    et un « ça marcherait » qui ignore ce fait serait un faux vert.
+    """
+    sale = arbre_de_travail_sale()
+    if not sale:
+        return
+    apercu = ", ".join(sale[:5])
+    if len(sale) > 5:
+        apercu += f", … ({len(sale)} au total)"
+    raise RuntimeError(
+        "Arbre de travail NON PROPRE : la livraison ne publie que les COMMITS, "
+        "donc ces changements ne seraient pas dans la PR. Committer ou retirer "
+        f"ces chemins, puis relancer — {apercu}."
+    )
 
 
 def verifier_prevol_local():
@@ -582,6 +626,15 @@ def main(argv=None) -> int:
 
     sha_local = exec_cmd(["git", "rev-parse", "HEAD"])
     log(f"Démarrage du trajet de livraison pour '{branche}' ({sha_local[:10]})...")
+
+    # 0. L'arbre de travail, AVANT le jeton et le réseau : un refus local et
+    # immédiat, qui ne dépend d'aucun accès GitHub.
+    try:
+        verifier_arbre_propre()
+        log_succes("Arbre de travail propre (tout est commité).")
+    except Exception as exc:
+        log_erreur(str(exc))
+        return 1
 
     try:
         jeton = obtenir_jeton(options.token)

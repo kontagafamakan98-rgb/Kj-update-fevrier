@@ -1499,6 +1499,90 @@
       ]
     },
     {
+      "id": "fly-env-drift: contrat du bus hors ligne jamais appele (une PR ne le voit plus avant deploiement)",
+      "garde": ".github/scripts/check-fly-env-drift.py",
+      "cible": ".github/scripts/check-fly-env-drift.py",
+      "trouve": "    if contrat_bus_hors_ligne:",
+      "remplace": "    if False and contrat_bus_hors_ligne:",
+      "runner": "python",
+      "preuve": "backend/tests/test_fly_env_drift.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_fly_env_drift.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_fly_env_drift.py::TestContratDuBusHorsLigne::test_le_mode_refs_only_juge_le_contrat_et_rend_1_si_le_depot_le_viole"
+      ]
+    },
+    {
+      "id": "fly-env-drift: battement DECLARE non juge hors ligne (une PR pose 30 s et part verte)",
+      "garde": ".github/scripts/check-fly-env-drift.py",
+      "cible": ".github/scripts/check-fly-env-drift.py",
+      "trouve": "    check_heartbeat_contract(declare, valeur, contrat_client, libelle=\"DÉCLARÉ\", libelle_valeur=\"DÉCLARÉE\", source=\"par le dépôt\")",
+      "remplace": "    pass",
+      "runner": "python",
+      "preuve": "backend/tests/test_fly_env_drift.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_fly_env_drift.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_fly_env_drift.py::TestReglagesDeTempsHorsLigne::test_un_battement_declare_trop_long_est_refuse_hors_ligne"
+      ]
+    },
+    {
+      "id": "fly-env-drift: bail calcule depuis le battement DECLARE non juge hors ligne",
+      "garde": ".github/scripts/check-fly-env-drift.py",
+      "cible": ".github/scripts/check-fly-env-drift.py",
+      "trouve": "    check_lease_contract(declare, valeur, contrat_client, contrats_serveur, libelle=\"DÉCLARÉ\")",
+      "remplace": "    pass",
+      "runner": "python",
+      "preuve": "backend/tests/test_fly_env_drift.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_fly_env_drift.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_fly_env_drift.py::TestReglagesDeTempsHorsLigne::test_un_battement_declare_allonge_le_bail_et_le_refuse_hors_ligne"
+      ]
+    },
+    {
+      "id": "fly-env-drift: repli du client non juge hors ligne (deux declarations peuvent diverger sur une PR)",
+      "garde": ".github/scripts/check-fly-env-drift.py",
+      "cible": ".github/scripts/check-fly-env-drift.py",
+      "trouve": "    check_fallback_contract(repli, raison_repli)",
+      "remplace": "    pass",
+      "runner": "python",
+      "preuve": "backend/tests/test_fly_env_drift.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_fly_env_drift.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_fly_env_drift.py::TestReglagesDeTempsHorsLigne::test_un_repli_trop_bavard_est_refuse_hors_ligne"
+      ]
+    },
+    {
       "id": "fly-env-drift: variable absente du runtime toleree",
       "garde": ".github/scripts/check-fly-env-drift.py",
       "cible": ".github/scripts/check-fly-env-drift.py",
@@ -5411,6 +5495,48 @@
       "cwd": "backend",
       "attend": [
         "FAILED tests/test_gate_perimetre.py::TestCouverture::test_un_motif_trop_court_est_refuse"
+      ]
+    },
+    {
+      "id": "livraison: arbre de travail sale livre en silence (la PR ne contient pas les commits visibles)",
+      "garde": ".github/scripts/livrer.py",
+      "cible": ".github/scripts/livrer.py",
+      "trouve": "    sale = arbre_de_travail_sale()",
+      "remplace": "    sale = []",
+      "runner": "python",
+      "preuve": "backend/tests/test_gate_perimetre.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_gate_perimetre.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_gate_perimetre.py::TestArbrePropre::test_un_arbre_sale_est_refuse_en_nommant_les_chemins"
+      ]
+    },
+    {
+      "id": "livraison: confirmation Vercel retiree du trajet (la fusion se dit complete sans production jugee)",
+      "garde": ".github/scripts/livrer.py",
+      "cible": ".github/scripts/livrer.py",
+      "trouve": "    ok_front = verifier_production_frontend(merge_sha, options.timeout_prod)",
+      "remplace": "    ok_front = True",
+      "runner": "python",
+      "preuve": "backend/tests/test_gate_perimetre.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_gate_perimetre.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_gate_perimetre.py::TestCheminParDefaut::test_les_etapes_sont_toutes_appelees_dans_l_ordre"
       ]
     },
     {

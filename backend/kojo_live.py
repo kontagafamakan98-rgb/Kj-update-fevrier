@@ -429,7 +429,22 @@ def _offrir_au_bus(user_id: str, event: str, data: Any) -> None:
 
 
 async def _publieur(client: Any, file: asyncio.Queue) -> None:
-    """Vide le tampon vers le canal partagé, une enveloppe à la fois."""
+    """Vide le tampon vers le canal partagé, une enveloppe à la fois.
+
+    Une enveloppe RETIRÉE du tampon est publiée avant de passer à la suivante,
+    même si Redis est tombé : l'échec est compté (`repli`), la publication est
+    retentée après `BUS_RECONNECT_SECONDS`, et l'enveloppe ne quitte la boucle
+    qu'une fois ACCEPTÉE par le bus. La seule perte possible est donc le
+    débordement du tampon (`perdus`), c'est-à-dire l'état que le contrat
+    dimensionne — pas une enveloppe en vol.
+
+    Mesuré le 19/10/2026 (`scripts/charge/mesure_panne_redis.py`, 400 flux,
+    400 évt/s pendant une panne de 2 s) : sans cette reprise, 799 des 800
+    enveloppes de la fenêtre parvenaient au bus — la manquante était celle que
+    la tâche venait de retirer au moment de l'échec, perdue SANS être comptée
+    (`perdus` restait à 0, seul `repli` bougeait). La file tenait sa promesse ;
+    c'est le consommateur qui la rompait.
+    """
     while True:
         user_id, event, data = await file.get()
         charge = json.dumps(
@@ -438,19 +453,24 @@ async def _publieur(client: Any, file: asyncio.Queue) -> None:
             default=str,
             separators=(",", ":"),
         )
-        try:
-            await client.publish(BUS_CHANNEL, charge)
-            _bus_compteurs["publies"] += 1
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:  # noqa: BLE001 - l'événement local est déjà livré
-            _bus_compteurs["repli"] += 1
-            logger.warning(
-                "Bus temps réel injoignable à la publication (%s) : l'événement "
-                "reste LOCAL et les autres workers ne le verront pas.",
-                exc,
-            )
-            await asyncio.sleep(BUS_RECONNECT_SECONDS)
+        while True:
+            try:
+                await client.publish(BUS_CHANNEL, charge)
+                _bus_compteurs["publies"] += 1
+                break
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:  # noqa: BLE001 - l'événement local est déjà livré
+                _bus_compteurs["repli"] += 1
+                logger.warning(
+                    "Bus temps réel injoignable à la publication (%s) : "
+                    "l'enveloppe est GARDÉE et republiée après reprise dans "
+                    "%.1f s — les autres workers la verront en retard, pas "
+                    "jamais.",
+                    exc,
+                    BUS_RECONNECT_SECONDS,
+                )
+                await asyncio.sleep(BUS_RECONNECT_SECONDS)
 
 
 async def _abonnement(client: Any) -> None:

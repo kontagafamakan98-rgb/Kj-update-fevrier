@@ -343,9 +343,21 @@ jobs:
       # FORMAT des variables critiques dans les RÉFÉRENCES du dépôt
       # (fly.toml, .env.example, DEPLOY_FLYIO.md) : CORS_ORIGINS,
       # VAPID_CLAIMS_EMAIL, BACKEND_PUBLIC_URL, FRONTEND_APP_URL,
-      # TRUSTED_HOSTS, REDIS_URL, MONGO_URL. Déterministe — SANS token ni
-      # réseau (audit local rejouable), lancé à chaque push.
-      - name: Audit formats des références (refs-only)
+      # TRUSTED_HOSTS, REDIS_URL, MONGO_URL. Et les DÉLAIS DU FLUX, jugés sur
+      # ce que le dépôt DÉCLARE et sur les défauts LUS : le battement
+      # (`KOJO_SSE_HEARTBEAT_SECONDS`, deux battements dans la fenêtre de
+      # silence du client), le bail qui en DÉCOULE (`PARTAGE_LEASE_SECONDS`),
+      # et le repli du client (`FALLBACK_POLL_MS`, moins bavard que le sondage
+      # remplacé et identique dans ses deux déclarations). Et le CONTRAT DES
+      # DEUX DÉLAIS DU BUS (reprise bornée [1 s, un battement], file ≥
+      # MAX_STREAMS_TOTAL × reprise). Sans quoi une PR qui casse un de ces
+      # contrats ne rougissait qu'APRÈS la fusion, une fois déployée.
+      # Déterministe — SANS token ni réseau (audit local rejouable), lancé à
+      # chaque push et chaque PR.
+      # Une surcharge posée en secret sur Fly échappe à cette passe : elle est
+      # DÉCLARÉE dans la sortie, et c'est l'étape en ligne ci-dessous qui la
+      # juge (FLY_API_TOKEN).
+      - name: Audit hors ligne (formats + délais du flux et du bus)
         run: python .github/scripts/check-fly-env-drift.py --refs-only
 
       # flyctl est requis par le check (flyctl secrets list). Référence ÉPINGLÉE

@@ -26,10 +26,14 @@ Trois surfaces sont mesurées ici, chacune sur l'artefact réel :
    mesuré par son INTERFACE (`main(argv)`), y compris le chemin en ligne avec une
    protection injectée, donc sans réseau et sans jeton.
 4. LA LIVRAISON (`.github/scripts/livrer.py`) — le SECOND chemin qui applique le
-   gate : elle doit attendre EXACTEMENT la liste déclarée (un check-run rouge HORS
-   périmètre ne bloque pas, un check du périmètre rouge bloque), refuser un
-   périmètre déclaré vide au lieu de retomber sur « tous les check-runs », et
-   juger le périmètre en pré-vol avant de pousser.
+   gate, et le chemin PAR DÉFAUT d'une PR verte : elle doit attendre EXACTEMENT
+   la liste déclarée (un check-run rouge HORS périmètre ne bloque pas, un check du
+   périmètre rouge bloque), refuser un périmètre déclaré vide au lieu de retomber
+   sur « tous les check-runs », juger le périmètre en pré-vol avant de pousser,
+   REFUSER un arbre de travail sale (elle publie des commits) avant le jeton et le
+   réseau, et appeler ses étapes dans l'ordre — production comprise, APRÈS la
+   fusion (lu par AST, pas par expression régulière sur la prose).
+   Preuve du point d'entrée : `package.json` expose `livrer` vers ce script.
 
 Deux asymétries assumées, écrites ici pour ne pas être relues comme des oublis :
 la protection de branche RÉELLE ne se lit qu'avec un jeton admin du dépôt, donc
@@ -45,6 +49,7 @@ rougir les tests nommés, ici même.
 """
 from __future__ import annotations
 
+import ast
 import importlib.util
 import json
 import sys
@@ -57,6 +62,7 @@ SCRIPTS = REPO_ROOT / ".github" / "scripts"
 CHEMIN_REGLE = SCRIPTS / "perimetre_gate.py"
 CHEMIN_GARDE = SCRIPTS / "check-gate-perimetre.py"
 CHEMIN_LIVRAISON = SCRIPTS / "livrer.py"
+PACKAGE = REPO_ROOT / "package.json"
 DECLARATION = SCRIPTS / "gate-perimetre.json"
 CI = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 
@@ -519,3 +525,116 @@ class TestLivraison:
         monkeypatch.setattr(livraison, "lire_protection", lambda *a, **k: (None, "HTTP 403 : Forbidden"))
         refus = livraison.verifier_perimetre_du_gate("jeton", en_ligne=True)
         assert _mentionne(refus, "droits admin"), refus
+
+
+class TestCheminParDefaut:
+    """`npm run livrer` est le chemin PAR DÉFAUT d'une PR verte — et reste tenu.
+
+    Un point d'entrée qui se débranche, une étape retirée ou déplacée après la
+    fusion ne rougiraient nulle part : la commande continuerait de rendre 0 en
+    faisant moins. Ces cas tiennent le contrat du trajet, pas son code.
+    """
+
+    # L'ordre attendu, ÉCRIT ici pour être comparé au fichier jugé (le lire
+    # depuis `livrer.py` ne prouverait rien). `verifier_arbre_propre` d'abord :
+    # c'est le seul contrôle qui doit tomber AVANT le jeton et le réseau.
+    ETAPES = [
+        "verifier_arbre_propre",
+        "obtenir_jeton",
+        "verifier_prevol_local",
+        "verifier_perimetre_du_gate",
+        "pousser_branche",
+        "trouver_ou_creer_pr",
+        "attendre_checks_ci",
+        "fusionner_pr",
+        "synchroniser_et_nettoyer_local",
+        "verifier_production_frontend",
+        "verifier_seo_production_strict",
+        "verifier_production_backend",
+    ]
+
+    def test_npm_run_livrer_lance_ce_script(self):
+        scripts = json.loads(PACKAGE.read_text(encoding="utf-8")).get("scripts", {})
+        assert scripts.get("livrer") == "python .github/scripts/livrer.py", scripts
+
+    def test_les_etapes_sont_toutes_appelees_dans_l_ordre(self):
+        appels = _appels_de_main()
+        assert appels, "main() introuvable ou sans appel : le trajet n'est pas jugé"
+        positions = []
+        for nom in self.ETAPES:
+            assert nom in appels, f"l'étape {nom} n'est plus appelée par main()"
+            positions.append(appels.index(nom))
+        assert positions == sorted(set(positions)), (
+            "l'ordre du trajet a changé : "
+            + ", ".join(f"{nom}@{i}" for nom, i in zip(self.ETAPES, positions))
+        )
+        # La production se confirme APRÈS la fusion : l'inverse ne vérifierait
+        # qu'une intention.
+        assert positions[-1] > positions[self.ETAPES.index("fusionner_pr")]
+
+    def test_les_trois_confirmations_de_production_sont_dans_le_trajet(self):
+        appels = _appels_de_main()
+        for confirmation in (
+            "verifier_production_frontend",
+            "verifier_seo_production_strict",
+            "verifier_production_backend",
+        ):
+            assert confirmation in appels, f"{confirmation} a disparu du trajet"
+
+
+def _appels_de_main():
+    """Les appels de `main()`, dans l'ordre du FICHIER (donc de l'exécution)."""
+    arbre = ast.parse(CHEMIN_LIVRAISON.read_text(encoding="utf-8"))
+    for noeud in arbre.body:
+        if isinstance(noeud, ast.FunctionDef) and noeud.name == "main":
+            appels = [
+                (sous.lineno, sous.func.id)
+                for sous in ast.walk(noeud)
+                if isinstance(sous, ast.Call) and isinstance(sous.func, ast.Name)
+            ]
+            return [nom for _, nom in sorted(appels)]
+    return []
+
+
+class TestArbrePropre:
+    """La livraison publie des COMMITS : un disque sale est REFUSÉ, pas ignoré.
+
+    Sans ce refus, `npm run livrer` ouvrirait une PR verte qui ne contient pas le
+    travail visible de l'auteur. Et le refus tombe AVANT le jeton et le réseau :
+    c'est la différence entre un refus local immédiat et une livraison qui a déjà
+    poussé avant de s'en apercevoir.
+    """
+
+    def test_un_arbre_sale_est_refuse_en_nommant_les_chemins(self, livraison, monkeypatch):
+        monkeypatch.setattr(
+            livraison, "exec_cmd", lambda *a, **k: " M backend/kojo_live.py\n?? notes.md"
+        )
+        with pytest.raises(RuntimeError) as refus:
+            livraison.verifier_arbre_propre()
+        message = str(refus.value)
+        assert "NON PROPRE" in message, message
+        assert "COMMITS" in message, message
+        assert "backend/kojo_live.py" in message and "notes.md" in message, message
+
+    def test_un_arbre_propre_passe(self, livraison, monkeypatch):
+        monkeypatch.setattr(livraison, "exec_cmd", lambda *a, **k: "")
+        assert livraison.verifier_arbre_propre() is None
+
+    def test_le_refus_tombe_avant_le_jeton_et_le_reseau(self, livraison, monkeypatch, capsys):
+        monkeypatch.setattr(livraison, "exec_cmd", lambda *a, **k: " M backend/a.py")
+
+        def interdit(*a, **k):
+            raise AssertionError("aucun jeton ni appel réseau ne doit partir sur un arbre sale")
+
+        monkeypatch.setattr(livraison, "obtenir_jeton", interdit)
+        monkeypatch.setattr(livraison, "appel_github", interdit)
+        assert livraison.main(["--branche", "feat/exemple"]) == 1
+        assert "NON PROPRE" in capsys.readouterr().err
+
+    def test_un_arbre_sale_est_refuse_aussi_en_simulation(self, livraison, monkeypatch, capsys):
+        # Le dry-run simule les EFFETS, pas les faits : un arbre sale reste un
+        # arbre sale, et un « ça marcherait » qui l'ignore serait un faux vert.
+        monkeypatch.setattr(livraison, "exec_cmd", lambda *a, **k: " M backend/a.py")
+        monkeypatch.setattr(livraison, "obtenir_jeton", lambda *a, **k: "jeton-factice")
+        assert livraison.main(["--branche", "feat/exemple", "--dry-run"]) == 1
+        assert "NON PROPRE" in capsys.readouterr().err
