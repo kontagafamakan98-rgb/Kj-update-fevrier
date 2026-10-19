@@ -856,6 +856,154 @@ class TestReglagesDeTempsDuFlux:
         sortie = "\n".join(check.checked)
         assert "PARTAGE_LEASE_SECONDS" in sortie, sortie
         assert "FALLBACK_POLL_MS" in sortie, sortie
+        # Les deux délais du bus sont jugés par le MÊME passage : sans cette
+        # ligne, la règle pourrait exister sans être appelée.
+        assert "KOJO_LIVE_BUS_QUEUE" in sortie, sortie
+
+
+class TestDelaisDuBus:
+    """Les DEUX délais du bus — et le contrat qui les LIE.
+
+    Le bus n'est pas la source de vérité, mais c'est lui qui porte un événement
+    aux AUTRES workers : pendant qu'il est en panne, ce qui est publié n'est
+    jamais rejoué (le pub/sub n'a pas d'historique). Les deux réglages ont un
+    défaut dans `kojo_live.py`, donc leur absence sur Fly n'est pas une
+    divergence doc↔prod — ce qui est jugé est leur VALEUR, déployée ou par
+    défaut, contre deux bornes et une relation : la file doit encaisser la
+    rafale que la fenêtre de reconnexion produit.
+    """
+
+    def test_les_trois_nombres_sont_lus_dans_le_code(self, check):
+        contrats = check.contrats_du_bus()
+        assert contrats is not None, "réglages du bus illisibles dans kojo_live.py"
+        delai, file_bus, flux_max = contrats
+        # Ni 2, ni 1000, ni 400 ne sont recopiés dans la règle : le contrat de
+        # la file se CALCULE à partir des deux autres.
+        assert delai == 2.0
+        assert file_bus == 1000.0
+        assert flux_max == 400.0
+
+    def test_un_fichier_sans_les_reglages_refuse_de_conclure(self, check, tmp_path):
+        # Une constante renommée ne rend pas un contrat par défaut.
+        vide = tmp_path / "kojo_live.py"
+        vide.write_text(
+            "BUS_QUEUE_SIZE = int(os.environ.get('AUTRE', '1'))\n", encoding="utf-8"
+        )
+        assert check.contrats_du_bus(vide) is None
+        assert check.contrats_du_bus(tmp_path / "absent.py") is None
+
+    def test_le_defaut_tient_le_contrat(self, check):
+        check.errors, check.checked = [], []
+        check.check_bus_contract(
+            False, "", check.contrats_du_serveur(), check.contrats_du_bus(), {}, {}
+        )
+        assert check.errors == [], check.errors
+        ligne = [l for l in check.checked if "KOJO_LIVE_BUS_QUEUE" in l][0]
+        # Le verdict publie les nombres en présence : délai, file, et le
+        # plancher CALCULÉ (400 flux × 2 s).
+        assert "2" in ligne and "1000" in ligne and "800" in ligne, ligne
+
+    def test_une_reconnexion_plus_longue_qu_un_battement_est_refusee(self, check):
+        check.errors, check.checked = [], []
+        check.check_bus_contract(
+            False, "", check.contrats_du_serveur(), check.contrats_du_bus(),
+            {"KOJO_LIVE_BUS_RECONNECT_SECONDS": "secret"},
+            {"KOJO_LIVE_BUS_RECONNECT_SECONDS": "30"},
+        )
+        assert len(check.errors) == 1, check.errors
+        refus = check.errors[0]
+        # Le refus nomme les DEUX nombres (30 s déployé, 20 s de battement) et
+        # la conséquence : ce qui est publié pendant la surdité n'est pas rejoué.
+        assert "30" in refus and "20" in refus, refus
+        assert "rejou" in refus, refus
+
+    def test_une_reconnexion_nulle_ou_sous_le_plancher_est_refusee(self, check):
+        # 0 s = boucle sans frein ; 0,2 s aussi, à l'échelle du journal.
+        for valeur in ("0", "0.2"):
+            check.errors, check.checked = [], []
+            check.check_bus_contract(
+                False, "", check.contrats_du_serveur(), check.contrats_du_bus(),
+                {"KOJO_LIVE_BUS_RECONNECT_SECONDS": "secret"},
+                {"KOJO_LIVE_BUS_RECONNECT_SECONDS": valeur},
+            )
+            assert len(check.errors) == 1, (valeur, check.errors)
+
+    def test_une_file_trop_petite_pour_la_reconnexion_est_refusee(self, check):
+        # 400 flux × 2 s = 800 : une file de 500 perdrait 300 enveloppes par
+        # fenêtre de reconnexion. C'est le contrat qui LIE les deux réglages.
+        check.errors, check.checked = [], []
+        check.check_bus_contract(
+            False, "", check.contrats_du_serveur(), check.contrats_du_bus(),
+            {"KOJO_LIVE_BUS_QUEUE": "secret"}, {"KOJO_LIVE_BUS_QUEUE": "500"},
+        )
+        assert len(check.errors) == 1, check.errors
+        refus = check.errors[0]
+        assert "500" in refus and "800" in refus and "400" in refus, refus
+        assert "ENSEMBLE" in refus, refus
+
+    def test_une_file_agrandie_rend_une_reconnexion_longue_acceptable(self, check):
+        # Le contrat n'est pas « 2 s » : 5 s avec 2 000 enveloppes tient. Un
+        # refus qui tomberait ici serait un plafond déguisé en contrat.
+        check.errors, check.checked = [], []
+        check.check_bus_contract(
+            False, "", check.contrats_du_serveur(), check.contrats_du_bus(),
+            {"KOJO_LIVE_BUS_RECONNECT_SECONDS": "secret", "KOJO_LIVE_BUS_QUEUE": "secret"},
+            {"KOJO_LIVE_BUS_RECONNECT_SECONDS": "5", "KOJO_LIVE_BUS_QUEUE": "2000"},
+        )
+        assert check.errors == [], check.errors
+        assert "2000" in "".join(check.checked), check.checked
+
+    def test_une_valeur_vide_dans_env_retombe_sur_le_defaut(self, check):
+        # `KOJO_LIVE_BUS_QUEUE=` dans [env] est falsy côté code
+        # (`os.environ.get(...) or défaut`) : refuser cet état serait refuser
+        # une machine qui tourne très bien — la classe de défaut du pré-vol plus
+        # sévère que la CI.
+        check.errors, check.checked = [], []
+        check.check_bus_contract(
+            False, "", check.contrats_du_serveur(), check.contrats_du_bus(),
+            {"KOJO_LIVE_BUS_QUEUE": "env"}, {"KOJO_LIVE_BUS_QUEUE": ""},
+        )
+        assert check.errors == [], check.errors
+        ligne = [l for l in check.checked if "KOJO_LIVE_BUS_QUEUE" in l][0]
+        assert "[env] vide" in ligne, ligne
+
+    def test_une_file_decimale_est_refusee(self, check):
+        check.errors, check.checked = [], []
+        check.check_bus_contract(
+            False, "", check.contrats_du_serveur(), check.contrats_du_bus(),
+            {"KOJO_LIVE_BUS_QUEUE": "secret"}, {"KOJO_LIVE_BUS_QUEUE": "1000.5"},
+        )
+        assert len(check.errors) == 1, check.errors
+        assert "ENTIER" in check.errors[0], check.errors[0]
+
+    def test_une_file_illisible_est_refusee_sans_la_publier(self, check):
+        check.errors, check.checked = [], []
+        check.check_bus_contract(
+            False, "", check.contrats_du_serveur(), check.contrats_du_bus(),
+            {"KOJO_LIVE_BUS_QUEUE": "secret"}, {"KOJO_LIVE_BUS_QUEUE": "mille"},
+        )
+        assert len(check.errors) == 1, check.errors
+        assert "ILLISIBLE" in check.errors[0]
+        assert "mille" not in check.errors[0], "la valeur déployée ne se cite pas"
+
+    def test_des_valeurs_deployees_non_lues_sont_un_angle_mort_declare(self, check):
+        # Secret Fly + SSH absent en CI : les deux valeurs se lisent ensemble,
+        # donc aucun des deux délais n'est jugé — et le passage le DIT.
+        check.errors, check.checked = [], []
+        check.check_bus_contract(
+            False, "", check.contrats_du_serveur(), check.contrats_du_bus(),
+            {"KOJO_LIVE_BUS_RECONNECT_SECONDS": "secret", "KOJO_LIVE_BUS_QUEUE": None},
+            {"KOJO_LIVE_BUS_RECONNECT_SECONDS": ""},
+        )
+        assert check.errors == [], check.errors
+        assert any("[AUCUN VERDICT]" in ligne for ligne in check.checked), check.checked
+
+    def test_un_contrat_illisible_refuse_de_conclure(self, check):
+        check.errors, check.checked = [], []
+        check.check_bus_contract(False, "", check.contrats_du_serveur(), None, {}, {})
+        assert len(check.errors) == 1, check.errors
+        assert "illisibles" in check.errors[0].lower()
+        assert "kojo_live.py" in check.errors[0]
 
 
 def quantite(lignes, motif):

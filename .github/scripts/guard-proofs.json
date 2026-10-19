@@ -295,7 +295,7 @@
       "invoque_par": "test",
       "preuve": "frontend/scripts/__tests__/check-workflows-lint.test.js",
       "runner": "vitest",
-      "motif": "refuse, AVANT le push, ce que le job requis workflow-lint refuserait apres : un bloc run: que shellcheck condamne (SC2046 mesure le 19/10/2026 sur backup-db.yml, parti en CI parce qu'aucun poste n'a shellcheck). Lit les blocs run: par indentation avec leur ligne absolue dans le YAML, remplace les ${{ }} par un jeton inerte (sinon faux positifs), ajoute set -e comme actionlint avant de deleguer (sinon SC2164 fantome), et n'exige l'outil que si le push touche un workflow"
+      "motif": "refuse, AVANT le push, ce que le job requis workflow-lint refuserait apres : un bloc run: que shellcheck condamne (SC2046 mesure le 19/10/2026 sur backup-db.yml, parti en CI parce qu'aucun poste n'a shellcheck). Lit les blocs run: par indentation avec leur ligne absolue dans le YAML, remplace les ${{ }} par des soulignes de meme longueur comme actionlint (sinon faux positifs, et la colonne resterait alignee), lui donne son amorce set -eo pipefail et ses SEPT exclusions recopiees de rule_shellcheck.go v1.7.12 avec --norc (sinon SC2164 fantome, ou un pre-vol plus severe ou plus indulgent que la CI), et n'exige l'outil que si le push touche un workflow"
     },
     {
       "chemin": "frontend/scripts/check-git-branches.js",
@@ -1454,6 +1454,48 @@
       "cwd": "backend",
       "attend": [
         "FAILED tests/test_fly_env_drift.py::TestReglagesDeTempsDuFlux::test_un_repli_aussi_bavard_que_l_ancien_sondage_est_refuse"
+      ]
+    },
+    {
+      "id": "fly-env-drift: reconnexion du bus plus longue qu'un battement toleree",
+      "garde": ".github/scripts/check-fly-env-drift.py",
+      "cible": ".github/scripts/check-fly-env-drift.py",
+      "trouve": "    elif delai > battement:",
+      "remplace": "    elif False and delai > battement:",
+      "runner": "python",
+      "preuve": "backend/tests/test_fly_env_drift.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_fly_env_drift.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_fly_env_drift.py::TestDelaisDuBus::test_une_reconnexion_plus_longue_qu_un_battement_est_refusee"
+      ]
+    },
+    {
+      "id": "fly-env-drift: file du bus trop petite pour la reconnexion toleree",
+      "garde": ".github/scripts/check-fly-env-drift.py",
+      "cible": ".github/scripts/check-fly-env-drift.py",
+      "trouve": "    if file_bus < plancher_file:",
+      "remplace": "    if False and file_bus < plancher_file:",
+      "runner": "python",
+      "preuve": "backend/tests/test_fly_env_drift.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_fly_env_drift.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_fly_env_drift.py::TestDelaisDuBus::test_une_file_trop_petite_pour_la_reconnexion_est_refusee"
       ]
     },
     {
@@ -2688,7 +2730,7 @@
       "id": "workflows-lint: expressions github non substituees",
       "garde": "frontend/scripts/check-workflows-lint.mjs",
       "cible": "frontend/scripts/check-workflows-lint.mjs",
-      "trouve": "  return script.replace(/\\$\\{\\{[^}]*\\}\\}/g, JETON_EXPRESSION);",
+      "trouve": "  return script.replace(/\\$\\{\\{[^}]*\\}\\}/g, (expression) => '_'.repeat(expression.length));",
       "remplace": "  return script;",
       "runner": "node",
       "preuve": "frontend/scripts/__tests__/check-workflows-lint.test.js",
@@ -2701,7 +2743,7 @@
       ],
       "cwd": "frontend",
       "attend": [
-        "remplace les expressions GitHub, jamais par du vide"
+        "remplace les expressions GitHub par des soulignés de MÊME longueur"
       ]
     },
     {

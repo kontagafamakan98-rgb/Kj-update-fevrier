@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-19",
-    "motif": "le pre-push lance le meme lint que le workflow-lint requis : garde de lint des blocs run: ajoute, et cablage dans le hook (refs du push par KOJO_REFS_DU_PUSH)",
+    "motif": "contrat des deux delais du bus : reprise bornee [1 s, un battement] et file >= MAX_STREAMS_TOTAL x delai, jugees sur la valeur deployee ou le defaut lu dans kojo_live.py, valeur vide de [env] retombant sur le defaut",
     "fichiers": {
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
       ".github/scripts/check-exec-bits.py": "92e00bbb66f78f7e06d186ef57a93559d1d3818b446edcdaf006244773690fe6",
@@ -121,9 +121,9 @@
       "frontend/scripts/check-git-branches.js": "ca59cb244f206e5461769d290c3d10165a34d025a05b47d8463cb30a4accbc87",
       "backend/scripts/check_atlas_backups.py": "4267bdbd40226f47c5454e9c72def56a4cf119cf36fc5816b05e0a4160223441",
       ".github/scripts/check-exercice-restauration.py": "54de4cd7521a19c5c4bcdd0a78e7ef9ef0fc87d3a62f15facf1b63323f0b5728",
-      ".github/scripts/check-fly-env-drift.py": "650437bf61fe067b946dc7de8138735ce934bf3071f2d69fd5879f63187de2c3",
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
-      "frontend/scripts/check-workflows-lint.mjs": "b89553ec473008f22732a0ee7460ff697e52da8dd35425812c9bf530c0ab6db0"
+      "frontend/scripts/check-workflows-lint.mjs": "f35fdf0b82e5aa7aa62ab638c69db028711615841a431665c1bc79f902742103",
+      ".github/scripts/check-fly-env-drift.py": "532f99217d266e6af04cd53a3c7e566d48e5a3ae0234a4f620c9f3f58b4598b1"
     }
   },
   "hors_perimetre": [

@@ -56,6 +56,19 @@ donc ce qui l'est réellement :
        — deux valeurs divergentes sont refusées, pas arbitrées. Cette valeur
        part dans le bundle : ce qui est jugé est la source dont il est bâti,
        et le message le dit.
+  10. LES DEUX DÉLAIS DU BUS, ET LEUR CONTRAT COMMUN :
+     * le DÉLAI DE RECONNEXION (`KOJO_LIVE_BUS_RECONNECT_SECONDS`) doit rester
+       dans [un plancher, UN BATTEMENT] : une reprise immédiate transforme une
+       panne de Redis en boucle qui republie sans répit (journal saturé, boucle
+       d'événements partagée avec les flux SSE), et au-delà d'un battement un
+       Redis revenu n'est pas rejoint avant plusieurs battements — or ce qui
+       est publié entre-temps n'est JAMAIS rejoué (pub/sub sans historique) ;
+     * la FILE DE PUBLICATION (`KOJO_LIVE_BUS_QUEUE`) doit absorber la rafale
+       produite pendant UNE fenêtre de reconnexion, au débit que la file d'un
+       abonné dimensionne déjà (`MAX_QUEUE_SIZE` : une notification par
+       seconde en rafale), soit `≥ MAX_STREAMS_TOTAL × délai`. Les deux
+       réglages se jugent ENSEMBLE : c'est la panne que l'un couvre que
+       l'autre doit encaisser.
 
 Usage :
     FLY_API_TOKEN=<deploy_token> python .github/scripts/check-fly-env-drift.py
@@ -127,11 +140,11 @@ SENSITIVE_KEYS = {
 # non vide dans le code, donc posable sans être exigée).
 OPTIONAL_KEYS = {
     "SENTRY_DSN", "PAYMENT_COMMISSION_RATE", "CORS_ORIGINS", "REDIS_URL",
-    # Bus temps réel (Redis pub/sub) : les deux réglages ont un défaut de repli
-    # dans `kojo_live` (canal `kojo:live`, tampon de 1000). Le bus lui-même
+    # Bus temps réel (Redis pub/sub) : les réglages ont un défaut de repli dans
+    # `kojo_live` (canal `kojo:live`, tampon de 1000, reprise à 2 s). Le bus lui-même
     # n'existe que si `REDIS_URL` est posé — leur absence sur Fly n'est donc
     # pas une divergence doc↔prod, seulement un réglage laissé au défaut.
-    "KOJO_LIVE_BUS_CHANNEL", "KOJO_LIVE_BUS_QUEUE",
+    "KOJO_LIVE_BUS_CHANNEL", "KOJO_LIVE_BUS_QUEUE", "KOJO_LIVE_BUS_RECONNECT_SECONDS",
     "BREVO_SENDER_NAME", "BREVO_REPLY_TO_EMAIL",
     "EMAIL_OTP_EXPIRY_MINUTES", "EMAIL_OTP_MAX_ATTEMPTS",
     "EMAIL_OTP_RESEND_COOLDOWN_SECONDS", "EMAIL_VERIFICATION_TOKEN_MINUTES",
@@ -817,6 +830,236 @@ def check_fallback_contract(valeur, raison):
     )
 
 
+# ── LE BUS TEMPS RÉEL : DEUX DÉLAIS, UN CONTRAT ─────────────────────────────
+# Le battement, le bail et le repli étaient jugés ; les deux réglages du BUS ne
+# l'étaient pas, alors que ce sont eux qui décident combien de temps un process
+# reste sourd et combien d'événements il peut perdre en attendant. Ils ont un
+# défaut dans `kojo_live.py`, donc leur absence sur Fly n'est PAS une divergence
+# — mais leur valeur (déployée ou par défaut) peut violer leur contrat.
+BUS_RECONNEXION_KEY = "KOJO_LIVE_BUS_RECONNECT_SECONDS"
+BUS_FILE_KEY = "KOJO_LIVE_BUS_QUEUE"
+# Plancher du délai de reprise : chaque tentative ratée coûte déjà un aller-retour
+# (le client Redis porte `socket_timeout=2`), donc la pause est le SEUL frein de
+# la boucle. Sous une seconde, une panne devient un incendie de journal — et la
+# boucle tourne dans la boucle d'événements qui sert les flux SSE.
+BUS_PLANCHER_S = 1.0
+# Débit déjà dimensionné pour la file d'UN abonné (`MAX_QUEUE_SIZE` : « une
+# notification par seconde pendant une rafale tient largement »). Le bus porte
+# une enveloppe par `publish`, donc une rafale qui sert tous les flux du process
+# pendant la fenêtre de reconnexion produit jusqu'à `flux_max × délai` enveloppes.
+DEBIT_BUS_PAR_FLUX = 1.0
+
+
+def contrats_du_bus(chemin=None):
+    """`(délai de reprise, taille de file, flux max)` LUS dans `kojo_live.py`.
+
+    Les trois sont lus, jamais recopiés : le contrat de la file se CALCULE à
+    partir du délai de reprise, et recopier l'un ou l'autre jugerait une autre
+    machine que celle qui tourne. `None` = lecteur cassé (constante renommée,
+    défaut retiré) : l'appelant refuse de conclure au lieu de supposer.
+    """
+    chemin = KOJO_LIVE if chemin is None else chemin
+    try:
+        texte = Path(chemin).read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+    def defaut(constante, cle, convertisseur):
+        trouve = re.search(
+            rf"{constante}\s*=\s*{convertisseur}\(\s*os\.environ\.get\(\s*"
+            rf'"{cle}"\s*,\s*"([\d.]+)"',
+            texte,
+        )
+        return float(trouve.group(1)) if trouve else None
+
+    delai = defaut("BUS_RECONNECT_SECONDS", BUS_RECONNEXION_KEY, "float")
+    file_bus = defaut("BUS_QUEUE_SIZE", BUS_FILE_KEY, "int")
+    flux_max = defaut("MAX_STREAMS_TOTAL", "KOJO_SSE_MAX_TOTAL", "int")
+    if delai is None or file_bus is None or flux_max is None:
+        return None
+    return delai, file_bus, flux_max
+
+
+def _battement_effectif(deploye, valeur, contrats_serveur):
+    """Le battement que la machine bat RÉELLEMENT (secondes), ou `None`.
+
+    `None` quand il n'est pas résolvable (déployé illisible ou nul) : la règle
+    du bail a déjà refusé ce cas, et la borne haute du bus se déclare alors non
+    jugée plutôt que d'être supposée sur le défaut du code.
+    """
+    if contrats_serveur is None:
+        return None
+    defaut, _ = contrats_serveur
+    if not deploye:
+        return defaut
+    try:
+        battement = float(str(valeur or "").strip())
+    except ValueError:
+        return None
+    return battement if battement > 0 else None
+
+
+def _delai_effectif(deployes, valeurs, cle, defaut):
+    """`(valeur, origine)` — la valeur déployée si elle existe, sinon le défaut.
+
+    `(None, "ILLISIBLE")` pour une valeur déployée qui n'est pas un nombre : un
+    réglage déployé qu'on ne sait pas lire ne retombe PAS sur le défaut du code,
+    ce qui jugerait une autre machine en croyant juger celle-ci.
+    """
+    if deployes.get(cle):
+        brut = str(valeurs.get(cle) or "").strip()
+        if not brut:
+            # Une valeur VIDE dans `[env]` est falsy dans le code
+            # (`os.environ.get(...) or défaut`) : le défaut s'applique. Un
+            # SECRET muet, lui, ne passe pas ici — le balayage des valeurs
+            # illisibles l'a déjà écarté, parce qu'on ne peut pas savoir ce
+            # qu'il porte.
+            return float(defaut), "défaut du code ([env] vide)"
+        try:
+            return float(brut), "valeur DÉPLOYÉE"
+        except ValueError:
+            return None, "ILLISIBLE"
+    return float(defaut), "défaut du code"
+
+
+def check_bus_contract(
+    battement_deploye, valeur_battement, contrats_serveur, contrats_bus,
+    deployes_bus, valeurs_bus,
+):
+    """Les deux délais du bus, jugés contre LEUR contrat — qui les lie.
+
+    Deux invariants, chacun pour une panne réelle :
+
+      * `BUS_PLANCHER_S ≤ délai ≤ battement` — sous le plancher la reprise est
+        une boucle sans frein (journal saturé, boucle d'événements partagée) ;
+        au-delà d'un battement, un Redis revenu n'est pas rejoint avant
+        plusieurs battements, et les événements publiés entre-temps ne sont
+        jamais rejoués : un pub/sub n'a pas d'historique ;
+      * `file ≥ MAX_STREAMS_TOTAL × délai × 1 évt/s` — pendant la fenêtre de
+        reconnexion, `publish` continue de remplir le tampon. En deçà, la rafale
+        déborde et le bus perd ces événements (`bus_stats()['perdus']`) : ils
+        restent locaux, donc invisibles des autres workers, sans rejeu.
+
+    Le second invariant est ce qui rend ces deux réglages UN contrat : allonger
+    la reconnexion sans agrandir la file déplace la panne, il ne la corrige pas.
+    """
+    if contrats_bus is None:
+        errors.append(
+            f"[{BUS_RECONNEXION_KEY}/{BUS_FILE_KEY}] réglages du bus ILLISIBLES "
+            f"({KOJO_LIVE.name}) : ni le délai de reprise ni la file ne sont "
+            "connaissables, donc leur contrat n'est pas jugé. Rétablir "
+            "`BUS_RECONNECT_SECONDS = float(os.environ.get(...))`, "
+            "`BUS_QUEUE_SIZE = int(os.environ.get(...))` et un "
+            "`MAX_STREAMS_TOTAL` numérique."
+        )
+        return
+
+    cles = (BUS_RECONNEXION_KEY, BUS_FILE_KEY)
+    # `deployes_bus` dit OÙ la valeur vit : `"secret"` (lisible seulement par
+    # SSH) ou `"env"` (lisible via l'API). Un secret muet n'a pas de valeur
+    # connaissable ; une entrée `[env]` VIDE, elle, laisse le défaut s'appliquer
+    # (`os.environ.get(...) or défaut`) et se juge comme tel.
+    muettes = [
+        cle for cle in cles
+        if deployes_bus.get(cle) == "secret" and not str(valeurs_bus.get(cle) or "").strip()
+    ]
+    if muettes:
+        # Même angle mort que le battement : un secret se lit par SSH, absent en
+        # CI. Le contrat lie les deux valeurs, donc aucun des deux n'est jugé.
+        checked.append(
+            f"  [AUCUN VERDICT] {', '.join(muettes)} DÉPLOYÉ(S) mais valeur(s) "
+            "illisible(s) (SSH indisponible) — les deux délais du bus ne sont "
+            "pas jugés"
+        )
+        return
+
+    delai_defaut, file_defaut, flux_max = contrats_bus
+    delai, origine_delai = _delai_effectif(
+        deployes_bus, valeurs_bus, BUS_RECONNEXION_KEY, delai_defaut
+    )
+    if delai is None:
+        errors.append(
+            f"[{BUS_RECONNEXION_KEY}] valeur DÉPLOYÉE ILLISIBLE : le délai de "
+            "reprise n'est pas un nombre, donc la fenêtre que la file doit couvrir "
+            "n'est pas calculable. Corriger ou retirer "
+            f"(fly secrets unset {BUS_RECONNEXION_KEY})."
+        )
+        return
+    file_bus, origine_file = _delai_effectif(
+        deployes_bus, valeurs_bus, BUS_FILE_KEY, file_defaut
+    )
+    if file_bus is None:
+        errors.append(
+            f"[{BUS_FILE_KEY}] valeur DÉPLOYÉE ILLISIBLE : une taille de file est "
+            "un nombre ENTIER d'événements. Corriger ou retirer "
+            f"(fly secrets unset {BUS_FILE_KEY})."
+        )
+        return
+    if file_bus != int(file_bus):
+        errors.append(
+            f"[{BUS_FILE_KEY}] {file_bus:g} : une taille de file est un nombre "
+            "ENTIER d'événements — une file décimale ne se crée pas."
+        )
+        return
+
+    if delai <= 0:
+        errors.append(
+            f"[{BUS_RECONNEXION_KEY}] {delai:g} s ({origine_delai}) : une reprise "
+            "sans répit republie en continu pendant une panne de Redis — journal "
+            "saturé, et boucle partagée avec les flux SSE. "
+            f"fly secrets unset {BUS_RECONNEXION_KEY} pour revenir au défaut."
+        )
+        return
+    if delai < BUS_PLANCHER_S:
+        errors.append(
+            f"[{BUS_RECONNEXION_KEY}] {delai:g} s ({origine_delai}) sous le plancher "
+            f"{BUS_PLANCHER_S:g} s : chaque tentative ratée coûte déjà un "
+            "aller-retour, donc la pause est le seul frein de la boucle — en deçà, "
+            "une panne devient un incendie de journal. "
+            f"fly secrets unset {BUS_RECONNEXION_KEY} pour revenir au défaut."
+        )
+        return
+
+    battement = _battement_effectif(battement_deploye, valeur_battement, contrats_serveur)
+    if battement is None:
+        checked.append(
+            f"  [AUCUN VERDICT] borne haute de {BUS_RECONNEXION_KEY} non jugée : "
+            "le battement réellement déployé est illisible (SSH indisponible)"
+        )
+    elif delai > battement:
+        errors.append(
+            f"[{BUS_RECONNEXION_KEY}] {delai:g} s ({origine_delai}) au-delà d'un "
+            f"battement ({battement:g} s) : après un redémarrage de Redis, le "
+            "process resterait sourd plusieurs battements — et ce qui est publié "
+            "entre-temps n'est JAMAIS rejoué (le pub/sub n'a pas d'historique). "
+            f"Ramener {BUS_RECONNEXION_KEY} sous le battement, ou retirer la "
+            "surcharge."
+        )
+        return
+
+    plancher_file = flux_max * delai * DEBIT_BUS_PAR_FLUX
+    if file_bus < plancher_file:
+        errors.append(
+            f"[{BUS_FILE_KEY}] file de {file_bus:g} ({origine_file}) sous "
+            f"{plancher_file:g} = {flux_max:g} flux × {delai:g} s × "
+            f"{DEBIT_BUS_PAR_FLUX:g} évt/s : la rafale produite pendant UNE "
+            "reconnexion déborderait le tampon, et le bus perdrait ces "
+            "événements (`bus_stats()['perdus']`) — déjà absents des autres "
+            "workers, sans rejeu. Les deux réglages se corrigent ENSEMBLE "
+            f"({BUS_FILE_KEY} plus grand, ou {BUS_RECONNEXION_KEY} plus court)."
+        )
+        return
+
+    borne_haute = (
+        f"un battement ({battement:g} s)" if battement is not None else "un battement ILLISIBLE"
+    )
+    checked.append(
+        f"  {OK} {BUS_RECONNEXION_KEY} = {delai:g} s ({origine_delai}) dans "
+        f"[{BUS_PLANCHER_S:g} s, {borne_haute}] ; {BUS_FILE_KEY} = {file_bus:g} "
+        f"({origine_file}) ≥ {plancher_file:g} = {flux_max:g} flux × {delai:g} s"
+    )
+
+
 def _mask(value):
     """Masque une valeur secrète : ne garde que le préfixe du schéma et la
     longueur (ex. 'redis://... [55 car.]'). JAMAIS la valeur complète dans la
@@ -1221,9 +1464,30 @@ def main(argv=None):
     # et aucun des deux n'était jugé : un bail trop court expire une place
     # vivante, un bail trop long garde les places d'un worker mort, un repli
     # aussi bavard que le sondage remplacé annule le remplacement.
-    check_lease_contract(deploye, valeur_battement, contrat_client, contrats_du_serveur())
+    contrats_serveur = contrats_du_serveur()
+    check_lease_contract(deploye, valeur_battement, contrat_client, contrats_serveur)
     valeur_repli, raison_repli = contrat_du_repli()
     check_fallback_contract(valeur_repli, raison_repli)
+
+    # 4g) LES DEUX DÉLAIS DU BUS, jugés ENSEMBLE : le délai de reprise décide
+    # combien de temps le process reste sourd, la file de publication doit
+    # encaisser ce que cette fenêtre produit. Leurs valeurs se lisent là où
+    # elles vivent (runtime [env], secret par SSH), ou à défaut dans le code.
+    bus_keys = (BUS_RECONNEXION_KEY, BUS_FILE_KEY)
+    deployes_bus = {
+        cle: ("secret" if cle in fly_secrets else "env" if cle in live_env else None)
+        for cle in bus_keys
+    }
+    valeurs_bus = {cle: live_env.get(cle, "") for cle in bus_keys}
+    muettes = [
+        cle for cle in bus_keys if deployes_bus[cle] == "secret" and not valeurs_bus[cle]
+    ]
+    if muettes:
+        valeurs_bus.update(read_secrets_via_ssh(muettes))
+    check_bus_contract(
+        deploye, valeur_battement, contrats_serveur,
+        contrats_du_bus(), deployes_bus, valeurs_bus,
+    )
 
     # 5) FORMAT : références du dépôt (déterministe) PUIS valeurs déployées
     _auditer_references()

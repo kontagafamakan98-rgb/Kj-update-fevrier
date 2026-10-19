@@ -14,10 +14,11 @@
 //     (`rhysd/actionlint@v1.7.12`), et il délègue lui-même les `run:` à
 //     shellcheck. Sa sortie nomme fichier, ligne et code — parité exacte.
 //  2. `shellcheck` seul, sinon : on EXTRAIT les blocs `run:` et on les lui
-//     donne avec les exclusions d'actionlint (`SC1091,SC2194,SC2050,SC2154,
-//     SC2157`) et SANS filtre de sévérité — mesuré : actionlint rapporte aussi
-//     les `info:` et les `style:` (SC2086, SC2005), donc filtrer ici rendrait
-//     le pré-vol plus indulgent que la CI, ce qui est le défaut à corriger.
+//     donne avec `--norc`, son amorce et les SEPT exclusions d'actionlint
+//     v1.7.12 (`EXCLUSIONS`, recopiées de `rule_shellcheck.go`), et SANS filtre
+//     de sévérité — mesuré : actionlint rapporte aussi les `info:` et les
+//     `style:` (SC2086, SC2005), donc filtrer ici rendrait le pré-vol plus
+//     indulgent que la CI, ce qui est le défaut à corriger.
 //
 // `shellcheck` est donc REQUIS (sans lui les `run:` ne sont pas jugés, et
 // actionlint se contente de les ignorer) : absent, le pré-vol REFUSE le push
@@ -25,12 +26,20 @@
 // est utilisé s'il est là ; absent, la sortie le DÉCLARE (la structure et les
 // expressions restent jugées par la CI) — une surface aveugle se déclare.
 //
+// ── Ce qui n'est PAS interprété, et se déclare ──────────────────────────────
+// `defaults.run.shell` (niveau workflow ou job) et le shell par défaut de
+// `runs-on: windows-*` (`pwsh`) demandent une lecture YAML STRUCTURÉE que le
+// scanner par indentation ne fait pas. Le dépôt n'en a aucun le 19/10/2026 ;
+// le jour où il en aura un, le bloc serait jugé en bash à tort — donc plus
+// sévère que la CI, et c'est ce cas que le pré-vol ne doit pas créer.
+//
 // ── Ce que ce script ne refait pas ──────────────────────────────────────────
-// Les `${{ … }}` sont REMPLACÉS par un jeton inerte avant shellcheck, comme le
-// fait actionlint : sans ça, `${{ secrets.X }}` déclenche des faux positifs
-// (« parameter expansion can't start with { ») et le pré-vol refuserait du
-// travail sain — une mesure ratée vaut moins qu'une mesure absente, parce
-// qu'elle apprend à contourner le garde.
+// Les `${{ … }}` sont REMPLACÉS par des SOULIGNÉS de même longueur avant
+// shellcheck, exactement comme actionlint : sans ça, `${{ secrets.X }}`
+// déclenche des faux positifs (« parameter expansion can't start with { ») et
+// le pré-vol refuserait du travail sain — une mesure ratée vaut moins qu'une
+// mesure absente, parce qu'elle apprend à contourner le garde. La longueur est
+// préservée pour que la COLONNE rapportée reste celle du YAML.
 //
 // Usage :
 //   node frontend/scripts/check-workflows-lint.mjs                 (tout)
@@ -52,33 +61,42 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
-// Le jeton qui remplace `${{ … }}`. Sans `$` : un mot inerte, donc ni SC2086
-// (non quoté) ni SC2050 (condition constante) ne se déclenchent à sa place.
-export const JETON_EXPRESSION = '__KOJO_EXPR__';
+// Les exclusions d'actionlint v1.7.12 — le tag que la CI épingle —, recopiées
+// de `rule_shellcheck.go` et non choisies ici : `$GITHUB_*` est fourni par le
+// runner (SC2153/SC2154), les `${{ }}` deviennent des soulignés (SC2050,
+// SC2194, SC2157, SC2043), un `source` dynamique n'a pas de sens (SC1091).
+// En AJOUTER une rendrait le pré-vol plus indulgent que la CI ; en RETIRER une,
+// plus sévère — les deux défauts que ce garde existe pour ne pas créer.
+export const EXCLUSIONS = 'SC1091,SC2194,SC2050,SC2153,SC2154,SC2157,SC2043';
 
-// Les exclusions d'actionlint, mesurées sur sa sortie : `$GITHUB_*` est fourni
-// par le runner (SC2154), les `${{ }}` sont déjà remplacés (SC2050), un
-// `source` dynamique et `$10` n'ont pas de sens dans un workflow.
-export const EXCLUSIONS = 'SC1091,SC2194,SC2050,SC2154,SC2157';
+// L'amorce qu'actionlint ajoute avant de déléguer, par shell. `pipefail` en plus
+// de `-e` pour bash : c'est SON texte, donc ses diagnostics sont les mêmes.
 
 const RUN = /^(\s*)(?:-\s+)?run:\s*(.*?)\s*$/;
 const SHELL = /^(\s*)shell:\s*(.+?)\s*$/;
 const BLOC = /^[|>][+-]?\d*$/;
 
-/** Remplace chaque `${{ … }}` par un jeton de même nature, jamais par du vide. */
+/** Remplace chaque `${{ … }}` par des soulignés de MÊME longueur, jamais par du vide. */
 export function substituerExpressions(script) {
-  return script.replace(/\$\{\{[^}]*\}\}/g, JETON_EXPRESSION);
+  return script.replace(/\$\{\{[^}]*\}\}/g, (expression) => '_'.repeat(expression.length));
 }
 
-/** `bash`, `sh`… normalisé ; `null` pour un shell que shellcheck ne lit pas. */
+/**
+ * `bash`/`sh` quand shellcheck les lit, `null` sinon — la règle d'ACTIONLINT.
+ *
+ * Elle est plus étroite qu'elle n'en a l'air, et c'est voulu : actionlint
+ * n'accepte que `bash`, `sh` et leurs préfixes `bash …` / `sh …`
+ * (`rule_shellcheck.go`, `runShellcheck`). Un `shell: /usr/bin/bash -e {0}`,
+ * lui, est IGNORÉ par la CI — le juger ici refuserait du travail que la CI
+ * accepte, donc un pré-vol plus sévère qu'elle. Le bloc se DÉCLARE non jugé
+ * plutôt que de diverger.
+ */
 export function shellNormalise(brut) {
   if (!brut) return 'bash';
-  const premier = brut
-    .replace(/\{[^}]*\}/g, ' ') // `bash -e {0}` → `bash -e`
-    .trim()
-    .split(/\s+/)[0];
-  const nom = path.basename(premier).toLowerCase();
-  if (nom === 'bash' || nom === 'sh') return nom;
+  const valeur = String(brut).trim();
+  if (valeur === 'bash' || valeur === 'sh') return valeur;
+  if (valeur.startsWith('bash ')) return 'bash';
+  if (valeur.startsWith('sh ')) return 'sh';
   return null;
 }
 
@@ -167,19 +185,24 @@ export function outils(env = process.env) {
 }
 
 /**
- * Les écarts d'un blocked `run:`, lignes ABSOLUES du fichier.
+ * Les écarts d'un bloc `run:`, lignes ABSOLUES du fichier.
  *
  * La ligne n'est pas recalculée : le fichier soumis à shellcheck porte
- * `set -e` puis le script aligné sur les lignes du YAML, donc shellcheck
- * lui-même compte en coordonnées du YAML. Une arithmétique de décalage serait
- * une seconde source d'erreur, et c'est précisément la ligne qui rend le refus
- * utilisable.
+ * l'amorce d'actionlint puis le script aligné sur les lignes du YAML, donc
+ * shellcheck lui-même compte en coordonnées du YAML. Une arithmétique de
+ * décalage serait une seconde source d'erreur, et c'est précisément la ligne
+ * qui rend le refus utilisable.
  *
- * `set -e` n'est pas décoratif : les steps tournent sous `bash -e {0}`, donc
- * actionlint l'ajoute avant de déléguer — MESURÉ le 19/10/2026, sans lui `cd
- * ../frontend` de `ci.yml` remontait en SC2164, un écart que la CI ne voit pas.
- * Un pré-vol plus sévère que la CI est un pré-vol qu'on apprend à contourner.
+ * L'amorce n'est pas décorative : les steps tournent sous `bash -e {0}`, donc
+ * actionlint ajoute `set -eo pipefail` avant de déléguer — MESURÉ le
+ * 19/10/2026, sans elle `cd ../frontend` de `ci.yml` remontait en SC2164, un
+ * écart que la CI ne voit pas. Un pré-vol plus sévère que la CI est un pré-vol
+ * qu'on apprend à contourner.
  */
+export function amorce(shell) {
+  return shell === 'bash' ? 'set -eo pipefail' : 'set -e';
+}
+
 export function lancerShellcheck(blocs, { shellcheck, repertoire = null, executer = execFileSync } = {}) {
   const travaux = repertoire || mkdtempSync(path.join(tmpdir(), 'kojo-lint-'));
   const ecarts = [];
@@ -191,10 +214,10 @@ export function lancerShellcheck(blocs, { shellcheck, repertoire = null, execute
     blocs.forEach((bloc, index) => {
       if (!bloc.shell) return;
       const fichier = path.join(travaux, `bloc-${index}.sh`);
-      // `set -e` occupe la ligne (ligne - 1) : le script commence donc à la
+      // L'amorce occupe la ligne (ligne - 1) : le script commence donc à la
       // ligne du `run:` dans le YAML, sans décalage à recalculer.
       const blancs = Math.max(0, bloc.ligne - 2);
-      writeFileSync(fichier, `${'\n'.repeat(blancs)}set -e\n${bloc.script}\n`, 'utf8');
+      writeFileSync(fichier, `${'\n'.repeat(blancs)}${amorce(bloc.shell)}\n${bloc.script}\n`, 'utf8');
       if (!lots.has(bloc.shell)) lots.set(bloc.shell, []);
       lots.get(bloc.shell).push({ fichier, bloc });
     });
@@ -204,7 +227,9 @@ export function lancerShellcheck(blocs, { shellcheck, repertoire = null, execute
       try {
         executer(
           shellcheck,
-          ['-s', shell, '-x', '-f', 'gcc', '-e', EXCLUSIONS, ...membres.map((m) => m.fichier)],
+          // `--norc` : sans lui, un `.shellcheckrc` du poste changerait le
+          // verdict — la CI, elle, tourne sous actionlint qui le passe.
+          ['--norc', '-f', 'gcc', '-x', '--shell', shell, '-e', EXCLUSIONS, ...membres.map((m) => m.fichier)],
           { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
         );
       } catch (erreur) {

@@ -3,12 +3,14 @@
 // Ce fichier prouve trois choses, et chacune a coûté un défaut réel :
 //
 //  1. l'EXTRACTION lit les blocs `run:` avec leur ligne ABSOLUE et remplace les
-//     `${{ … }}` par un jeton inerte. Sans le remplacement, `${{ secrets.X }}`
-//     remonte en faux positif : un pré-vol qui refuse du travail sain apprend
-//     à être contourné ;
-//  2. `set -e` est ajouté avant de déléguer, parce que les steps tournent sous
-//     `bash -e {0}` : mesuré, sans lui le `cd ../frontend` de `ci.yml` remonte
-//     en SC2164, un écart que la CI ne voit pas ;
+//     `${{ … }}` par des soulignés de même longueur, comme actionlint. Sans le
+//     remplacement, `${{ secrets.X }}` remonte en faux positif : un pré-vol qui
+//     refuse du travail sain apprend à être contourné ;
+//  2. l'AMORCE d'actionlint (`set -eo pipefail`) est ajoutée avant de déléguer,
+//     parce que les steps tournent sous `bash -e {0}` : mesuré, sans elle le
+//     `cd ../frontend` de `ci.yml` remonte en SC2164, un écart que la CI ne
+//     voit pas — et les sept exclusions sont LES SIENNES (SC2153 et SC2043
+//     comprises, sans quoi le pré-vol serait plus sévère que la CI) ;
 //  3. avec le VRAI shellcheck, la commande refuse un `$(date +%F)` non quoté
 //     (SC2046) en nommant la ligne du YAML — c'est le défaut qui est parti en
 //     CI le 19/10/2026 sur `.github/workflows/backup-db.yml`.
@@ -24,14 +26,17 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
 import {
   EXCLUSIONS,
-  JETON_EXPRESSION,
+  amorce,
   blocsDeRun,
   fichiersDuPush,
+  lancerShellcheck,
   main,
   outils,
   shellNormalise,
   substituerExpressions,
 } from '../check-workflows-lint.mjs';
+
+const EXPRESSION = '${{ secrets.MONGO_URL }}';
 
 const SCRIPT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)), '..', 'check-workflows-lint.mjs',
@@ -103,7 +108,7 @@ describe('check-workflows-lint — les blocs run: et leurs lignes', () => {
   it('extrait chaque bloc avec sa ligne ABSOLUE dans le YAML', () => {
     const blocs = blocsDeRun(FIXTURE);
     expect(blocs.map((b) => b.ligne)).toEqual([9, 13, 17, 21]);
-    expect(blocs[0].script).toBe(`echo "${JETON_EXPRESSION}"\necho fin`);
+    expect(blocs[0].script).toBe(`echo "${'_'.repeat(EXPRESSION.length)}"\necho fin`);
     expect(blocs[1].script).toBe('echo ok');
   });
 
@@ -112,27 +117,37 @@ describe('check-workflows-lint — les blocs run: et leurs lignes', () => {
     // pwsh : extrait (sa ligne compte) mais `shell: null` → non jugé.
     expect(blocs[2].shell).toBeNull();
     expect(blocs[2].shellBrut).toBe('pwsh');
-    // Un chemin absolu et un `{0}` restent du bash.
-    expect(blocs[3].shell).toBe('bash');
+    // `/usr/bin/bash -e {0}` : actionlint l'IGNORE (il n'accepte que `bash`,
+    // `sh` et leurs préfixes) — le juger ici serait plus sévère que la CI.
+    expect(blocs[3].shell).toBeNull();
+    expect(blocs[3].shellBrut).toBe('/usr/bin/bash -e {0}');
   });
 
-  it('remplace les expressions GitHub, jamais par du vide', () => {
-    // Une substitution par des espaces casserait `[ "${{ x }}" = … ]` ; une
-    // suppression laisserait un `$` orphelin. Un mot inerte, lui, ne déclenche
-    // ni SC2086 (non quoté) ni SC2050 (condition constante) à sa place.
-    const sortie = substituerExpressions('if [ "${{ github.sha }}" = "x" ]; then echo ${{ secrets.A }}; fi');
+  it('remplace les expressions GitHub par des soulignés de MÊME longueur', () => {
+    // Le geste d'actionlint : des espaces casseraient `[ "${{ x }}" = … ]`, une
+    // suppression laisserait un `$` orphelin, et une longueur différente
+    // décalerait la COLONNE rapportée. Même longueur = même géométrie.
+    const source = 'if [ "${{ github.sha }}" = "x" ]; then echo ${{ secrets.A }}; fi';
+    const sortie = substituerExpressions(source);
     expect(sortie).not.toContain('${{');
-    expect(sortie).toContain(JETON_EXPRESSION);
+    expect(sortie).toHaveLength(source.length);
+    expect(sortie).toContain('_'.repeat('${{ github.sha }}'.length));
     expect(sortie.startsWith('if [ "')).toBe(true);
+    expect(substituerExpressions('echo ok')).toBe('echo ok');
   });
 
-  it('normalise les noms de shell, et refuse ceux qu’il ne lit pas', () => {
+  it('ne reconnaît que les shells d’actionlint, et déclare les autres', () => {
+    // `rule_shellcheck.go` : `bash`, `sh`, `bash …`, `sh …`, rien d'autre.
     expect(shellNormalise(undefined)).toBe('bash');
+    expect(shellNormalise('bash')).toBe('bash');
     expect(shellNormalise('bash -e {0}')).toBe('bash');
-    expect(shellNormalise('/usr/bin/bash')).toBe('bash');
+    expect(shellNormalise('sh -e {0}')).toBe('sh');
     expect(shellNormalise('sh')).toBe('sh');
     expect(shellNormalise('pwsh')).toBeNull();
     expect(shellNormalise('python')).toBeNull();
+    // Un chemin absolu est ignoré par la CI : le pré-vol s'aligne (non jugé).
+    expect(shellNormalise('/usr/bin/bash')).toBeNull();
+    expect(shellNormalise('/bin/sh -e {0}')).toBeNull();
   });
 });
 
@@ -244,11 +259,39 @@ describe('check-workflows-lint — la commande', () => {
     expect(sortie).toContain('[OK]');
   });
 
-  it('les exclusions sont celles d’actionlint, pas un choix local', () => {
-    // Elles sont recopiées de son comportement mesuré : les changer sans le
-    // mesurer rendrait le pré-vol différent de la CI dans un sens ou dans
-    // l'autre. La liste est figée ici pour que le changement soit visible.
-    expect(EXCLUSIONS).toBe('SC1091,SC2194,SC2050,SC2154,SC2157');
+  it('les exclusions sont les SEPT d’actionlint v1.7.12, pas un choix local', () => {
+    // Recopiées de `rule_shellcheck.go` du tag que la CI épingle. En retirer
+    // une rendrait le pré-vol plus SÉVÈRE que la CI (SC2153, SC2043 en tête) :
+    // c'est le défaut qu'on a trouvé en relisant la source, pas en devinant.
+    expect(EXCLUSIONS).toBe('SC1091,SC2194,SC2050,SC2153,SC2154,SC2157,SC2043');
+  });
+
+  it('délègue avec les options et l’amorce d’actionlint, pas les siennes', () => {
+    // `--norc` : un `.shellcheckrc` du poste ne doit pas changer le verdict.
+    // `set -eo pipefail` : c'est le texte exact qu'actionlint ajoute, donc ses
+    // diagnostics sont les mêmes des deux côtés.
+    const repertoire = dossier();
+    // Seuls les deux blocs bash de la fixture partent à shellcheck (pwsh et
+    // `/usr/bin/bash` sont déclarés non jugés, comme le fait la CI).
+    const blocs = blocsDeRun(FIXTURE).filter((b) => b.shell);
+    expect(blocs).toHaveLength(2);
+    let args = [];
+    lancerShellcheck(blocs, {
+      shellcheck: 'shellcheck',
+      repertoire,
+      executer: (_commande, recus) => {
+        args = recus;
+        return '';
+      },
+    });
+    expect(args.slice(0, 6)).toEqual(['--norc', '-f', 'gcc', '-x', '--shell', 'bash']);
+    expect(args).toContain(EXCLUSIONS);
+    const lignes = readFileSync(path.join(repertoire, 'bloc-0.sh'), 'utf8').split('\n');
+    // Ligne 9 du YAML en index 8 : l'amorce occupe la ligne 8, le script commence
+    // à la ligne du `run:` — aucun décalage n'est recalculé.
+    expect(lignes[7]).toBe(amorce('bash'));
+    expect(lignes[7]).toBe('set -eo pipefail');
+    expect(lignes[8]).toBe(`echo "${'_'.repeat(EXPRESSION.length)}"`);
   });
 });
 
