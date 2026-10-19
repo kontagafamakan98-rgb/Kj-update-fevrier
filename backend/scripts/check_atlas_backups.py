@@ -45,7 +45,16 @@ PALIERS_SANS_PITR = ("M0", "M2", "M5")
 
 
 def _palier(document):
-    """Palier du cluster (`M10`, `M20`…) lu dans la première spécification."""
+    """Palier du cluster (`M0`, `M10`, `M20`…) — LU, jamais deviné.
+
+    DEUX formes selon le type de déploiement : un cluster DÉDIÉ porte le palier
+    dans `replicationSpecs[].regionConfigs[].{electableSpecs,…}.instanceSize`,
+    un cluster PARTAGÉ (M0/M2/M5, fournisseur TENANT) le porte dans
+    `providerSettings.instanceSizeName`. Ne lire que la première rendait
+    « palier inconnu » sur le cluster réel (M0, mesuré le 19/10/2026) — et le
+    remède publié devenait « activer le Cloud Backup », impossible sur ce
+    palier : exactement le remède impossible que cette sonde existe pour éviter.
+    """
     specs = document.get("replicationSpecs") or []
     for spec in specs:
         for region in spec.get("regionConfigs") or []:
@@ -53,6 +62,10 @@ def _palier(document):
                 instance = (region.get(cle) or {}).get("instanceSize")
                 if instance:
                     return str(instance)
+    provider = document.get("providerSettings") or {}
+    for valeur in (provider.get("instanceSizeName"), document.get("instanceSizeName")):
+        if valeur:
+            return str(valeur)
     return ""
 
 
@@ -104,11 +117,24 @@ def analyser(statut, corps):
     ]
 
     if not sauvegardes:
-        lignes.append(
-            "[ERREUR] Sauvegardes DÉSACTIVÉES sur ce cluster : aucune restauration "
-            "n'est possible. Remède : activer le Cloud Backup du cluster "
-            "(Atlas → Backup → Enable)."
-        )
+        if palier in PALIERS_SANS_PITR:
+            # Un palier partagé ne fournit AUCUNE sauvegarde continue : cocher
+            # « Backup » y est impossible, et proposer de le faire enverrait
+            # l'exploitant dans un mur.
+            lignes.append(
+                f"[ERREUR] Sauvegardes DÉSACTIVÉES — et le palier {palier} (partagé) ne "
+                "fournit AUCUNE sauvegarde continue : « Backup » n'y est pas activable. "
+                "Deux remèdes : passer à un palier dédié (M10 minimum) pour activer "
+                "Cloud Backup + PITR ; ou, tant qu'on reste en partagé, tenir une "
+                "sauvegarde EXTERNE (mongodump quotidien vérifié — procédure et exercice "
+                "daté dans backend/SAUVEGARDES_ATLAS.md)."
+            )
+        else:
+            lignes.append(
+                f"[ERREUR] Sauvegardes DÉSACTIVÉES sur ce cluster (palier "
+                f"{palier or 'inconnu'}) : aucune restauration n'est possible. Remède : "
+                "activer le Cloud Backup du cluster (Atlas → Backup → Enable)."
+            )
         return 1, lignes
 
     if not continu:

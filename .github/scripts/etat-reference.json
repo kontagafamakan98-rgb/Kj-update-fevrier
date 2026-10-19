@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-19",
-    "motif": "la sonde Fly juge desormais le battement de coeur DEPLOYE (KOJO_SSE_HEARTBEAT_SECONDS) contre la fenetre de silence du client, lue dans frontend/src/config/flux-temps-reel.js : une surcharge en secret Fly changeait le battement reel sans toucher les trois sources du garde hors ligne (mesure du 18/10/2026 : fenetre 15 s contre battement 20 s)",
+    "motif": "la sonde lit le palier des clusters PARTAGES (providerSettings.instanceSizeName) : sans cette lecture le cluster reel (M0) sortait « palier inconnu » et le remede publie etait « activer le Cloud Backup », impossible sur ce palier (releve du 19/10/2026 avec les cles ATLAS_* posees)",
     "fichiers": {
       ".githooks/pre-push": "57a57605381510b531a2653226add8b0cd3f1f5879cc2adeead186342a2b44a9",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -113,7 +113,6 @@
       "frontend/scripts/classes-coquilles.js": "94a2b644525375b0cabc8bfb71b5fb42e4beb90080e9f196cda01dc4ed94509d",
       "frontend/scripts/check-prerender-shells.js": "2ea6bf7d3635b045f0413b6a35e9105845960d46a5ecf4184c2bd5ee2f611077",
       "frontend/scripts/check-session-reload-production.js": "30f3d15481f689f73579c618c92728755d60fa5b55f53dc91d80577c9e853217",
-      "backend/scripts/check_atlas_backups.py": "e04c1c8f3bad4dc9948deb050f451278da5b72af4d2863d46100530a3baadc9d",
       "backend/server.py": "98ac7e99c63a77d7eeb36d63a0cfe318dea5b798d789665b85e5d4caede1a6bf",
       "frontend/scripts/juges-de-temps.js": "f77642cb38faa55bda29910fa9976120f06be893ce58d905cf3c4180ca6a18dc",
       "frontend/scripts/check-moteurs-gestes.js": "d092df072526de8c1c4f8f31ed9849c287b78f09d056de2bccc2ce48b3a41a0e",
@@ -121,7 +120,8 @@
       "frontend/scripts/check-token-exposure-production.js": "0fd396ac948eae4f23de5bf608df4f2cbdc91c0998d509d4eb75ea1ba89b8fd4",
       "frontend/scripts/check-sse-proxy-production.js": "2031baeb402c738c7c5c28d252a8004a7dbde6d0d754b6d99e31bfa1559278d3",
       "frontend/scripts/check-git-branches.js": "ca59cb244f206e5461769d290c3d10165a34d025a05b47d8463cb30a4accbc87",
-      ".github/scripts/check-fly-env-drift.py": "626ff760af805d2c5210657505723d91f16ccc4d4c9db8264e38c56b92313c61"
+      ".github/scripts/check-fly-env-drift.py": "626ff760af805d2c5210657505723d91f16ccc4d4c9db8264e38c56b92313c61",
+      "backend/scripts/check_atlas_backups.py": "f1faedbdf04960d13e4538922103196493c54617e64f2f1cd4b3ac3f68088c0f"
     }
   },
   "hors_perimetre": [

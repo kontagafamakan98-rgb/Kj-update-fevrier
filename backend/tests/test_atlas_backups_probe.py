@@ -79,10 +79,46 @@ def test_un_palier_partage_est_nomme_au_lieu_de_recevoir_un_remède_impossible(s
     assert "ne la fournit pas" in texte
 
 
+def _cluster_partage(backup=True, pit=True, palier="M0"):
+    """La forme RÉELLE d'un cluster partagé (M0), relevée le 19/10/2026 : pas de
+    `replicationSpecs`, le palier vit dans `providerSettings.instanceSizeName`."""
+    return {
+        "name": "Kojo",
+        "backupEnabled": backup,
+        "pitEnabled": pit,
+        "providerSettings": {"providerName": "TENANT", "instanceSizeName": palier},
+    }
+
+
+def test_le_palier_d_un_cluster_partage_se_lit_dans_providerSettings(sonde):
+    # Sans cette lecture, le cluster réel sortait « palier inconnu » (mesuré le
+    # 19/10/2026) et le remède publié était impossible sur un M0.
+    assert sonde._palier(_cluster_partage(palier="M0")) == "M0"
+    # Les deux formes restent lues : un cluster dédié n'a pas de providerSettings.
+    assert sonde._palier(_cluster(palier="M20")) == "M20"
+
+
 def test_sauvegardes_desactivees_font_echouer(sonde):
     code, lignes = sonde.analyser(200, _cluster(backup=False))
+    texte = "\n".join(lignes)
     assert code == 1
-    assert "DÉSACTIVÉES" in "\n".join(lignes)
+    assert "DÉSACTIVÉES" in texte
+    # Palier dédié : le remède Atlas est le bon, et le palier est nommé.
+    assert "M10" in texte and "Atlas → Backup → Enable" in texte
+
+
+def test_sauvegardes_desactivees_sur_un_palier_partage_ne_demandent_pas_l_impossible(sonde):
+    code, lignes = sonde.analyser(200, _cluster_partage(backup=False, palier="M0"))
+    texte = "\n".join(lignes)
+    assert code == 1
+    assert "M0" in texte
+    assert "AUCUNE sauvegarde continue" in texte
+    # Le remède impossible ne doit PAS être proposé sur ce palier.
+    assert "Atlas → Backup → Enable" not in texte, texte
+    # Les deux remèdes réels sont nommés : changer de palier, ou sauvegarder
+    # dehors (la procédure existe et a un exercice daté).
+    assert "M10" in texte and "mongodump" in texte
+    assert "SAUVEGARDES_ATLAS.md" in texte
 
 
 def test_un_champ_absent_ne_se_lit_pas_desactive_mais_illisible(sonde):
