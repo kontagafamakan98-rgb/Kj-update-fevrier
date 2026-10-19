@@ -121,7 +121,7 @@ jobs:
         run: |
           python scripts/exercice_restauration.py \
             --base kojo_db --cible kojo_verif \
-            --rapport /tmp/restauration-$(date +%F).json
+            --rapport "/tmp/restauration-$(date +%F).json"
 
       - name: Chiffrer l'archive (les dumps contiennent des données personnelles)
         env:
