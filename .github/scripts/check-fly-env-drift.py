@@ -41,8 +41,9 @@ donc ce qui l'est réellement :
      (secret ou [env]), est jugé contre la fenêtre de silence du CLIENT
      (`frontend/src/config/flux-temps-reel.js`, lue et non recopiée) : deux
      battements doivent tenir dans cette fenêtre, sinon un flux vivant mais
-     inactif serait déclaré tombé. C'est la seule valeur qu'aucun garde hors
-     ligne ne peut voir — elle n'existe que sur la machine déployée.
+     inactif serait déclaré tombé. Une surcharge ne vit que sur la machine
+     déployée : c'est là qu'elle se lit — et ce que le DÉPÔT en déclare se juge
+     aussi hors ligne (voir 10 bis).
   9. LES AUTRES RÉGLAGES DE TEMPS DU FLUX, chacun contre SON contrat :
      * le BAIL du registre Redis (`PARTAGE_LEASE_SECONDS`) n'existe pas comme
        variable : il est CALCULÉ depuis le battement déployé par une formule
@@ -69,6 +70,23 @@ donc ce qui l'est réellement :
        seconde en rafale), soit `≥ MAX_STREAMS_TOTAL × délai`. Les deux
        réglages se jugent ENSEMBLE : c'est la panne que l'un couvre que
        l'autre doit encaisser.
+     Ce MÊME contrat se juge AUSSI HORS LIGNE (`--refs-only`, l'étape de PR
+     sans jeton) : sur ce que le DÉPÔT déclare (`fly.toml [env]` et bloc
+     `fly secrets set` de DEPLOY_FLYIO.md) et les défauts LUS dans
+     `kojo_live.py`. Une file documentée trop petite, une reprise documentée
+     au-delà d'un battement ou un défaut de code qui viole la relation sont
+     donc vus AVANT le déploiement. Ce que cette passe ne voit pas — une
+     surcharge posée en SECRET sur Fly — est DÉCLARÉ, et l'étape en ligne le
+     juge.
+  10 bis. LES TROIS RÉGLAGES DE TEMPS DU FLUX, JUGÉS HORS LIGNE EUX AUSSI :
+     le battement DÉCLARÉ (ou son défaut) contre la fenêtre du client, le bail
+     qui en DÉCOULE (donc calculé depuis la valeur déclarée, jamais depuis le
+     défaut seul quand une déclaration existe), et le repli du client dans ses
+     DEUX déclarations. Le jugement n'est pas réécrit : les mêmes règles sont
+     appelées avec les déclarations du dépôt pour source, et le verdict nomme
+     l'origine (« DÉCLARÉ »). Une PR qui déclare 30 s de battement, qui allonge
+     la formule du bail ou qui aligne le repli sur les 30 s du sondage remplacé
+     rougit AVANT la fusion, au lieu d'attendre un déploiement.
 
 Usage :
     FLY_API_TOKEN=<deploy_token> python .github/scripts/check-fly-env-drift.py
@@ -482,8 +500,11 @@ def contrat_du_client(chemin=None):
     return battement, battement * (toleres + 1) + marge
 
 
-def check_heartbeat_contract(deploye, valeur, contrat=None):
-    """Le battement déployé doit tenir DANS la fenêtre du client.
+def check_heartbeat_contract(
+    deploye, valeur, contrat=None,
+    libelle="DÉPLOYÉ", libelle_valeur="DÉPLOYÉE", source="sur Fly",
+):
+    """Le battement (déployé OU déclaré) doit tenir DANS la fenêtre du client.
 
     Invariant jugé : `2 × battement ≤ fenêtre de silence` — celui du garde hors
     ligne (`SILENCE_TIMEOUT_MS >= 2 × BATTEMENT_SERVEUR_MS`) : le client doit
@@ -492,10 +513,16 @@ def check_heartbeat_contract(deploye, valeur, contrat=None):
     Un intervalle n'est pas un secret, contrairement à ce que `SECRET_FORMAT_CHECKS`
     sait masquer : le nommer est ce qui rend le refus actionnable (« 30 s contre
     une fenêtre de 45 s »). Aucune autre valeur déployée n'est jamais citée ici.
+
+    Les trois `libelle*`/`source` portent l'ORIGINE de la valeur : « DÉPLOYÉ »
+    quand elle est lue sur la machine (API Machines, SSH), « DÉCLARÉ » quand elle
+    est lue dans ce que le dépôt déclare (`fly.toml`, bloc `fly secrets set`).
+    Le JUGEMENT est le même code : seule la source change, et la nommer empêche
+    de lire un vert hors ligne comme un verdict sur la machine.
     """
     if not deploye:
         checked.append(
-            f"  {OK} {BATTEMENT_KEY} non surchargé sur Fly (défaut du code)"
+            f"  {OK} {BATTEMENT_KEY} non surchargé {source} (défaut du code)"
         )
         return
     if contrat is None:
@@ -512,7 +539,7 @@ def check_heartbeat_contract(deploye, valeur, contrat=None):
         # Aveugle, et DIT : la valeur d'un secret se lit par SSH, indisponible
         # dans la CI. Un vert ici serait un vert qui n'a rien mesuré.
         checked.append(
-            f"  [AUCUN VERDICT] {BATTEMENT_KEY} DÉPLOYÉ mais sa valeur est illisible "
+            f"  [AUCUN VERDICT] {BATTEMENT_KEY} {libelle} mais sa valeur est illisible "
             f"(SSH indisponible) — l'écart avec la fenêtre client ({fenetre_ms:g} ms) "
             "n'a pas été jugé"
         )
@@ -521,7 +548,7 @@ def check_heartbeat_contract(deploye, valeur, contrat=None):
         secondes = float(brut)
     except ValueError:
         errors.append(
-            f"[{BATTEMENT_KEY}] valeur DÉPLOYÉE ILLISIBLE ({len(brut)} car., "
+            f"[{BATTEMENT_KEY}] valeur {libelle_valeur} ILLISIBLE ({len(brut)} car., "
             "attendu un nombre de secondes) — le battement réel n'est pas "
             "connaissable, donc la fenêtre du client ne peut pas le contenir. "
             f"Corriger ou retirer (fly secrets unset {BATTEMENT_KEY})."
@@ -530,14 +557,14 @@ def check_heartbeat_contract(deploye, valeur, contrat=None):
     deploye_ms = secondes * 1000
     if deploye_ms <= 0:
         errors.append(
-            f"[{BATTEMENT_KEY}] valeur DÉPLOYÉE {secondes:g} s : un battement nul ou "
+            f"[{BATTEMENT_KEY}] valeur {libelle_valeur} {secondes:g} s : un battement nul ou "
             "négatif ne bat pas — le flux serait muet dès l'ouverture. "
             f"fly secrets unset {BATTEMENT_KEY} pour revenir au défaut du code."
         )
         return
     if deploye_ms * 2 > fenetre_ms:
         errors.append(
-            f"[{BATTEMENT_KEY}] battement DÉPLOYÉ {secondes:g} s : deux battements "
+            f"[{BATTEMENT_KEY}] battement {libelle} {secondes:g} s : deux battements "
             f"({deploye_ms * 2:g} ms) dépassent la fenêtre de silence du client "
             f"({fenetre_ms:g} ms) — un flux VIVANT mais inactif serait déclaré "
             "tombé, donc une reconnexion par flux inactif. Aligner la fenêtre du "
@@ -655,8 +682,10 @@ def contrats_du_serveur(chemin=None):
     return float(defaut.group(1)), bail
 
 
-def check_lease_contract(deploye, valeur, contrat_client, contrats):
-    """Le bail CALCULÉ depuis le battement déployé, jugé contre ses contrats.
+def check_lease_contract(
+    deploye, valeur, contrat_client, contrats, libelle="DÉPLOYÉ",
+):
+    """Le bail CALCULÉ depuis le battement déployé (ou déclaré), jugé contre ses contrats.
 
     Deux invariants, chacun pour une panne réelle :
 
@@ -698,7 +727,7 @@ def check_lease_contract(deploye, valeur, contrat_client, contrats):
         # en CI. Le bail dépend de cette valeur, donc il n'est pas calculable —
         # et un bail calculé sur le défaut ne serait pas celui de la machine.
         checked.append(
-            f"  [AUCUN VERDICT] {BAIL_CONSTANTE} DÉRIVÉ d'un battement DÉPLOYÉ dont la "
+            f"  [AUCUN VERDICT] {BAIL_CONSTANTE} DÉRIVÉ d'un battement {libelle} dont la "
             "valeur est illisible (SSH indisponible) — le bail réel n'a pas été calculé"
         )
         return
@@ -708,7 +737,7 @@ def check_lease_contract(deploye, valeur, contrat_client, contrats):
             battement_s = float(brut)
         except ValueError:
             errors.append(
-                f"[{BAIL_CONSTANTE}] le battement DÉPLOYÉ est ILLISIBLE : le bail en "
+                f"[{BAIL_CONSTANTE}] le battement {libelle} est ILLISIBLE : le bail en "
                 "découle, donc il n'est pas calculable. Corriger ou retirer la "
                 f"surcharge (fly secrets unset {BATTEMENT_KEY})."
             )
@@ -716,7 +745,7 @@ def check_lease_contract(deploye, valeur, contrat_client, contrats):
         if battement_s <= 0:
             # La règle du battement refuse déjà ce cas : ne pas doubler le bruit.
             return
-        origine = f"battement déployé {battement_s:g} s"
+        origine = f"battement {libelle.lower()} {battement_s:g} s"
     else:
         battement_s = defaut_s
         origine = f"battement par défaut {battement_s:g} s"
@@ -899,12 +928,17 @@ def _battement_effectif(deploye, valeur, contrats_serveur):
     return battement if battement > 0 else None
 
 
-def _delai_effectif(deployes, valeurs, cle, defaut):
+def _delai_effectif(deployes, valeurs, cle, defaut, libelle="DÉPLOYÉE"):
     """`(valeur, origine)` — la valeur déployée si elle existe, sinon le défaut.
 
     `(None, "ILLISIBLE")` pour une valeur déployée qui n'est pas un nombre : un
     réglage déployé qu'on ne sait pas lire ne retombe PAS sur le défaut du code,
     ce qui jugerait une autre machine en croyant juger celle-ci.
+
+    `libelle` nomme l'ORIGINE dans le verdict : « DÉPLOYÉE » en ligne,
+    « DÉCLARÉE » hors ligne. Le même jugement sert les deux passes — seule la
+    source diffère, et la nommer est ce qui empêche de lire un vert hors ligne
+    comme un verdict sur la machine.
     """
     if deployes.get(cle):
         brut = str(valeurs.get(cle) or "").strip()
@@ -916,7 +950,7 @@ def _delai_effectif(deployes, valeurs, cle, defaut):
             # qu'il porte.
             return float(defaut), "défaut du code ([env] vide)"
         try:
-            return float(brut), "valeur DÉPLOYÉE"
+            return float(brut), f"valeur {libelle}"
         except ValueError:
             return None, "ILLISIBLE"
     return float(defaut), "défaut du code"
@@ -924,7 +958,7 @@ def _delai_effectif(deployes, valeurs, cle, defaut):
 
 def check_bus_contract(
     battement_deploye, valeur_battement, contrats_serveur, contrats_bus,
-    deployes_bus, valeurs_bus,
+    deployes_bus, valeurs_bus, libelle="DÉPLOYÉE",
 ):
     """Les deux délais du bus, jugés contre LEUR contrat — qui les lie.
 
@@ -975,22 +1009,22 @@ def check_bus_contract(
 
     delai_defaut, file_defaut, flux_max = contrats_bus
     delai, origine_delai = _delai_effectif(
-        deployes_bus, valeurs_bus, BUS_RECONNEXION_KEY, delai_defaut
+        deployes_bus, valeurs_bus, BUS_RECONNEXION_KEY, delai_defaut, libelle
     )
     if delai is None:
         errors.append(
-            f"[{BUS_RECONNEXION_KEY}] valeur DÉPLOYÉE ILLISIBLE : le délai de "
+            f"[{BUS_RECONNEXION_KEY}] valeur {libelle} ILLISIBLE : le délai de "
             "reprise n'est pas un nombre, donc la fenêtre que la file doit couvrir "
             "n'est pas calculable. Corriger ou retirer "
             f"(fly secrets unset {BUS_RECONNEXION_KEY})."
         )
         return
     file_bus, origine_file = _delai_effectif(
-        deployes_bus, valeurs_bus, BUS_FILE_KEY, file_defaut
+        deployes_bus, valeurs_bus, BUS_FILE_KEY, file_defaut, libelle
     )
     if file_bus is None:
         errors.append(
-            f"[{BUS_FILE_KEY}] valeur DÉPLOYÉE ILLISIBLE : une taille de file est "
+            f"[{BUS_FILE_KEY}] valeur {libelle} ILLISIBLE : une taille de file est "
             "un nombre ENTIER d'événements. Corriger ou retirer "
             f"(fly secrets unset {BUS_FILE_KEY})."
         )
@@ -1057,6 +1091,163 @@ def check_bus_contract(
         f"  {OK} {BUS_RECONNEXION_KEY} = {delai:g} s ({origine_delai}) dans "
         f"[{BUS_PLANCHER_S:g} s, {borne_haute}] ; {BUS_FILE_KEY} = {file_bus:g} "
         f"({origine_file}) ≥ {plancher_file:g} = {flux_max:g} flux × {delai:g} s"
+    )
+
+
+# ── LE MÊME CONTRAT, JUGÉ HORS LIGNE ────────────────────────────────────────
+# Le contrat n'était jugé qu'avec `FLY_API_TOKEN` : une PR qui pose une file
+# trop petite, une reprise au-delà d'un battement, ou qui change un DÉFAUT de
+# `kojo_live.py` de sorte que la relation ne tienne plus, partait verte et ne
+# rougissait qu'après la fusion — sur `main`, une fois déployée. La règle est
+# donc jugée une SECONDE fois SANS réseau, sur ce que le dépôt DÉCLARE et sur
+# les défauts qu'il porte : c'est le verdict qu'une PR peut voir.
+#
+# Ce qui reste hors de portée est DÉCLARÉ, pas supposé : une surcharge posée en
+# SECRET sur Fly (`fly secrets set KOJO_LIVE_BUS_QUEUE=…`) ne vit ni dans
+# `fly.toml` ni dans la doc. Elle échappe donc à la passe hors ligne — et
+# l'étape en ligne, qui lit les secrets déployés, la juge.
+DECLARED_KEYS = (BUS_RECONNEXION_KEY, BUS_FILE_KEY, BATTEMENT_KEY)
+
+
+def declarations_du_bus(chemin_toml=None, chemin_doc=None):
+    """`(deployes, valeurs)` : les réglages du bus tels que le DÉPÔT les déclare.
+
+    Deux sources, celles qui décrivent la PRODUCTION : la table `[env]` de
+    `fly.toml` (config commitée) et le bloc `fly secrets set` de
+    `DEPLOY_FLYIO.md` (la commande que l'exploitation copie). `deployes` porte
+    la même forme que la passe en ligne (`"env"` / `"secret"`), pour que le
+    JUGEMENT soit le même code.
+
+    Une valeur VIDE ou un placeholder (`…`, `...`) n'est PAS une déclaration :
+    le défaut du code s'applique, et c'est lui qui est jugé. Un secret
+    documenté l'emporte sur `[env]` — sur Fly le secret écrase `[env]` au même
+    nom, et c'est la valeur-là qui tournerait.
+
+    `.env.example` n'est pas lu : c'est un template de DÉVELOPPEMENT, et y
+    refuser une valeur locale serait un pré-vol plus sévère que la production.
+    """
+    chemin_toml = FLY_TOML if chemin_toml is None else chemin_toml
+    chemin_doc = DEPLOY_DOC if chemin_doc is None else chemin_doc
+    deployes, valeurs = {}, {}
+
+    try:
+        env = parse_fly_toml_env(Path(chemin_toml).read_text(encoding="utf-8"))
+    except OSError:
+        env = {}
+    for cle in DECLARED_KEYS:
+        # Une entrée `[env]` VIDE laisse le défaut s'appliquer au runtime
+        # (`os.environ.get(...) or défaut`) : ce n'est pas une déclaration.
+        if env.get(cle):
+            deployes[cle] = "env"
+            valeurs[cle] = env[cle]
+
+    try:
+        doc = Path(chemin_doc).read_text(encoding="utf-8")
+    except OSError:
+        doc = ""
+    # TOUS les blocs `fly secrets set` de la doc, pas seulement le premier :
+    # l'exploitation en ajoute au fil des fonctionnalités (webhook, Redis…), et
+    # ne lire qu'un bloc rendrait aveugle à la déclaration de droite.
+    for bloc in re.finditer(r"fly secrets set[\s\S]*?```", doc, re.I):
+        for cle, valeur in re.findall(
+            r"([A-Z][A-Z0-9_]{3,})[ \t]*=[ \t]*(\S*)", bloc.group(0)
+        ):
+            if cle not in DECLARED_KEYS:
+                continue
+            valeur = valeur.strip().strip("\"'").strip()
+            if not valeur or "..." in valeur or "…" in valeur:
+                continue  # placeholder ou vide : rien n'est déclaré
+            deployes[cle] = "secret"
+            valeurs[cle] = valeur
+
+    return deployes, valeurs
+
+
+def check_contrat_bus_hors_ligne(chemin_bus=None, chemin_toml=None, chemin_doc=None):
+    """Le contrat des deux délais du bus, jugé SANS Fly — donc sur une PR.
+
+    Le jugement n'est pas réécrit ici : `check_bus_contract` est appelé avec les
+    DÉCLARATIONS du dépôt à la place des valeurs déployées, et le battement
+    DÉCLARÉ (ou son défaut) comme borne haute. Une seconde implémentation
+    divergerait au premier changement de borne — et c'est la copie qu'on ne
+    retouche pas qui rendrait vert un contrat cassé.
+
+    Ce que la passe publie toujours : la portée. Un vert hors ligne n'est pas un
+    vert sur la machine, et le dire est ce qui empêche de confondre les deux.
+    """
+    contrats_bus = contrats_du_bus(chemin_bus)
+    contrats_serveur = contrats_du_serveur(chemin_bus)
+    if contrats_bus is None:
+        # Le refus est prononcé par `check_bus_contract` (lecteurs cassés) :
+        # le doubler ici n'ajouterait qu'une seconde ligne pour la même cause.
+        check_bus_contract(False, "", contrats_serveur, None, {}, {},
+                           libelle="DÉCLARÉE")
+        return
+
+    deployes, valeurs = declarations_du_bus(chemin_toml, chemin_doc)
+    check_bus_contract(
+        BATTEMENT_KEY in deployes, valeurs.get(BATTEMENT_KEY, ""),
+        contrats_serveur, contrats_bus, deployes, valeurs, libelle="DÉCLARÉE",
+    )
+    checked.append(
+        "  [DÉCLARÉ] contrat du bus jugé HORS LIGNE sur ce que le dépôt déclare "
+        "(`fly.toml [env]`, bloc `fly secrets set` de DEPLOY_FLYIO.md) et les "
+        "défauts lus dans kojo_live.py ; une surcharge posée en SECRET sur Fly "
+        "n'est pas lisible ici — l'étape en ligne (FLY_API_TOKEN) la juge"
+    )
+
+
+# ── LE BATTEMENT, SON BAIL ET LE REPLI, JUGÉS HORS LIGNE EUX AUSSI ─────────
+# Le contrat du bus a reçu sa passe hors ligne le 19/10/2026 ; les trois réglages
+# de temps du flux, eux, n'étaient jugés QU'AVEC un jeton Fly. Une PR qui
+# déclarait un battement de 30 s (fenêtre client de 45 s), qui changeait la
+# formule du bail, ou qui alignait le repli du client sur les 30 s du sondage
+# remplacé partait donc verte et ne rougissait qu'après la fusion, une fois
+# déployée. Les trois se jugent pourtant SANS réseau : le battement est déclaré
+# (`fly.toml [env]` ou bloc `fly secrets set` de la doc) ou prend le défaut lu
+# dans `kojo_live.py`, le bail en DÉCOULE, et le repli vit dans le bundle (deux
+# déclarations, une seule valeur). Le JUGEMENT est le MÊME que la passe en
+# ligne : seule la source change, et le verdict la nomme (« DÉCLARÉ »).
+#
+# Ce qui reste hors de portée est DÉCLARÉ : une surcharge posée en SECRET sur
+# Fly (`fly secrets set KOJO_SSE_HEARTBEAT_SECONDS=30`) ne vit ni dans
+# `fly.toml` ni dans la doc — l'étape en ligne, qui la lit, la juge.
+
+def check_temps_du_flux_hors_ligne(
+    chemin_flux=None, chemin_bus=None, chemin_toml=None, chemin_doc=None,
+    chemins_repli=None,
+):
+    """Le battement, son bail et le repli du client, jugés SANS Fly (une PR).
+
+    Le jugement n'est pas réécrit ici : `check_heartbeat_contract`,
+    `check_lease_contract` et `check_fallback_contract` sont appelés avec les
+    DÉCLARATIONS du dépôt à la place des valeurs déployées, et les défauts LUS
+    comme origine. Une seconde implémentation divergerait au premier changement
+    de borne, et c'est la copie qu'on ne retouche pas qui rendrait vert un
+    contrat cassé.
+
+    Le bail est jugé sur le battement DÉCLARÉ, jamais sur le défaut seul :
+    `PARTAGE_LEASE_SECONDS` se CALCULE depuis lui, donc une déclaration de 30 s
+    allonge le bail à 90 s — et c'est cette machine-là que le contrat juge.
+
+    Ce que la passe publie toujours : la portée. Un vert hors ligne n'est pas un
+    vert sur la machine.
+    """
+    contrat_client = contrat_du_client(chemin_flux)
+    contrats_serveur = contrats_du_serveur(chemin_bus)
+    deployes, valeurs = declarations_du_bus(chemin_toml, chemin_doc)
+    declare = BATTEMENT_KEY in deployes
+    valeur = valeurs.get(BATTEMENT_KEY, "")
+    check_heartbeat_contract(declare, valeur, contrat_client, libelle="DÉCLARÉ", libelle_valeur="DÉCLARÉE", source="par le dépôt")
+    check_lease_contract(declare, valeur, contrat_client, contrats_serveur, libelle="DÉCLARÉ")
+    repli, raison_repli = contrat_du_repli(chemins_repli)
+    check_fallback_contract(repli, raison_repli)
+    checked.append(
+        "  [DÉCLARÉ] battement, bail et repli jugés HORS LIGNE sur ce que le dépôt "
+        "déclare (`fly.toml [env]`, bloc `fly secrets set` de DEPLOY_FLYIO.md), les "
+        "défauts lus dans kojo_live.py et les DEUX déclarations du repli ; une "
+        "surcharge posée en SECRET sur Fly n'est pas lisible ici — l'étape en ligne "
+        "(FLY_API_TOKEN) la juge"
     )
 
 
@@ -1245,11 +1436,17 @@ def check_reference_formats():
             _check(key, value, "DEPLOY_FLYIO.md")
 
 
-def _auditer_references():
+def _auditer_references(contrat_bus_hors_ligne=False):
     """L'audit des RÉFÉRENCES du dépôt, gardé par la disponibilité des
     validateurs : appelé par le mode `--refs-only` ET par le check complet — les
     références s'auditent sans Fly, donc c'est le seul contrôle qui tourne sur un
     run sans jeton (une PR sans secret).
+
+    `contrat_bus_hors_ligne` ajoute le contrat du bus, jugé SANS réseau sur les
+    déclarations du dépôt. Le mode complet le passe à `False` : la passe en
+    ligne juge les valeurs DÉPLOYÉES, qui sont la même chose plus autoritaires
+    qu'une déclaration — deux verdicts pour une seule machine ne feraient que
+    doubler les lignes (et les refus).
 
     Une seule implémentation de cette garde : deux copies divergeraient sur ce
     qu'est « validateurs indisponibles », et celle qui ne remplirait pas `errors`
@@ -1260,6 +1457,12 @@ def _auditer_references():
         check_reference_formats()
     else:
         errors.append(f"Validateurs indisponibles : {_VALIDATORS_ERR}")
+    if contrat_bus_hors_ligne:
+        # Les trois réglages de temps du flux d'abord (le battement porte le
+        # bail), puis les deux délais du bus : deux contrats distincts, deux
+        # verdicts nommés, un seul passage hors ligne.
+        check_temps_du_flux_hors_ligne()
+        check_contrat_bus_hors_ligne()
 
 
 def _rapport(entete, cesure, message_ok):
@@ -1377,12 +1580,16 @@ def main(argv=None):
     if refs_only and not API_TOKEN:
         # Mode références seules : déterministe, aucun accès Fly requis.
         # Utile en CI (chaque push) et en local pour auditer les fichiers
-        # de référence SANS token ni réseau.
-        _auditer_references()
+        # de référence SANS token ni réseau. Le contrat du bus est jugé ICI
+        # aussi : c'est le seul passage qu'une PR voit avant le déploiement.
+        _auditer_references(contrat_bus_hors_ligne=True)
         return _rapport(
-            f"Audit des RÉFÉRENCES du dépôt (mode --refs-only, app={FLY_APP}) :",
-            "divergence(s) de format dans les références",
-            "[OK] formats des références du dépôt conformes.",
+            f"Audit des RÉFÉRENCES du dépôt (formats + battement/bail/repli + "
+            f"contrat du bus, mode --refs-only, app={FLY_APP}) :",
+            "divergence(s) de format dans les références ou de contrat des délais "
+            "du flux et du bus",
+            "[OK] formats des références, délais du flux et contrat du bus "
+            "conformes (hors ligne).",
         )
 
     if not API_TOKEN:

@@ -395,10 +395,11 @@ class TestCheckReferenceFormats:
 
     def test_le_step_refs_only_tourne_sans_jeton(self):
         # `--refs-only` doit tourner SANS FLY_API_TOKEN : c'est ce qui permet à
-        # l'audit des formats de références de tourner à CHAQUE push. Le verdict
-        # sur les références réelles appartient à l'étape de CI qui l'exécute ;
-        # ici on ne vérifie que son câblage (une étape qui exigerait un jeton ne
-        # tournerait jamais sur une PR).
+        # l'audit des formats de références — ET au contrat du bus — de tourner
+        # à CHAQUE push et sur chaque PR. Le verdict sur les références réelles
+        # appartient à l'étape de CI qui l'exécute ; ici on ne vérifie que son
+        # câblage (une étape qui exigerait un jeton ne tournerait jamais sur
+        # une PR, donc le contrat ne serait vu qu'après déploiement).
         workflow = (
             BACKEND_DIR.parent / ".github" / "workflows" / "ci.yml"
         ).read_text(encoding="utf-8")
@@ -407,7 +408,7 @@ class TestCheckReferenceFormats:
             (
                 i
                 for i, line in enumerate(lines)
-                if "name: Audit formats des références (refs-only)" in line
+                if "name: Audit hors ligne (formats + délais du flux et du bus)" in line
             ),
             None,
         )
@@ -1004,6 +1005,312 @@ class TestDelaisDuBus:
         assert len(check.errors) == 1, check.errors
         assert "illisibles" in check.errors[0].lower()
         assert "kojo_live.py" in check.errors[0]
+class TestContratDuBusHorsLigne:
+    """Le MÊME contrat, jugé SANS Fly : c'est le verdict qu'une PR voit.
+
+    Jugé seulement en ligne, le contrat ne rougissait qu'après la fusion et le
+    déploiement : une PR qui pose une file trop petite, une reprise au-delà d'un
+    battement, ou qui change un défaut de `kojo_live.py`, partait verte. La
+    règle lit donc les DÉCLARATIONS du dépôt (`fly.toml [env]`, bloc
+    `fly secrets set` de DEPLOY_FLYIO.md) et les défauts du code ; ce qu'elle ne
+    peut pas voir — une surcharge en secret Fly — est DÉCLARÉ, jamais supposé.
+    """
+
+    @staticmethod
+    def _toml(tmp_path, lignes):
+        toml = tmp_path / "fly.toml"
+        toml.write_text("[env]\n" + lignes + "\n", encoding="utf-8")
+        return toml
+
+    @staticmethod
+    def _doc(tmp_path, lignes):
+        doc = tmp_path / "DEPLOY_FLYIO.md"
+        doc.write_text(
+            "# Déploiement\n\n```bash\nfly secrets set \\\n" + lignes + "\n```\n",
+            encoding="utf-8",
+        )
+        return doc
+
+    def test_le_depot_actuel_tient_le_contrat_hors_ligne(self, check):
+        check.errors, check.checked = [], []
+        check.check_contrat_bus_hors_ligne()
+        assert check.errors == [], check.errors
+        assert any("KOJO_LIVE_BUS_QUEUE" in ligne for ligne in check.checked), check.checked
+
+    def test_une_file_documentee_trop_petite_est_refusee(self, check, tmp_path):
+        # 500 < 400 flux × 2 s : la rafale d'UNE reconnexion déborde, et le bus
+        # perd ces enveloppes sans rejeu. Documenter cette valeur dans la
+        # commande de déploiement la ferait appliquer telle quelle.
+        doc = self._doc(tmp_path, '  "KOJO_LIVE_BUS_QUEUE=500" \\')
+        check.errors, check.checked = [], []
+        check.check_contrat_bus_hors_ligne(chemin_doc=doc, chemin_toml=tmp_path / "absent.toml")
+        assert len(check.errors) == 1, check.errors
+        refus = check.errors[0]
+        assert "500" in refus and "800" in refus and "ENSEMBLE" in refus, refus
+        assert "DÉCLARÉE" in refus, refus
+
+    def test_une_valeur_du_second_bloc_de_la_doc_est_lue(self, check, tmp_path):
+        # La doc ajoute un bloc `fly secrets set` par fonctionnalité (webhook,
+        # Redis…) : ne lire que le premier rendrait aveugle à celui de droite.
+        doc = tmp_path / "DEPLOY_FLYIO.md"
+        doc.write_text(
+            "```bash\nfly secrets set \\\n  \"JWT_SECRET=...\" \\\n```\n\n"
+            "```bash\nfly secrets set KOJO_LIVE_BUS_QUEUE=10\n```\n",
+            encoding="utf-8",
+        )
+        check.errors, check.checked = [], []
+        check.check_contrat_bus_hors_ligne(chemin_doc=doc, chemin_toml=tmp_path / "absent.toml")
+        assert len(check.errors) == 1, check.errors
+        assert "10" in check.errors[0] and "800" in check.errors[0], check.errors[0]
+
+    def test_une_reprise_documentee_au_dela_du_battement_est_refusee(self, check, tmp_path):
+        doc = self._doc(tmp_path, '  "KOJO_LIVE_BUS_RECONNECT_SECONDS=30" \\')
+        check.errors, check.checked = [], []
+        check.check_contrat_bus_hors_ligne(chemin_doc=doc, chemin_toml=tmp_path / "absent.toml")
+        assert len(check.errors) == 1, check.errors
+        refus = check.errors[0]
+        assert "30" in refus and "20" in refus and "rejou" in refus, refus
+
+    def test_une_valeur_de_fly_toml_est_lue_comme_une_declaration(self, check, tmp_path):
+        # 5 s doublent la fenêtre : la file par défaut (1000) ne couvre plus
+        # 400 × 5 = 2000. C'est `[env]` qui est jugé, pas seulement la doc.
+        toml = self._toml(tmp_path, "KOJO_LIVE_BUS_RECONNECT_SECONDS = '5'")
+        check.errors, check.checked = [], []
+        check.check_contrat_bus_hors_ligne(
+            chemin_toml=toml, chemin_doc=tmp_path / "absent.md"
+        )
+        assert len(check.errors) == 1, check.errors
+        assert "2000" in check.errors[0], check.errors[0]
+
+    def test_un_battement_declare_releve_la_borne_haute(self, check, tmp_path):
+        # 60 s de reprise serait refusé contre le défaut (20 s). Déclarer un
+        # battement de 90 s ET une file qui couvre 400 × 60 = 24000 rend l'état
+        # conforme : la borne se LIT, elle n'est pas figée.
+        toml = self._toml(
+            tmp_path,
+            "KOJO_SSE_HEARTBEAT_SECONDS = '90'\n"
+            "KOJO_LIVE_BUS_RECONNECT_SECONDS = '60'",
+        )
+        doc = self._doc(tmp_path, '  "KOJO_LIVE_BUS_QUEUE=24000" \\')
+        check.errors, check.checked = [], []
+        check.check_contrat_bus_hors_ligne(chemin_toml=toml, chemin_doc=doc)
+        assert check.errors == [], check.errors
+        ligne = [l for l in check.checked if "KOJO_LIVE_BUS_QUEUE" in l][0]
+        assert "90" in ligne and "24000" in ligne, ligne
+
+    def test_une_valeur_vide_dans_fly_toml_retombe_sur_le_defaut(self, check, tmp_path):
+        # `KOJO_SSE_HEARTBEAT_SECONDS = ''` laisse le défaut (20 s) s'appliquer
+        # au runtime : la borne haute hors ligne doit donc être 20 s, pas « non
+        # jugée ». Avec une reprise de 5 s, la file par défaut (1000) ne couvre
+        # plus 400 × 5 = 2000 — c'est bien le calcul par défaut qui juge.
+        toml = self._toml(
+            tmp_path,
+            "KOJO_SSE_HEARTBEAT_SECONDS = ''\n"
+            "KOJO_LIVE_BUS_RECONNECT_SECONDS = '5'",
+        )
+        check.errors, check.checked = [], []
+        check.check_contrat_bus_hors_ligne(
+            chemin_toml=toml, chemin_doc=tmp_path / "absent.md"
+        )
+        assert len(check.errors) == 1, check.errors
+        assert "2000" in check.errors[0], check.errors[0]
+        assert "AUCUN VERDICT" not in "\n".join(check.checked), check.checked
+
+    def test_une_valeur_declaree_illisible_est_refusee(self, check, tmp_path):
+        toml = self._toml(tmp_path, "KOJO_LIVE_BUS_QUEUE = 'mille'")
+        check.errors, check.checked = [], []
+        check.check_contrat_bus_hors_ligne(
+            chemin_toml=toml, chemin_doc=tmp_path / "absent.md"
+        )
+        assert len(check.errors) == 1, check.errors
+        assert "DÉCLARÉE ILLISIBLE" in check.errors[0], check.errors[0]
+        assert "mille" not in check.errors[0], "la valeur déclarée ne se cite pas"
+
+    def test_un_lecteur_casse_refuse_de_conclure_hors_ligne(self, check, tmp_path):
+        vide = tmp_path / "kojo_live.py"
+        vide.write_text("BUS_QUEUE_SIZE = int(os.environ.get('AUTRE', '1'))\n", encoding="utf-8")
+        check.errors, check.checked = [], []
+        check.check_contrat_bus_hors_ligne(chemin_bus=vide)
+        assert len(check.errors) == 1, check.errors
+        assert "illisibles" in check.errors[0].lower(), check.errors[0]
+        # Aucun vert sur les clés : un contrat qu'on n'a pas lu ne se publie pas.
+        assert not any("KOJO_LIVE_BUS_QUEUE" in l for l in check.checked), check.checked
+
+    def test_les_surcharges_secretes_de_fly_sont_declarees_hors_de_portee(self, check):
+        check.errors, check.checked = [], []
+        check.check_contrat_bus_hors_ligne()
+        portee = [l for l in check.checked if "[DÉCLARÉ]" in l]
+        assert len(portee) == 1, check.checked
+        assert "FLY_API_TOKEN" in portee[0] and "SECRET" in portee[0], portee[0]
+
+    def test_le_mode_refs_only_juge_le_contrat_et_rend_1_si_le_depot_le_viole(
+        self, check, tmp_path, monkeypatch
+    ):
+        """Le câblage qui fait qu'une PR le voie : `main --refs-only` l'appelle."""
+        monkeypatch.setattr(check, "API_TOKEN", "")
+        monkeypatch.setattr(
+            check, "FLY_TOML",
+            self._toml(tmp_path, "KOJO_LIVE_BUS_QUEUE = '10'"),
+        )
+        check.errors, check.checked = [], []
+        assert check.main(["--refs-only"]) == 1
+        assert any("KOJO_LIVE_BUS_QUEUE" in e for e in check.errors), check.errors
+
+    def test_le_depot_actuel_rend_0_en_refs_only(self, check, monkeypatch):
+        # Le vert qu'une PR voit aujourd'hui — sans jeton, sans réseau.
+        monkeypatch.setattr(check, "API_TOKEN", "")
+        check.errors, check.checked = [], []
+        assert check.main(["--refs-only"]) == 0, check.errors
+        sortie = "\n".join(check.checked)
+        assert "KOJO_LIVE_BUS_QUEUE" in sortie, sortie
+
+
+class TestReglagesDeTempsHorsLigne:
+    """Le battement, son BAIL et le REPLI : le MÊME jugement, SANS Fly.
+
+    Le contrat du bus a reçu sa passe hors ligne le 19/10/2026 ; ces trois
+    réglages-là n'étaient jugés qu'AVEC un jeton Fly. Une PR qui déclarait un
+    battement de 30 s (fenêtre client de 45 s), qui allongeait la formule du
+    bail, ou qui alignait le repli sur les 30 s du sondage remplacé partait
+    donc verte et ne rougissait qu'après la fusion, une fois déployée.
+
+    Ce que ces cas tiennent : le JUGEMENT n'est pas réécrit hors ligne — les
+    mêmes règles sont appelées avec les DÉCLARATIONS du dépôt, et le bail est
+    calculé depuis le battement DÉCLARÉ (30 s ⇒ 90 s), pas depuis le défaut.
+    """
+
+    @staticmethod
+    def _toml(tmp_path, lignes):
+        return TestContratDuBusHorsLigne._toml(tmp_path, lignes)
+
+    @staticmethod
+    def _repli(tmp_path, notifications=60_000, messages=60_000):
+        """Les deux déclarations du repli, dans deux fichiers distincts."""
+        fichiers = []
+        for nom, valeur in (
+            ("NotificationContext.js", notifications),
+            ("Messages.js", messages),
+        ):
+            chemin = tmp_path / nom
+            chemin.write_text(f"const FALLBACK_POLL_MS = {valeur};\n", encoding="utf-8")
+            fichiers.append(chemin)
+        return tuple(fichiers)
+
+    def test_le_depot_actuel_tient_les_trois_contrats_hors_ligne(self, check):
+        check.errors, check.checked = [], []
+        check.check_temps_du_flux_hors_ligne()
+        assert check.errors == [], check.errors
+        sortie = "\n".join(check.checked)
+        for cle in ("KOJO_SSE_HEARTBEAT_SECONDS", "PARTAGE_LEASE_SECONDS", "FALLBACK_POLL_MS"):
+            assert cle in sortie, sortie
+        # La portée est publiée UNE fois, et elle dit ce que la passe ne voit pas.
+        portee = [l for l in check.checked if "[DÉCLARÉ]" in l]
+        assert len(portee) == 1, check.checked
+        assert "SECRET" in portee[0] and "FLY_API_TOKEN" in portee[0], portee[0]
+
+    def test_un_battement_declare_trop_long_est_refuse_hors_ligne(self, check, tmp_path):
+        # 30 s déclaré dans fly.toml, fenêtre client de 45 s : deux battements
+        # (60 s) dépassent la fenêtre. C'est l'écart mesuré le 18/10/2026, et
+        # hors ligne il se voit AVANT le déploiement.
+        toml = self._toml(tmp_path, "KOJO_SSE_HEARTBEAT_SECONDS = '30'")
+        check.errors, check.checked = [], []
+        check.check_temps_du_flux_hors_ligne(
+            chemin_toml=toml, chemin_doc=tmp_path / "absent.md",
+            chemins_repli=self._repli(tmp_path),
+        )
+        assert any("[KOJO_SSE_HEARTBEAT_SECONDS]" in e for e in check.errors), check.errors
+        refus = [e for e in check.errors if "[KOJO_SSE_HEARTBEAT_SECONDS]" in e][0]
+        assert "30" in refus and "45000" in refus and "DÉCLARÉ" in refus, refus
+        assert "fly secrets unset KOJO_SSE_HEARTBEAT_SECONDS" in refus, refus
+
+    def test_un_battement_declare_allonge_le_bail_et_le_refuse_hors_ligne(self, check, tmp_path):
+        # Le bail se CALCULE depuis le battement (3 × 30 = 90 s) : au-delà de la
+        # fenêtre client (45 s) plus un battement (30 s), soit 75 s. Juger le
+        # défaut du code pendant qu'une déclaration existe jugerait une autre
+        # machine.
+        toml = self._toml(tmp_path, "KOJO_SSE_HEARTBEAT_SECONDS = '30'")
+        check.errors, check.checked = [], []
+        check.check_temps_du_flux_hors_ligne(
+            chemin_toml=toml, chemin_doc=tmp_path / "absent.md",
+            chemins_repli=self._repli(tmp_path),
+        )
+        assert any("[PARTAGE_LEASE_SECONDS]" in e for e in check.errors), check.errors
+        refus = [e for e in check.errors if "[PARTAGE_LEASE_SECONDS]" in e][0]
+        assert "90" in refus and "75" in refus, refus
+        assert "déclaré" in refus, refus
+
+    def test_un_battement_declare_plus_court_tient_toujours_le_contrat(self, check, tmp_path):
+        # 15 s : deux battements (30 s) tiennent, et le bail (60 s) tombe
+        # EXACTEMENT sur fenêtre + un battement (45 + 15). Un refus ici serait
+        # une borne déguisée en contrat.
+        toml = self._toml(tmp_path, "KOJO_SSE_HEARTBEAT_SECONDS = '15'")
+        check.errors, check.checked = [], []
+        check.check_temps_du_flux_hors_ligne(
+            chemin_toml=toml, chemin_doc=tmp_path / "absent.md",
+            chemins_repli=self._repli(tmp_path),
+        )
+        assert check.errors == [], check.errors
+
+    def test_un_repli_trop_bavard_est_refuse_hors_ligne(self, check, tmp_path):
+        # 30 s, c'est exactement le sondage que le flux remplace (2 req/min) :
+        # le remplacement n'aurait remplacé qu'un aller-retour par un autre.
+        repli = self._repli(tmp_path, notifications=30_000, messages=30_000)
+        check.errors, check.checked = [], []
+        check.check_temps_du_flux_hors_ligne(
+            chemin_toml=tmp_path / "absent.toml", chemin_doc=tmp_path / "absent.md",
+            chemins_repli=repli,
+        )
+        assert len(check.errors) == 1, check.errors
+        assert "FALLBACK_POLL_MS" in check.errors[0] and "30000" in check.errors[0], check.errors[0]
+        assert "sondage" in check.errors[0], check.errors[0]
+
+    def test_des_replis_divergents_sont_refuses_hors_ligne(self, check, tmp_path):
+        # Deux cadences selon la page ouverte : elles ne s'arbitrent pas, elles
+        # se refusent — et le refus nomme les deux nombres.
+        repli = self._repli(tmp_path, notifications=60_000, messages=30_000)
+        check.errors, check.checked = [], []
+        check.check_temps_du_flux_hors_ligne(
+            chemin_toml=tmp_path / "absent.toml", chemin_doc=tmp_path / "absent.md",
+            chemins_repli=repli,
+        )
+        assert len(check.errors) == 1, check.errors
+        assert "DIVERGENTES" in check.errors[0], check.errors[0]
+
+    def test_un_contrat_client_illisible_refuse_de_conclure_hors_ligne(self, check, tmp_path):
+        # Sans contrat client, le bail ne peut pas être jugé contre le verdict
+        # de celui qui abandonne : la passe refuse de conclure, elle ne suppose pas.
+        check.errors, check.checked = [], []
+        check.check_temps_du_flux_hors_ligne(
+            chemin_flux=tmp_path / "absent.js",
+            chemin_toml=self._toml(tmp_path, "KOJO_SSE_HEARTBEAT_SECONDS = '30'"),
+            chemin_doc=tmp_path / "absent.md",
+            chemins_repli=self._repli(tmp_path),
+        )
+        bail = [e for e in check.errors if "[PARTAGE_LEASE_SECONDS]" in e]
+        assert len(bail) == 1, check.errors
+        assert "ILLISIBLE" in bail[0] and "flux-temps-reel.js" in bail[0], bail[0]
+
+    def test_le_mode_refs_only_publie_les_trois_verdicts(self, check, monkeypatch):
+        """Le câblage qui fait qu'une PR les voie : `main --refs-only` les appelle."""
+        monkeypatch.setattr(check, "API_TOKEN", "")
+        check.errors, check.checked = [], []
+        assert check.main(["--refs-only"]) == 0, check.errors
+        sortie = "\n".join(check.checked)
+        assert "KOJO_SSE_HEARTBEAT_SECONDS" in sortie, sortie
+        assert "PARTAGE_LEASE_SECONDS" in sortie, sortie
+        assert "FALLBACK_POLL_MS" in sortie, sortie
+
+    def test_le_mode_refs_only_rend_1_si_le_repli_est_trop_bavard(
+        self, check, tmp_path, monkeypatch
+    ):
+        monkeypatch.setattr(check, "API_TOKEN", "")
+        monkeypatch.setattr(
+            check, "REPLI_FICHIERS",
+            self._repli(tmp_path, notifications=30_000, messages=30_000),
+        )
+        check.errors, check.checked = [], []
+        assert check.main(["--refs-only"]) == 1
+        assert any("FALLBACK_POLL_MS" in e for e in check.errors), check.errors
 
 
 def quantite(lignes, motif):

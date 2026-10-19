@@ -301,8 +301,9 @@ variables critiques (CORS_ORIGINS, VAPID_CLAIMS_EMAIL, URLs publiques,
 TRUSTED_HOSTS, REDIS_URL, MONGO_URL) sur 3 plans :
 
 ```bash
-# 1) Formats des RÉFÉRENCES du dépôt (déterministe, SANS token ni réseau —
-#    rejouable localement et lancé par la CI à chaque push) :
+# 1) Formats des RÉFÉRENCES du dépôt ET contrat des deux délais du bus
+#    (déterministe, SANS token ni réseau — rejouable localement et lancé par
+#    la CI à chaque push et chaque PR, donc AVANT le déploiement) :
 python .github/scripts/check-fly-env-drift.py --refs-only
 
 # 2) Drift doc↔prod + présence des secrets + formats DÉPLOYÉS (nécessite
@@ -333,6 +334,18 @@ Le check valide :
   moins bavard que les 2 req/min du sondage remplacé. Les valeurs sont lues et
   le calcul refait, jamais recopiés : si la formule change, c'est elle qui est
   jugée.
+- **les deux délais du bus temps réel**, qui se jugent ENSEMBLE :
+  `KOJO_LIVE_BUS_RECONNECT_SECONDS` reste entre 1 s (en deçà, une boucle
+  republie sans répit) et UN battement de cœur (au-delà, un Redis revenu n'est
+  pas rejoint avant plusieurs battements, et le pub/sub ne rejoue rien) ;
+  `KOJO_LIVE_BUS_QUEUE` doit valoir au moins `MAX_STREAMS_TOTAL × reprise`
+  (une notification par seconde et par flux) — allonger la reprise sans
+  agrandir la file déplace la panne. Le mode `--refs-only` juge ce contrat HORS
+  LIGNE sur ce que le dépôt déclare (`fly.toml [env]`, bloc `fly secrets set`
+  ci-dessous) et sur les défauts lus dans `kojo_live.py` : une PR le voit avant
+  le déploiement. Une surcharge posée en SECRET sur Fly n'est pas lisible
+  hors ligne — la passe en ligne la juge, et le mode `--refs-only` DÉCLARE
+  cette portée.
 
 Valeurs de référence contrôlées : `backend/fly.toml [env]` (config de prod),
 `backend/.env.example` (template dev — les valeurs vides et `http://localhost`

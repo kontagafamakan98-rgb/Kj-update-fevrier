@@ -265,8 +265,15 @@ retombe sur le repli.
   `start_bus` DIT la perte si `WEB_CONCURRENCY > 1` — `kojo_settings` refuse
   même de démarrer dans ce cas en production. Ce que le bus ne fait pas : il ne
   porte pas de présence (aucune liste de flux par compte n’est partagée), il
-  n’ordonne rien entre process, et une publication qui échoue laisse
-  l’événement LOCAL sans le propager (`bus_stats()['repli']`). Ce qu’il coûte :
+  n’ordonne rien entre process, et une publication qui échoue est retentée sur
+  la MÊME enveloppe (`bus_stats()['repli']` compte la tentative) : les autres
+  workers la reçoivent en RETARD, pas jamais. Ce que la reprise empêche, et qui
+  a été mesuré : sans elle, la tâche retirait une enveloppe du tampon, la
+  publication échouait, et elle passait à la suivante — **799 des 800**
+  enveloppes d’une fenêtre de 2 s parvenaient au bus, la manquante n’étant
+  comptée NULLE PART (`perdus` restait à 0). Banc :
+  `scripts/charge/mesure_panne_redis.py` (400 flux, 400 évt/s, panne réelle :
+  800/800 depuis la correction). Ce qu’il coûte :
   un message par événement par process abonné, et un tampon borné
   (`KOJO_LIVE_BUS_QUEUE`, 1000) dont le dépassement est compté (`perdus`) — le
   bus perd, jamais le flux local. **Mesuré** à 200 flux (§5) : non
@@ -390,6 +397,7 @@ la RAM fait rougir le test (vérifié en sens inverse le 18/10 : 800/256 →
 | `scripts/charge/mesure_memoire_flux.py` | banc : RSS par palier de flux ouverts, coût marginal et pire palier, `mesure_memoire.json` |
 | `tests/test_dimensionnement_machine.py` | garde : la config ne promet pas plus que `base + hard_limit × coût_pire ≤ RAM × 0,75` |
 | `scripts/charge/mesure_push.py` | banc : débit et p95 avec/sans 200 connexions ouvertes, flux muets ou publiés, bus actif ou non (§5) |
+| `scripts/charge/mesure_panne_redis.py` | banc : panne de Redis pendant la fenêtre de reconnexion (socket et client `redis-py` réels, serveur pub/sub minimal) — enveloppes reçues, comptées perdues, pertes MUETTES |
 | `scripts/charge/serveur_mesure.py` | `--bus memoire` (pub/sub en mémoire, protocole `redis.asyncio`), `POST /_mesure/publier`, `GET /_mesure/bus` (§5) |
 
 Non corrigé, volontairement listé : bornage des avis (§6.4), index texte pour

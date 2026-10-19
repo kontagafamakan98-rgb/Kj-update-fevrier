@@ -458,6 +458,32 @@ par `Settings → Branches → main`, ou l'API
 `PUT /repos/{owner}/{repo}/branches/main/protection`. Une modification
 permanente de la règle se fait dans la même page et doit être reportée ici.
 
+### Livrer une PR verte — `npm run livrer`
+
+Le chemin **par défaut** d'une PR verte est une seule commande, depuis la
+racine du dépôt et sur la branche de travail :
+
+```bash
+npm run livrer
+```
+
+Elle enchaîne : arbre de travail **propre** (refus si un fichier est modifié
+ou non suivi : la livraison ne publie que les commits), pré-vol local, push,
+ouverture ou reprise de la PR, attente des **10 checks requis** (la liste vit
+une fois, dans `.github/scripts/gate-perimetre.json`), fusion en squash, puis
+**confirmation de la production** : révision servie par Vercel, sonde SEO
+stricte, révision servie par Fly. Un refus de confirmation rend le code **2**
+(« fusionnée mais production non conforme »), jamais 0.
+
+Options utiles : `--branche NOM` (livrer une autre branche), `--reprise-pr N`,
+`--mode merge`, `--dry-run` (pré-vols seulement). Jeton : `GH_TOKEN` (ou la
+crédential git de `github.com`).
+
+> La fusion dans l'interface GitHub reste possible — la protection de `main`
+l'exige — mais c'est l'**exception** : elle n'attend pas la confirmation de
+production et ne relit pas la protection de branche. `npm run livrer` est le
+seul chemin qui fasse les trois vérifications APRÈS la fusion.
+
 ## Comptes de test
 
 Des comptes de démonstration existent en production (backend Fly.io) :

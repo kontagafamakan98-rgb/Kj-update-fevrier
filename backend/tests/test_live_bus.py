@@ -234,7 +234,51 @@ async def test_un_redis_en_panne_ne_prive_pas_le_process_de_son_propre_flux(capl
         )
 
     assert kojo_live.bus_actif() is True, "le bus doit rester branché pour réessayer"
-    assert any("reste LOCAL" in message for message in caplog.messages), caplog.messages
+    # Le journal ne dit plus « reste LOCAL » mais « GARDÉE et republiée » : ce
+    # n'est plus une perte pour les autres workers, seulement un RETARD (mesuré
+    # le 19/10/2026 : l'ancienne version perdait une enveloppe par fenêtre).
+    assert any("GARDÉE" in message for message in caplog.messages), caplog.messages
+
+
+@pytest.mark.asyncio
+async def test_un_echec_de_publication_ne_perd_pas_l_enveloppe_en_vol(monkeypatch):
+    """La fenêtre de reconnexion ne peut pas coûter l'enveloppe EN VOL.
+
+    Mesuré le 19/10/2026 (`scripts/charge/mesure_panne_redis.py`, 400 flux,
+    400 évt/s, panne de 2 s) : la tâche retirait une enveloppe du tampon, la
+    publication échouait, et elle passait à la suivante après la pause. Le bus
+    recevait donc 799 des 800 enveloppes de la fenêtre, et la manquante n'était
+    comptée NULLE PART (`perdus` restait à 0, seul `repli` bougeait) : la file
+    tenait sa promesse, le consommateur la rompait.
+
+    La reprise doit être celle de la MÊME enveloppe, et dans l'ordre.
+    """
+    monkeypatch.setattr(kojo_live, "BUS_RECONNECT_SECONDS", 0.01)
+    faux = FauxRedis(en_panne=True)
+    await kojo_live.start_bus(client=faux)
+    queue = kojo_live.subscribe("compte-i")
+
+    for index in range(3):
+        kojo_live.publish("compte-i", "message", {"index": index})
+
+    # Les trois sont livrées LOCALEMENT, panne comprise.
+    assert [evenement[1]["index"] for evenement in _vider(queue)] == [0, 1, 2]
+
+    # Deux tentatives échouées au moins : la preuve que le chemin de panne a
+    # bien été pris (sinon la reprise ci-dessous ne prouverait rien).
+    await attendre(
+        lambda: kojo_live.bus_stats()["repli"] >= 2,
+        "la panne de publication n'a pas été retentée",
+    )
+    faux.en_panne = False
+
+    await attendre(
+        lambda: len(faux.publies) == 3,
+        "les enveloppes gardées n'ont jamais été republiées après la reprise",
+    )
+    publiees = [json.loads(charge)["d"]["index"] for _, charge in faux.publies]
+    assert publiees == [0, 1, 2], "la reprise a changé l'ordre de publication"
+    assert kojo_live.bus_stats()["perdus"] == 0, "une enveloppe a été perdue sans débordement"
 
 
 @pytest.mark.asyncio
