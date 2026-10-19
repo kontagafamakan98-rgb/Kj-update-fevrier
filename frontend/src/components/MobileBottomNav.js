@@ -187,7 +187,7 @@ export default function MobileBottomNav() {
   return (
     <div
       data-mobile-bottom-nav="true"
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white/95 backdrop-blur-sm supports-[backdrop-filter]:bg-white/85 pb-[max(env(safe-area-inset-bottom),0.5rem)] md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-40 border-t verre-barre pb-[max(env(safe-area-inset-bottom),0.5rem)] md:hidden"
     >
       <div className={`grid ${user ? 'grid-cols-5' : 'grid-cols-4'} gap-1 px-2 pt-2`}>
         {navItems.map((item) => {

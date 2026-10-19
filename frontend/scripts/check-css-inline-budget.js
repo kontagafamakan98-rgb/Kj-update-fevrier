@@ -30,6 +30,13 @@
  *
  *   gzip de la feuille partagée : 15 115 o. Total CSS inline du build : 995 321 o.
  *
+ * ── Le relevé a bougé le 19/10/2026 : 82 450 o / 16 144 o gzip / 1 107 règles /
+ *    sha 7f189b682b8d6eec ────────────────────────────────────────────────────
+ * La couche des TROIS EFFETS (verre chaud, forme liquide, titre cinétique — voir
+ * le bloc de `src/index.css` du même nom) ajoute 24 règles et 2 126 o aux treize
+ * documents. Le budget n'est PAS élargi : il reste 82 944 o, et la marge tombe à
+ * 494 o — c'est elle qui fera rougir la prochaine règle ajoutée sans re-mesure.
+ *
  * ── Le relevé a bougé le 17/10/2026 : 80 324 o / 15 759 o gzip / 1 083 règles /
  *    sha f5da31364d5a2964 ────────────────────────────────────────────────────
  * Le vocabulaire des ÉCRANS D'APPLICATION (bandeau d'accueil, tuiles de mesure
@@ -129,6 +136,8 @@ export const FEUILLE_DE_REFERENCE = 'index.html';
  * le dire — au lieu de dériver en silence.
  */
 export const CSS_INLINE_BUDGETS = {
+  // Relevé 19/10/2026 : 82 450 o / 16 144 o gzip / 1107 règles / sha 7f189b682b8d6eec
+  // (les trois effets : +24 règles, +2 126 o — budget inchangé, marge 494 o).
   // Relevé 17/10/2026 : 80 324 o / 15 759 o gzip / 1083 règles / sha f5da31364d5a2964.
   // (Relevé 11/10/2026 : 76 533 o / 15 115 o gzip / 1044 règles / sha 41d0f2e82d7950d9 ;
   //  09/10/2026 : 69 276 o / 13 111 o gzip / 936 règles / sha d8c74e2cb457a497.)

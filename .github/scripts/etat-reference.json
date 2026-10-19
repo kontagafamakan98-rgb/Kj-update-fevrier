@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-19",
-    "motif": "les trois contrats de temps du flux sont juges hors ligne sur une PR : battement declare, bail qui en decoule et repli du client",
+    "motif": "les trois contrats de temps du flux sont juges hors ligne sur une PR : battement declare, bail qui en decoule et repli du client ; et le releve du budget CSS inline re-mesure le 19/10/2026 (couche des trois effets) est declare, pour que l'empreinte du fichier suive la mesure",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -77,7 +77,6 @@
       "frontend/scripts/check-corpus-missions.js": "0be42e212f324618e1de0882b07a426c00f115b2a8afe381b13277597ee71a1c",
       "frontend/scripts/check-cors-preflight.js": "69cabaccb06a20088ac20012a3dd3d0a29f3109279fd4ccb4a771eaab52c9960",
       "frontend/scripts/check-couverture-tiers.js": "623a9b63ef8ec72b52f2699f6047026943d20382f91e8f8ded92084efe72a06f",
-      "frontend/scripts/check-css-inline-budget.js": "f2ec08e78600460fbc3ca8536b7e18f404d8190a0487ba8c41515e3ce8ad5bff",
       "frontend/scripts/check-css-selecteurs-morts.js": "f6da1417e610d2cdddf032b350f097adccf1ecd272b91028c082626c0c0c63eb",
       "frontend/scripts/check-deployed-revision.js": "00cf101db5028430418db290061e8ade1b71b53049fefb954b09c8d02f05a7be",
       "frontend/scripts/check-drapeaux-emoji.js": "43c50d9cbc0693221ebfa973e136c0577c3082a4288c93c4d4b73bb04f7da732",
@@ -123,7 +122,8 @@
       "frontend/scripts/retard-main.js": "eef5724dae66bc8e17fbb50e0be1c426b9eba4ceb24c04808c8fdb0f8dacad37",
       "frontend/scripts/style-layout-budgets.cjs": "db93353a147d9be6e84999ea065d3b3df5d08871a62fe943f3346bc80d68ede9",
       "frontend/scripts/validate-vercel-json.mjs": "16a56835e1fb299821c3a1dd7fa4d0957982a970a493e98ed8855d06fc563518",
-      ".github/scripts/check-fly-env-drift.py": "34d5475512295ca57ca19ad37a6acb04ba63ffc5cb5c504913d9fcaff103a5e9"
+      ".github/scripts/check-fly-env-drift.py": "34d5475512295ca57ca19ad37a6acb04ba63ffc5cb5c504913d9fcaff103a5e9",
+      "frontend/scripts/check-css-inline-budget.js": "54e924ad265800a95b0c85a6fb1a9cede28f9f0252d9c059de363c29bb867d74"
     }
   },
   "hors_perimetre": [

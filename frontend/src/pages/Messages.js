@@ -300,7 +300,7 @@ export default function Messages() {
   // à la seule action qui puisse ouvrir une conversation (postuler à une
   // mission). Sans lui, l'écran vide n'offrait RIEN à faire.
   const EmptyIcon = () => (
-    <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-orange-50">
+    <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-orange-50 morphe">
       <MessageCircle size={36} className="text-orange-500" strokeWidth={1.5} aria-hidden="true" />
     </div>
   );
