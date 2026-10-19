@@ -295,6 +295,11 @@ _bus_client_local = False
 _bus_file: Optional[asyncio.Queue] = None
 _bus_taches: List[asyncio.Task] = []
 _bus_actif = False
+# Drapeau d'ARRÊT lu par les deux tâches du bus. Une annulation peut être
+# AVALÉE par un `asyncio.wait_for` qui se termine au même instant (course
+# corrigée en 3.12 seulement, cf. `stop_bus`) : sans drapeau, la tâche
+# continuerait sa boucle et `stop_bus` attendrait indéfiniment.
+_bus_arret = False
 _bus_compteurs: Dict[str, int] = {
     "publies": 0,
     "recus": 0,
@@ -391,8 +396,10 @@ async def start_bus(client: Any = None) -> bool:
     serveur Redis dans la CI.
     """
     global _bus_client, _bus_client_local, _bus_file, _bus_actif, _partage_client
+    global _bus_arret
     if _bus_actif:
         return True
+    _bus_arret = False
     if client is None:
         client = _creer_client_redis()
         _bus_client_local = client is not None
@@ -420,13 +427,24 @@ async def start_bus(client: Any = None) -> bool:
 
 
 async def stop_bus() -> None:
-    """Coupe les deux tâches du bus. Idempotent, et ne lève pas.
+    """Coupe les deux tâches du bus. Idempotent, et ne bloque pas.
 
     Le client n'est fermé que s'il a été CRÉÉ ici : un client injecté par un
     test (ou par un appelant) garde sa propre durée de vie.
+
+    L'attente est BORNÉE : `Task.cancel()` n'est pas une garantie de fin. Un
+    `asyncio.wait_for` qui se termine au moment où l'annulation arrive peut
+    l'avaler (course des versions antérieures à 3.12), et la tâche repart dans
+    sa boucle. Sans borne, cette course faisait attendre `stop_bus` — donc la
+    fermeture du process — indéfiniment : mesuré le 19/10/2026, la suite
+    backend expirait à 30 min sur `test_un_echec_de_publication_ne_perd_pas_
+    l_enveloppe_en_vol` sous Python 3.11 + pytest 9, sans jamais rendre la
+    main (deux passes de CI identiques). Le drapeau `_bus_arret` fait sortir
+    les boucles à leur prochain tour ; `asyncio.wait` borne ce qu'on attend.
     """
-    global _bus_client, _bus_client_local, _bus_file, _bus_actif
+    global _bus_client, _bus_client_local, _bus_file, _bus_actif, _bus_arret
     global _dernier_resync, _resync_en_attente, _resync_tache
+    _bus_arret = True
     taches, _bus_taches[:] = list(_bus_taches), []
     differee, _resync_tache = _resync_tache, None
     if differee is not None and differee not in taches:
@@ -434,7 +452,21 @@ async def stop_bus() -> None:
     for tache in taches:
         tache.cancel()
     if taches:
-        await asyncio.gather(*taches, return_exceptions=True)
+        terminees, restantes = await asyncio.wait(
+            taches, timeout=BUS_READ_TIMEOUT_SECONDS + 1.0
+        )
+        for tache in terminees:
+            if not tache.cancelled():
+                # Consommer le résultat : une exception non lue se lirait
+                # « Task exception was never retrieved » au shutdown.
+                tache.exception()
+        if restantes:
+            logger.warning(
+                "Bus temps réel : %d tâche(s) n'ont pas rendu la main après "
+                "annulation — arrêt non bloquant (annulation avalée par un délai "
+                "concurrent) ; le drapeau d'arrêt les fait sortir à leur prochain tour.",
+                len(restantes),
+            )
     global _partage_client
     client, local = _bus_client, _bus_client_local
     _bus_client = None
@@ -505,15 +537,17 @@ async def _publieur(client: Any, file: asyncio.Queue) -> None:
     (`perdus` restait à 0, seul `repli` bougeait). La file tenait sa promesse ;
     c'est le consommateur qui la rompait.
     """
-    while True:
+    while not _bus_arret:
         user_id, event, data = await file.get()
+        if _bus_arret:
+            break
         charge = json.dumps(
             {"o": _origine, "u": user_id, "e": event, "d": data},
             ensure_ascii=False,
             default=str,
             separators=(",", ":"),
         )
-        while True:
+        while not _bus_arret:
             try:
                 await client.publish(BUS_CHANNEL, charge)
                 _bus_compteurs["publies"] += 1
@@ -622,7 +656,7 @@ async def _abonnement(client: Any) -> None:
     souscription n'en est pas une : aucun flux n'a vécu sans elle.
     """
     aveugle = False
-    while True:
+    while not _bus_arret:
         pubsub = None
         try:
             pubsub = client.pubsub()
@@ -638,6 +672,8 @@ async def _abonnement(client: Any) -> None:
                     ignore_subscribe_messages=True,
                     timeout=BUS_READ_TIMEOUT_SECONDS,
                 )
+                if _bus_arret:
+                    break
                 if message is None:
                     # Canal calme : ce n'est PAS une coupure, la connexion est
                     # toujours ouverte (cf. `BUS_READ_TIMEOUT_SECONDS`).

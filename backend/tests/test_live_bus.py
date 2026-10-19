@@ -453,6 +453,64 @@ async def test_le_tampon_borne_perd_le_bus_jamais_l_evenement_local(monkeypatch)
     bloque.set()
 
 
+class FauxPubSubAnnulationAvalee(FauxPubSub):
+    """Un abonnement qui AVALE sa première annulation.
+
+    C'est la course de `asyncio.wait_for` antérieure à 3.12 : quand le délai
+    expire au moment où l'annulation arrive, le `CancelledError` peut être
+    perdu et la tâche repart dans sa boucle. Le double la reproduit à volonté.
+    """
+
+    def __init__(self, bus: FauxRedis):
+        super().__init__(bus)
+        self.annulations_avalees = 0
+
+    async def get_message(self, ignore_subscribe_messages=True, timeout=None):
+        try:
+            return await super().get_message(ignore_subscribe_messages, timeout)
+        except asyncio.CancelledError:
+            if self.annulations_avalees == 0:
+                self.annulations_avalees += 1
+                return None
+            raise
+
+
+class FauxRedisAnnulationAvalee(FauxRedis):
+    """Le même bus, dont l'abonnement perd sa première annulation."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dernier_pubsub = None
+
+    def pubsub(self):
+        self.dernier_pubsub = FauxPubSubAnnulationAvalee(self)
+        return self.dernier_pubsub
+
+
+@pytest.mark.asyncio
+async def test_une_annulation_avalee_ne_bloque_pas_l_arret_du_bus():
+    """`stop_bus` est BORNÉ même quand une annulation est perdue.
+
+    Mesuré le 19/10/2026 : sous Python 3.11 + pytest 9, la suite backend
+    expirait à 30 min sur le cas de reprise d'enveloppe (deux passes de CI
+    identiques) — le test finissait, puis `stop_bus` attendait sans borne une
+    tâche dont l'annulation avait été avalée par un délai concurrent. Ici,
+    l'attente est bornée et le drapeau d'arrêt fait sortir la boucle : l'arrêt
+    rend la main en quelques millisecondes.
+    """
+    faux = FauxRedisAnnulationAvalee()
+    await kojo_live.start_bus(client=faux)
+    await asyncio.sleep(0.01)  # laisse l'abonnement s'installer dans son délai
+
+    await asyncio.wait_for(kojo_live.stop_bus(), timeout=5.0)
+
+    assert kojo_live.bus_actif() is False
+    assert faux.dernier_pubsub is not None, "l'abonnement n'a jamais été ouvert"
+    assert faux.dernier_pubsub.annulations_avalees == 1, (
+        "le cas de l'annulation avalée n'a pas été exercé : la preuve ne prouverait rien"
+    )
+
+
 @pytest.mark.asyncio
 async def test_arreter_le_bus_rend_les_taches_et_redemarre_proprement():
     """Le shutdown coupe les deux tâches ; un redémarrage rebranche le bus."""
