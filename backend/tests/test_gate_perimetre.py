@@ -54,6 +54,7 @@ import importlib.util
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -594,6 +595,81 @@ def _appels_de_main():
             ]
             return [nom for _, nom in sorted(appels)]
     return []
+
+
+class TestRevisionsDepuisOriginMain:
+    """Les révisions ATTENDUES se lisent sur `origin/main`, jamais sur `HEAD`.
+
+    L'étape de synchronisation locale est best-effort : `livrer.py` journalise son
+    échec et continue. Lire les révisions attendues sur `HEAD` faisait donc
+    dépendre le verdict d'un `main` local périmé — un `git pull --ff-only`
+    refusé — et la vérification attendait le commit d'AVANT la fusion pendant que
+    la production servait le nouveau : un faux refus (code 2) sur une livraison
+    réussie. Ces cas figent la référence LUE, et le refus quand elle n'a pas pu
+    être relue.
+    """
+
+    FUSION = "a" * 40
+    DISTANTE = "b" * 40
+
+    def _faux_outils(self, livraison, monkeypatch, ancestor: int = 0):
+        """Faux `exec_cmd` et faux `subprocess.run`, qui NOTENT chaque commande."""
+        appels = []
+
+        def faux_exec(args, *a, **k):
+            appels.append(list(args))
+            if args[:3] == ["git", "rev-list", "-1"]:
+                return self.DISTANTE
+            return ""
+
+        def faux_run(args, *a, **k):
+            appels.append(list(args))
+            if "merge-base" in args:
+                return SimpleNamespace(returncode=ancestor)
+            return SimpleNamespace(returncode=0)
+
+        monkeypatch.setattr(livraison, "exec_cmd", faux_exec)
+        monkeypatch.setattr(livraison, "subprocess", SimpleNamespace(run=faux_run))
+        return appels
+
+    def test_le_frontend_lit_le_dernier_commit_sur_origin_main(self, livraison, monkeypatch):
+        appels = self._faux_outils(livraison, monkeypatch)
+        assert livraison.verifier_production_frontend(self.FUSION, timeout_minutes=1) is True
+        assert ["git", "fetch", "origin", "main"] in appels, "la base distante n'a pas été relue"
+        assert any(
+            a[:4] == ["git", "rev-list", "-1", livraison.REF_BASE_DISTANTE]
+            and a[-1] == "frontend/"
+            for a in appels
+        ), appels
+        assert not any("HEAD" in a for a in appels), "le main local a été consulté"
+        controle = next(a for a in appels if a and a[0] == "node")
+        assert controle[controle.index("--sinon") + 1] == self.DISTANTE, controle
+        assert controle[controle.index("--attendu") + 1] == self.FUSION, controle
+
+    def test_le_backend_lit_aussi_origin_main(self, livraison, monkeypatch):
+        appels = self._faux_outils(livraison, monkeypatch)
+        assert livraison.verifier_production_backend(self.FUSION, timeout_minutes=1) is True
+        assert any(
+            a[:4] == ["git", "rev-list", "-1", livraison.REF_BASE_DISTANTE]
+            and ".github/workflows/ci.yml" in a
+            for a in appels
+        ), appels
+        assert not any("HEAD" in a for a in appels), "le main local a été consulté"
+        controle = next(
+            a for a in appels if any("check_deployed_revision.py" in str(x) for x in a)
+        )
+        assert controle[controle.index("--attendu") + 1] == self.DISTANTE, controle
+
+    def test_une_base_distante_qui_ne_porte_pas_la_fusion_refuse_de_conclure(
+        self, livraison, monkeypatch, capsys
+    ):
+        appels = self._faux_outils(livraison, monkeypatch, ancestor=1)
+        assert livraison.verifier_production_frontend(self.FUSION, timeout_minutes=1) is False
+        # Le contrôle de production ne part PAS contre une référence non relue :
+        # ce serait le même faux verdict, en silence.
+        assert not any(a and a[0] == "node" for a in appels), appels
+        sortie = capsys.readouterr().err
+        assert "origin/main" in sortie and self.FUSION[:10] in sortie, sortie
 
 
 class TestArbrePropre:

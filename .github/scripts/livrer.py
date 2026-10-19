@@ -20,7 +20,11 @@ aux checks que la protection de `main` exige réellement : une dérive du régla
 GitHub se voit ici, attribuable à la livraison, plutôt que six semaines plus tard
 par une fusion manuelle passée sous un check rouge.
   6. Élagage et synchronisation locale (suppression de la branche de travail fusionnée)
-  7. Attente et confirmation formelle des révisions servies en production :
+  7. Attente et confirmation formelle des révisions servies en production. Les
+     révisions ATTENDUES se lisent sur la BASE DISTANTE (`origin/main`, relu
+     après la fusion), jamais sur le `main` local : l'étape 6 est best-effort,
+     donc un dépôt local périmé ne doit pas faire refuser une production qui
+     sert pourtant le bon commit (faux refus, code 2).
      - Vercel (frontend) : balise meta `kojo-build-revision` sur https://kojoforafrica.cc.cd
      - SEO (frontend)    : sonde stricte `check-seo-production.js --strict`, lancée JUSTE
        APRÈS la confirmation de la révision servie — la MÊME commande que la CI, et son
@@ -497,11 +501,76 @@ def synchroniser_et_nettoyer_local(branche_travail: str):
         log_succes(f"Branche locale '{branche_travail}' supprimée proprement.")
 
 
+# Référence des révisions attendues : la BASE DISTANTE, jamais le `main` local.
+REF_BASE_DISTANTE = "origin/main"
+
+
+def rafraichir_base_distante(merge_sha: str) -> None:
+    """Relit `origin/main` et vérifie qu'il porte la fusion qui vient d'avoir lieu.
+
+    L'étape 6 (`synchroniser_et_nettoyer_local`) est BEST-EFFORT : son échec est
+    journalisé et le trajet continue. Lire les révisions attendues sur `HEAD`
+    faisait donc dépendre le verdict d'un `main` local périmé — un `git pull
+    --ff-only` refusé, une bascule ratée — et la vérification attendait le
+    commit d'AVANT la fusion pendant que la production servait le nouveau :
+    `livrer` rendait 2 sur une livraison réussie.
+
+    On relit donc la référence DISTANTE ici, et on refuse de conclure quand
+    elle ne porte pas la fusion : comparer à une référence non relue rendrait
+    le même faux verdict, en silence.
+    """
+    if not merge_sha:
+        raise RuntimeError(
+            "Révision de fusion inconnue : le verdict de production ne peut pas "
+            "être rattaché à la fusion qui vient d'avoir lieu."
+        )
+    exec_cmd(["git", "fetch", "origin", "main"])
+    res = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", merge_sha, REF_BASE_DISTANTE],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if res.returncode != 0:
+        raise RuntimeError(
+            f"{REF_BASE_DISTANTE} ne contient pas la fusion {merge_sha[:10]} : la "
+            "référence distante n'a pas été relue, et un verdict rendu contre elle "
+            "serait faux. Vérifier le réseau puis relancer (`git fetch origin main`)."
+        )
+
+
+def revision_attendue(chemins: list[str], merge_sha: str) -> str:
+    """Dernier commit de `origin/main` touchant `chemins` — jamais celui de `HEAD`.
+
+    Les deux confirmations de production lisent la même référence : un `main`
+    local en retard ne doit plus pouvoir décider du verdict.
+    """
+    rafraichir_base_distante(merge_sha)
+    revision = exec_cmd(["git", "rev-list", "-1", REF_BASE_DISTANTE, "--", *chemins])
+    if not revision:
+        raise RuntimeError(
+            f"aucun commit de {REF_BASE_DISTANTE} ne touche {', '.join(chemins)} — "
+            "la référence ou les chemins ne sont pas ceux du dépôt."
+        )
+    return revision
+
+
 def verifier_production_frontend(sha_attendu: str, timeout_minutes: int = 10) -> bool:
     log(f"Contrôle de la révision servie par VERCEL (frontend sur {URL_FRONTEND_PROD})...")
-    # Calculer également la révision dernier commit frontend si pertinent
-    dernier_frontend = exec_cmd(["git", "rev-list", "-1", "HEAD", "--", "frontend/"])
-    log(f"Révisions acceptées : {sha_attendu[:10]} (merge) ou {dernier_frontend[:10]} (dernier commit frontend)")
+    try:
+        # Le dernier commit frontend se lit sur la base DISTANTE (relue après la
+        # fusion), pas sur le `main` local : c'est ce qui rend le verdict
+        # indépendant de l'étape de synchronisation, best-effort.
+        dernier_frontend = revision_attendue(["frontend/"], sha_attendu)
+    except Exception as exc:
+        log_erreur(f"Révision frontend non établie : {exc}")
+        return False
+    log(
+        f"Révisions acceptées : {sha_attendu[:10]} (merge) ou "
+        f"{dernier_frontend[:10]} (dernier commit frontend sur {REF_BASE_DISTANTE})"
+    )
 
     cmd = [
         "node",
@@ -568,8 +637,15 @@ def verifier_seo_production_strict() -> bool:
 
 def verifier_production_backend(sha_attendu: str, timeout_minutes: int = 10) -> bool:
     log(f"Contrôle de la révision servie par FLY.IO (backend sur {URL_BACKEND_HEALTH})...")
-    dernier_backend = exec_cmd(["git", "rev-list", "-1", "HEAD", "--", "backend/", ".github/workflows/ci.yml"])
-    log(f"Révision backend attendue : {dernier_backend[:10]}")
+    try:
+        # Même référence que le frontend : la base DISTANTE relue après la fusion.
+        dernier_backend = revision_attendue(
+            ["backend/", ".github/workflows/ci.yml"], sha_attendu
+        )
+    except Exception as exc:
+        log_erreur(f"Révision backend non établie : {exc}")
+        return False
+    log(f"Révision backend attendue : {dernier_backend[:10]} (sur {REF_BASE_DISTANTE})")
 
     cmd = [
         sys.executable,
@@ -707,6 +783,8 @@ def main(argv=None) -> int:
     try:
         synchroniser_et_nettoyer_local(branche)
     except Exception as exc:
+        # Best-effort, et SANS conséquence sur le verdict : les révisions
+        # attendues se lisent sur `origin/main` relu dans les deux confirmations.
         log_erreur(f"Erreur lors de la synchronisation locale : {exc}")
 
     # 7. Confirmation des révisions servies en production
