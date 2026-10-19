@@ -29,6 +29,10 @@ on:
 
 permissions:
   contents: read
+  # Lire l'historique du workflow de sauvegarde externe : sur un palier
+  # partagé, c'est SA fraîcheur qui décide du verdict (M0 ne fournit aucune
+  # sauvegarde continue).
+  actions: read
 
 jobs:
   atlas-backups:
@@ -52,4 +56,9 @@ jobs:
           ATLAS_PRIVATE_KEY: ${{ secrets.ATLAS_PRIVATE_KEY }}
           ATLAS_PROJECT_ID: ${{ secrets.ATLAS_PROJECT_ID }}
           ATLAS_CLUSTER: ${{ secrets.ATLAS_CLUSTER }}
+          # Le dépôt et le jeton servent à lire le dernier run RÉUSSI de
+          # `backup-db.yml` : la sonde juge sa fraîcheur, jamais un fichier
+          # qu'elle ne peut pas voir.
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python backend/scripts/check_atlas_backups.py

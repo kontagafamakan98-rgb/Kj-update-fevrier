@@ -41,6 +41,31 @@ message, pour qu'on ne cherche pas une panne qui n'existe pas.
 Cluster → Backup**. Une case « Cloud Backup » cochée sans « Continuous Cloud
 Backup » est le cas piégeux que la sonde attrape.
 
+### Le cluster est en M0 : la sauvegarde est EXTERNE, et la sonde juge sa fraîcheur
+
+Relevé le 19/10/2026, clés `ATLAS_*` posées : le cluster de production `Kojo`
+est un **M0** (fournisseur TENANT), `backupEnabled=false`, `pitEnabled=false`.
+Un palier partagé ne fournit **aucune** sauvegarde continue : « activer le
+Cloud Backup » y est impossible, et la sonde le dit au lieu de le demander.
+La seule restauration possible est donc celle du workflow
+`.github/workflows/backup-db.yml` (cron 02:40 UTC) :
+
+1. `mongodump` de la production, archive unique compressée ;
+2. `mongorestore` de CETTE archive dans une base de travail `kojo_verif` ;
+3. comparaison source/archive par `backend/scripts/exercice_restauration.py`
+   (empreintes SHA-256 par collection, index compris) — une archive non
+   restaurée n'est pas une sauvegarde ;
+4. chiffrement AES-256 (les dumps contiennent des données personnelles) ;
+5. dépôt sur un bucket S3/R2 **privé**, avec empreinte et taille publiées.
+
+La sonde Atlas juge alors la **fraîcheur** du dernier run réussi de ce
+workflow — 36 h par défaut (`BACKUP_FRAICHEUR_MAX_HEURES`) — parce qu'une
+sauvegarde de trois jours n'est pas une sauvegarde. Six secrets sont
+nécessaires : `MONGO_URL`, `BACKUP_S3_BUCKET`, `BACKUP_S3_ENDPOINT`,
+`BACKUP_S3_ACCESS_KEY_ID`, `BACKUP_S3_SECRET_KEY`, `BACKUP_PASSPHRASE`.
+Sans eux le workflow rend **2** en nommant ce qui manque, et la sonde rougit en
+disant qu'aucune sauvegarde externe n'a jamais abouti.
+
 ---
 
 ## 2. Procédure de restauration (production)

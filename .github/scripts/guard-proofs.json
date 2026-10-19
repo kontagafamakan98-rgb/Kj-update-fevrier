@@ -2071,6 +2071,27 @@
       ]
     },
     {
+      "id": "atlas-backups: sauvegarde externe perimee toleree",
+      "garde": "backend/scripts/check_atlas_backups.py",
+      "cible": "backend/scripts/check_atlas_backups.py",
+      "trouve": "    if age > seuil_heures:",
+      "remplace": "    if False and age > seuil_heures:",
+      "runner": "python",
+      "preuve": "backend/tests/test_atlas_backups_probe.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_atlas_backups_probe.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_atlas_backups_probe.py::TestSauvegardeExterne::test_une_sauvegarde_perimee_est_refusee_en_nommant_les_deux_durees"
+      ]
+    },
+    {
       "id": "atlas-backups: palier partage invisible (remede impossible publie)",
       "garde": "backend/scripts/check_atlas_backups.py",
       "cible": "backend/scripts/check_atlas_backups.py",

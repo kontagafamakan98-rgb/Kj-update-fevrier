@@ -220,6 +220,106 @@ def test_le_workflow_epingle_ses_actions_a_une_version():
         )
 
 
+# ── La sauvegarde EXTERNE : le seul recours d'un palier partagé ───────────────
+# M0 ne fournit pas de sauvegarde continue. Exiger un Cloud Backup y est
+# impossible ; exiger un vert serait un silence. La sonde juge donc la FRAÎCHEUR
+# d'une sauvegarde externe VÉRIFIÉE, lue dans l'historique du workflow.
+
+class TestSauvegardeExterne:
+    def test_aucun_succes_n_est_pas_un_vert(self, sonde):
+        code, ligne = sonde.juger_sauvegarde_externe(None, maintenant=0)
+        assert code == 1
+        assert "Aucune sauvegarde EXTERNE" in ligne
+        # Le refus dit quoi poser : sans ça, il faudrait deviner l'entrée.
+        assert "MONGO_URL" in ligne and sonde.WORKFLOW_SAUVEGARDE in ligne
+
+    def test_une_sauvegarde_recente_donne_un_vert_en_nommant_l_age(self, sonde):
+        maintenant = sonde._instant("2026-10-19T06:00:00Z")
+        code, ligne = sonde.juger_sauvegarde_externe("2026-10-19T00:00:00Z", maintenant)
+        assert code == 0, ligne
+        assert "il y a 6 h" in ligne
+        # Le vert ne prétend pas qu'Atlas sauvegarde : il dit ce qui existe.
+        assert "aucune sauvegarde continue" in ligne
+
+    def test_une_sauvegarde_perimee_est_refusee_en_nommant_les_deux_durees(self, sonde):
+        maintenant = sonde._instant("2026-10-20T16:00:00Z")
+        code, ligne = sonde.juger_sauvegarde_externe("2026-10-19T00:00:00Z", maintenant)
+        assert code == 1, ligne
+        assert "40 h" in ligne and "36 h" in ligne
+
+    def test_un_horodatage_illisible_n_est_pas_recent(self, sonde):
+        code, ligne = sonde.juger_sauvegarde_externe("hier-soir", maintenant=0)
+        assert code == 1
+        assert "ILLISIBLE" in ligne
+
+    def test_une_date_dans_le_futur_est_refusee(self, sonde):
+        maintenant = sonde._instant("2026-10-19T00:00:00Z")
+        code, ligne = sonde.juger_sauvegarde_externe("2026-10-21T00:00:00Z", maintenant)
+        assert code == 1
+        assert "FUTUR" in ligne
+
+    def test_un_cluster_partage_sans_sauvegarde_bascule_sur_l_externe(
+        self, sonde, monkeypatch, capsys
+    ):
+        """Le câblage, pas seulement la règle : c'est `main()` qui décide."""
+        for nom in sonde.VARIABLES:
+            monkeypatch.setenv(nom, "valeur-factice")
+        monkeypatch.setattr(
+            sonde, "lire_cluster",
+            lambda *a, **k: (200, _cluster_partage(backup=False, palier="M0"), ""),
+        )
+        maintenant = sonde._instant("2026-10-19T06:00:00Z")
+        monkeypatch.setattr(
+            sonde, "dernier_succes_externe",
+            lambda *a, **k: ("ok", "2026-10-19T04:00:00Z"),
+        )
+        monkeypatch.setattr(sonde.time, "time", lambda: maintenant)
+        monkeypatch.setattr("sys.argv", ["check_atlas_backups.py"])
+        code = sonde.main()
+        sortie = capsys.readouterr().out
+        assert code == 0, sortie
+        assert "Sauvegarde EXTERNE vérifiée il y a 2 h" in sortie, sortie
+        # Le remède impossible ne doit pas survivre à côté du vert.
+        assert "Atlas → Backup → Enable" not in sortie, sortie
+
+    def test_un_cluster_dedie_sans_sauvegarde_ne_bascule_pas_sur_l_externe(
+        self, sonde, monkeypatch, capsys
+    ):
+        """Sur un palier dédié, Atlas PEUT sauvegarder : c'est ce qu'on exige."""
+        for nom in sonde.VARIABLES:
+            monkeypatch.setenv(nom, "valeur-factice")
+        monkeypatch.setattr(
+            sonde, "lire_cluster", lambda *a, **k: (200, _cluster(backup=False), "")
+        )
+        monkeypatch.setattr(
+            sonde, "dernier_succes_externe",
+            lambda *a, **k: ("ok", "2026-10-19T04:00:00Z"),
+        )
+        monkeypatch.setattr("sys.argv", ["check_atlas_backups.py"])
+        code = sonde.main()
+        sortie = capsys.readouterr().out
+        assert code == 1, sortie
+        assert "Atlas → Backup → Enable" in sortie, sortie
+
+    def test_le_workflow_de_sauvegarde_existe_et_verifie_par_restauration(self):
+        """Une fraîcheur jugée sur un workflow qui ne sauvegarde pas serait un
+        vert sans mesure : le contrat est vérifié ici."""
+        texte = (RACINE / ".github" / "workflows" / "backup-db.yml").read_text(
+            encoding="utf-8"
+        )
+        assert "cron:" in texte and "workflow_dispatch" in texte
+        assert "mongodump" in texte and "mongorestore" in texte
+        # La preuve qu'une archive est une sauvegarde : elle est RESTAURÉE et
+        # comparée, par le script dont l'exercice daté se sert déjà.
+        assert "exercice_restauration.py" in texte
+        # Données personnelles : jamais en clair hors du runner.
+        assert "openssl enc -aes-256-cbc" in texte
+        assert "s3 cp" in texte
+        assert "continue-on-error" not in texte, (
+            "une étape qui ne peut pas échouer ne sauvegarde rien"
+        )
+
+
 def test_le_runbook_est_date_et_dit_ce_qu_il_ne_prouve_pas():
     texte = RUNBOOK.read_text(encoding="utf-8")
     assert "18/10/2026" in texte, "un exercice sans date ne prouve rien"
