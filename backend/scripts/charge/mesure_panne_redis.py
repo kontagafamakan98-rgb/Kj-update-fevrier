@@ -332,8 +332,25 @@ async def attendre_vidage(kojo_live, secondes: float) -> None:
     )
 
 
-def _compte_local(kojo_live, files):
-    return sum(file.qsize() for file in files)
+def _vider_files(files):
+    """Compte les ÉVÉNEMENTS livrés localement et les RELECTURES demandées.
+
+    Une relecture de réparation (`resync`) est une TRAME, pas un événement : la
+    compter comme un événement ferait croire à une livraison en trop. Les deux
+    sont mesurées, et séparément : la première prouve que la panne du bus n'a
+    pas privé le process de son propre flux, la seconde que la fenêtre sans
+    écoute a bien été réparée pour chaque flux.
+    """
+    evenements = 0
+    resyncs = 0
+    for file in files:
+        while not file.empty():
+            nom = file.get_nowait()[0]
+            if nom == "resync":
+                resyncs += 1
+            else:
+                evenements += 1
+    return evenements, resyncs
 
 
 async def principal() -> int:
@@ -398,7 +415,7 @@ async def principal() -> int:
 
         recues = len(redis.publications) - apres_temoin
         stats = kojo_live.bus_stats()
-        local = _compte_local(kojo_live, files)
+        local, relectures = _vider_files(files)
         perdues = stats["perdus"]
         muettes = enveloppes - recues - perdues
         hors_contrat = enveloppes > kojo_live.BUS_QUEUE_SIZE
@@ -425,6 +442,7 @@ async def principal() -> int:
                 "comptees_perdues": perdues,
                 "pertes_muettes": muettes,
                 "local_livres": local,
+                "relectures": relectures,
                 "hors_contrat": hors_contrat,
             },
             "compteurs": stats,
@@ -442,6 +460,11 @@ async def principal() -> int:
             echecs.append(
                 f"les flux LOCAUX ont livré {local}/{total_envoyes} (témoin + "
                 "panne) : la panne du bus a privé le process de son propre flux"
+            )
+        if relectures != len(files):
+            echecs.append(
+                f"{relectures}/{len(files)} flux ont été faits de relire après "
+                "la fenêtre sans écoute : les autres resteraient avec un trou"
             )
         if muettes != 0:
             echecs.append(
@@ -461,7 +484,8 @@ async def principal() -> int:
         etat = "hors contrat (perte attendue et COMPTÉE)" if hors_contrat else "contrat tenu"
         print(
             f"✅ {etat} : {recues}/{enveloppes} enveloppes de la panne au bus, "
-            f"{perdues} comptées, 0 muette, {local}/{total_envoyes} livrées localement",
+            f"{perdues} comptées, {muettes} muette(s), {local}/{total_envoyes} "
+            f"livrées localement, {relectures}/{len(files)} flux faits de relire",
             flush=True,
         )
         return 0

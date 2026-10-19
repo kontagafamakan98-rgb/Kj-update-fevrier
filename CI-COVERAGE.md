@@ -51,7 +51,7 @@ plusieurs commits entre deux validations ; le premier signal vient de la PR.
 | ⚠️ **Vivant** | F4 | `fly-env-drift` : deux contrôles SSH inopérants | Les secrets en mémoire ne sont pas inspectés sans session SSH active. |
 | ⚠️ **Vivant** | F5 | `mobile-build` prouve la compilation, pas l'exécution | L'APK compile sans tester son exécution sur appareil réel. |
 | ⚠️ **Vivant** | F6 / F6bis | Budgets Lighthouse sans latence d'API | Le gate évalue l'artefact sous bridage local sans dépendance réseau API. |
-| ⚠️ **Vivant** | F7 | `backend-tests` : Redis et TrustedHost désactivés | L'environnement de test bypass le middleware d'hôte et le cache Redis. |
+| ⚠️ **Partiel** | F7 | `backend-tests` : suite principale sans Redis, TrustedHost désactivé | La suite PRINCIPALE garde `REDIS_URL=""` (le chemin de repli) et le middleware d'hôte reste coupé. La variante Redis, elle, est jugée par DEUX étapes dédiées du même job, contre le service `redis:7` : la traversée entre deux workers (`test_live_bus_deux_workers.py`), la perte d'enveloppe en vol, et la perte de l'ABONNÉ — fenêtre sans écoute DÉCLARÉE (`reprises`) et réparée par `resync` sur chaque flux (douze enveloppes publiées par un autre worker pendant la fenêtre, zéro livrée) — (`test_live_bus_panne_redis.py`, proxy TCP interrompu). |
 | ✅ **Clos** | F3 | Le verrou `/jobs/:id` s'éteignait tout seul | Résolu (17/09) : pile locale « forme production » avec MongoDB et rewrites. |
 | ✅ **Clos** | F8 | Aucun job ne vérifie le résultat du déploiement | Résolu (20/09) : vérification de `/health` avec révision Git attendue. |
 | ✅ **Clos** | F9 | Intégrations SEO/analytics absentes du build | Résolu (20/09) : sonde quotidienne stricte (`seo-production-probe.yml`) ; étape informative retirée de `ci.yml` le 10/10/2026 ; depuis le 12/10/2026, la MÊME sonde stricte tourne aussi juste après chaque déploiement (`frontend-build`, push sur `main`) — l'écart n'attend donc plus le cron —, et le RETOUR d'une étape informative est refusé par `.github/scripts/check-seo-probe-strict.py` (job `workflow-lint`). **Depuis le 12/10/2026, ses fiches `/jobs/:id` ont deux sources** — le sitemap ET l'API publique des missions —, donc un sitemap muet ne les rend plus invisibles : une fiche vivante absente de tout sitemap est jugée puis refusée (non découvrable), et un sitemap muet avec une API illisible est refusé aussi (§7.2, ligne du 12/10/2026). **Depuis le 12/10/2026, la FAMILLE est fermée, pas seulement cette instance** : `.github/scripts/check-informative-steps.py` mesure toute la syntaxe qui rend une étape incapable d'échouer (7 formes sur 155 étapes lues, toutes légitimes — quatre harnais de mutation, une extraction pip-audit, un `kill` de PID sorti, une invite `sdkmanager`) et exige une déclaration motivée par forme ; une déclaration périmée, un compte d'occurrences qui change, un motif trop court, une forme inconnue ou un registre illisible sont refusés, et il refuse de conclure sous 40 étapes lues. |
@@ -614,8 +614,11 @@ DISABLE_TRUSTED_HOST_MIDDLEWARE: "true"
 
 - `REDIS_URL` vide : tout code qui dépend de Redis (cache, circuit breaker
   persistant) prend son chemin de repli mémoire. Ce n'est pas un défaut — c'est le
-  prix d'une CI sans Redis — mais **aucun test ne couvre la variante Redis**, qui
-  est celle de la production.
+  prix d'une CI sans Redis pour la SUITE PRINCIPALE — mais **la variante Redis
+  n'y est pas jugée** : elle l'est par les deux étapes dédiées du job, contre le
+  vrai service `redis:7`. Ce qui reste hors de portée de ces deux étapes : le
+  cache et le circuit breaker persistants, jamais exercés avec Redis ; seule la
+  partie bus du temps réel l'est.
 - `DISABLE_TRUSTED_HOST_MIDDLEWARE` : le `TrustedHostMiddleware` est actif en
   production et **désactivé en CI**. Sa configuration (et donc une erreur de
   `TRUSTED_HOSTS` qui bloquerait la prod) n'est pas exercée par les tests.

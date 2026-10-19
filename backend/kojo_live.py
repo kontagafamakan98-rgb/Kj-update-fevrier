@@ -28,6 +28,16 @@ CE QUE CE MODULE NE FAIT PAS, ET QUI DOIT ÊTRE DIT
     se répare en RELISANT l'API : l'événement `ready` porte le compteur exact,
     et `resync` demande au client de recharger. Le push est un accélérateur,
     jamais la source de vérité.
+  * **Ce que l'ABONNÉ perd quand Redis tombe, et comment il le répare.** Le
+    pub/sub n'a AUCUN historique : une enveloppe publiée par un autre worker
+    pendant que notre abonnement est rompu ne sera jamais rejouée. La perte est
+    donc réelle, et elle n'est pas au bout du publieur (lui la garde) mais chez
+    ceux qui écoutaient. Elle est DÉCLARÉE (`bus_stats()['reprises']` compte
+    chaque fenêtre sans écoute) et RÉPARÉE : au rétablissement, chaque flux
+    local reçoit `resync` et relit la source de vérité. La cadence des relectures
+    est bornée (`RESYNC_MIN_INTERVAL_SECONDS`) pour ne pas devenir plus bavarde
+    que le sondage remplacé, avec une relecture de rattrapage pour la dernière
+    fenêtre d'une rafale.
   * **Il ne bloque pas un flux métier.** `publish` est synchrone, ne lève pas et
     ne touche à aucune I/O : une notification qui ne part pas en direct reste
     lisible par l'API (elle est stockée AVANT l'appel).
@@ -127,6 +137,26 @@ BUS_QUEUE_SIZE = int(os.environ.get("KOJO_LIVE_BUS_QUEUE", "1000") or 1000)
 BUS_RECONNECT_SECONDS = float(
     os.environ.get("KOJO_LIVE_BUS_RECONNECT_SECONDS", "2") or 2
 )
+
+# Attente d'un message sur le canal. Une lecture qui EXPIRE n'est pas une
+# panne : c'est un canal SILENCIEUX. `pubsub.listen()` ne sait pas le dire —
+# il lit avec le `socket_timeout` du client (2 s) et lève un `TimeoutError`
+# toutes les 2 s, ce qui faisait passer un canal calme pour une coupure.
+# Mesuré le 19/10/2026 : l'abonnement se rompait toutes les 2,2 s et restait
+# sourd pendant la reprise, soit près de la MOITIÉ du temps — la perte que ce
+# module prétendait déclarer était donc permanente au repos. On lit par
+# `get_message` avec un délai EXPLICITE : il rend `None` sur silence et garde
+# la connexion ouverte (le message de battement reste ignoré).
+BUS_READ_TIMEOUT_SECONDS = 2.0
+
+# Cadence MINIMALE des relectures de réparation (voir `_reparer_apres_perte`).
+# Un Redis qui bat de l'aile ferait une reprise toutes les
+# `BUS_RECONNECT_SECONDS` ; relire à chacune serait plus bavard que le sondage
+# que le flux a remplacé (2 req/min). Une relecture étant TOTALE, une seule
+# couvre toutes les fenêtres depuis la précédente — d'où un plancher, et une
+# relecture différée pour que la DERNIÈRE fenêtre d'une rafale ne reste pas la
+# seule non réparée.
+RESYNC_MIN_INTERVAL_SECONDS = 10.0
 
 SSE_HEADERS = {
     # Aucun cache, aucune transformation : un flux mis en cache rejouerait les
@@ -265,6 +295,11 @@ _bus_client_local = False
 _bus_file: Optional[asyncio.Queue] = None
 _bus_taches: List[asyncio.Task] = []
 _bus_actif = False
+# Drapeau d'ARRÊT lu par les deux tâches du bus. Une annulation peut être
+# AVALÉE par un `asyncio.wait_for` qui se termine au même instant (course
+# corrigée en 3.12 seulement, cf. `stop_bus`) : sans drapeau, la tâche
+# continuerait sa boucle et `stop_bus` attendrait indéfiniment.
+_bus_arret = False
 _bus_compteurs: Dict[str, int] = {
     "publies": 0,
     "recus": 0,
@@ -272,7 +307,19 @@ _bus_compteurs: Dict[str, int] = {
     "illisibles": 0,
     "repli": 0,
     "perdus": 0,
+    # Souscriptions ÉTABLIES (la première comprise), fenêtres où ce process
+    # n'écoutait pas, et relectures demandées en réparation : la perte de
+    # l'ABONNÉ est déclarée, pas supposée nulle.
+    "ecoutes": 0,
+    "reprises": 0,
+    "resyncs": 0,
 }
+# Dernière relecture de réparation (monotonic) et relecture différée en vol.
+# La tâche différée est gardée à part de `_bus_taches` (qui n'est jamais purgée
+# des tâches terminées) : un Redis qui bat de l'aile en créerait une par rafale.
+_dernier_resync = 0.0
+_resync_en_attente = False
+_resync_tache: Optional[asyncio.Task] = None
 
 
 def origine_du_processus() -> str:
@@ -286,7 +333,15 @@ def bus_actif() -> bool:
 
 
 def bus_stats() -> Dict[str, int]:
-    """Compteurs du bus : publiés, reçus, échos ignorés, illisibles, replis, perdus."""
+    """Compteurs du bus.
+
+    Côté PUBLIEUR : `publies`, `perdus` (débordement du tampon), `repli`
+    (tentatives échouées). Côté ABONNÉ : `recus`, `echo` (anti-doublon),
+    `illisibles`, `ecoutes` (souscriptions établies), `reprises` (fenêtres
+    sans écoute — ce qui a été publié par les autres workers pendant ces
+    fenêtres est perdu, le pub/sub n'ayant pas d'historique) et `resyncs`
+    (relectures demandées pour réparer).
+    """
     return dict(_bus_compteurs)
 
 
@@ -341,8 +396,10 @@ async def start_bus(client: Any = None) -> bool:
     serveur Redis dans la CI.
     """
     global _bus_client, _bus_client_local, _bus_file, _bus_actif, _partage_client
+    global _bus_arret
     if _bus_actif:
         return True
+    _bus_arret = False
     if client is None:
         client = _creer_client_redis()
         _bus_client_local = client is not None
@@ -370,23 +427,54 @@ async def start_bus(client: Any = None) -> bool:
 
 
 async def stop_bus() -> None:
-    """Coupe les deux tâches du bus. Idempotent, et ne lève pas.
+    """Coupe les deux tâches du bus. Idempotent, et ne bloque pas.
 
     Le client n'est fermé que s'il a été CRÉÉ ici : un client injecté par un
     test (ou par un appelant) garde sa propre durée de vie.
+
+    L'attente est BORNÉE : `Task.cancel()` n'est pas une garantie de fin. Un
+    `asyncio.wait_for` qui se termine au moment où l'annulation arrive peut
+    l'avaler (course des versions antérieures à 3.12), et la tâche repart dans
+    sa boucle. Sans borne, cette course faisait attendre `stop_bus` — donc la
+    fermeture du process — indéfiniment : mesuré le 19/10/2026, la suite
+    backend expirait à 30 min sur `test_un_echec_de_publication_ne_perd_pas_
+    l_enveloppe_en_vol` sous Python 3.11 + pytest 9, sans jamais rendre la
+    main (deux passes de CI identiques). Le drapeau `_bus_arret` fait sortir
+    les boucles à leur prochain tour ; `asyncio.wait` borne ce qu'on attend.
     """
-    global _bus_client, _bus_client_local, _bus_file, _bus_actif
+    global _bus_client, _bus_client_local, _bus_file, _bus_actif, _bus_arret
+    global _dernier_resync, _resync_en_attente, _resync_tache
+    _bus_arret = True
     taches, _bus_taches[:] = list(_bus_taches), []
+    differee, _resync_tache = _resync_tache, None
+    if differee is not None and differee not in taches:
+        taches.append(differee)
     for tache in taches:
         tache.cancel()
     if taches:
-        await asyncio.gather(*taches, return_exceptions=True)
+        terminees, restantes = await asyncio.wait(
+            taches, timeout=BUS_READ_TIMEOUT_SECONDS + 1.0
+        )
+        for tache in terminees:
+            if not tache.cancelled():
+                # Consommer le résultat : une exception non lue se lirait
+                # « Task exception was never retrieved » au shutdown.
+                tache.exception()
+        if restantes:
+            logger.warning(
+                "Bus temps réel : %d tâche(s) n'ont pas rendu la main après "
+                "annulation — arrêt non bloquant (annulation avalée par un délai "
+                "concurrent) ; le drapeau d'arrêt les fait sortir à leur prochain tour.",
+                len(restantes),
+            )
     global _partage_client
     client, local = _bus_client, _bus_client_local
     _bus_client = None
     _bus_client_local = False
     _bus_file = None
     _bus_actif = False
+    _dernier_resync = 0.0
+    _resync_en_attente = False
     _partage_client = None
     if local and client is not None:
         try:
@@ -402,12 +490,16 @@ def reset_bus() -> None:
     reset sert aux fixtures qui isolent les compteurs et l'origine observée.
     """
     global _bus_client, _bus_client_local, _bus_file, _bus_actif, _partage_client
+    global _dernier_resync, _resync_en_attente, _resync_tache
     _bus_client = None
     _bus_client_local = False
     _bus_file = None
     _bus_actif = False
     _partage_client = None
     _bus_taches.clear()
+    _dernier_resync = 0.0
+    _resync_en_attente = False
+    _resync_tache = None
     for cle in _bus_compteurs:
         _bus_compteurs[cle] = 0
 
@@ -445,15 +537,17 @@ async def _publieur(client: Any, file: asyncio.Queue) -> None:
     (`perdus` restait à 0, seul `repli` bougeait). La file tenait sa promesse ;
     c'est le consommateur qui la rompait.
     """
-    while True:
+    while not _bus_arret:
         user_id, event, data = await file.get()
+        if _bus_arret:
+            break
         charge = json.dumps(
             {"o": _origine, "u": user_id, "e": event, "d": data},
             ensure_ascii=False,
             default=str,
             separators=(",", ":"),
         )
-        while True:
+        while not _bus_arret:
             try:
                 await client.publish(BUS_CHANNEL, charge)
                 _bus_compteurs["publies"] += 1
@@ -473,24 +567,123 @@ async def _publieur(client: Any, file: asyncio.Queue) -> None:
                 await asyncio.sleep(BUS_RECONNECT_SECONDS)
 
 
+def _diffuser_resync(motif: str) -> int:
+    """Demande à CHAQUE flux local de RELIRE la source de vérité. Rend les flux servis.
+
+    C'est la seule réparation possible d'une fenêtre aveugle : on ne peut pas
+    retrouver les enveloppes que le pub/sub n'a jamais gardées, mais on peut
+    rendre le client exact en le faisant relire. Une file PLEINE est laissée à
+    `_deposer_local`, qui lui déposera son propre `resync` au prochain
+    événement : la compter ici serait compter deux fois la même relecture.
+    """
+    global _dernier_resync
+    if not _flux:
+        return 0
+    _dernier_resync = time.monotonic()
+    _bus_compteurs["resyncs"] += 1
+    servis = 0
+    for files in list(_flux.values()):
+        for queue in list(files):
+            try:
+                queue.put_nowait(("resync", {"motif": motif}))
+                servis += 1
+            except asyncio.QueueFull:
+                pass
+    logger.warning(
+        "Bus temps réel : abonnement rétabli après %d fenêtre(s) sans écoute — "
+        "%d flux local(aux) RELISENT (resync, motif %s). Ce qu'un AUTRE worker a "
+        "publié pendant ces fenêtres ne sera jamais rejoué (le pub/sub n'a pas "
+        "d'historique) ; la relecture est la réparation.",
+        _bus_compteurs["reprises"],
+        servis,
+        motif,
+    )
+    return servis
+
+
+async def _resync_differee() -> None:
+    """La relecture de rattrapage : la DERNIÈRE fenêtre d'une rafale.
+
+    Sans elle, un Redis qui retombe dans la marge du plancher laisserait sa
+    dernière fenêtre non relue — et c'est justement celle dont personne ne
+    parlerait plus ensuite.
+    """
+    global _resync_en_attente, _resync_tache
+    try:
+        reste = RESYNC_MIN_INTERVAL_SECONDS - (time.monotonic() - _dernier_resync)
+        if reste > 0:
+            await asyncio.sleep(reste)
+        if _bus_actif:
+            _diffuser_resync("bus_reprise")
+    finally:
+        _resync_en_attente = False
+        _resync_tache = None
+
+
+def _reparer_apres_perte() -> None:
+    """Déclare la fenêtre aveugle et fait relire les flux, à cadence bornée.
+
+    Le pub/sub n'a aucun historique : une enveloppe publiée par un AUTRE worker
+    pendant que notre abonnement était rompu est perdue pour nos flux, et
+    aucune reconnexion ne la rapportera. On ne peut donc pas réparer
+    l'enveloppe — on répare l'ÉTAT du client en le faisant relire.
+
+    La relecture est TOTALE : une seule couvre toutes les fenêtres depuis la
+    précédente. D'où un plancher (`RESYNC_MIN_INTERVAL_SECONDS`) — relire à
+    chaque reprise d'un Redis qui bat de l'aile serait plus bavard que le
+    sondage remplacé (2 req/min) — et une relecture DIFFÉRÉE quand la dernière
+    fenêtre tombe dans la marge, pour qu'aucune ne reste non réparée.
+    """
+    global _resync_en_attente, _resync_tache
+    _bus_compteurs["reprises"] += 1
+    if time.monotonic() - _dernier_resync < RESYNC_MIN_INTERVAL_SECONDS:
+        if _resync_en_attente or not _bus_actif:
+            return
+        _resync_en_attente = True
+        _resync_tache = asyncio.create_task(_resync_differee())
+        return
+    _diffuser_resync("bus_reprise")
+
+
 async def _abonnement(client: Any) -> None:
     """Écoute le canal partagé et redistribue aux flux LOCAUX de ce process.
 
     La reprise est une boucle bornée par `BUS_RECONNECT_SECONDS` : un Redis qui
-    redémarre ne doit pas rendre le process sourd pour toute sa vie.
+    redémarre ne doit pas rendre le process sourd pour toute sa vie. Mais la
+    reprise ne RATTRAPE rien (le pub/sub n'a pas d'historique) : chaque
+    interruption est donc une fenêtre aveugle, comptée (`reprises`) et réparée
+    par une relecture (`resync`) au rétablissement. La toute PREMIÈRE
+    souscription n'en est pas une : aucun flux n'a vécu sans elle.
     """
-    while True:
+    aveugle = False
+    while not _bus_arret:
         pubsub = None
         try:
             pubsub = client.pubsub()
             await pubsub.subscribe(BUS_CHANNEL)
-            async for message in pubsub.listen():
-                if not message or message.get("type") != "message":
+            _bus_compteurs["ecoutes"] += 1
+            if aveugle:
+                # Réparer AVANT de recevoir : le client relit la vérité d'abord,
+                # puis les événements de la reprise s'appliquent par-dessus.
+                aveugle = False
+                _reparer_apres_perte()
+            while True:
+                message = await pubsub.get_message(
+                    ignore_subscribe_messages=True,
+                    timeout=BUS_READ_TIMEOUT_SECONDS,
+                )
+                if _bus_arret:
+                    break
+                if message is None:
+                    # Canal calme : ce n'est PAS une coupure, la connexion est
+                    # toujours ouverte (cf. `BUS_READ_TIMEOUT_SECONDS`).
                     continue
-                _livrer_enveloppe(message.get("data"))
+                if message.get("type") == "message":
+                    _livrer_enveloppe(message.get("data"))
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # noqa: BLE001 - l'abonnement se reprend
+            aveugle = True
             _bus_compteurs["repli"] += 1
             logger.warning(
                 "Bus temps réel : abonnement interrompu (%s) — reprise dans %.1f s.",

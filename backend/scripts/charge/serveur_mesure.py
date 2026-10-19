@@ -329,12 +329,17 @@ class _PubSubMemoire:
     async def subscribe(self, canal):
         self._file = self._bus.abonner(canal)
 
-    async def listen(self):
-        while not self._ferme:
-            message = await self._file.get()
-            if message is None:
-                return
-            yield {"type": "message", "data": message}
+    async def get_message(self, ignore_subscribe_messages=True, timeout=None):
+        """Un message, ou `None` quand le canal est calme (jamais une coupure)."""
+        if self._ferme or self._file is None:
+            return None
+        try:
+            message = await asyncio.wait_for(self._file.get(), timeout=timeout)
+        except asyncio.TimeoutError:
+            return None
+        if message is None:
+            return None
+        return {"type": "message", "data": message}
 
     async def aclose(self):
         if not self._ferme and self._file is not None:
