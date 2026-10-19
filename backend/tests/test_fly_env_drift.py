@@ -572,3 +572,119 @@ class TestOrphelinsBoutEnBout:
         ).read_text(encoding="utf-8")
         assert "run: python .github/scripts/check-fly-env-drift.py" in workflow
         assert "FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}" in workflow
+
+
+class TestBattementDeploye:
+    """`KOJO_SSE_HEARTBEAT_SECONDS` posé sur la machine : la valeur que les
+    gardes HORS LIGNE ne peuvent pas voir.
+
+    `battement-coeur-aligne.test.js` lit trois sources commitées (défaut Python,
+    `fly.toml`, config du client) ; une surcharge posée en secret Fly change le
+    battement RÉEL sans toucher aucune des trois. Mesure à l'origine du défaut :
+    une fenêtre client de 15 s contre un battement de 20 s déclarait TOMBÉ un
+    flux vivant mais inactif, donc une reconnexion par flux inactif — plus
+    d'allers-retours que le sondage que le flux remplace.
+
+    Deux moitiés sont éprouvées ici : la RÈGLE (valeurs en clair, aucun réseau)
+    et son CÂBLAGE dans `main()` (sans lui, la règle serait un ornement).
+    """
+
+    def test_le_contrat_est_lu_dans_la_config_du_client(self, check):
+        # Les trois nombres sont LUS, jamais recopiés : 20 s de battement, un
+        # battement manqué toléré, 5 s de marge → 45 s de silence toléré. La
+        # valeur 45 000 est aussi celle qu'asserte le garde JavaScript : si le
+        # client change, c'est LUI qui fait foi et ce test dit l'écart.
+        assert check.contrat_du_client() == (20000.0, 45000.0)
+
+    def test_un_contrat_illisible_n_est_pas_un_contrat(self, check, tmp_path):
+        fichier = tmp_path / "flux-temps-reel.js"
+        fichier.write_text("export const AUTRE = 1;\n", encoding="utf-8")
+        assert check.contrat_du_client(fichier) is None
+        assert check.contrat_du_client(tmp_path / "absent.js") is None
+
+    def test_une_surcharge_absente_est_nommee_sans_rougir(self, check):
+        check.errors, check.checked = [], []
+        check.check_heartbeat_contract(False, "", check.contrat_du_client())
+        assert check.errors == []
+        assert any("KOJO_SSE_HEARTBEAT_SECONDS" in ligne for ligne in check.checked)
+
+    def test_une_surcharge_qui_tient_dans_la_fenetre_passe(self, check):
+        contrat = check.contrat_du_client()
+        # 20 s (le défaut) et 15 s (plus RAPIDE que le défaut) sont deux états
+        # sains : un battement plus fréquent ne fait que raccourcir l'attente du
+        # client, il ne peut pas la dépasser.
+        for valeur in ("20", "15", "22.5"):
+            check.errors, check.checked = [], []
+            check.check_heartbeat_contract(True, valeur, contrat)
+            assert check.errors == [], (valeur, check.errors)
+            assert quantite(check.checked, "KOJO_SSE_HEARTBEAT_SECONDS") == 1
+
+    def test_une_surcharge_plus_longue_que_la_fenetre_est_refusee(self, check):
+        check.errors, check.checked = [], []
+        check.check_heartbeat_contract(True, "30", check.contrat_du_client())
+        assert len(check.errors) == 1, check.errors
+        refus = check.errors[0]
+        # Le refus NOMME les deux nombres en présence (30 s déployé, 45 s de
+        # fenêtre) et le remède : sans eux, il faudrait rouvrir deux fichiers
+        # pour savoir de quel écart on parle.
+        assert "30" in refus and "45000" in refus and "fenêtre" in refus, refus
+        assert "fly secrets unset KOJO_SSE_HEARTBEAT_SECONDS" in refus
+
+    def test_une_valeur_illisible_est_refusee_sans_la_publier(self, check):
+        check.errors, check.checked = [], []
+        check.check_heartbeat_contract(True, "trente-secondes", check.contrat_du_client())
+        assert len(check.errors) == 1, check.errors
+        refus = check.errors[0]
+        assert "ILLISIBLE" in refus
+        # La valeur n'est jamais recopiée : un secret se masque, et celui-ci
+        # pourrait un jour porter autre chose qu'un nombre.
+        assert "trente" not in refus, refus
+        assert "15 car." in refus, refus
+
+    def test_un_battement_nul_est_refuse(self, check):
+        check.errors, check.checked = [], []
+        check.check_heartbeat_contract(True, "0", check.contrat_du_client())
+        assert len(check.errors) == 1, check.errors
+        assert "ne bat pas" in check.errors[0]
+
+    def test_une_valeur_non_lue_est_un_angle_mort_declare(self, check):
+        # SSH indisponible en CI : la règle ne peut pas juger. Elle le DIT, et
+        # ne rougit pas — comme les formats de secrets déployés, dont la valeur
+        # est lue par le même canal. Un vert ici serait un vert sans lecture.
+        check.errors, check.checked = [], []
+        check.check_heartbeat_contract(True, "", check.contrat_du_client())
+        assert check.errors == []
+        assert any("[AUCUN VERDICT]" in ligne and "KOJO_SSE_HEARTBEAT" in ligne
+                   for ligne in check.checked), check.checked
+
+    def test_un_contrat_illisible_refuse_de_conclure(self, check):
+        check.errors, check.checked = [], []
+        check.check_heartbeat_contract(True, "20", None)
+        assert len(check.errors) == 1, check.errors
+        assert "ILLISIBLE" in check.errors[0]
+        assert "flux-temps-reel.js" in check.errors[0]
+
+    def test_la_regle_est_cablee_dans_main(self, check, monkeypatch, capsys):
+        """Sans ce cas, la règle pourrait exister sans être appelée : le job
+        resterait vert et la surcharge continuerait de passer."""
+        monkeypatch.setattr(check, "API_TOKEN", "jeton-factice")
+        monkeypatch.setattr(
+            check, "fetch_json", lambda url, token: [{"id": "m", "state": "started", "config": {"env": {}}}]
+        )
+        monkeypatch.setattr(
+            check, "list_fly_secrets", lambda token: {"KOJO_SSE_HEARTBEAT_SECONDS": "digest"}
+        )
+        monkeypatch.setattr(
+            check, "read_secrets_via_ssh",
+            lambda keys: {cle: "30" for cle in keys if cle == "KOJO_SSE_HEARTBEAT_SECONDS"},
+        )
+        check.errors, check.checked = [], []
+        code = check.main([])
+        sortie = capsys.readouterr().out
+        assert "[KOJO_SSE_HEARTBEAT_SECONDS]" in sortie, sortie
+        assert "deux battements" in sortie, sortie
+        assert code == 1, sortie
+
+
+def quantite(lignes, motif):
+    return sum(1 for ligne in lignes if motif in ligne)

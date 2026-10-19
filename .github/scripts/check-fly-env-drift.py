@@ -37,6 +37,12 @@ donc ce qui l'est réellement :
      CORS, VAPID, TRUSTED_HOSTS, REDIS_URL, MONGO_URL). Détecte une valeur
      déployée mal formée (ex. un slash final sur BACKEND_PUBLIC_URL, un
      espace après mailto:, une URI redis:// manquante).
+  8. BATTEMENT DE CŒUR DÉPLOYÉ : `KOJO_SSE_HEARTBEAT_SECONDS`, s'il est posé
+     (secret ou [env]), est jugé contre la fenêtre de silence du CLIENT
+     (`frontend/src/config/flux-temps-reel.js`, lue et non recopiée) : deux
+     battements doivent tenir dans cette fenêtre, sinon un flux vivant mais
+     inactif serait déclaré tombé. C'est la seule valeur qu'aucun garde hors
+     ligne ne peut voir — elle n'existe que sur la machine déployée.
 
 Usage :
     FLY_API_TOKEN=<deploy_token> python .github/scripts/check-fly-env-drift.py
@@ -406,6 +412,117 @@ def check_env_example_coverage(example_keys, fly_toml_env, fly_secrets):
                 f"NI secret sur Fly — le poser (fly secrets set) ou l'ajouter "
                 f"à OPTIONAL_KEYS si un défaut de repli existe dans le code."
             )
+
+
+# ── Le battement de cœur DÉPLOYÉ, jugé contre la fenêtre du CLIENT ──────────
+# La surcharge échappait à TOUS les gardes du dépôt :
+# `battement-coeur-aligne.test.js` lit le défaut Python, `fly.toml` et la config
+# du client — trois sources HORS LIGNE. Poser `KOJO_SSE_HEARTBEAT_SECONDS` en
+# secret Fly change le battement RÉEL sans toucher aucune des trois (mesuré le
+# 18/10/2026 : une fenêtre client de 15 s contre un battement de 20 s déclarait
+# tombé un flux VIVANT mais inactif, donc une reconnexion par flux inactif —
+# plus d'allers-retours que le sondage remplacé). Cette règle-ci juge la valeur
+# DÉPLOYÉE, là où elle existe : c'est la seule qui compte.
+BATTEMENT_KEY = "KOJO_SSE_HEARTBEAT_SECONDS"
+FLUX_CONFIG = REPO_ROOT / "frontend" / "src" / "config" / "flux-temps-reel.js"
+
+
+def contrat_du_client(chemin=None):
+    """(battement_ms, fenêtre_ms) du CLIENT, LUS dans sa config — ou None.
+
+    Les trois nombres sont LUS, jamais recopiés : un `45000` écrit ici serait une
+    seconde source, et c'est la divergence de deux sources qui a coûté une
+    reconnexion par flux inactif. `None` = contrat illisible (fichier absent ou
+    export renommé) : l'appelant refuse alors de conclure au lieu de supposer.
+    """
+    chemin = FLUX_CONFIG if chemin is None else chemin
+    try:
+        texte = Path(chemin).read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+    def nombre(nom):
+        trouve = re.search(rf"export const {nom}\s*=\s*([\d.]+)\s*;", texte)
+        return float(trouve.group(1)) if trouve else None
+
+    battement = nombre("BATTEMENT_SERVEUR_MS")
+    toleres = nombre("BATTEMENTS_TOLERES")
+    marge = nombre("MARGE_GIGUE_MS")
+    if battement is None or toleres is None or marge is None:
+        return None
+    # La MÊME formule que le client (`SILENCE_TIMEOUT_MS`), appliquée aux nombres
+    # lus : le client tolère `toleres` battements manqués, plus une marge de
+    # gigue.
+    return battement, battement * (toleres + 1) + marge
+
+
+def check_heartbeat_contract(deploye, valeur, contrat=None):
+    """Le battement déployé doit tenir DANS la fenêtre du client.
+
+    Invariant jugé : `2 × battement ≤ fenêtre de silence` — celui du garde hors
+    ligne (`SILENCE_TIMEOUT_MS >= 2 × BATTEMENT_SERVEUR_MS`) : le client doit
+    pouvoir manquer un battement sans condamner un flux vivant.
+
+    Un intervalle n'est pas un secret, contrairement à ce que `SECRET_FORMAT_CHECKS`
+    sait masquer : le nommer est ce qui rend le refus actionnable (« 30 s contre
+    une fenêtre de 45 s »). Aucune autre valeur déployée n'est jamais citée ici.
+    """
+    if not deploye:
+        checked.append(
+            f"  {OK} {BATTEMENT_KEY} non surchargé sur Fly (défaut du code)"
+        )
+        return
+    if contrat is None:
+        errors.append(
+            f"[{BATTEMENT_KEY}] surchargé sur Fly, mais le contrat du client est "
+            f"ILLISIBLE ({FLUX_CONFIG.name}) — l'écart réel avec la fenêtre de "
+            f"silence n'a pas pu être jugé. Rétablir les exports "
+            f"BATTEMENT_SERVEUR_MS / BATTEMENTS_TOLERES / MARGE_GIGUE_MS."
+        )
+        return
+    _, fenetre_ms = contrat
+    brut = str(valeur or "").strip()
+    if not brut:
+        # Aveugle, et DIT : la valeur d'un secret se lit par SSH, indisponible
+        # dans la CI. Un vert ici serait un vert qui n'a rien mesuré.
+        checked.append(
+            f"  [AUCUN VERDICT] {BATTEMENT_KEY} DÉPLOYÉ mais sa valeur est illisible "
+            f"(SSH indisponible) — l'écart avec la fenêtre client ({fenetre_ms:g} ms) "
+            "n'a pas été jugé"
+        )
+        return
+    try:
+        secondes = float(brut)
+    except ValueError:
+        errors.append(
+            f"[{BATTEMENT_KEY}] valeur DÉPLOYÉE ILLISIBLE ({len(brut)} car., "
+            "attendu un nombre de secondes) — le battement réel n'est pas "
+            "connaissable, donc la fenêtre du client ne peut pas le contenir. "
+            f"Corriger ou retirer (fly secrets unset {BATTEMENT_KEY})."
+        )
+        return
+    deploye_ms = secondes * 1000
+    if deploye_ms <= 0:
+        errors.append(
+            f"[{BATTEMENT_KEY}] valeur DÉPLOYÉE {secondes:g} s : un battement nul ou "
+            "négatif ne bat pas — le flux serait muet dès l'ouverture. "
+            f"fly secrets unset {BATTEMENT_KEY} pour revenir au défaut du code."
+        )
+        return
+    if deploye_ms * 2 > fenetre_ms:
+        errors.append(
+            f"[{BATTEMENT_KEY}] battement DÉPLOYÉ {secondes:g} s : deux battements "
+            f"({deploye_ms * 2:g} ms) dépassent la fenêtre de silence du client "
+            f"({fenetre_ms:g} ms) — un flux VIVANT mais inactif serait déclaré "
+            "tombé, donc une reconnexion par flux inactif. Aligner la fenêtre du "
+            "client (frontend/src/config/flux-temps-reel.js) ou retirer la "
+            f"surcharge (fly secrets unset {BATTEMENT_KEY})."
+        )
+        return
+    checked.append(
+        f"  {OK} {BATTEMENT_KEY} = {secondes:g} s — deux battements "
+        f"({deploye_ms * 2:g} ms) tiennent dans la fenêtre client ({fenetre_ms:g} ms)"
+    )
 
 
 def _mask(value):
@@ -795,6 +912,15 @@ def main(argv=None):
             )
     except RuntimeError as exc:
         errors.append(str(exc))
+
+    # 4e) BATTEMENT DE CŒUR DÉPLOYÉ : la seule valeur que les gardes hors ligne
+    # ne voient pas. La surcharge vit en secret Fly (ou, à tort, dans [env]) :
+    # on la lit là où elle est, puis on la juge contre la fenêtre du CLIENT.
+    deploye = BATTEMENT_KEY in fly_secrets or BATTEMENT_KEY in live_env
+    valeur_battement = live_env.get(BATTEMENT_KEY, "")
+    if deploye and not valeur_battement and BATTEMENT_KEY in fly_secrets:
+        valeur_battement = read_secrets_via_ssh([BATTEMENT_KEY]).get(BATTEMENT_KEY, "")
+    check_heartbeat_contract(deploye, valeur_battement, contrat_du_client())
 
     # 5) FORMAT : références du dépôt (déterministe) PUIS valeurs déployées
     _auditer_references()
