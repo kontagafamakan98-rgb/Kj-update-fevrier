@@ -47,7 +47,7 @@ export default function ConsentBanner() {
     <section
       role="region"
       aria-label={t('cookiesConsentTitle')}
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-stone-200 bg-white px-4 py-4 shadow-lg md:bottom-6 md:left-auto md:right-6 md:max-w-sm md:rounded-[3px] md:border"
+      className="fixed inset-x-0 bottom-0 z-50 border-t px-4 py-4 verre-barre md:bottom-6 md:left-auto md:right-6 md:max-w-sm md:rounded-[3px] md:border"
     >
       <h2 className="text-sm font-semibold text-stone-900">{t('cookiesConsentTitle')}</h2>
       <p className="mt-1 text-sm text-stone-600">{t('cookiesConsentBody')}</p>

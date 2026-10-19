@@ -178,7 +178,7 @@ export default function NotificationPanel() {
       // pas non plus — la minification renomme les variables, et l'objet vit dans
       // un autre module que son lecteur. Ce que le corpus lit, c'est un LITTÉRAL
       // dans une position de classe : il est ici, à l'endroit qui peint.
-      className={`carte-flottante absolute right-0 ${sens === VERS_LE_HAUT ? 'bottom-full mb-2' : 'mt-2'} w-[340px] sm:w-[380px] max-h-[520px] flex flex-col z-50 overflow-hidden outline-hidden`}
+      className={`verre-panneau absolute right-0 ${sens === VERS_LE_HAUT ? 'bottom-full mb-2' : 'mt-2'} w-[340px] sm:w-[380px] max-h-[520px] flex flex-col z-50 overflow-hidden outline-hidden`}
       style={{ maxHeight: 'calc(100vh - 80px)' }}
     >
       {/* En-tête */}

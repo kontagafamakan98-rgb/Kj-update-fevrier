@@ -2877,6 +2877,277 @@ form label {
   }
 }
 
+/* ══ LES TROIS EFFETS : VERRE CHAUD, FORME LIQUIDE, TITRE CINÉTIQUE ═════════
+
+   Troisième langage du site, et il ne remplace aucun des deux précédents :
+   l'accueil parle en SECTIONS, les écrans en BLOCS, et ce bloc-ci ajoute ce que
+   les deux n'avaient pas — une MATIÈRE. Il est écrit ici, à la fin, pour une
+   raison qui n'est pas cosmétique : la feuille est INLINÉE ENTIÈRE dans chaque
+   document pré-rendu (`vite-plugins/inline-critical-css.js`), donc ces règles
+   sont lues AVANT le premier paint, et elles ne doivent rien coûter au LCP ni
+   au CLS. D'où la contrainte tenue par les trois familles ci-dessous :
+     • `.verre-barre` / `.verre-panneau` ne peignent qu'un FOND, un FILET, une
+       OMBRE et un `backdrop-filter` — aucune propriété de mise en page ;
+     • `.morphe` ne peint qu'un `border-radius` (et une tache, pour le bandeau
+       d'écran) : la boîte garde sa taille, donc rien ne se déplace ;
+     • le titrage cinétique ne peint qu'un DÉGRADÉ DANS LES GLYPHES
+       (`background-clip: text`) : le texte est peint dès la première frame, à
+       la même place et dans la même boîte. L'ÉLECTION du LCP, elle, se mesure
+       (voir le titrage plus bas : un titre peint par un fond n'est plus un
+       candidat texte pour Chrome, et c'est pourquoi `.titre-page` en est exclu).
+
+   Le verre est CHAUD, et c'est dit : un `backdrop-filter` sur du blanc froid
+   donnerait au site la matière d'un gabarit d'application, exactement ce que la
+   refonte du 27/09/2026 a retiré. Les deux teintes sont prises aux jetons du
+   site (papier et filet), jamais inventées pour l'occasion.
+
+   `prefers-reduced-motion` ne reçoit pas un dessin différent : il reçoit le
+   dessin IMMOBILE — titres en encre pleine (ou blancs sur l'orange), formes
+   rondes et calmes. Une animation refusée ne doit jamais rendre un texte
+   invisible ni une surface méconnaissable. Même règle en `forced-colors`, où
+   un repli de dégradé dans des glyphes transparents effacerait le titre. */
+
+/* ── LE VERRE CHAUD ─────────────────────────────────────────────────────────
+
+   Deux variantes, parce qu'il y a deux relations et pas une : une BARRE est
+   collée au bord de la fenêtre (elle n'a pas de rayon, son filet est déjà porté
+   par l'utilitaire `border-b`/`border-t`), un PANNEAU flotte au-dessus du
+   contenu (il a son rayon et son ombre, comme `.carte-flottante`). Le fond est
+   le PAPIER du site à 78-82 %, jamais du blanc pur : sur la crème, un blanc
+   opaque se lit comme une découpe, pas comme une vitre. */
+.verre-barre {
+  background-color: rgba(253, 250, 244, 0.78);
+  border-color: rgba(240, 220, 195, 0.9);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 10px 30px -24px rgba(120, 53, 15, 0.35);
+  -webkit-backdrop-filter: blur(16px) saturate(1.25);
+  backdrop-filter: blur(16px) saturate(1.25);
+}
+
+.verre-panneau {
+  background-color: rgba(253, 250, 244, 0.82);
+  border: 1px solid rgba(240, 220, 195, 0.95);
+  border-radius: 0.75rem;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 24px 50px -30px rgba(120, 53, 15, 0.45);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  backdrop-filter: blur(20px) saturate(1.3);
+}
+
+/* Le repli : un navigateur sans `backdrop-filter` ne doit pas peindre une vitre
+   À MOITIÉ (un fond à 78 % sans flou laisse lire le contenu derrière). Il
+   reçoit le papier PLEIN, et la barre comme le panneau restent lisibles. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .verre-barre,
+  .verre-panneau {
+    background-color: var(--kojo-papier);
+  }
+}
+
+/* ── LA FORME LIQUIDE ───────────────────────────────────────────────────────
+
+   Une seule `@keyframes`, et elle ne peint qu'un RAYON. C'est ce qui la rend
+   sûre sur n'importe quelle surface : le rayon ne participe pas à la boîte, donc
+   une forme qui se déforme ne pousse rien. Elle est réservée aux formes
+   DÉCORATIVES (la tache d'un bandeau d'écran, la pastille d'un état vide) : un
+   texte, une photo ou une carte de contenu gardent leur forme — une carte qui
+   ondulerait se lirait comme un défaut de rendu, pas comme une matière.
+
+   L'amplitude est VOLONTAIREMENT faible (46-58 %) : au-delà, la forme cesse de
+   se lire comme un galet et commence à se lire comme un bug. */
+@keyframes kojo-morphe {
+  0% {
+    border-radius: 46% 54% 52% 48% / 52% 46% 54% 48%;
+  }
+  50% {
+    border-radius: 58% 42% 44% 56% / 45% 58% 42% 55%;
+  }
+  100% {
+    border-radius: 46% 54% 52% 48% / 52% 46% 54% 48%;
+  }
+}
+
+.morphe {
+  /* Le rayon de REPOS est déjà organique : sous `prefers-reduced-motion`, où
+     l'animation s'éteint, la pastille reste un galet calme et non un cercle
+     parfait — le dessin immobile est le même dessin, arrêté. */
+  border-radius: 46% 54% 52% 48% / 52% 46% 54% 48%;
+  animation: kojo-morphe 16s var(--kojo-ease) infinite;
+}
+
+/* La tache du BANDEAU D'ÉCRAN : elle donne une matière au premier bloc d'un
+   écran connecté sans ajouter un seul nœud au document (donc sans rien à tenir
+   d'accord entre React et une coquille — ces routes ne sont pas pré-rendues).
+   `z-index: -1` avec `isolation` la garde DERRIÈRE le contenu mais DEVANT le
+   fond du bandeau, et `pointer-events: none` l'empêche d'avaler un appui. */
+.bande-app {
+  position: relative;
+  isolation: isolate;
+}
+
+.bande-app::before {
+  /* La tache RESTE DANS LE BANDEAU : mesuré le 19/10/2026, une tache de 9 rem
+     ancrée en haut à droite débordait sous la carte et se lisait comme une
+     salissure sur la page. Elle est donc CENTRÉE verticalement et bornée à une
+     taille qui tient dans la hauteur d'un bandeau (son rembourrage est déjà
+     `--rythme-carte`, 22 à 32 px, plus son contenu) — sans `overflow: hidden`
+     sur la carte, qui couperait aussi l'anneau de focus de ses boutons. */
+  position: absolute;
+  top: 50%;
+  right: 1.25rem;
+  z-index: -1;
+  width: clamp(3rem, 10vw, 4.5rem);
+  height: clamp(3rem, 10vw, 4.5rem);
+  transform: translateY(-50%);
+  border-radius: 46% 54% 52% 48% / 52% 46% 54% 48%;
+  background-image: radial-gradient(
+    circle at 35% 35%,
+    rgba(234, 88, 12, 0.18),
+    rgba(234, 88, 12, 0) 70%
+  );
+  content: "";
+  pointer-events: none;
+  animation: kojo-morphe 18s var(--kojo-ease) infinite;
+}
+
+/* La pastille d'une tuile d'action se liquéfie AU SURVOL, et seulement là :
+   c'est une réponse à un geste, pas une décoration qui bouge toute seule. Le
+   rayon de repos est celui du vocabulaire (0,375 rem). */
+.tuile-action-icone {
+  transition: border-radius 0.3s var(--kojo-ease);
+}
+
+.tuile-action:hover .tuile-action-icone {
+  border-radius: 42% 58% 55% 45% / 55% 45% 58% 42%;
+}
+
+/* ── LE TITRAGE CINÉTIQUE ───────────────────────────────────────────────────
+
+   Un reflet de marque TRAVERSE les glyphes, lentement, sans jamais changer la
+   boîte du titre : `background-clip: text` peint le dégradé DANS les lettres,
+   et seule `background-position` bouge. C'est le seul effet continu du site, et
+   il est borné au titrage — trois porteurs, un seul nom d'animation.
+
+   POURQUOI PAS `.titre-page` PARTOUT, ET C'EST MESURÉ : le 19/10/2026, le
+   dégradé posé sur `.titre-page` a fait PERDRE son candidat texte à /about
+   (mobile) — le navigateur a élu le conteneur (`min-h-screen fond-sable …`)
+   au lieu du paragraphe déclaré (`introClass`), `lcp-geometrie-declaree.spec.js`
+   l'a nommé, et le retrait du dégradé a fait repasser le cas. Un titre dont les
+   glyphes sont peints par un FOND n'est plus, pour Chrome, une peinture de
+   texte : l'élection se déplace, et une page peut élire une boîte qu'aucun plan
+   ne décrit. L'effet est donc posé sur l'explicite (`.titre-cinetique`, que les
+   titres d'écran portent depuis `src/config/app-cadres.js`) et sur les deux
+   classes dont l'élection est mesurée ailleurs (`.titre-section`, `.titre-heros`
+   — les titres de section et le héros, dont le LCP de « / » est la PHOTO). Une
+   page publique garde son titre plein : c'est le prix de son LCP.
+
+   Les deux teintes du reflet sont des JETONS : l'encre et l'orange foncé sur
+   papier, le blanc et la crème sur l'orange du héros. Aucune couleur nouvelle,
+   donc aucun contraste à re-mesurer : le pire état du reflet est l'orange foncé
+   (#c2410c) sur le papier, 4,9:1 — au-dessus du seuil du grand texte, et le
+   titre est toujours du grand texte.
+
+   Les titres POSÉS SUR L'ORANGE sortent de l'effet (`.bande-page`, `.cta-final`) :
+   un reflet d'encre sur un fond orange serait illisible, et c'est exactement le
+   défaut que la règle de couleur de `.bande-page .titre-page` corrige depuis le
+   28/09/2026. L'exception est écrite ICI, à côté de ce qu'elle excepte. */
+@keyframes kojo-cinetique {
+  from {
+    background-position: 130% 50%;
+  }
+  to {
+    background-position: -30% 50%;
+  }
+}
+
+.titre-section,
+.titre-heros,
+.titre-cinetique {
+  --cinetique-a: var(--kojo-encre);
+  --cinetique-b: var(--kojo-orange-fonce);
+  background-image: linear-gradient(
+    100deg,
+    var(--cinetique-a) 0%,
+    var(--cinetique-a) 38%,
+    var(--cinetique-b) 50%,
+    var(--cinetique-a) 62%,
+    var(--cinetique-a) 100%
+  );
+  /* LE FOND COUVRE TOUJOURS LE TEXTE, et ce n'est pas un détail : un dégradé
+     positionné hors de la boîte laisse des glyphes SANS fond — donc, avec
+     `-webkit-text-fill-color: transparent`, des glyphes INVISIBLES. Mesuré le
+     19/10/2026 sur /jobs, quand `.titre-page` portait encore l'effet : le titre
+     affichait « is disponibles », l'animation ayant déplacé la bande hors des
+     premières lettres. La couleur
+     de fond (`--cinetique-a`) est donc peinte SOUS le dégradé, et la bande se
+     RÉPÈTE : son début et sa fin sont la MÊME teinte, donc la couture est
+     invisible et le reflet ne peut jamais découvrir un mot. */
+  background-color: var(--cinetique-a);
+  background-repeat: repeat;
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: kojo-cinetique 13s linear infinite;
+}
+
+.titre-heros {
+  --cinetique-a: #fff;
+  --cinetique-b: #ffe4cf;
+}
+
+/* L'EXCEPTION, nommée : les titres sur l'orange reprennent leur couleur pleine
+   et perdent le dégradé. `currentColor` lit la couleur que la règle de la bande
+   pose (#fff), donc l'exception ne recopie aucune teinte. */
+.bande-page .titre-cinetique,
+.bande-page .titre-section,
+.cta-final .titre-cinetique,
+.cta-final .titre-section,
+.cta-final h2 {
+  background-image: none;
+  -webkit-text-fill-color: currentColor;
+  animation: none;
+}
+
+/* Le dessin IMMOBILE : plus d'animation, et le titrage reprend son encre pleine
+   plutôt qu'un dégradé arrêté au milieu d'un mot. */
+@media (prefers-reduced-motion: reduce) {
+  .morphe,
+  .bande-app::before {
+    animation: none;
+  }
+
+  .titre-section,
+  .titre-heros,
+  .titre-cinetique {
+    background-image: none;
+    -webkit-text-fill-color: currentColor;
+    animation: none;
+  }
+
+  .tuile-action-icone {
+    transition: none;
+  }
+
+  .tuile-action:hover .tuile-action-icone {
+    border-radius: 0.375rem;
+  }
+}
+
+/* Les couleurs FORCÉES du système ignorent un fond : un glyphe rempli par un
+   dégradé devenu transparent disparaîtrait. Le titre reprend la couleur texte
+   du système, comme n'importe quel autre titre. */
+@media (forced-colors: active) {
+  .titre-section,
+  .titre-heros,
+  .titre-cinetique {
+    background-image: none;
+    -webkit-text-fill-color: currentColor;
+  }
+}
+
 
 
 

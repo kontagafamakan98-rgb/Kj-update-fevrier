@@ -245,7 +245,7 @@ export default function Navbar() {
       {isMobileMenuOpen && (
         <>
           <button type="button" aria-label={t('closeMenu')} className="fixed inset-0 z-40 bg-black/30 md:hidden" onClick={closeMobileMenu} />
-          <div ref={menuRef} id="mobile_menu" className="relative z-50 md:hidden border-t border-gray-200 bg-white shadow-xl">
+          <div ref={menuRef} id="mobile_menu" className="relative z-50 md:hidden border-t verre-barre">
             {/* `overscroll-contain` : arrivé au bout du tiroir, un geste de plus ne
                 doit pas faire défiler la PAGE derrière lui — le corps est déjà gelé
                 (`overflow: hidden`), mais la chaîne de défilement remonte quand

@@ -246,7 +246,7 @@ export const CADRES_APP = {
     // La plus large : le tableau de bord aligne des colonnes de statistiques et
     // une liste de missions, deux contenus qui respirent en largeur.
     frameClass: 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 cadre-page',
-    titleClass: 'titre-page',
+    titleClass: 'titre-page titre-cinetique',
     squelette: {
       regle: REGLES_DE_SQUELETTE.PIED_HORS_ECRAN,
       hauteurClass: HAUTEUR_PIED_HORS_ECRAN,
@@ -261,7 +261,7 @@ export const CADRES_APP = {
     // Colonne de lecture : un formulaire de profil se parcourt du regard, il ne
     // se compare pas en colonnes.
     frameClass: 'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 cadre-page',
-    titleClass: 'titre-page',
+    titleClass: 'titre-page titre-cinetique',
     squelette: {
       regle: REGLES_DE_SQUELETTE.PIED_HORS_ECRAN,
       hauteurClass: HAUTEUR_PIED_HORS_ECRAN,
@@ -276,7 +276,7 @@ export const CADRES_APP = {
     // Deux colonnes (fils et conversation) : entre le tableau de bord et la
     // colonne de lecture, la largeur où les deux tiennent sans se tasser.
     frameClass: 'max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 cadre-page',
-    titleClass: 'titre-page',
+    titleClass: 'titre-page titre-cinetique',
     squelette: {
       regle: REGLES_DE_SQUELETTE.REPLIQUE,
       pourquoi:
@@ -292,7 +292,7 @@ export const CADRES_APP = {
     // Formulaire : même raison que /profile. Sa gouttière était `px-4` seul —
     // c'est précisément la divergence que cette déclaration ferme.
     frameClass: 'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 cadre-page',
-    titleClass: 'titre-page',
+    titleClass: 'titre-page titre-cinetique',
     squelette: {
       regle: REGLES_DE_SQUELETTE.GENERIQUE,
       pourquoi:
@@ -326,7 +326,7 @@ export const CADRES_APP = {
     emplacement: 'pages/JobDetails.js',
     // Une mission se lit à côté de ses actions : large, comme le tableau de bord.
     frameClass: 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 cadre-page',
-    titleClass: 'titre-page',
+    titleClass: 'titre-page titre-cinetique',
     squelette: {
       regle: REGLES_DE_SQUELETTE.PIED_HORS_ECRAN,
       hauteurClass: HAUTEUR_PIED_HORS_ECRAN,

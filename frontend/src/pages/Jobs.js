@@ -554,7 +554,7 @@ export default function Jobs() {
             {/* Un état vide a besoin d'un VISAGE avant d'avoir une phrase :
                 le pictogramme dit en une seconde qu'il n'y a rien à lire, et
                 l'action est juste en dessous. */}
-            <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-stone-100 text-stone-400" aria-hidden="true">
+            <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-stone-100 text-stone-400 morphe" aria-hidden="true">
               <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <circle cx="11" cy="11" r="6.5" />
                 <path strokeLinecap="round" d="m16 16 4.5 4.5" />
