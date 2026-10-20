@@ -42,10 +42,19 @@ const API = 'http://127.0.0.1:8123/api';
 // Les jetons, écrits une fois : ce sont les valeurs de src/index.css. Une sonde
 // qui les relirait dans la feuille ne pourrait plus signaler qu'on l'a changée
 // sans le dire.
+//
+// RE-DÉCLARÉS LE 20/10/2026, et c'est la sonde qui l'a demandé : la carte
+// éditoriale est devenue du VERRE (`.carte-editoriale`, un fond de papier chaud
+// à 94 % et un filet de crème translucide) pour tenir le contraste au pire fond
+// composé. L'ancienne paire opaque (`--kojo-papier` / `--kojo-filet`) n'est plus
+// ce que la feuille peint, et ces deux littéraux ont rougi en CI exactement
+// comme ils doivent : en nommant le changement au lieu de le suivre en silence.
+// L'état, lui, n'a pas bougé : le filet choisi reste #fdba74, le fond choisi la
+// crème de la marque, et la largeur du filet est la même dans les deux états.
 const FILET_CHOISIE = 'rgb(253, 186, 116)'; // #fdba74, le filet de `.etiquette-app-orange`
 const CREME = 'rgb(255, 247, 237)'; // --kojo-creme
-const FILET_NEUTRE = 'rgb(230, 225, 215)'; // --kojo-filet
-const PAPIER = 'rgb(255, 253, 249)'; // --kojo-papier
+const FILET_NEUTRE = 'rgba(240, 220, 195, 0.9)'; // le filet du verre de carte
+const VERRE = 'rgba(252, 249, 242, 0.94)'; // le fond de carte, 94 % de papier chaud
 
 /** Connexion par le formulaire, comme un utilisateur — voir l'en-tête. */
 async function connexion(page, email) {
@@ -119,6 +128,11 @@ test.describe('Parcours E2E — la carte de proposition de /jobs/:id', () => {
 
     const [choisie, neutre] = await etats();
     expect(choisie).toEqual({ fond: CREME, filet: FILET_CHOISIE, largeur: '1px', rayon: '8px' });
-    expect(neutre).toEqual({ fond: PAPIER, filet: FILET_NEUTRE, largeur: '1px', rayon: '8px' });
+    expect(neutre).toEqual({ fond: VERRE, filet: FILET_NEUTRE, largeur: '1px', rayon: '8px' });
+    // Les deux états doivent rester DISTINCTS par la feuille, pas seulement par
+    // la classe : si la variante choisie perdait sa teinte, les deux cartes
+    // seraient peintes à l'identique et la liste n'aurait plus d'état lisible.
+    expect(choisie.filet).not.toBe(neutre.filet);
+    expect(choisie.fond).not.toBe(neutre.fond);
   });
 });
