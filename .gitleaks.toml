@@ -102,3 +102,20 @@ condition = "AND"
 commits = ["8e196a6f0c63f6bd4940ea3f66c0aea3b53dd985"]
 paths = ['''^kojo_backend_audit_complet\.py$''']
 targetRules = ["jwt", "generic-api-key"]
+
+# ── 5. Jeton de FIXTURE du test du rapporteur de secrets ────────────────────
+# `backend/tests/test_secret_scan_workflow.py` prouve que le rapporteur ne
+# PUBLIE jamais la valeur d'un constat : il lui faut donc une valeur en FORME
+# de jeton, écrite en clair, pour pouvoir affirmer ensuite qu'elle n'apparaît
+# nulle part dans le rapport ni dans le journal. La chaîne est volontairement
+# factice (« valeurQuiNeDoitJamaisSortir ») et aucun service ne l'a émise.
+#
+# Deux règles la voient — `github-pat` sur la forme du jeton, et
+# `generic-api-key` sur l'affectation `"Secret": "…"` du faux rapport JSON.
+# Les nommer toutes les deux est nécessaire : écarter l'une ferait réapparaître
+# l'autre. Bornée au CHEMIN et aux règles : un vrai jeton, déposé dans un autre
+# fichier de test ou dans celui-ci sous une autre forme, reste refusé.
+[[allowlists]]
+description = "jeton de fixture du test du rapporteur de secrets (valeur factice, jamais émise par un service)"
+paths = ['''^backend/tests/test_secret_scan_workflow\.py$''']
+targetRules = ["github-pat", "generic-api-key"]
