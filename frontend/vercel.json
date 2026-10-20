@@ -84,7 +84,8 @@
     { "source": "/support", "destination": "/support.html" },
     { "source": "/support/", "destination": "/support.html" },
     { "source": "/support-admin", "destination": "/app.html" },
-    { "source": "/support-admin/", "destination": "/app.html" }
+    { "source": "/support-admin/", "destination": "/app.html" },
+    { "source": "/workers/(.*)", "destination": "https://api.kojoforafrica.cc.cd/api/og/workers/$1" }
   ],
   "headers": [
     {

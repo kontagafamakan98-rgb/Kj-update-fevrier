@@ -1,0 +1,121 @@
+# Configuration gitleaks du dépôt — lue par le job `secret-scan` de `ci.yml`
+# (chaque PR, BLOQUANT) et par `.github/workflows/secret-scan-history.yml`
+# (passe unique sur tout l'historique, rejouable en dispatch).
+#
+# ── Pourquoi un fichier de configuration ────────────────────────────────────
+# Le jeu de règles par DÉFAUT de gitleaks est conservé (`[extend] useDefault`) :
+# ce fichier ne retire aucune règle, il ne fait qu'ÉCARTER des constats jugés,
+# un par un, avec leur motif. Une exception n'est pas un silence : elle est
+# bornée à des CHEMINS, à des COMMITS et à des RÈGLES (`targetRules`), donc un
+# vrai secret déposé ailleurs, ou de la forme d'un fournisseur, reste refusé.
+#
+# ── Relevé du passage sur TOUT l'historique (20/10/2026) ───────────────────
+# `gitleaks 8.30.1 git --log-opts="--all"` sur 2 115 commits / 32,1 Mo :
+# 21 constats, 6 valeurs distinctes, AUCUN secret réel. Les deux premières
+# exceptions couvrent ce qui est encore dans l'ARBRE COURANT ; les deux
+# suivantes, des fichiers DISPARUS (sauvegardes `*.backup`, script d'audit
+# supprimé) et sont bornées à leurs commits — un commit nouveau qui reprendrait
+# la même valeur n'est donc PAS couvert, et rougira.
+#
+# Ce que cette configuration ne peut PAS faire : reconnaître un secret d'un
+# fournisseur non couvert par ses règles, ou un secret sans forme connue. C'est
+# pourquoi la passe d'historique existe à côté de la sonde par PR, et pourquoi
+# son relevé est daté plutôt que supposé.
+title = "KOJO — scan de secrets (gitleaks)"
+
+[extend]
+# Les règles et exceptions par défaut de gitleaks restent la base : les retirer
+# réduirait la couverture sans que rien ne le dise.
+useDefault = true
+
+# ── 1. Empreintes SHA-256 de `.github/scripts/etat-reference.json` ──────────
+# Ce fichier est un TABLEAU d'empreintes (`"chemin": "<sha256>"`). La règle
+# `generic-api-key` y voit des clés de 64 caractères, et elle a raison sur la
+# FORME : c'est bien une chaîne aléatoire de 64 hexadécimaux. Ce n'est pas un
+# secret — une empreinte est PUBLIQUE par construction, c'est même ce qui lui
+# permet de comparer sans révéler. Le fichier est RÉGÉNÉRÉ à chaque mutation du
+# registre des preuves : une exception par VALEUR serait périmée au commit
+# suivant, donc l'exception porte sur le chemin.
+#
+# Bornée au chemin ET à la règle : une clé `sk-…` ou un jeton JWT déposé dans
+# ce même fichier relève d'une AUTRE règle, et reste refusé.
+[[allowlists]]
+description = "etat-reference.json : empreintes SHA-256 des fichiers, pas des secrets"
+paths = ['''(^|/)\.github/scripts/etat-reference\.json$''']
+targetRules = ["generic-api-key"]
+
+# ── 2. Jeton de SONDES des tests de la sonde d'exposition ───────────────────
+# `frontend/scripts/__tests__/check-token-exposure-production.test.js` porte un
+# faux jeton en dur, et le DIT (« Jeton de SONDES : jamais un vrai jeton, et
+# jamais publié par la sonde »). La valeur est syntaxiquement un JWT, mais sa
+# signature est une chaîne arbitraire : aucun service ne l'a émis, donc aucun
+# service ne l'accepte.
+#
+# Bornée au chemin ET à la règle `jwt` : un vrai jeton collé dans un AUTRE
+# fichier de test reste refusé.
+[[allowlists]]
+description = "Jeton factice de la sonde d'exposition (fixture documentée, signature arbitraire)"
+paths = ['''^frontend/scripts/__tests__/check-token-exposure-production\.test\.js$''']
+targetRules = ["jwt"]
+
+# ── 3. Repli JWT d'AVANT le fail-fast, dans des fichiers disparus ───────────
+# Treize constats de la passe d'historique, une seule valeur : le PRÉFIXE
+# statique `kojo-prod-secret-2025-afrique-ouest-`, concaténé à un
+# `uuid.uuid4()` calculé à l'exécution. Ce préfixe n'est pas une clé utilisable
+# (il ne suffit pas à signer un jeton), et il n'existe plus dans l'arbre :
+# `JWT_SECRET` est aujourd'hui EXIGÉ en production (`kojo_settings`, fail-fast).
+#
+# L'exception est bornée aux commits où la valeur vit, ET aux chemins qui la
+# portent (le `server.py` d'alors, ses copies `*.backup`, les répertoires de
+# sauvegarde). Un commit NOUVEAU qui réintroduirait ce repli n'est donc pas
+# couvert : il rougira, et c'est voulu — un secret par défaut est justement le
+# défaut que le fail-fast a supprimé.
+[[allowlists]]
+description = "préfixe de repli JWT (pré-fail-fast), borné aux commits et aux fichiers qui le portaient"
+condition = "AND"
+commits = [
+  "a47714d97b62a81165dbd5deeabef5870a12a177",
+  "f7d19f80fb82ed706904f031f48eef116476edd5",
+  "d6735331c84fb33487ec630abe2ee16d38784964",
+  "3f857410d49fdaed3d0ac7476985cf2293e5ea63",
+  "48cf051692defce35f57f19fd9329825fd74027b",
+  "52dcf8a187e7e85ab190817ac4e6b2f9bb2ebdfe",
+  "e3692ec0edcdbbf0f22d5730aea2af598d450af8",
+]
+paths = [
+  '''^backend/server\.py$''',
+  '''^backend/server\.py\..*\.backup$''',
+  '''^(backup_gmail_phase1|backup_serverpy_fix|gmail_phase1_extract|serverpy_fix_extract)/''',
+]
+targetRules = ["generic-api-key"]
+
+# ── 4. Jeton « invalide » d'un script d'audit supprimé ──────────────────────
+# `kojo_backend_audit_complet.py` (disparu) envoyait volontairement un jeton
+# dont la signature est littéralement `invalid_signature`, pour vérifier que
+# l'API répond 401. Ce n'est pas un jeton : c'est le cas NÉGATIF du test.
+# Deux règles voient cette même ligne (`jwt`, et `generic-api-key` sur
+# l'affectation `invalid_token = "…"`) : l'exception les nomme toutes les deux,
+# sans quoi écarter l'une ferait simplement réapparaître l'autre.
+[[allowlists]]
+description = "jeton volontairement invalide du script d'audit supprimé (cas négatif 401)"
+condition = "AND"
+commits = ["8e196a6f0c63f6bd4940ea3f66c0aea3b53dd985"]
+paths = ['''^kojo_backend_audit_complet\.py$''']
+targetRules = ["jwt", "generic-api-key"]
+
+# ── 5. Jeton de FIXTURE du test du rapporteur de secrets ────────────────────
+# `backend/tests/test_secret_scan_workflow.py` prouve que le rapporteur ne
+# PUBLIE jamais la valeur d'un constat : il lui faut donc une valeur en FORME
+# de jeton, écrite en clair, pour pouvoir affirmer ensuite qu'elle n'apparaît
+# nulle part dans le rapport ni dans le journal. La chaîne est volontairement
+# factice (« valeurQuiNeDoitJamaisSortir ») et aucun service ne l'a émise.
+#
+# Deux règles la voient — `github-pat` sur la forme du jeton, et
+# `generic-api-key` sur l'affectation `"Secret": "…"` du faux rapport JSON.
+# Les nommer toutes les deux est nécessaire : écarter l'une ferait réapparaître
+# l'autre. Bornée au CHEMIN et aux règles : un vrai jeton, déposé dans un autre
+# fichier de test ou dans celui-ci sous une autre forme, reste refusé.
+[[allowlists]]
+description = "jeton de fixture du test du rapporteur de secrets (valeur factice, jamais émise par un service)"
+paths = ['''^backend/tests/test_secret_scan_workflow\.py$''']
+targetRules = ["github-pat", "generic-api-key"]

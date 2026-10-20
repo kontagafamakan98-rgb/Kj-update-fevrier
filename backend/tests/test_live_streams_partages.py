@@ -197,6 +197,16 @@ async def test_le_battement_de_coeur_repousse_le_bail(monkeypatch):
     compté comme fermé, et le compte pourrait ouvrir un flux de trop.
     """
     monkeypatch.setattr(kojo_live, "HEARTBEAT_SECONDS", 0.01)
+    # Horloge CONTRÔLÉE, et la raison est mesurée : `kojo_live` date le bail en
+    # MILLISECONDES (`int(time.time() * 1000)`). Sur un interpréteur rapide, la
+    # réservation et le premier rafraîchissement tombent dans la MÊME
+    # milliseconde, le bail ressort identique et le `>` strict rougit alors que
+    # le contrat est tenu (mesuré le 20/10/2026 : échec déterministe en 0,3 s
+    # sur Python 3.11, vert sur 3.14 — une course, pas une régression). Avancer
+    # l'horloge d'une seconde avant de lire la seconde valeur rend l'égalité
+    # significative : elle ne peut plus venir que d'un rafraîchissement MANQUÉ.
+    horloge = {"ms": 1_800_000_000_000}
+    monkeypatch.setattr(kojo_live.time, "time", lambda: horloge["ms"] / 1000.0)
     faux = FauxRegistre()
     kojo_live.brancher_partage(faux)
 
@@ -204,10 +214,11 @@ async def test_le_battement_de_coeur_repousse_le_bail(monkeypatch):
     corps = reponse.body_iterator
     try:
         (membre, premier_bail), = _membres(faux, "compte-vivant").items()
+        horloge["ms"] += 1_000  # une seconde de vie du flux
         assert await anext(corps) == ": keepalive\n\n"
         second_bail = _membres(faux, "compte-vivant")[membre]
-        assert second_bail > premier_bail, (
-            "le bail n'a pas été repoussé : le flux expirerait en vivant"
+        assert second_bail == premier_bail + 1_000, (
+            "le bail n'a pas été repoussé d'une seconde : le flux expirerait en vivant"
         )
     finally:
         await corps.aclose()

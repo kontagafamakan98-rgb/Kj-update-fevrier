@@ -69,7 +69,11 @@ from kojo_auth_core import (
     set_auth_cookies,
     verify_password,
 )
-from kojo_middlewares import RateLimitMiddleware, WestAfricaSecurityMiddleware
+from kojo_middlewares import (
+    RateLimitMiddleware,
+    RequestIdMiddleware,
+    WestAfricaSecurityMiddleware,
+)
 from kojo_owner import ensure_owner_exists, get_owner_account, resolve_owner_id, verify_owner_access
 from kojo_validation import (
     ALL_PREFIXES_70_99,
@@ -102,6 +106,7 @@ __all__ = [
     "OWNER_USER_ID",
     "RATE_LIMIT_MAX_TRACKED_KEYS",
     "RateLimitMiddleware",
+    "RequestIdMiddleware",
     "WEST_AFRICA_ORIGINS",
     "WestAfricaSecurityMiddleware",
     "_cloudinary_health_cache",

@@ -403,6 +403,11 @@ class NotificationType(str, Enum):
     PAYMENT_CONFIRMED   = "payment_confirmed"    # Client : paiement confirmé
     JOB_COMPLETED       = "job_completed"        # Client + Worker : mission terminée
     NEW_MESSAGE         = "new_message"          # Message reçu
+    # Une VEILLE a trouvé des missions : la notification renvoie vers la liste
+    # (`related_type` "job_alert"), pas vers une mission — elle en résume
+    # plusieurs. C'est un type à part pour que le centre de notifications la
+    # dessine et la fasse naviguer sans deviner.
+    JOB_ALERT           = "job_alert"            # Worker : veille emploi servie
     GENERAL             = "general"              # Notification générique
 
 class Notification(BaseModel):

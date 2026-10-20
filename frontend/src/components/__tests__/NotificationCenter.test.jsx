@@ -34,7 +34,7 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 
 // --- Doublures : le panneau est isolé du réseau, de l'auth et de l'i18n ---
 
@@ -108,10 +108,19 @@ function Sonde() {
  * qui recopierait une cloche de header mobile ferait passer les tests pour ce
  * que le site ne fait plus.
  */
+// Où le panneau a emmené la personne : un clic sur une notification VISE une
+// route (une fiche mission, ou la liste pour une veille), et cette cible se lit
+// ici plutôt que dans l'URL supposée d'un `navigate`.
+function Localisation() {
+  const location = useLocation();
+  return <div data-location={location.pathname} />;
+}
+
 const rendu = () => render(
   <MemoryRouter>
     <NotificationProvider>
       <Sonde />
+      <Localisation />
       <nav>
         <div className="hidden md:flex"><NotificationBell /></div>
       </nav>
@@ -160,6 +169,37 @@ const ouvrirAvecLaLigneServeur = async () => {
   fireEvent.click(cloches()[0]);
   await waitFor(() => expect(screen.getByText(NOTIF_SERVEUR.title)).toBeTruthy());
 };
+
+describe('centre de notifications — une alerte emploi renvoie à la LISTE', () => {
+  it("une notification de veille (job_alert) ouvre /jobs, et se marque lue", async () => {
+    // Ce que dépose `kojo_job_alerts.passage_digest` : un RÉSUMÉ de plusieurs
+    // missions, donc `related_id` nul. Naviguer vers une fiche choisie à la
+    // place de la personne serait un contresens ; vers la liste, non.
+    getAll.mockResolvedValue({
+      notifications: [{
+        ...NOTIF_SERVEUR,
+        type: 'job_alert',
+        related_id: null,
+        related_type: 'job_alert',
+        title: '3 nouvelles missions pour votre alerte',
+        body: '3 missions correspondent à votre veille emploi.',
+      }],
+      unread_count: 1,
+      total: 1,
+    });
+    rendu();
+    await waitFor(() => expect(getAll).toHaveBeenCalled());
+    fireEvent.click(cloches()[0]);
+
+    const ligne = await screen.findByRole('button', { name: /3 nouvelles missions/ });
+    fireEvent.click(ligne);
+
+    await waitFor(() =>
+      expect(document.querySelector('[data-location]').getAttribute('data-location')).toBe('/jobs')
+    );
+    expect(markRead).toHaveBeenCalledWith(NOTIF_SERVEUR.id);
+  });
+});
 
 describe('centre de notifications — supprimer une notification la retire de l\'écran', () => {
   it("une notification du serveur : le serveur est appelé, puis la ligne disparaît", async () => {

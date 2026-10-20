@@ -16,8 +16,19 @@ from fastapi import APIRouter, HTTPException, Response
 from kojo_core import db
 from kojo_balises import DesequilibreHtml, exiger_balises_equilibrees
 from kojo_job_og import escape_xml, job_og_html, job_og_html_404
+# La vue PUBLIQUE d'un travailleur vit dans son routeur (allowlist) : le
+# pré-rendu et la carte OG la LISENT au lieu d'en construire une seconde. Deux
+# constructions divergeraient au premier champ ajouté, et c'est exactement ce
+# que l'allowlist existe pour empêcher.
+from kojo_routers_workers_public import profil_public
 from kojo_settings import FRONTEND_APP_URL, logger
-from kojo_identifiants import identifiant_job_query
+from kojo_identifiants import identifiant_job_query, identifiant_public
+from kojo_worker_og import (
+    nom_complet,
+    worker_meta_lines,
+    worker_og_html,
+    worker_og_html_404,
+)
 
 router = APIRouter()
 
@@ -140,10 +151,11 @@ def _draw_og_background(W: int, H: int):
     return img, ImageDraw.Draw(img)
 
 
-def _render_job_og_card(job: dict, square: bool = False) -> bytes:
-    """Génère la carte Open Graph de la fiche mission : dégradé orange→rouge
-    (cohérent avec les images OG statiques du frontend), logo K, titre réel
-    de la mission (2 lignes max), budget FCFA, catégorie et localisation.
+def _render_og_card(*, title: str, primary_line: str, secondary_line: str, square: bool = False) -> bytes:
+    """Génère une carte Open Graph : dégradé orange→rouge (cohérent avec les
+    images OG statiques du frontend), logo K, titre réel (2 lignes max), une
+    ligne principale (budget d'une mission, réputation d'un travailleur) et une
+    ligne secondaire (catégorie · lieu).
 
     Format wide 1200x630 (défaut) pour les cartes de flux ; format carré
     1200x1200 (square=True) pour les réseaux qui recadrent en vignette 1:1
@@ -166,9 +178,7 @@ def _render_job_og_card(job: dict, square: bool = False) -> bytes:
     # fichier en avertissement pyflakes sans rien dire de plus.
     W, H = (1200, 1200) if square else (1200, 630)
     img, draw = _draw_og_background(W, H)
-
-    title = (job.get("title") or "Mission").strip()
-    budget_line, meta_line = _job_og_meta(job)
+    budget_line, meta_line = primary_line, secondary_line
 
     if square:
         # ── Composition carrée CENTRÉE (zone sûre ~940 px de large) ────────
@@ -261,6 +271,34 @@ def _render_job_og_card(job: dict, square: bool = False) -> bytes:
     # CPU sur la boucle d'un worker à 1 vCPU.
     img.convert("RGB").save(buf, "PNG", compress_level=6)
     return buf.getvalue()
+
+
+def _render_job_og_card(job: dict, square: bool = False) -> bytes:
+    """Carte OG d'une fiche mission (titre, budget, catégorie · lieu).
+
+    Enveloppe de `_render_og_card` : le dessin est PARTAGÉ avec la carte d'un
+    profil travailleur — une seconde copie du gabarit divergerait de la première
+    au premier changement de teinte, et deux cartes du même site ne se
+    ressembleraient plus.
+    """
+    budget_line, meta_line = _job_og_meta(job)
+    return _render_og_card(
+        title=(job.get("title") or "Mission").strip(),
+        primary_line=budget_line,
+        secondary_line=meta_line,
+        square=square,
+    )
+
+
+def _render_worker_og_card(worker: dict, square: bool = False) -> bytes:
+    """Carte OG d'un profil travailleur : nom, réputation, lieu · compétences."""
+    principale, secondaire = worker_meta_lines(worker)
+    return _render_og_card(
+        title=(nom_complet(worker) or "Travailleur"),
+        primary_line=principale,
+        secondary_line=secondaire,
+        square=square,
+    )
 
 
 _OG_CACHE_CLOSED = "public, max-age=86400, s-maxage=86400, must-revalidate"
@@ -391,6 +429,110 @@ async def get_job_og_html(job_id: str):
         headers={"Cache-Control": _job_og_cache_control(job)},
     )
 
+
+# ── Profil public d'un travailleur (/workers/:id) ────────────────────────────
+# Même famille que les trois routes ci-dessus, même discipline d'ordre : la
+# variante « -square.png » AVANT le motif « {worker_id}.png », et le HTML APRÈS
+# les images — sinon FastAPI lirait « awa-square.png » comme un identifiant.
+#
+# Ce que ces routes ne peuvent PAS publier : elles lisent `profil_public`, donc
+# l'allowlist. Une carte de partage est publique et restera en cache : elle ne
+# doit jamais graver un email, un téléphone ou une position.
+
+
+@router.get("/og/workers/{worker_id}-square.png", include_in_schema=False)
+async def get_worker_og_image_square(worker_id: str):
+    """Carte Open Graph CARRÉE (1200x1200) d'un profil travailleur.
+
+    Returns:
+        Response: PNG 1200x1200, ou 404 si le profil n'est pas public.
+    """
+    worker = await profil_public(worker_id)
+    if not worker:
+        raise HTTPException(status_code=404, detail="Worker not found")
+    try:
+        # Hors de la boucle : le rendu est du CPU (cf. `_render_og_card`).
+        png = await asyncio.to_thread(_render_worker_og_card, worker, square=True)
+    except Exception as exc:  # Pillow absent ou erreur de rendu : 500 propre
+        logger.error("OG square worker render failed for %s: %s", worker_id, exc)
+        raise HTTPException(status_code=500, detail="OG image rendering failed") from exc
+    return Response(
+        content=png,
+        media_type="image/png",
+        # Un profil vit (avis, missions, ville) : pas d'état terminal, donc
+        # jamais la politique de cache longue des missions clôturées.
+        headers={"Cache-Control": _OG_CACHE_ACTIVE},
+    )
+
+
+@router.get("/og/workers/{worker_id}.png", include_in_schema=False)
+async def get_worker_og_image(worker_id: str):
+    """Carte Open Graph dynamique (1200x630) d'un profil travailleur.
+
+    Le rewrite Vercel /api/:path* achemine l'appel ; le crawler reçoit un PNG
+    avec le NOM RÉEL et la réputation de la personne, pas la carte générique du
+    site.
+
+    Returns:
+        Response: PNG 1200x630, ou 404 si le profil n'est pas public.
+    """
+    worker = await profil_public(worker_id)
+    if not worker:
+        raise HTTPException(status_code=404, detail="Worker not found")
+    try:
+        png = await asyncio.to_thread(_render_worker_og_card, worker)
+    except Exception as exc:
+        logger.error("OG worker image render failed for %s: %s", worker_id, exc)
+        raise HTTPException(status_code=500, detail="OG image rendering failed") from exc
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={"Cache-Control": _OG_CACHE_ACTIVE},
+    )
+
+
+@router.get("/og/workers/{worker_id}", include_in_schema=False)
+async def get_worker_og_html(worker_id: str):
+    """Page HTML pré-rendue d'un profil travailleur (/workers/:id).
+
+    Sert ce qu'un crawler sans JavaScript doit lire : titre, description,
+    canonical, cartes OG — et un `<h1>` statique. 200 si le profil est public,
+    404 noindex sinon. C'est la même paire que la fiche mission, et le rewrite
+    Vercel /workers/(.*) → /api/og/workers/$1 l'achemine ici.
+
+    Returns:
+        Response: HTML pré-rendu (200), ou HTML noindex (404) si le profil
+        n'est pas publiable (inconnu, client, supprimé).
+    """
+    worker = await profil_public(worker_id)
+    base = _site_base()
+    try:
+        if not worker:
+            return Response(
+                content=exiger_balises_equilibrees(
+                    f"la page 404 du profil {worker_id}", worker_og_html_404(), origine="kojo_worker_og"
+                ),
+                media_type="text/html; charset=utf-8",
+                status_code=404,
+                headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex"},
+            )
+        corps = exiger_balises_equilibrees(
+            f"le profil travailleur {worker_id}",
+            # L'identifiant de la ROUTE, quand la vue n'en rend aucun (document
+            # importé sans `id` ni `_id`) : une URL canonique vide ne désignerait
+            # plus la page ouverte.
+            worker_og_html({**worker, "id": worker.get("id") or worker_id}, base),
+            origine="kojo_worker_og",
+        )
+    except DesequilibreHtml as exc:
+        logger.error("Pré-rendu HTML du profil %s refusé : %s", worker_id, exc)
+        raise HTTPException(status_code=500, detail="Worker HTML rendering failed") from exc
+    return Response(
+        content=corps,
+        media_type="text/html; charset=utf-8",
+        headers={"Cache-Control": _OG_CACHE_ACTIVE},
+    )
+
 # Base du site pour le SITEMAP (seul reste à être servi par le backend ; le
 # robots.txt, lui, est un fichier du build). En production, FRONTEND_APP_URL doit
 # pointer vers le domaine public (kojoforafrica.cc.cd, alias Vercel) ; repli sur
@@ -486,6 +628,33 @@ async def get_sitemap_xml():
             f"  <url><loc>{escape_xml(base)}/jobs/{escape_xml(job['id'])}</loc>"
             f"<lastmod>{str(job.get('updated_at') or job.get('created_at') or '')[:10]}</lastmod>"
             f"<changefreq>daily</changefreq><priority>0.8</priority><mobile:mobile/></url>"
+        )
+
+    # Profils TRAVAILLEURS publics. Depuis le 20/10/2026, /workers/:id est une
+    # page pré-rendue par le backend (rewrite Vercel /workers/(.*)) : sans
+    # entrée ici, elle ne serait découverte que par un lien entrant — c'est-à-
+    # dire, en pratique, jamais. Seuls les profils qui publient un NOM sont
+    # listés (une page sans nom n'a rien à indexer), les plus récents d'abord.
+    # Limite : le sitemap reste sous les 50 000 URL du format, missions
+    # comprises.
+    curseur = db.users.find(
+        {
+            "user_type": "worker",
+            "deleted": {"$ne": True},
+            "first_name": {"$nin": [None, ""]},
+        },
+        {"id": 1, "_id": 1, "created_at": 1},
+    ).sort("created_at", -1).limit(4000)
+    async for worker in curseur:
+        # `identifiant_public` : un compte importé peut ne porter que `_id`, et
+        # un identifiant vide ne désignerait aucune page.
+        identifiant = identifiant_public(worker)
+        if not identifiant:
+            continue
+        lines.append(
+            f"  <url><loc>{escape_xml(base)}/workers/{escape_xml(identifiant)}</loc>"
+            f"<lastmod>{str(worker.get('created_at') or '')[:10]}</lastmod>"
+            f"<changefreq>weekly</changefreq><priority>0.6</priority><mobile:mobile/></url>"
         )
 
     lines.append("</urlset>")

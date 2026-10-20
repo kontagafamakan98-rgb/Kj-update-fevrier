@@ -39,8 +39,10 @@ from kojo_models import NotificationType
 # Les durées de conservation ne sont pas recopiées ici : la purge demande à
 # chaque règle son filtre (kojo_retention), qui porte aussi l'index TTL.
 from kojo_retention import RETENTION_RULES
+from kojo_job_alerts import passage_digest
 from kojo_settings import (
     EMAIL_HEALTH_ALERT_INTERVAL_MINUTES,
+    JOB_ALERT_DIGEST_INTERVAL_MINUTES,
     OWNER_EMAIL,
     OWNER_USER_ID,
     PAYOUT_ALERT_REMINDER_DAYS,
@@ -586,3 +588,28 @@ async def email_provider_alert_loop():
             break
         except Exception as exc:
             logger.warning(f"⚠️ Erreur auto-alerte fournisseur email: {exc}")
+
+
+async def job_alert_digest_loop():
+    """Tâche de fond : résume les nouvelles missions aux veilles actives.
+
+    Même modèle que les autres boucles — sommeil d'abord (aucun email au
+    redémarrage, ni à chaque déploiement), annulable proprement au shutdown,
+    erreurs isolées par itération — et un BAIL : sans lui, N machines Fly
+    enverraient N fois le même résumé aux mêmes travailleurs.
+
+    Le travail lui-même vit dans `kojo_job_alerts.passage_digest` : il est
+    appelable directement par un test (aucune horloge à attendre).
+    """
+    while True:
+        try:
+            await asyncio.sleep(JOB_ALERT_DIGEST_INTERVAL_MINUTES * 60)
+            await executer_si_bail(
+                "job_alert_digest",
+                timedelta(minutes=JOB_ALERT_DIGEST_INTERVAL_MINUTES),
+                passage_digest,
+            )
+        except asyncio.CancelledError:
+            break
+        except Exception as exc:
+            logger.warning(f"⚠️ Erreur résumé alertes emploi: {exc}")

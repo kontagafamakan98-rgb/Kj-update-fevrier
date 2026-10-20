@@ -22,7 +22,10 @@ Kojo connecte clients et artisans en Afrique de l'Ouest (Sénégal, Mali, Côte 
 cd backend
 cp .env.example .env        # Remplir les valeurs
 python -m venv .venv        # Optionnel mais recommandé
-.venv/Scripts/pip install -r requirements.txt   # Windows ; .venv/bin/pip sur Unix
+# Windows ; .venv/bin/pip sur Unix. `--require-hashes` vérifie l'empreinte
+# SHA-256 de chaque distribution (requirements.lock) : un fichier remplacé sur
+# PyPI fait échouer l'installation au lieu de passer en silence.
+.venv/Scripts/pip install --require-hashes -r requirements.lock
 uvicorn server:app --reload --port 8000
 ```
 
@@ -113,6 +116,7 @@ cd frontend && npm test
 | `DB_NAME` | | défaut `kojo_db` |
 | `VERCEL_PROJECT_NAME` | recommandé | **`kj-update-fevrier`** — restreint le CORS aux seuls domaines du projet Vercel Kojo |
 | `REDIS_URL` | | Rate-limiting partagé multi-workers (optionnel, 1 worker = mémoire suffit) |
+| `METRICS_TOKEN` | | Jeton du scrape Prometheus `GET /metrics` — vide = endpoint fermé (503 nommée), jamais public (voir [`backend/METRIQUES.md`](backend/METRIQUES.md)) |
 | `VAPID_PRIVATE_KEY` / `VAPID_PUBLIC_KEY` | ✅ | Push notifications web (les deux doivent correspondre) |
 
 **Pièges à connaître (leçons du terrain)** :
@@ -279,7 +283,7 @@ curl -s https://kojoforafrica.cc.cd/ | grep -c 'href="tel:'        # 2
 
 ## CI
 
-`.github/workflows/ci.yml` (11 jobs, dont 10 requis sur `main` — la liste vit
+`.github/workflows/ci.yml` (12 jobs, dont 11 requis sur `main` — la liste vit
 une seule fois, `.github/scripts/gate-perimetre.json`, cf. « Protection de
 `main` » plus bas) :
 
@@ -299,6 +303,14 @@ une seule fois, `.github/scripts/gate-perimetre.json`, cf. « Protection de
   étant nommé (paquet, version, correctif). **Requis depuis le 16/10/2026** (il
   avait été rouge 6 fois sur 30 runs, tous sur des avis de PRODUCTION, sans
   bloquer une seule fusion)
+- **secret-scan** — `gitleaks` sur les commits que la PR apporte (`base...HEAD`,
+  jamais l'historique) : une clé collée dans un script est annotée (fichier,
+  ligne, règle) puis **bloque la fusion**, sans jamais publier la valeur. Le
+  binaire est épinglé (8.30.1) et comparé à l'empreinte SHA-256 de sa release.
+  Le job REFUSE aussi de conclure quand la plage n'a pas été parcourue (un vert
+  qui n'a rien mesuré). L'historique complet a sa propre passe, rejouable à la
+  demande : `.github/workflows/secret-scan-history.yml` (relevé du 20/10/2026 :
+  2 115 commits, 21 constats, **0 secret réel**)
 - **e2e-playwright** — la suite navigateur Chromium : parcours clés, LCP/CLS par
   route pré-rendue, tiers avant/après interaction, coquilles, CSP réelle.
   **Requis depuis le 16/10/2026** (15 rouges sur 27 exécutions, dont un cas
@@ -408,21 +420,21 @@ administrateur). Pour le modifier : `Settings → General → Pull Requests`, ou
 ### Protection de `main` (branche protégée)
 
 `main` est protégée par une règle GitHub : **aucun commit ne peut y entrer
-autrement que par une PR dont les 10 checks CI sont verts**. Concrètement :
+autrement que par une PR dont les 11 checks CI sont verts**. Concrètement :
 
 - **PR obligatoire** — les pushs directs sur `main` sont refusés par le serveur
   (`GH006: Protected branch update failed … Changes must be made through a pull
   request`), même pour l'administrateur du dépôt (protection appliquée aussi
   aux admins : impossible de la contourner « par erreur »).
-- **10 checks requis** — le workflow en déclare **11** : `Bundle size report (PR
+- **11 checks requis** — le workflow en déclare **12** : `Bundle size report (PR
   comment)` en est volontairement **exclu** (il publie un commentaire de PR, il
   ne juge rien ; son budget de taille est asserté par `check-bundle-size.js`
-  **dans** `frontend-build`, qui est requis). Les dix requis sont : `Audits
+  **dans** `frontend-build`, qui est requis). Les onze requis sont : `Audits
   détectent les régressions`, `Backend tests (Python + MongoDB)`, `Dépendances
-  (avis de sécurité)`, `E2E Playwright tests (Chromium)`, `Fly env doc-prod
-  (drift + secrets)`, `Frontend tests + build (Node/Vite)`, `Lighthouse
-  performance budgets`, `Mobile build (Capacitor + Android)`, `Workflow lint
-  (actionlint + shellcheck)`, `Deploy backend to Fly.io`.
+  (avis de sécurité)`, `Secrets (gitleaks)`, `E2E Playwright tests (Chromium)`,
+  `Fly env doc-prod (drift + secrets)`, `Frontend tests + build (Node/Vite)`,
+  `Lighthouse performance budgets`, `Mobile build (Capacitor + Android)`,
+  `Workflow lint (actionlint + shellcheck)`, `Deploy backend to Fly.io`.
 - **Une seule liste, deux chemins** — cette liste vit dans
   `.github/scripts/gate-perimetre.json` (une identité de job **et** le nom exact
   du check-run, plus l'exemption motivée du rapport de taille) et **les deux**

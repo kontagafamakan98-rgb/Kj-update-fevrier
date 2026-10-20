@@ -328,6 +328,10 @@ async def delete_my_account(current_user: User = Depends(get_current_user)):
     # Cascade des données directement liées au compte.
     await db.push_tokens.delete_many({"user_id": user_id})
     await db.notifications.delete_many({"user_id": user_id})
+    # La veille emploi porte l'ADRESSE du compte et ses critères (ville, pays) :
+    # deux données personnelles qui n'ont plus d'objet une fois le compte
+    # supprimé, et qu'aucun autre compte ne lit. Elle part donc avec lui.
+    await db.job_alerts.delete_many({"user_id": user_id})
     # Les notifications dont ce compte était le DESTINATAIRE viennent de partir,
     # mais le nom vit aussi chez l'autre partie : `proposal_received` et
     # `proposal_accepted` l'interpolent à l'écriture (kojo_shared), et la copie
@@ -395,6 +399,7 @@ USER_DATA_SOURCES = (
     ("support_tickets", ("user_id",)),
     ("push_tokens", ("user_id",)),
     ("business_events", ("user_id",)),
+    ("job_alerts", ("user_id",)),
 )
 
 # Collections qui portent des données d'un utilisateur mais SANS clé

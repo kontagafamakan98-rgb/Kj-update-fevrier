@@ -113,6 +113,22 @@
   },
   {
     "methode": "GET",
+    "chemin": "/metrics",
+    "nom": "metrics_prometheus",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "HEAD",
+    "chemin": "/metrics",
+    "nom": "metrics_prometheus",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "GET",
     "chemin": "/favicon.ico",
     "nom": "favicon",
     "code": null,

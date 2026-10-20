@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
-  Bell as BellGlyph, CheckCircle2, ClipboardList, Flag, MessageSquare, PartyPopper, Wallet, Wrench,
+  Bell as BellGlyph, Briefcase, CheckCircle2, ClipboardList, Flag, MessageSquare, PartyPopper, Wallet, Wrench,
 } from 'lucide-react';
 import { Icone } from './chrome-icons';
 import { VERS_LE_HAUT } from './notificationPanelPlacement';
@@ -28,6 +28,9 @@ const ICONES_PAR_TYPE = {
   payment_confirmed: CheckCircle2,
   job_completed: Flag,
   new_message: MessageSquare,
+  // Une veille emploi servie : la mallette dit « mission », et la distinction
+  // avec `job_in_progress` (clé) tient à la forme, pas à la couleur.
+  job_alert: Briefcase,
   general: BellGlyph,
 };
 const TypeIcon = ({ type, className = 'h-5 w-5 text-orange-600' }) => {
@@ -158,6 +161,14 @@ export default function NotificationPanel() {
     if (!notif.is_read) markAsRead(notif.id);
     if (notif.related_id && notif.related_type === 'job') {
       navigate(`/jobs/${notif.related_id}`);
+      closePanel();
+      return;
+    }
+    if (notif.related_type === 'job_alert') {
+      // Une veille RÉSUME plusieurs missions : elle renvoie à la LISTE, jamais
+      // à une fiche choisie à la place de la personne. La page porte les
+      // filtres de recherche, donc la suite du parcours est là.
+      navigate('/jobs');
       closePanel();
     }
   };

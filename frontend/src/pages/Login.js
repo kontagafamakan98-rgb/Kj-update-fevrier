@@ -16,11 +16,18 @@ import { usePageMeta } from '../utils/seo';
 import { PAGE_SECTIONS } from '../config/page-sections';
 import { MarqueKojo } from '../config/marque-kojo';
 
+// ── CE QUI ENVOIE UN COMPTE VERS /payment-verification (20/10/2026) ────────
+// La VÉRIFICATION EMAIL, et elle seule. Les comptes de paiement ne servent
+// qu'au premier versement / premier paiement : les exiger à la connexion
+// faisait passer un travailleur par DEUX comptes avant d'ouvrir son tableau de
+// bord, pour un argent qu'il n'avait pas encore à recevoir. L'argent reste
+// protégé : le backend refuse un décaissement sans compte. La règle est la
+// même que celle de `ProtectedRoute` (App.js) — deux règles pour un même état
+// finiraient par diverger.
 const requiresRegistrationCompletion = (user) => {
   if (!user) return false;
 
-  const minimumRequired = user?.user_type === 'worker' ? 2 : 1;
-  return !user.is_verified || Number(user.payment_accounts_count || 0) < minimumRequired;
+  return !user.is_verified;
 };
 
 export default function Login() {

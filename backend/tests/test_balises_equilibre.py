@@ -8,10 +8,10 @@ Ce que ces tests mesurent, et ce qu'ils ne font PAS :
      est un fichier partagé, produit par la règle JS ; deux implémentations sans
      jeu commun finissent par diverger sur un cas limite sans que personne le voie.
   2. LE REFUS — un document déséquilibré lève, et la phrase NOMME la balise.
-  3. LES PAGES RÉELLES — la fiche mission et sa 404 sont équilibrées, y compris
-     pour des titres et des descriptions hostiles (balises, guillemets, émojis).
-     Le refus est prouvé sur une page réellement cassée, pas seulement sur une
-     chaîne fabriquée pour l'occasion.
+  3. LES PAGES RÉELLES — la fiche mission, sa 404, le profil travailleur et sa
+     404 sont équilibrés, y compris pour des noms et des descriptions hostiles
+     (balises, guillemets, émojis). Le refus est prouvé sur une page réellement
+     cassée, pas seulement sur une chaîne fabriquée pour l'occasion.
   4. LE CÂBLAGE — la route répond 500 (et journalise la balise) quand la page
      qu'elle s'apprête à servir est déséquilibrée.
   5. L'INVENTAIRE — chaque module qui écrit du HTML est déclaré ici. Un nouveau
@@ -37,6 +37,7 @@ from kojo_balises import (
     exiger_balises_equilibrees,
 )
 from kojo_job_og import job_og_html, job_og_html_404
+from kojo_worker_og import worker_og_html, worker_og_html_404
 
 BACKEND = Path(__file__).resolve().parent.parent
 CAS = json.loads(
@@ -165,6 +166,72 @@ async def test_la_route_refuse_une_404_desequilibree_par_un_500(monkeypatch):
     assert erreur.value.status_code == 500
 
 
+TRAVAILLEUR = {
+    "id": "worker-1",
+    "first_name": "Awa",
+    "last_name": "Diop",
+    "city": "Dakar",
+    "skills": ["plomberie"],
+    "bio": "Artisan plombier.",
+    "stats": {"missions_completed": 2, "rating_average": 4.7, "rating_count": 2},
+}
+
+
+@pytest.mark.parametrize(
+    "nom_du_travailleur",
+    [
+        "Awa Diop",
+        "</div><div>injection",
+        "A <b> & \"x\" 'y'",
+        "\U0001F600" * 30,
+    ],
+)
+def test_le_profil_travailleur_est_equilibre_pour_des_noms_hostiles(nom_du_travailleur):
+    """Le profil pré-rendu est lu par les crawlers : il tient ses balises."""
+    worker = {
+        **TRAVAILLEUR,
+        "first_name": nom_du_travailleur,
+        "bio": "</section> dans la bio " * 12,
+    }
+    assert desequilibres_des_balises(worker_og_html(worker, BASE)) == []
+
+
+def test_la_page_404_du_profil_est_equilibree():
+    assert desequilibres_des_balises(worker_og_html_404()) == []
+
+
+def _profil_factice(document):
+    """Doublure de `profil_public` : la vue publique, sans base."""
+
+    async def _profil(_worker_id):
+        return document
+
+    return _profil
+
+
+@pytest.mark.asyncio
+async def test_la_route_du_profil_refuse_une_page_desequilibree_par_un_500(monkeypatch):
+    """La même règle que la fiche mission, sur le second producteur de HTML."""
+    monkeypatch.setattr(kojo_routers_public, "profil_public", _profil_factice(TRAVAILLEUR))
+    monkeypatch.setattr(
+        kojo_routers_public,
+        "worker_og_html",
+        lambda *_a, **_k: "<!DOCTYPE html><html><body><div>jamais fermée</body></html>",
+    )
+    with pytest.raises(HTTPException) as erreur:
+        await kojo_routers_public.get_worker_og_html("worker-1")
+    assert erreur.value.status_code == 500
+
+
+@pytest.mark.asyncio
+async def test_la_route_du_profil_sert_la_404_equilibree_avec_noindex(monkeypatch):
+    monkeypatch.setattr(kojo_routers_public, "profil_public", _profil_factice(None))
+    reponse = await kojo_routers_public.get_worker_og_html("absent")
+    assert reponse.status_code == 404
+    assert reponse.headers["x-robots-tag"] == "noindex"
+    assert b"noindex, nofollow" in reponse.body
+
+
 def test_seuls_les_modules_declares_ecrivent_du_html():
     # Un producteur de HTML absent de cette liste ne serait vérifié par personne.
     producteurs = {
@@ -172,4 +239,13 @@ def test_seuls_les_modules_declares_ecrivent_du_html():
         for nom in BACKEND.glob("*.py")
         if re.search(r"text/html|<!DOCTYPE html>|<html", nom.read_text(encoding="utf-8"))
     }
-    assert producteurs == {"kojo_job_og.py", "kojo_routers_public.py"}
+    # `kojo_routers_job_alerts.py` produit le HTML du RÉSUMÉ d'alertes emploi
+    # (email), pas un document servi : il entre dans l'inventaire pour la même
+    # raison que les autres, et parce qu'un producteur tu est exactement ce que
+    # ce test existe pour empêcher.
+    assert producteurs == {
+        "kojo_job_og.py",
+        "kojo_worker_og.py",
+        "kojo_routers_job_alerts.py",
+        "kojo_routers_public.py",
+    }

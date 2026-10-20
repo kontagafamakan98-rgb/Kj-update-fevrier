@@ -811,9 +811,18 @@ async def db_find_one(collection: str, query: Dict) -> Optional[Dict]:
 async def reset_state():
     # Le rate-limiter (mémoire, REDIS_URL vide) est partagé sur toute la
     # session ; on vide ses compteurs à chaque test pour éviter des 429
-    # fantômes (buckets auth-otp 12/5min et auth-session 20/5min) en mode
-    # réel comme en mode FakeDB.
+    # fantômes (buckets auth-otp 12/5min, auth-login 300/5min et auth-session
+    # 20/5min) en mode réel comme en mode FakeDB.
     _srv.request_counts.clear()
+    # Même raison pour le plafond par RÉSEAU (kojo_login_reseau) : ses échecs et
+    # ses sondes vivent en mémoire quand REDIS_URL est vide, donc un test qui
+    # sature un /24 laisserait 429 le suivant — et le client de test partage
+    # tous la même adresse.
+    try:
+        import kojo_login_reseau
+        kojo_login_reseau.oublier_tout()
+    except Exception:
+        pass
     # Le circuit breaker PayDunya a un état EN MÉMOIRE (kojo_payments) en plus
     # du doc persisté en base : sans reset, un test qui adopte un circuit open
     # en base le laisse en mémoire pour les tests suivants (fraîcheur : un
@@ -829,6 +838,11 @@ async def reset_state():
         fake_db.reset_all()
     yield
     _srv.request_counts.clear()
+    try:
+        import kojo_login_reseau
+        kojo_login_reseau.oublier_tout()
+    except Exception:
+        pass
     try:
         import kojo_payments
         kojo_payments._paydunya_circuit.update({"state": "closed", "consecutive_failures": 0, "opened_at": 0.0})

@@ -174,12 +174,25 @@ const PRERENDER_SCRIPT = [
 ].join('\n');
 
 /**
- * HTML pré-rendu d'une mission, produit par le code de production.
+ * HTML pré-rendu d'une page, produit par le code de production.
+ *
+ * `script` est le programme `-c` qui importe le module de pré-rendu : par défaut
+ * celui de la fiche mission. Le PROFIL TRAVAILLEUR
+ * (`scripts/check-worker-og-contract.js`) réutilise cette fonction avec son
+ * propre programme — l'exécution (interpréteur, encodage, remontée d'erreur)
+ * est donc la même pour les deux pages, et un défaut de l'une ne se cache pas
+ * dans une seconde copie du code d'appel.
  *
  * @returns {{html: string, error: string}} `html` vide si l'exécution échoue.
  */
-export const renderPrerenderedPage = ({ python, job = FIXTURE_JOB, base, root = REPO_ROOT } = {}) => {
-  const result = spawnSync(python, ['-c', PRERENDER_SCRIPT, path.join(root, 'backend'), base], {
+export const renderPrerenderedPage = ({
+  python,
+  job = FIXTURE_JOB,
+  base,
+  root = REPO_ROOT,
+  script = PRERENDER_SCRIPT,
+} = {}) => {
+  const result = spawnSync(python, ['-c', script, path.join(root, 'backend'), base], {
     cwd: root,
     input: JSON.stringify(job),
     encoding: 'utf8',
@@ -198,11 +211,25 @@ export const renderPrerenderedPage = ({ python, job = FIXTURE_JOB, base, root = 
   return { html: String(result.stdout || ''), error: '' };
 };
 
-/** Premier interpréteur capable d'importer le module de production, ou null. */
-export const findPython = ({ root = REPO_ROOT, candidates = PYTHON_CANDIDATES, base = '' } = {}) => {
-  if (!existsSync(path.join(root, PRERENDER_MODULE))) return null;
+/**
+ * Premier interpréteur capable d'importer le module de production, ou null.
+ *
+ * `module` / `job` / `script` désignent la PAGE jugée : la fiche mission par
+ * défaut, le profil travailleur quand l'appelant le demande. L'existence du
+ * module est vérifiée AVANT de lancer un interpréteur — un garde ne doit pas
+ * lancer dix processus pour découvrir que le fichier qu'il juge n'existe pas.
+ */
+export const findPython = ({
+  root = REPO_ROOT,
+  candidates = PYTHON_CANDIDATES,
+  base = '',
+  module = PRERENDER_MODULE,
+  job = FIXTURE_JOB,
+  script = PRERENDER_SCRIPT,
+} = {}) => {
+  if (!existsSync(path.join(root, module))) return null;
   for (const candidate of candidates) {
-    const { html, error } = renderPrerenderedPage({ python: candidate, base, root });
+    const { html, error } = renderPrerenderedPage({ python: candidate, job, base, root, script });
     if (!error && html) return candidate;
   }
   return null;

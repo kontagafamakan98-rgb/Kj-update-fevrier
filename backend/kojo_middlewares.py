@@ -8,12 +8,68 @@ Extrait de `kojo_core`, qui n'en garde que la facade : le nom continue d'y
 etre servi (`from kojo_core import X`) pour ses importeurs. La surface
 publique de la facade est figee par `tests/test_core_surface.py`.
 """
+import re
+import uuid
+
 from fastapi import Request, status
 from kojo_settings import APP_VERSION, CSRF_COOKIE_NAME, get_security_headers_for_path
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 from kojo_network import get_client_ip
 from kojo_rate_limit import get_rate_limit_bucket, rate_limit_check
+
+# ── Identifiant de requête : ce qui relie un incident à SES lignes ─────────
+# Sans lui, un message d'erreur, un 500 et les journaux du serveur ne se
+# recoupent que par l'horodatage — inutilisable quand trois cents requêtes se
+# croisent et qu'un utilisateur dit « ça a échoué ». L'identifiant est renvoyé
+# au client ET posé sur la réponse ; le support peut alors nommer LA requête.
+#
+# Un identifiant FOURNI par le client n'est accepté que s'il a la forme d'un
+# identifiant : sans ce filtre, un en-tête arbitraire (retour à la ligne,
+# balise, log forgé) entrerait tel quel dans les journaux et les réponses.
+REQUEST_ID_HEADER = "X-Request-ID"
+_FORMAT_IDENTIFIANT = re.compile(r"^[A-Za-z0-9._-]{8,64}$")
+
+
+def _identifiant_de_requete(valeur: object) -> str:
+    """L'identifiant à publier : celui du client s'il est sain, sinon le nôtre.
+
+    Un identifiant reçu est un VŒU, pas une preuve : une valeur hors format
+    (trop longue, caractères de contrôle, espace) est remplacée au lieu d'être
+    recopiée, et l'appelant n'a aucun moyen de choisir ce qui s'écrit dans les
+    journaux.
+    """
+    texte = str(valeur or "").strip()
+    if _FORMAT_IDENTIFIANT.match(texte):
+        return texte
+    return uuid.uuid4().hex[:16]
+
+
+class RequestIdMiddleware(BaseHTTPMiddleware):
+    """Pose `X-Request-ID` sur la réponse et `request.state.request_id`.
+
+    Le plus EXTERNE des middlewares (monté en dernier) : un 429 du
+    rate-limiter ou un refus de taille reçoivent donc aussi un identifiant,
+    alors que monté à l'intérieur, les réponses de refus n'en auraient pas —
+    précisément celles qu'un utilisateur signale.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        identifiant = _identifiant_de_requete(request.headers.get(REQUEST_ID_HEADER))
+        request.state.request_id = identifiant
+        try:
+            response = await call_next(request)
+        except Exception:
+            # La requête a échoué AVANT de produire une réponse : le
+            # gestionnaire d'exceptions global la transforme en 500, mais on ne
+            # peut pas lui ajouter l'en-tête depuis ici. On nomme au moins la
+            # requête dans le journal, avec la trace d'exception.
+            from kojo_settings import logger
+
+            logger.exception("💥 Requête %s en échec non géré", identifiant)
+            raise
+        response.headers[REQUEST_ID_HEADER] = identifiant
+        return response
 
 class WestAfricaSecurityMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):

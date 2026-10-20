@@ -49,8 +49,16 @@ vi.mock('../../services/api', () => ({
   // Trace de session — le SEUL juge d'amorçage : branchée sur le stockage comme
   // getAuthToken, pour que le court-circuit soit jugé sur son vrai critère (une
   // trace est-elle là ?), pas sur une doublure à réponse fixe.
-  hasSessionTrace: vi.fn(() => Boolean(localStorage.getItem('token')) || Boolean(localStorage.getItem('user'))),
-  hasSessionArtifact: vi.fn(() => Boolean(localStorage.getItem('user'))),
+  //
+  // Depuis le 20/10/2026 la trace est un MARQUEUR sans PII
+  // (`kojo_session_trace`), avec un `'user'` laissé par une version antérieure
+  // encore lu comme trace valable (le démarrage le remplace).
+  SESSION_TRACE_KEY: 'kojo_session_trace',
+  hasSessionTrace: vi.fn(() => Boolean(localStorage.getItem('token'))
+    || Boolean(localStorage.getItem('user'))
+    || Boolean(localStorage.getItem('kojo_session_trace'))),
+  hasSessionArtifact: vi.fn(() => Boolean(localStorage.getItem('user'))
+    || Boolean(localStorage.getItem('kojo_session_trace'))),
   // Les scénarios historiques modélisent une session portée par le jeton, donc
   // le shell natif. Le web (cookie seul) est couvert en fin de fichier.
   isNativeShell: vi.fn(() => true),
@@ -366,7 +374,17 @@ describe('AuthContext — web : la session est le cookie httpOnly seul', () => {
     expect(sessionStorage.getItem('token')).toBeNull();
     expect(sessionStorage.getItem('token_expires_at')).toBeNull();
     // Le reste de la session a bien été établi (absence de jeton ≠ login raté).
-    expect(readStoredUser().country).toBe('mali');
+    expect(screen.getByTestId('country').textContent).toBe('mali');
+    // ── AUCUNE donnée personnelle en stockage (20/10/2026) ────────────────
+    // Le profil était réécrit dans localStorage à chaque amorçage (nom, email,
+    // téléphone) : un appareil partagé, une XSS ou une sauvegarde de navigateur
+    // l'emportaient. Seul un marqueur sans PII reste, et il suffit à l'amorçage.
+    expect(localStorage.getItem('user')).toBeNull();
+    expect(JSON.stringify(localStorage)).not.toContain('Jean');
+    expect(JSON.stringify(localStorage)).not.toContain('jean@example.com');
+    expect(JSON.stringify(localStorage)).not.toContain('+223771234567');
+    expect(localStorage.getItem('kojo_session_trace')).toBe('1');
+    expect(hasSessionArtifact()).toBe(true);
     expect(authAPI.login).toHaveBeenCalledWith({ email: 'jean@example.com', password: 'motdepasse' });
   });
 });

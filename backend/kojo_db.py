@@ -112,6 +112,16 @@ async def create_database_indexes():
         await db.job_proposals.create_index("worker_id")
         await db.job_proposals.create_index([("job_id", 1), ("worker_id", 1)])
 
+        # Alertes emploi (kojo_job_alerts) : UNE veille par compte, garantie par
+        # l'index unique — sans lui, deux activations simultanées (double clic,
+        # deux onglets) inséreraient deux documents, donc deux emails pour les
+        # mêmes missions. Le jeton de désinscription est unique et sparse : il
+        # n'est comparé qu'à la recherche, et les veilles d'avant son
+        # introduction n'en portent pas.
+        await db.job_alerts.create_index("user_id", unique=True)
+        await db.job_alerts.create_index("token", unique=True, sparse=True)
+        await db.job_alerts.create_index("active")
+
         # Journal des événements métier (kojo_business_events) : `cle` unique
         # absorbe une écriture répétée d'un même jalon.
         await db.business_events.create_index("cle", unique=True)
@@ -161,9 +171,27 @@ async def create_database_indexes():
         await db.payments.create_index("receiver_id")
         await db.payments.create_index("status")
         await db.payments.create_index("invoice_token", sparse=True)
+        # `disburse_token` est relu par la re-vérification d'un décaissement
+        # (`kojo_routers_payments`, chemin de l'argent) et n'était pas indexé :
+        # chaque re-vérification balayait la collection entière.
+        await db.payments.create_index("disburse_token", sparse=True)
+        # Clé d'idempotence du checkout : UNIQUE et SPARSE. Le champ était
+        # accepté et stocké sans jamais être lu — deux requêtes simultanées
+        # créaient donc deux factures pour le même geste client. L'unicité
+        # n'est pas qu'un accélérateur : c'est elle qui rend le rejeu
+        # inoffensif (index créé même sur les documents `None`, exclus par
+        # `sparse`).
+        await db.payments.create_index("idempotency_key", unique=True, sparse=True)
         await db.payments.create_index([("created_at", -1)])
         # (index TTL des paiements : dans le bloc de conservation plus bas,
         # créé depuis kojo_retention.RETENTION_RULES)
+
+        # Support : `id` (lecture d'un ticket) et `email` (retrouver les tickets
+        # d'un demandeur) étaient interrogés SANS index — un balayage complet à
+        # chaque ouverture, sur la collection la plus identifiante du dépôt.
+        await db.support_tickets.create_index("id", unique=True)
+        await db.support_tickets.create_index("email")
+        await db.support_tickets.create_index([("status", 1), ("created_at", -1)])
 
         # Email OTP collection indexes
         await db.email_otps.create_index([("email", 1), ("purpose", 1)], unique=True)

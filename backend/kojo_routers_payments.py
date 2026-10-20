@@ -6,6 +6,7 @@ from typing import Optional
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pymongo.errors import DuplicateKeyError
 
 from kojo_core import db
 from kojo_models import (
@@ -40,6 +41,27 @@ from kojo_payments import (
 from kojo_identifiants import identifiant_query, identifiant_job_query
 
 router = APIRouter()
+
+
+def _reponse_checkout_reutilise(record, breakdown) -> dict:
+    """Réponse d'un checkout DÉJÀ fait : même forme qu'une création.
+
+    Un seul constructeur pour les trois chemins de réutilisation (clé
+    d'idempotence, paiement en attente, course perdue sur l'index unique) :
+    trois copies du même dictionnaire divergeraient au premier champ ajouté,
+    et le client verrait un `reused: true` incomplet.
+    """
+    return {
+        "status": "success",
+        "provider": "paydunya",
+        "payment_id": record["id"],
+        "invoice_token": record.get("invoice_token"),
+        "checkout_url": record.get("checkout_url"),
+        "payment_method": record.get("payment_method"),
+        "channel": record.get("provider_channel"),
+        "reused": True,
+        **breakdown,
+    }
 
 
 def _append_query_param(url: str, key: str, value: str) -> str:
@@ -385,9 +407,27 @@ async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_
     if not job:
         raise HTTPException(status_code=404, detail="Mission introuvable")
 
-    # Idempotence : un paiement PENDING déjà existant pour (job, payeur)
-    # est renvoyé tel quel (même facture) au lieu d'en créer un second —
-    # protège d'un double-clic ou d'un retry réseau qui créait 2 factures.
+    # ── Idempotence : la clé du client était acceptée sans être LUE ───────
+    # `idempotency_key` était stockée et jamais consultée : la protection
+    # réelle reposait sur « un paiement pending existe pour (job, payeur) »,
+    # qui ne couvre ni deux clics simultanés (aucun n'est encore inséré), ni
+    # un rejeu après que le premier checkout a échoué. La clé est maintenant
+    # le PREMIER critère : une requête rejouée retrouve SA facture.
+    if request.idempotency_key:
+        deja = await db.payments.find_one({
+            "idempotency_key": request.idempotency_key,
+            "payer_id": current_user.id,
+        })
+        if deja:
+            breakdown = calculate_payment_breakdown(
+                deja.get("amount") or 0, await get_effective_commission_rate()
+            )
+            return _reponse_checkout_reutilise(deja, breakdown)
+
+    # Filet pour les clients qui n'envoient pas de clé : un paiement PENDING
+    # déjà existant pour (job, payeur) est renvoyé tel quel (même facture)
+    # au lieu d'en créer un second — protège d'un double-clic ou d'un retry
+    # réseau qui créait 2 factures.
     existing_pending = await db.payments.find_one({
         "job_id": request.job_id,
         "payer_id": current_user.id,
@@ -395,17 +435,7 @@ async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_
     })
     if existing_pending and existing_pending.get("checkout_url"):
         breakdown = calculate_payment_breakdown(existing_pending.get("amount") or 0, await get_effective_commission_rate())
-        return {
-            "status": "success",
-            "provider": "paydunya",
-            "payment_id": existing_pending["id"],
-            "invoice_token": existing_pending.get("invoice_token"),
-            "checkout_url": existing_pending.get("checkout_url"),
-            "payment_method": existing_pending.get("payment_method"),
-            "channel": existing_pending.get("provider_channel"),
-            "reused": True,
-            **breakdown
-        }
+        return _reponse_checkout_reutilise(existing_pending, breakdown)
 
     is_owner_user = bool(OWNER_EMAIL) and current_user.email == OWNER_EMAIL
     if job.get("client_id") != current_user.id and not is_owner_user:
@@ -489,7 +519,28 @@ async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_
         'updated_at': datetime.now(timezone.utc).isoformat(),
     }
 
-    await db.payments.insert_one(payment_record)
+    try:
+        await db.payments.insert_one(payment_record)
+    except DuplicateKeyError:
+        # L'index UNIQUE sur `idempotency_key` a tranché une COURSE : deux
+        # requêtes simultanées portant la même clé. La perdante relit la
+        # facture de la gagnante au lieu de renvoyer une erreur — c'est
+        # exactement ce qu'une clé d'idempotence promet au client.
+        gagnant = await db.payments.find_one({
+            "idempotency_key": request.idempotency_key,
+            "payer_id": current_user.id,
+        })
+        if gagnant:
+            return _reponse_checkout_reutilise(
+                gagnant,
+                calculate_payment_breakdown(
+                    gagnant.get("amount") or 0, await get_effective_commission_rate()
+                ),
+            )
+        raise HTTPException(
+            status_code=409,
+            detail="Ce paiement a déjà été lancé. Rechargez la page pour retrouver la facture.",
+        )
 
     return_url = build_checkout_redirect_url(f"/payment?payment_id={payment_record['id']}", request.return_url)
     cancel_url = build_checkout_redirect_url(f"/payment?payment_id={payment_record['id']}&cancelled=1", request.cancel_url)
@@ -684,11 +735,35 @@ async def paydunya_payment_ipn(request: Request):
 
     previous_status = payment_record.get('status')
 
-    try:
-        payment_record = await sync_payment_status_with_paydunya(payment_record)
-    except Exception as exc:
-        logger.error(f"⚠️ Échec de vérification IPN PayDunya auprès du serveur: {exc}")
-        return {'status': 'error', 'detail': 'verification failed'}
+    # ── L'IPN PUBLIC NE MARTÈLE PAS LE FOURNISSEUR ─────────────────────────
+    # Cette route est anonyme par nature (c'est un webhook) : quiconque connaît
+    # un `payment_id` peut la frapper, et chaque appel déclenchait jusqu'ici un
+    # vrai aller-retour PayDunya. Deux bornes, dans cet ordre :
+    #
+    #   1. un paiement DÉJÀ CONFIRMÉ n'a plus rien à demander : le statut ne
+    #      bougera plus (les transitions de séquestre ne passent pas par ici).
+    #      Un rejeu du fournisseur — ou une IPN forgée — coûte donc ZÉRO appel ;
+    #   2. le cache de 15 s que les GET utilisent déjà : une rafale d'IPN pour
+    #      le même paiement ne fait qu'une requête. Le cache porte le résultat
+    #      d'une confirmation RÉELLE (il n'est écrit qu'après un sync), donc le
+    #      lire ne revient pas à croire un payload.
+    #
+    # Sans ces deux bornes, 240 POST/min/IP suffisaient à épuiser le quota
+    # PayDunya et — cinq échecs consécutifs plus loin — à ouvrir le disjoncteur
+    # global 2 h, c'est-à-dire à refuser TOUS les checkouts du site.
+    if previous_status == 'completed':
+        return {'status': 'ok', 'detail': 'déjà confirmé'}
+
+    cached_ipn = _get_cached_payment_status(payment_record['id'])
+    if cached_ipn is not None:
+        payment_record = cached_ipn
+    else:
+        try:
+            payment_record = await sync_payment_status_with_paydunya(payment_record)
+            _cache_payment_status(payment_record['id'], payment_record)
+        except Exception as exc:
+            logger.error(f"⚠️ Échec de vérification IPN PayDunya auprès du serveur: {exc}")
+            return {'status': 'error', 'detail': 'verification failed'}
 
     local_status = payment_record.get('status')
 

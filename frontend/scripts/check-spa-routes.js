@@ -74,6 +74,15 @@ export const BACKEND_OG_ROUTE = '/og/jobs/{job_id}';
 export const JOB_REWRITE_SOURCE = '/jobs/(.*)';
 // Le rewrite doit produire ce suffixe, quel que soit le backend visé.
 export const JOB_REWRITE_SUFFIX = '/api/og/jobs/$1';
+
+// ── Le PROFIL TRAVAILLEUR est pré-rendu de la même façon (20/10/2026) ───────
+// Il était servi par le gabarit nu + `X-Robots-Tag: noindex` : indexable selon
+// le produit, invisible pour un moteur. Les deux formes vivent donc ici, et le
+// garde exige les deux — un rewrite qui viserait encore app.html remettrait la
+// page dans la catégorie privée, avec un noindex qu'un crawler lirait.
+export const BACKEND_WORKER_OG_ROUTE = '/og/workers/{worker_id}';
+export const WORKER_REWRITE_SOURCE = '/workers/(.*)';
+export const WORKER_REWRITE_SUFFIX = '/api/og/workers/$1';
 export const SPA_CATCH_ALL = '/(.*)';
 export const SPA_INDEX = '/index.html';
 // Gabarit NU des routes clientes (émis par vite.config.js) : aucun contenu de
@@ -414,6 +423,28 @@ export function runSpaRoutesCheck(options = {}) {
     }
   }
 
+  // ── 1bis. Le rewrite du PROFIL TRAVAILLEUR, même forme que la fiche ───────
+  const workerRewrite = find(WORKER_REWRITE_SOURCE);
+  if (!workerRewrite) {
+    errors.push(
+      `aucun rewrite « ${WORKER_REWRITE_SOURCE} » : le profil public d'un travailleur n'est plus ` +
+        'pré-rendu, les crawlers et les moteurs recevront la coquille vide de la SPA'
+    );
+  } else {
+    const destination = String(workerRewrite.destination || '');
+    if (!destination.endsWith(WORKER_REWRITE_SUFFIX)) {
+      errors.push(
+        `le rewrite « ${WORKER_REWRITE_SOURCE} » mène à « ${destination} » au lieu de se terminer par ` +
+          `« ${WORKER_REWRITE_SUFFIX} » — vérifie le chemin côté backend (${BACKEND_WORKER_OG_ROUTE})`
+      );
+    }
+    if (!/^https:\/\//.test(destination)) {
+      errors.push(
+        `le rewrite « ${WORKER_REWRITE_SOURCE} » n'est pas une destination absolue (https) : « ${destination} »`
+      );
+    }
+  }
+
   // ── 2. Cohérence de backend avec le proxy /api ────────────────────────────
   const apiProxy = find('/api/:path*');
   if (!apiProxy) {
@@ -426,13 +457,22 @@ export function runSpaRoutesCheck(options = {}) {
         return null;
       }
     };
-    const jobHost = host(jobRewrite.destination);
     const apiHost = host(apiProxy.destination);
-    if (jobHost && apiHost && jobHost !== apiHost) {
-      errors.push(
-        `la fiche mission et le proxy API ne visent pas le même backend ` +
-          `(« ${jobHost} » contre « ${apiHost} ») : la fiche afficherait des données d'un autre service`
-      );
+    // Les DEUX pages pré-rendues par le serveur doivent viser le même backend
+    // que le proxy : sinon la fiche et le profil serviraient des données d'un
+    // autre service que le reste de l'application.
+    for (const [nom, rewrite] of [
+      ['la fiche mission', jobRewrite],
+      ['le profil travailleur', workerRewrite],
+    ]) {
+      if (!rewrite) continue;
+      const pageHost = host(rewrite.destination);
+      if (pageHost && apiHost && pageHost !== apiHost) {
+        errors.push(
+          `${nom} et le proxy API ne visent pas le même backend ` +
+            `(« ${pageHost} » contre « ${apiHost} ») : la page afficherait des données d'un autre service`
+        );
+      }
     }
   }
 
@@ -612,6 +652,25 @@ export function runSpaRoutesCheck(options = {}) {
     }
   }
 
+  // ── 6ter-bis. Une page pré-rendue par le SERVEUR ne porte pas noindex ──────
+  // Elle a quitté les routes privées (donc robots.txt) parce que son rewrite
+  // la sert depuis le backend : un `X-Robots-Tag: noindex` oublié dans
+  // vercel.json la maintiendrait hors de l'index tout en donnant l'illusion
+  // qu'elle est prête. C'était exactement l'état de /workers/:id jusqu'au
+  // 20/10/2026 — pré-rendue nulle part, noindex, et personne ne le voyait.
+  for (const route of productionRoutes) {
+    if (privateRoutes.includes(route)) continue;
+    if (Object.hasOwn(PAGE_META, route)) continue;
+    const tag = robotsTagFor(route);
+    if (tag && /noindex/i.test(tag)) {
+      errors.push(
+        `vercel.json : « ${route} » est pré-rendue par le backend (rewrite hors build) mais porte ` +
+          `« X-Robots-Tag: ${tag} » — un crawler la garderait hors de l'index. Retirer cet en-tête, ` +
+          'ou la remettre dans les routes privées (rewrite vers app.html).'
+      );
+    }
+  }
+
   // ── 7. La page 404 existe réellement dans le build et n'est pas indexable ─
   const notFoundPath = path.join(buildDir, '404.html');
   if (existsSync(buildDir)) {
@@ -746,17 +805,28 @@ export function runSpaRoutesCheck(options = {}) {
   const routerPath = path.join(repoRoot, BACKEND_ROUTER);
   if (!existsSync(routerPath)) {
     errors.push(`${BACKEND_ROUTER} introuvable : impossible de vérifier que la route OG existe côté backend`);
-  } else if (!readFileSync(routerPath, 'utf8').includes(`"${BACKEND_OG_ROUTE}"`)) {
-    errors.push(
-      `la route backend « ${BACKEND_OG_ROUTE} » n'est plus déclarée dans ${BACKEND_ROUTER} : ` +
-        `le rewrite « ${JOB_REWRITE_SOURCE} » pointe vers un chemin qui n'existe plus`
-    );
+  } else {
+    const source = readFileSync(routerPath, 'utf8');
+    // Les DEUX pages pré-rendues : un rewrite peut fort bien viser un chemin
+    // que le backend ne déclare plus (route renommée, module déplacé) — les
+    // crawlers recevraient alors un 404 silencieux sous une URL indexée.
+    for (const [chemin, rewrite] of [
+      [BACKEND_OG_ROUTE, JOB_REWRITE_SOURCE],
+      [BACKEND_WORKER_OG_ROUTE, WORKER_REWRITE_SOURCE],
+    ]) {
+      if (!source.includes(`"${chemin}"`)) {
+        errors.push(
+          `la route backend « ${chemin} » n'est plus déclarée dans ${BACKEND_ROUTER} : ` +
+            `le rewrite « ${rewrite} » pointe vers un chemin qui n'existe plus`
+        );
+      }
+    }
   }
 
   if (errors.length === 0) {
     notices.push(
-      `${rewrites.length} rewrites analysés : fiche /jobs/:id → backend, sitemap proxifié, ` +
-        'routes SPA déclarées nommément et aucune règle masquée (URL inconnue → 404)'
+      `${rewrites.length} rewrites analysés : fiche /jobs/:id et profil /workers/:id → backend, ` +
+        'sitemap proxifié, routes SPA déclarées nommément et aucune règle masquée (URL inconnue → 404)'
     );
     notices.push(
       `${privateRoutes.length} route(s) privée(s) dérivée(s) du routage : X-Robots-Tag dans ` +

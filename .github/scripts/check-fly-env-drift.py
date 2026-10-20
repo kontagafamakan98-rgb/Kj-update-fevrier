@@ -144,6 +144,9 @@ SENSITIVE_KEYS = {
     "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN",
     "CLOUDINARY_API_SECRET", "VAPID_PRIVATE_KEY", "REDIS_URL",
     "GOOGLE_CLIENT_SECRET", "SENTRY_DSN",
+    # Jeton de l'endpoint Prometheus : un secret qui se rotate, donc hors du
+    # snapshot de stabilité (sinon une rotation voulue passerait pour un écart).
+    "METRICS_TOKEN",
     # Jeton du gateway IA (Neon) : porteur d'accès aux modèles, donc une clé
     # à rotater sans alerte de stabilité.
     "NEON_AI_GATEWAY_TOKEN",
@@ -158,6 +161,11 @@ SENSITIVE_KEYS = {
 # non vide dans le code, donc posable sans être exigée).
 OPTIONAL_KEYS = {
     "SENTRY_DSN", "PAYMENT_COMMISSION_RATE", "CORS_ORIGINS", "REDIS_URL",
+    # Métriques Prometheus : sans `METRICS_TOKEN` le backend démarre et
+    # `/metrics` refuse (503 nommée). L'absence sur Fly est donc un choix
+    # d'exploitation (collecte éteinte), pas une config incomplète — mais sa
+    # PRÉSENCE est ce qui rend la collecte possible (backend/METRIQUES.md).
+    "METRICS_TOKEN",
     # Bus temps réel (Redis pub/sub) : les réglages ont un défaut de repli dans
     # `kojo_live` (canal `kojo:live`, tampon de 1000, reprise à 2 s). Le bus lui-même
     # n'existe que si `REDIS_URL` est posé — leur absence sur Fly n'est donc

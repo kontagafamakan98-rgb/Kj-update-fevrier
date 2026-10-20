@@ -42,6 +42,21 @@ from kojo_core import (
     revoke_token, sanitize_email, security, set_auth_cookies,
     validate_payment_accounts, verify_password,
 )
+# Le verrou par COMPTE (et non par IP) : voir le module pour le pourquoi.
+from kojo_login_guard import enregistrer_echec, oublier_echecs, secondes_de_verrou
+# Le plafond par RÉSEAU — l'autre moitié du problème : le verrou de compte ne
+# voit pas une attaque qui change de compte à chaque essai, et le rate-limiter
+# ne voit que des IP (une par opérateur, en CGNAT). Voir le module pour les
+# trois règles et pour le goutte-à-goutte qui épargne les voisins.
+from kojo_login_reseau import (
+    SEUIL_ECHECS as SEUIL_ECHECS_RESEAU,
+    echecs as echecs_du_reseau,
+    enregistrer_echec as enregistrer_echec_reseau,
+    prendre_sondage,
+    reseau_de,
+    secondes_avant_sondage,
+)
+from kojo_network import get_client_ip
 from kojo_email import (
     create_email_verification_token, hash_email_otp, issue_email_otp,
     verify_email_verification_token, mask_email_address,
@@ -726,7 +741,7 @@ async def register_user_verified(user_data: UserWithPayment, response: Response)
         log_and_raise_http_exception(500, "Une erreur inattendue s'est produite lors de l'inscription. Veuillez réessayer.")
 
 @router.post("/auth/login")
-async def login_user(credentials: UserLogin, response: Response):
+async def login_user(credentials: UserLogin, response: Response, request: Request):
     """Connexion par email + mot de passe (cookie httpOnly + jeton bearer).
 
     Returns:
@@ -736,7 +751,6 @@ async def login_user(credentials: UserLogin, response: Response):
     try:
         # Sanitize email input
         clean_email = sanitize_email(credentials.email)
-        user = await db.users.find_one({"email": clean_email})
     except ValueError as e:
         # sanitize_email() lève ValueError pour des raisons lisibles par un
         # humain ("Email too long", "Invalid characters"...) sans détail
@@ -744,9 +758,70 @@ async def login_user(credentials: UserLogin, response: Response):
         # suspectes, mais on renvoie un message générique au client.
         logger.warning(f"Tentative de login avec email invalide: {e}")
         raise HTTPException(status_code=400, detail="Adresse email invalide")
+
+    # ── Plafond par RÉSEAU (kojo_login_reseau) ───────────────────────────
+    # Lu AVANT la lecture du compte : un réseau saturé ne doit pas coûter une
+    # requête en base par tentative. Au seuil, le réseau passe au
+    # GOUTTE-À-GOUTTE (une tentative sonde toutes les `SONDAGE_SECONDS`) au lieu
+    # d'être bloqué : un compte verrouillé refuse même le bon mot de passe,
+    # mais un VOISIN du même réseau doit pouvoir se connecter — c'est toute la
+    # différence entre punir une source et punir des gens.
+    reseau = reseau_de(get_client_ip(request))
+    try:
+        sature = await echecs_du_reseau(reseau) >= SEUIL_ECHECS_RESEAU
+        if sature and not await prendre_sondage(reseau):
+            raise HTTPException(
+                status_code=429,
+                detail="Trop de tentatives de connexion depuis ce réseau. Réessayez dans quelques secondes.",
+                headers={"Retry-After": str(max(1, await secondes_avant_sondage(reseau)))},
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        # Une panne du COMPTEUR ne doit jamais empêcher de se connecter : le
+        # verrou de compte et le rate-limiter restent appliqués, et le repli est
+        # journalisé par le module. Refuser ici ferait d'un incident de compteur
+        # une panne de connexion pour tout un opérateur.
+        logger.warning(f"⚠️ Plafond de connexion par réseau indisponible ({exc}) — connexion non bloquée")
+
+    user = await db.users.find_one({"email": clean_email})
+    # ── Verrou par COMPTE (kojo_login_guard) ─────────────────────────────
+    # Le rate-limiter ne voit que des IP : en CGNAT ouest-africain, une limite
+    # par IP punit des voisins et ne voit pas un credential stuffing réparti.
+    # Le verrou compte l'attaque du point de vue du COMPTE visé, et il est lu
+    # AVANT le mot de passe : sinon le bon mot de passe passerait pendant le
+    # verrou, qui ne protégerait donc rien.
+    #
+    # Un email INCONNU n'est jamais verrouillé (aucun document à marquer) : il
+    # reste un 401, comme avant. Répondre 429 sur un email inexistant ferait du
+    # verrou un annuaire des comptes existants.
+    if user:
+        secondes = secondes_de_verrou(user)
+        if secondes > 0:
+            raise HTTPException(
+                status_code=429,
+                detail="Trop de tentatives sur ce compte. Réessayez dans quelques minutes.",
+                headers={"Retry-After": str(secondes)},
+            )
+
     if not user or not verify_password(credentials.password, user["password_hash"]):
+        # L'échec est COMPTÉ avant de répondre : un refus non compté rendrait
+        # la protection décorative. Le COMPTE d'abord (il nomme la victime),
+        # le RÉSEAU ensuite — y compris pour un email inconnu : sans cela le
+        # « spraying » qui teste des adresses au hasard échapperait au plafond,
+        # et un compteur limité aux comptes existants ferait du 429 un annuaire.
+        if user:
+            await enregistrer_echec(user["id"])
+        try:
+            await enregistrer_echec_reseau(reseau)
+        except Exception as exc:  # compté nulle part plutôt que de refuser la requête
+            logger.warning(f"⚠️ Plafond de connexion par réseau : échec non compté ({exc})")
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    
+
+    # Succès : le verrou et les compteurs disparaissent — la victime qui se
+    # souvient de son mot de passe n'attend pas la fin du délai.
+    await oublier_echecs(user["id"])
+
     access_token = create_access_token(data={
         "sub": user["id"],
         "email": user["email"],

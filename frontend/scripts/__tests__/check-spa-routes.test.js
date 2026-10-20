@@ -3,11 +3,14 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {
+  BACKEND_WORKER_OG_ROUTE,
   DEV_ONLY_ROUTES,
   JOB_REWRITE_SOURCE,
   JOB_REWRITE_SUFFIX,
   SPA_CATCH_ALL,
   SPA_INDEX,
+  WORKER_REWRITE_SOURCE,
+  WORKER_REWRITE_SUFFIX,
   findShadowedRules,
   matchesPattern,
   parseAppRoutes,
@@ -54,6 +57,7 @@ function R() {
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/jobs" element={<Jobs />} />
       <Route path="/jobs/:id" element={<JobDetails />} />
+      <Route path="/workers/:id" element={<WorkerProfile />} />
       <Route path="/profile" element={<Profile />} />
       <Route path="/support" element={<Support />} />
       {import.meta.env.DEV && (
@@ -78,6 +82,9 @@ const CONFORMING_REWRITES = [
   { source: '/jobs', destination: '/jobs.html' },
   { source: '/jobs/', destination: '/jobs.html' },
   { source: JOB_REWRITE_SOURCE, destination: `https://api.kojoforafrica.cc.cd${JOB_REWRITE_SUFFIX}` },
+  // Le profil public est pré-rendu par le MÊME backend (20/10/2026) : il n'est
+  // donc plus servi par app.html, et il n'est plus privé non plus.
+  { source: WORKER_REWRITE_SOURCE, destination: `https://api.kojoforafrica.cc.cd${WORKER_REWRITE_SUFFIX}` },
   { source: '/api/:path*', destination: 'https://api.kojoforafrica.cc.cd/api/:path*' },
   { source: '/sitemap.xml', destination: 'https://api.kojoforafrica.cc.cd/api/sitemap.xml' },
   { source: '/login', destination: '/login.html' },
@@ -144,6 +151,7 @@ function makeProject({
   headers = CONFORMING_HEADERS,
   appSource = APP_SOURCE,
   router = true,
+  routerSource = null,
   notFound = NOT_FOUND_HTML,
   raw,
   index = true,
@@ -191,7 +199,9 @@ function makeProject({
   if (router) {
     fs.writeFileSync(
       path.join(backendDir, 'kojo_routers_public.py'),
-      'api_router.add_api_route("/og/jobs/{job_id}", og_job_html)\n'
+      routerSource ??
+        ('api_router.add_api_route("/og/jobs/{job_id}", og_job_html)\n' +
+          'api_router.add_api_route("/og/workers/{worker_id}", og_worker_html)\n')
     );
   }
   return { root, frontendDir, buildDir, repoRoot: root };
@@ -426,6 +436,75 @@ describe('check-spa-routes — la fiche /jobs/:id', () => {
   it('échoue si la route backend disparaît', () => {
     const project = makeProject({ router: false });
     expect(run(project).errors.join('\n')).toContain('kojo_routers_public.py');
+  });
+});
+
+describe('check-spa-routes — le profil /workers/:id', () => {
+  it('est PUBLIC par dérivation : pré-rendu par le backend, plus par app.html', () => {
+    // La règle qui compte : une page servie par le serveur quitte les routes
+    // privées — donc robots.txt. Elle était privée (noindex) avant le 20/10/2026.
+    expect(privateRoutesOf(['/workers/:id', '/dashboard'], CONFORMING_REWRITES)).toEqual([
+      '/dashboard',
+    ]);
+  });
+
+  it('exige un rewrite vers la route OG du backend', () => {
+    const project = makeProject({
+      rewrites: withRewrites((rewrites) =>
+        rewrites.filter((rule) => rule.source !== WORKER_REWRITE_SOURCE)
+      ),
+    });
+    const result = run(project);
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toContain(WORKER_REWRITE_SOURCE);
+  });
+
+  it('échoue si le profil retombe sur le gabarit nu (app.html)', () => {
+    const project = makeProject({
+      rewrites: withRewrites((rewrites) => {
+        for (const rule of rewrites) {
+          if (rule.source === WORKER_REWRITE_SOURCE) rule.destination = '/app.html';
+        }
+      }),
+    });
+    const result = run(project);
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toContain(WORKER_REWRITE_SUFFIX);
+  });
+
+  it('échoue sur une destination relative', () => {
+    const project = makeProject({
+      rewrites: withRewrites((rewrites) => {
+        for (const rule of rewrites) {
+          if (rule.source === WORKER_REWRITE_SOURCE) {
+            rule.destination = '/api/og/workers/$1';
+          }
+        }
+      }),
+    });
+    expect(run(project).errors.join('\n')).toContain('absolue');
+  });
+
+  it('REFUSE un noindex laissé sur une page pré-rendue par le serveur', () => {
+    // Le défaut réel : la page est prête, servie, et pourtant hors de l'index.
+    // Aucun autre garde ne le voyait (elle n'a ni coquille ni texte de route).
+    const project = makeProject({
+      headers: [
+        ...CONFORMING_HEADERS,
+        { source: '/workers/:id', headers: [{ key: 'X-Robots-Tag', value: 'noindex, follow' }] },
+      ],
+    });
+    const errors = run(project).errors.join('\n');
+    expect(errors).toContain('/workers/:id');
+    expect(errors).toContain("hors de l'index");
+  });
+
+  it('échoue si la route backend du profil disparaît', () => {
+    const project = makeProject({
+      routerSource: `api_router.add_api_route("${'/og/jobs/{job_id}'}", og_job_html)\n`,
+    });
+    const errors = run(project).errors.join('\n');
+    expect(errors).toContain(BACKEND_WORKER_OG_ROUTE);
   });
 });
 

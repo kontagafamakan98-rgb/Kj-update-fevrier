@@ -1,0 +1,43 @@
+[
+  {
+    "methode": "GET",
+    "chemin": "/api/job-alerts",
+    "nom": "lire_alerte_emploi",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "PUT",
+    "chemin": "/api/job-alerts",
+    "nom": "enregistrer_alerte_emploi",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "DELETE",
+    "chemin": "/api/job-alerts",
+    "nom": "couper_alerte_emploi",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/job-alerts/unsubscribe",
+    "nom": "desinscrire_alerte_emploi",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  }
+]

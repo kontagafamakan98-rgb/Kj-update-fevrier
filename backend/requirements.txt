@@ -21,7 +21,10 @@ pywebpush==2.0.0
 # rendu 1200x630 côté serveur (Pillow). Wheels self-contained (PNG natif),
 # aucune lib système requise — les polices DejaVu sont installées dans le
 # Dockerfile pour le texte (repli Aileron embarqué sinon).
-Pillow>=12.3.0,<13.0.0
+# 13.0.0 est un PLANCHER, pas un choix : la 12.3.0 que le lock portait cumule
+# huit avis (CVE-2026-112395 à CVE-2026-112899), tous corrigés en 13.0.0 — et le
+# job `Dépendances (avis de sécurité)` audite la version EXPÉDIÉE, pas la plage.
+Pillow>=13.0.0,<14.0.0
 # Monitoring d'erreurs production (optionnel — activé si SENTRY_DSN est défini)
 sentry-sdk>=2.0,<3.0
 # Optionnel - rate-limiter partagé entre workers Render (multi-instance safe).

@@ -134,5 +134,17 @@ test.describe('Parcours E2E — la carte de proposition de /jobs/:id', () => {
     // seraient peintes à l'identique et la liste n'aurait plus d'état lisible.
     expect(choisie.filet).not.toBe(neutre.filet);
     expect(choisie.fond).not.toBe(neutre.fond);
+
+    // ── Le nom mène au profil public ──────────────────────────────────────
+    // `/workers/:id` est la SEULE surface où la réputation d'un travailleur se
+    // lit, et c'est ici qu'un client choisit. Sans ce lien la page existait
+    // sans qu'aucun écran n'y mène : le lien est donc jugé là où il sert, dans
+    // le vrai DOM servi — pas seulement dans le composant.
+    for (let index = 0; index < 2; index += 1) {
+      await expect(
+        cartes.nth(index).locator('a[href^="/workers/"]'),
+        `la carte ${index + 1} doit nommer son travailleur par un lien vers son profil`
+      ).toHaveCount(1);
+    }
   });
 });

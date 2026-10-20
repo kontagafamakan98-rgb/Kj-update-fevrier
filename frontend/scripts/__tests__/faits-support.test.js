@@ -29,6 +29,15 @@
  * Il ne juge pas non plus la LANGUE des traductions (une clé non traduite est
  * un autre sujet, `i18nParity` tient les clés) : il exige seulement qu'aucun
  * dictionnaire ne publie une phrase qui contredit le chiffre.
+ *
+ * ── Ce que la traduction a laissé passer, mesuré le 20/10/2026 ─────────────
+ * Les formes fausses ci-dessous étaient toutes FRANÇAISES ou ANGLAISES, donc
+ * invisibles dans une phrase wolof : `contactIntro` et `homeAboutText2` de `wo`
+ * disaient « altine ba gaawu » et ceux de `bm` « ntɛnɛn ni sibiri ntɛm » —
+ * lundi→samedi, exactement l'énoncé que le 07/10/2026 avait retiré du français.
+ * Le fait faux avait donc survécu à sa correction, dans deux langues que le
+ * garde ne lisait pas. Les deux formes locales sont désormais déclarées : une
+ * traduction qui réintroduit six jours sur sept rougit comme le français.
  */
 import { describe, it, expect } from 'vitest';
 import fs from 'fs';
@@ -50,6 +59,11 @@ const FORMES_FAUSSES = [
   { motif: /\blundi\s+au\s+samedi\b/i, dit: '« du lundi au samedi »' },
   { motif: /\blundi\s*-\s*samedi\b/i, dit: '« lundi-samedi »' },
   { motif: /\bMonday\s*(?:to|-)\s*Saturday\b/i, dit: '« Monday to Saturday »' },
+  // Formes LOCALES de la même affirmation, mesurées dans `wo` et `bm` le
+  // 20/10/2026 : « du lundi au samedi » s'y écrit ainsi, et le garde n'en
+  // connaissait que la version française.
+  { motif: /\baltine\s+ba\s+gaawu\b/i, dit: '« altine ba gaawu » (lundi au samedi, en wolof)' },
+  { motif: /\bntɛnɛn\s+ni\s+sibiri\b/i, dit: '« ntɛnɛn ni sibiri » (lundi au samedi, en bambara)' },
 ];
 
 /** LES FORMES VRAIES : au moins l'une doit être publiée. */
@@ -103,6 +117,8 @@ describe('le support répond sept jours sur sept — dans les valeurs publiées'
         { ou: 'faux-a', texte: 'Le support répond 6j/7 par téléphone.' },
         { ou: 'faux-b', texte: 'Kojo est joignable du lundi au samedi.' },
         { ou: 'faux-c', texte: 'The Kojo team answers Monday to Saturday.' },
+        { ou: 'faux-d', texte: 'Ekib Kojo di tontu altine ba gaawu, ci telefon.' },
+        { ou: 'faux-e', texte: 'Kojo jɛkulu bɛ jaabi ntɛnɛn ni sibiri ntɛm.' },
         { ou: 'vrai-a', texte: 'Le support répond sept jours sur sept.' },
         { ou: 'vrai-b', texte: 'Seven days a week, by phone.' },
         { ou: 'vrai-c', texte: 'Support client 7j/7.' },
@@ -110,7 +126,7 @@ describe('le support répond sept jours sur sept — dans les valeurs publiées'
         // version « 6/70 » ou une quantité « 16/7 » ne parlent pas du support.
         { ou: 'voisin', texte: 'Lot 6/70 vendu' },
       ]).map((message) => message.split(' — ')[0]),
-    ).toEqual(['faux-a', 'faux-b', 'faux-c']);
+    ).toEqual(['faux-a', 'faux-b', 'faux-c', 'faux-d', 'faux-e']);
   });
 
   it("aucune valeur publiée (cinq dictionnaires + le plan) ne dit six jours sur sept", () => {

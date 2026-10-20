@@ -1,0 +1,10 @@
+[
+  {
+    "methode": "GET",
+    "chemin": "/api/workers/{worker_id}",
+    "nom": "get_public_worker_profile",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  }
+]

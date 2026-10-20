@@ -5,6 +5,7 @@
     { "job": "audit-regression-test", "nom": "Audits détectent les régressions" },
     { "job": "backend-tests", "nom": "Backend tests (Python + MongoDB)" },
     { "job": "dependency-audit", "nom": "Dépendances (avis de sécurité)" },
+    { "job": "secret-scan", "nom": "Secrets (gitleaks)" },
     { "job": "e2e-playwright", "nom": "E2E Playwright tests (Chromium)" },
     { "job": "fly-env-drift", "nom": "Fly env doc-prod (drift + secrets)" },
     { "job": "frontend-build", "nom": "Frontend tests + build (Node/Vite)" },

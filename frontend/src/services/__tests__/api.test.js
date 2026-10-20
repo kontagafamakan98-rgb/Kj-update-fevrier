@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { api, getAuthToken, isNativeShell, hasSessionArtifact, hasSessionTrace, handleApiError, TRANSPORT_FAILURE_MESSAGE, SERVER_FAILURE_MESSAGE } from '../api';
+import { api, getAuthToken, isNativeShell, hasSessionArtifact, hasSessionTrace, handleApiError, TRANSPORT_FAILURE_MESSAGE, SERVER_FAILURE_MESSAGE, SESSION_TRACE_KEY } from '../api';
 import fr from '../../i18n/fr.json';
+import { safeLog } from '../../utils/env';
 
 // Le jeton ne vit en stockage que dans le shell natif (Capacitor). Les scénarios
 // de jeton ci-dessous décrivent ce mode : on l'active explicitement, et le web
@@ -542,15 +543,27 @@ describe('api — web : aucun jeton en stockage, aucun en-tête Authorization', 
     document.cookie = 'kojo_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
   });
 
-  it('hasSessionArtifact : vrai sur le profil laissé par une connexion, faux sinon', () => {
+  it('hasSessionArtifact : le MARQUEUR suffit, et il ne porte aucune donnée personnelle', () => {
     // Seul signal lisible quand l'API est appelée en cross-origin : le cookie
-    // de session est alors rangé sur l'hôte de l'API. Le vestige ne vaut pas
+    // de session est alors rangé sur l'hôte de l'API. Le marqueur ne vaut pas
     // preuve (aucun jeton n'en sort, le serveur a le dernier mot) mais c'est
-    // lui qui déclenche la question /auth/me.
+    // lui qui déclenche la question /auth/me — et il ne dit RIEN de la personne.
     expect(hasSessionArtifact()).toBe(false);
-    localStorage.setItem('user', JSON.stringify({ id: 'user-1' }));
+    localStorage.setItem(SESSION_TRACE_KEY, '1');
     expect(hasSessionArtifact()).toBe(true);
     // Purge de session (logout, 401) : plus aucun vestige.
+    localStorage.removeItem(SESSION_TRACE_KEY);
+    expect(hasSessionArtifact()).toBe(false);
+  });
+
+  it('hasSessionArtifact : un profil laissé par une version ANTÉRIEURE reste une trace', () => {
+    // Compatibilité de mise à jour : le web n'écrit plus ce profil (la PII
+    // reste en mémoire), mais la clé écrite hier doit encore déclencher la
+    // sonde — sinon la mise à jour déconnecte visuellement les sessions en
+    // cours, portées par le seul cookie. Le démarrage la remplace ensuite par
+    // le marqueur.
+    localStorage.setItem('user', JSON.stringify({ id: 'user-1' }));
+    expect(hasSessionArtifact()).toBe(true);
     localStorage.removeItem('user');
     expect(hasSessionArtifact()).toBe(false);
   });
@@ -652,5 +665,78 @@ describe('api — web : aucun jeton en stockage, aucun en-tête Authorization', 
     expect(global.fetch).toHaveBeenCalledTimes(1);
     expect(global.fetch.mock.calls[0][0]).not.toContain('/api/auth/me');
     expect(location.getRedirectTarget()).toBe('/login');
+  });
+});
+
+// L'identifiant de requête (`X-Request-ID`) est ce qui permet au support de
+// retrouver LA requête d'un incident dans les journaux du serveur. Deux moitiés
+// comptent, et chacune manquerait sans l'autre : l'erreur doit le PORTER (sinon
+// l'information est perdue dès la première couche), et une panne serveur doit le
+// NOMMER dans la console (sinon l'utilisateur n'a rien à citer). Un 4xx est un
+// RÉSULTAT, pas un incident : il porte l'identifiant sans faire de bruit.
+describe('api — identifiant de requête : un incident se nomme', () => {
+  const reponseAvecRequete = (status, corps, identifiant) => ({
+    ok: false,
+    status,
+    text: async () => corps,
+    headers: { get: (nom) => (nom === 'X-Request-ID' ? identifiant : null) },
+  });
+
+  beforeEach(() => {
+    vi.stubEnv('VITE_API_URL', 'https://stub.example');
+    sortieModeNatif();
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+
+  it('un 500 porte l’identifiant et le nomme dans la console', async () => {
+    const bruit = vi.spyOn(safeLog, 'error').mockImplementation(() => {});
+    global.fetch = vi.fn().mockResolvedValue(
+      reponseAvecRequete(500, '{"detail":"Erreur interne"}', 'abc123def456')
+    );
+
+    const erreur = await api.get('/jobs').catch((error) => error);
+
+    expect(erreur.response.status).toBe(500);
+    expect(erreur.response.requestId).toBe('abc123def456');
+    // Ce que l'utilisateur peut citer au support : le chemin, le statut, LA requête.
+    expect(bruit).toHaveBeenCalledTimes(1);
+    expect(String(bruit.mock.calls[0][0])).toContain('abc123def456');
+    expect(String(bruit.mock.calls[0][0])).toContain('/jobs');
+  });
+
+  it('un 4xx porte l’identifiant SANS écrire dans la console', async () => {
+    // Mot de passe refusé, doublon, quota : des résultats que les pages
+    // traitent. Les journaliser noierait le seul cas où le support cherche.
+    const bruit = vi.spyOn(safeLog, 'error').mockImplementation(() => {});
+    global.fetch = vi.fn().mockResolvedValue(
+      reponseAvecRequete(409, '{"detail":"Compte déjà existant"}', 'def456abc123')
+    );
+
+    const erreur = await api.post('/auth/register', {}).catch((error) => error);
+
+    expect(erreur.response.requestId).toBe('def456abc123');
+    expect(bruit).not.toHaveBeenCalled();
+  });
+
+  it('une panne sans en-tête est nommée comme telle, jamais « undefined »', async () => {
+    // Un proxy peut masquer l'en-tête : l'incident reste un incident, et la
+    // ligne de journal ne doit pas annoncer un identifiant qui n'existe pas.
+    const bruit = vi.spyOn(safeLog, 'error').mockImplementation(() => {});
+    global.fetch = vi.fn().mockResolvedValue(reponseAvecRequete(502, '', ''));
+
+    const erreur = await api.get('/jobs').catch((error) => error);
+
+    expect(erreur.response.requestId).toBe('');
+    expect(bruit).toHaveBeenCalledTimes(1);
+    expect(String(bruit.mock.calls[0][0])).toContain('aucun identifiant');
+    expect(String(bruit.mock.calls[0][0])).not.toContain('undefined');
   });
 });

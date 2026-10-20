@@ -20,6 +20,14 @@ l'utilise aussi, et deux copies divergeraient en silence.
 """
 
 
+# La coupe de la description, en POINTS DE CODE — et c'est le SEUL endroit qui la
+# fixe côté Python : la fiche travailleur (`kojo_worker_og.py`) importe cette
+# valeur, sinon deux pages couperaient à deux longueurs. La copie JavaScript vit
+# dans `frontend/src/utils/jobSeo.js` (`DESCRIPTION_LIMIT`) et les deux sont
+# confrontées par les gardes de contrat hors ligne.
+DESCRIPTION_LIMIT = 150
+
+
 def escape_xml(value: str) -> str:
     return (
         str(value)
@@ -46,7 +54,7 @@ def job_og_html(job: dict, base: str) -> str:
     raw_title = str(job.get("title") or "")
     title = f"{raw_title} — Kojo" if raw_title else "Mission — Kojo"
     raw_desc = str(job.get("description") or "")
-    desc = raw_desc[:150] + ("…" if len(raw_desc) > 150 else "")
+    desc = raw_desc[:DESCRIPTION_LIMIT] + ("…" if len(raw_desc) > DESCRIPTION_LIMIT else "")
     url = f"{base}/jobs/{escape_xml(job_id)}"
     wide = f"{base}/api/og/jobs/{escape_xml(job_id)}.png"
     square = f"{base}/api/og/jobs/{escape_xml(job_id)}-square.png"
