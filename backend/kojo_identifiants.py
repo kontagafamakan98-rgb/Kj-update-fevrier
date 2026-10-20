@@ -82,6 +82,29 @@ def identifiant_job_query(valeur: str) -> dict:
     return identifiant_query(valeur, ("id", "job_id"))
 
 
+def identifiants_query(valeurs, champs=("id",)) -> dict:
+    """Filtre qui retrouve PLUSIEURS documents par les identifiants rendus.
+
+    Même règle que `identifiant_query`, appliquée à une liste : un `$in`
+    écrit à la main sur `id` rate les documents importés (identifiant en
+    ObjectId, en nombre, ou porté par `_id`) — et c'est exactement ce que le
+    garde `test_identifiants_un_proprietaire` interdit dans un routeur.
+
+    Sert aux lectures en LOT (les prénoms des auteurs d'avis d'un profil
+    public) : une requête par identifiant ferait un N+1 sur une route que les
+    crawlers ouvrent en rafale.
+    """
+    identifiants = [str(valeur) for valeur in valeurs if valeur]
+    if not identifiants:
+        return {"$or": []}
+    formes = []
+    for valeur in identifiants:
+        formes.extend(_formes_stockables(valeur))
+    candidats = [{champ: {"$in": formes}} for champ in champs]
+    candidats.append({"_id": {"$in": formes}})
+    return {"$or": candidats}
+
+
 def identifiant_public(document: dict) -> str:
     """L'identifiant ADRESSABLE d'un document, tel qu'il est rendu au client.
 

@@ -36,7 +36,7 @@
     {
       "fichier": "ci.yml",
       "job": "dependency-audit",
-      "etape": "Avis sur les dépendances Python (backend/requirements.txt, dev incluses) — BLOQUANT",
+      "etape": "Avis sur les dépendances Python (backend/requirements.lock, dev incluses) — BLOQUANT",
       "forme": "commande neutralisee",
       "nombre": 1,
       "motif": "`|| true` ne borne QUE l'extraction du tableau (`grep` sans correspondance n'est pas un avis) ; l'étape finit par `exit 1` dès que pip-audit sort non nul — verdict ou pas —, donc elle ne peut pas verdir sans conclure."

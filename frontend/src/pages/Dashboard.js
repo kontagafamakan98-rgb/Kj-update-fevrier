@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 // Le lien interne AVEC la transition de vue native (components/LienVue.js).
 import Link from '../components/LienVue';
 // Le CADRE de la page : son pas, sa largeur et sa gouttière sont déclarés une
@@ -7,7 +7,6 @@ import Link from '../components/LienVue';
 import CadrePage from '../components/CadrePage';
 import {
   Briefcase,
-  CircleDollarSign,
   ClipboardList,
   GraduationCap,
   Hammer,
@@ -31,7 +30,6 @@ import { useLanguage } from '../contexts/LanguageContext';
 import OwnerService from '../services/ownerService';
 const PreciseLocationDemo = lazy(() => import('../components/PreciseLocationDemo'));
 import { jobsAPI } from '../services/apiEndpoints';
-import { getLocaleForLanguage } from '../utils/pack2PageI18n/core';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/dashboard';
 import { safeLog } from '../utils/env';
 // LE squelette du tableau de bord, partagé par le repli Suspense de la route
@@ -47,21 +45,32 @@ export default function Dashboard() {
   const [stats, setStats] = useState({
     totalJobs: 0,
     activeJobs: 0,
-    completedJobs: 0,
-    totalEarnings: 0
+    completedJobs: 0
   });
   const [recentJobs, setRecentJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isFamakan, setIsFamakan] = useState(false);
+  // ── L'ÉCHEC SE DIT, IL NE SE DÉGUISE PAS EN ZÉRO (20/10/2026) ────────────
+  // `loadDashboardData` n'écrivait qu'un log en cas de panne : l'écran
+  // affichait alors 0 / 0 / 0, c'est-à-dire « vous n'avez aucune mission »
+  // pour une simple coupure réseau. Le drapeau porte l'état réel de la
+  // lecture, et `reloadToken` est ce qui relance une tentative.
+  const [loadError, setLoadError] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
+  // Ce que la page sait des OFFRES reçues (le travailleur n'a pas de compteur
+  // de missions dans cette réponse : afficher 0 pour lui était un mensonge).
+  const [availableCount, setAvailableCount] = useState(0);
 
   const { user } = useAuth();
   const { t, currentLanguage } = useLanguage();
   const pageT = makeScopedTranslator(currentLanguage, t);
-  const locale = useMemo(() => getLocaleForLanguage(currentLanguage), [currentLanguage]);
 
   useEffect(() => {
     loadDashboardData();
-  }, []);
+    // `reloadToken` est la seule dépendance voulue : il ne change qu'au clic
+    // sur « Réessayer », donc ce chargement ne repart pas à chaque rendu.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reloadToken]);
 
   useEffect(() => {
     setIsFamakan(OwnerService.isOwnerSessionValid(user));
@@ -69,6 +78,7 @@ export default function Dashboard() {
 
   const loadDashboardData = async () => {
     try {
+      setLoadError(false);
       const jobs = await jobsAPI.getAll();
       const jobsList = Array.isArray(jobs) ? jobs : jobs?.data || [];
 
@@ -77,18 +87,27 @@ export default function Dashboard() {
         setStats({
           totalJobs: clientJobs.length,
           activeJobs: clientJobs.filter((job) => job.status === 'open' || job.status === 'in_progress').length,
-          completedJobs: clientJobs.filter((job) => job.status === 'completed').length,
-          totalEarnings: 0
+          completedJobs: clientJobs.filter((job) => job.status === 'completed').length
         });
         setRecentJobs(clientJobs.slice(0, 5));
       } else {
+        setAvailableCount(jobsList.length);
         setRecentJobs(jobsList.slice(0, 5));
       }
     } catch (error) {
+      // La panne est VISIBLE. Les mesures ne sont plus affichées du tout (cf.
+      // `masquer`) : un tiret dit « je ne sais pas », un zéro dit « rien ».
       safeLog.error('Error loading dashboard data:', error);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
+  };
+
+  /** Relance la lecture : le squelette revient le temps de la réponse. */
+  const recharger = () => {
+    setLoading(true);
+    setReloadToken((jeton) => jeton + 1);
   };
 
   const translateStatus = (status) => {
@@ -98,12 +117,23 @@ export default function Dashboard() {
 
   const translateCategory = (category) => t(category) || category;
 
-  const statCards = [
-    { label: t('activeJobs'), value: stats.activeJobs, icon: ClipboardList },
-    { label: t('completedJobs'), value: stats.completedJobs, icon: Sparkles },
-    { label: t('totalJobs'), value: stats.totalJobs, icon: Briefcase },
-    { label: t('totalEarnings'), value: `${stats.totalEarnings.toLocaleString(locale)} XOF`, icon: CircleDollarSign }
-  ];
+  // Une mesure NON LUE n'est pas une mesure à zéro : tant que la lecture a
+  // échoué, la tuile dit « je ne sais pas » (—). Et un travailleur n'a aucun
+  // compteur de missions dans cette réponse : ses trois anciennes tuiles
+  // affichaient 0 en permanence, ce qui était faux dans tous les cas. Il ne
+  // reste donc chez lui que la mesure que la page sait vraiment — le nombre
+  // d'offres reçues. La tuile « gains » a disparu pour tout le monde : aucun
+  // de ces chiffres n'était alimenté, et un « 0 XOF » se lit comme un revenu.
+  const masquer = (valeur) => (loadError ? '—' : valeur);
+  const statCards = user?.user_type === 'client'
+    ? [
+        { label: t('activeJobs'), value: masquer(stats.activeJobs), icon: ClipboardList },
+        { label: t('completedJobs'), value: masquer(stats.completedJobs), icon: Sparkles },
+        { label: t('totalJobs'), value: masquer(stats.totalJobs), icon: Briefcase }
+      ]
+    : [
+        { label: t('availableJobs'), value: masquer(availableCount), icon: Briefcase }
+      ];
 
   // Le dessin d'une action (fond, glyphe, levée) appartient à `.tuile-action`
   // (src/index.css) : ces objets ne portent donc plus de teinte ni de classe,
@@ -226,11 +256,31 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {/* LES QUATRE MESURES — une tuile dit un chiffre, pas une carte : le
+      {/* ── LA LECTURE A ÉCHOUÉ : on le DIT, et on propose de réessayer ────
+          Avant, l'échec ne produisait qu'un log : l'écran restait avec des
+          zéros, donc une coupure réseau se lisait « aucune mission ». Le
+          bandeau est `role="alert"` (annoncé), et le bouton relance la lecture
+          au lieu de demander à l'utilisateur de recharger la page entière. */}
+      {loadError && (
+        <div
+          role="alert"
+          className="carte-editoriale carte-cotes bloc-app flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <p className="text-sm text-stone-700">{t('networkConnectionError')}</p>
+          <button type="button" onClick={recharger} className="bouton bouton-clair shrink-0">
+            {t('retry')}
+          </button>
+        </div>
+      )}
+
+      {/* LES MESURES — une tuile dit un chiffre, pas une carte : le
           libellé en petites capitales, le chiffre en serif tabulaire, et rien
           d'autre. Le glyphe du bloc au-dessus rappelle à quoi la mesure se
-          rapporte, il ne décore pas le chiffre. */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 bloc-app">
+          rapporte, il ne décore pas le chiffre. Le nombre de colonnes suit le
+          nombre de tuiles (trois, ou une seule pour un travailleur). */}
+      <div
+        className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${statCards.length >= 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} bloc-app`}
+      >
         {statCards.map((item) => {
           const Icon = item.icon;
           return (
@@ -361,6 +411,9 @@ export default function Dashboard() {
           carte à filet du site. La gouttière de chaque ligne est portée par
           `.ligne-app` — la page n'écrit plus ni rembourrage ni fond de survol,
           donc les trois gouttières différentes du même écran disparaissent. */}
+      {/* Pas de carte « missions » sur une lecture échouée : sa liste vide
+          dirait « aucune mission », exactement le mensonge du bandeau. */}
+      {!loadError && (
       <div className="carte-editoriale overflow-hidden">
         <div className="carte-cotes border-b border-stone-200 py-4">
           <h2 className="titre-carte-app">
@@ -400,6 +453,7 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+      )}
     </CadrePage>
   );
 }

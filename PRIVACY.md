@@ -27,6 +27,7 @@ n'ont pas cette garantie, et les écarts connus sont nommés en section 6.
 | Support | nom, téléphone, email, motif, message libre | `support_tickets` |
 | Vérification | code OTP (haché), date de péremption ; jeton d'accès révoqué (identifiant seul) | `email_otps`, `revoked_tokens` |
 | Livraison email | adresse email, fait de livraison reçu du fournisseur (rebond, plainte, livraison réussie), identifiant d'événement | `email_delivery_events`, `email_suppressions` |
+| Alerte emploi | adresse email du compte, critères choisis (catégorie, ville, pays), jeton de désinscription | `job_alerts` |
 
 La liste fait autorité dans le code : `USER_DATA_SOURCES`, `USER_DATA_BY_EMAIL`
 et `NO_USER_DATA_COLLECTIONS` (`backend/kojo_routers_users.py`) classent
@@ -60,7 +61,8 @@ comptable des paiements qui le référencent :
   `location.coordinates` et le point GeoJSON `geo` — par `$unset`, pour que la
   clé disparaisse au lieu de rester vide (`JOB_LOCATION_FIELDS`,
   `backend/kojo_routers_users.py`) ;
-- les notifications, propositions, avis écrits, jetons push et profil
+- les notifications, propositions, avis écrits, jetons push, **alertes emploi**
+  (adresse et critères : elles n'ont plus de destinataire) et profil
   travailleur sont supprimés ; les sessions en cours ne peuvent plus se
   réauthentifier ;
 - les **messages restent** au-delà de la suppression du compte — ils appartiennent aussi à l'autre partie — puis suivent l'échéance de la règle `messages` (section 3). Un message garde ce que son auteur a écrit ; rien ne peut en être retiré sans le réécrire ;

@@ -9,7 +9,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from kojo_core import db, get_current_user
 from kojo_models import JobProposal, User, UserType
 from kojo_settings import OWNER_EMAIL
-from kojo_identifiants import dump_stable, identifiant_query, identifiant_job_query
+from kojo_identifiants import (
+    dump_stable,
+    identifiant_public,
+    identifiant_query,
+    identifiant_job_query,
+    identifiants_query,
+)
 
 router = APIRouter()
 
@@ -60,12 +66,15 @@ async def get_job_proposals(
     worker_ids = list({p.get("worker_id") for p in proposals if p.get("worker_id")})
     workers_by_id = {}
     if worker_ids:
+        # LOT, et par la règle d'identifiant (`identifiants_query`) : un `$in`
+        # recopié sur `id` ratait les comptes importés, et la proposition
+        # s'affichait sans nom ni photo pour ces travailleurs-là.
         workers_cursor = db.users.find(
-            {**identifiant_query({"$in": worker_ids})},
+            {**identifiants_query(worker_ids)},
             {"_id": 0, "id": 1, "first_name": 1, "last_name": 1, "profile_photo": 1, "rating": 1, "total_reviews": 1}
         )
         async for w in workers_cursor:
-            workers_by_id[w["id"]] = w
+            workers_by_id[identifiant_public(w)] = w
 
     enriched = []
     for p in proposals:
@@ -76,7 +85,7 @@ async def get_job_proposals(
             proposal_out["worker_name"] = full_name or None
             proposal_out["worker_photo"] = worker.get("profile_photo")
             proposal_out["worker"] = {
-                "id": worker.get("id"),
+                "id": identifiant_public(worker),
                 "first_name": worker.get("first_name"),
                 "last_name": worker.get("last_name"),
                 "profile_photo": worker.get("profile_photo"),

@@ -144,6 +144,15 @@
       "hors_mutation": "aucune preuve ne peut rougir : le seul test qui le nomme (check-og-assets.test.js) vérifie un texte de renvoi produit par check-og-assets.js et n'importe jamais ce module. Mesuré : neutraliser la comparaison d'empreinte du générateur a laissé la preuve verte"
     },
     {
+      "chemin": "backend/scripts/maj_lock_requirements.py",
+      "role": "outil",
+      "invoque_par": "aucun",
+      "preuve": "backend/tests/test_requirements_lock.py",
+      "runner": "pytest",
+      "motif": "outil de RÉGÉNÉRATION, pas un garde : il écrit backend/requirements.lock depuis l'environnement installé et l'API PyPI, et ne prononce aucun verdict sur le dépôt (il n'a pas de sortie 1 sur un écart, seulement des refus internes qui empêchent d'écrire un lock faux). Ce qui juge le lock LIVRÉ — pins, empreintes, installation vérifiée partout — est backend/tests/test_requirements_lock.py, exécuté par le job backend-tests : accorder à ce script un rôle de garde ferait croire que le dépôt est audité par lui, alors qu'il faudrait le lancer à la main pour cela",
+      "hors_mutation": "aucune mutation ne peut rougir : le script ne lit pas le dépôt pour le juger, il ÉCRIT un fichier à partir du réseau. Sa seule défaillance utile — écrire un lock non épinglé ou sans empreinte — est refusée par la preuve sur le fichier LIVRÉ (pins, empreintes sha256, complétude contre requirements.txt), qui ne dépend pas de ce script : remplacer sa boucle d'écriture par un `pass` laisse le lock du commit intact et la preuve verte. La mutation qui aurait un sens (un lock faux) se rejoue en éditant le lock, pas l'outil"
+    },
+    {
       "chemin": "frontend/scripts/mesure-alignement-app.mjs",
       "role": "outil",
       "invoque_par": "aucun",
@@ -1018,6 +1027,30 @@
       "preuve": "frontend/scripts/__tests__/verre-contraste.test.js",
       "runner": "vitest",
       "motif": "le VERRE DES MESSAGES ne se juge pas a l'oeil : ce module lit les regles REELLES de src/index.css (pas une fixture), compose chaque pile de couches avec son alpha reel par-dessus le sable ET par-dessus l'encre du site (le pire fond d'une surface flottante), retient le pire des deux et le compare aux seuils WCAG (4,5:1 pour le texte, 3:1 pour un objet graphique). Mesure du 19/10/2026 : l'encre secondaire du panneau (stone-500) tenait 4,56:1 sur le papier mais 3,17:1 sur le verre compose, sous le seuil d'un petit texte, et le filet jaune 500 ne tenait que 1,84:1 — d'ou --kojo-encre-douce et les teintes 700. Il REFUSE une exigence dont la regle a disparu (supprimer une surface la rendrait plus verte en la rendant plus courte), une couleur qu'il ne sait pas composer (var() non declare, currentColor, degrade : il ne devine rien), et de conclure sous son plancher de paires mesurees."
+    },
+    {
+      "chemin": ".github/scripts/install-gitleaks.sh",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "backend/tests/test_secret_scan_workflow.py",
+      "runner": "pytest",
+      "motif": "installe le scanner de secrets en VERSION épinglée et EMPREINTE vérifiée (SHA-256 de la release) : un binaire téléchargé sans contrôle a le même défaut qu'un `uses:` sur une branche, et un scanner qui ne s'installe pas doit arrêter le job au lieu de laisser passer une PR. Source unique de la version pour le gate de PR et pour la passe d'historique"
+    },
+    {
+      "chemin": ".github/scripts/rapport-secrets.py",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "backend/tests/test_secret_scan_workflow.py",
+      "runner": "pytest",
+      "motif": "prononce le VERDICT du scan de secrets : annote chaque constat (fichier, ligne, règle) sans publier la valeur, sort en 1 sur constat, et REFUSE de conclure (2) quand le rapport manque ou quand la plage comptait des commits et que le scanner n'en a lu AUCUN — un vert qui n'a rien mesuré"
+    },
+    {
+      "chemin": "frontend/scripts/check-worker-og-contract.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-worker-og-contract.test.js",
+      "runner": "vitest",
+      "motif": "contrat app ↔ pré-rendu de /jobs/:id ET /workers/:id, jugé hors ligne : il exécute le module de production de chaque page et compare les octets annoncés par jobSeo.js / workerSeo.js ; une divergence (titre, description coupée en points de code, cartes OG, canonical) sort en 1. L'absence d'interpréteur Python est une ERREUR en CI, un simple avis hors CI"
     }
   ],
   "rejeux": [
@@ -5783,6 +5816,68 @@
       "cwd": "backend",
       "attend": [
         "FAILED tests/test_resync_parite.py::TestLeRefus::test_un_plancher_sous_la_parite_est_refuse"
+      ]
+    },
+    {
+      "id": "secrets: plage non parcourue acceptee",
+      "garde": ".github/scripts/rapport-secrets.py",
+      "cible": ".github/scripts/rapport-secrets.py",
+      "trouve": "        if lus == 0:",
+      "remplace": "        if False and lus == 0:",
+      "runner": "python",
+      "preuve": "backend/tests/test_secret_scan_workflow.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_secret_scan_workflow.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_secret_scan_workflow.py::TestRapport::test_une_plage_non_parcourue_refuse_de_conclure"
+      ]
+    },
+    {
+      "id": "secrets: empreinte d'installation neutralisee",
+      "garde": ".github/scripts/install-gitleaks.sh",
+      "cible": ".github/scripts/install-gitleaks.sh",
+      "trouve": "GITLEAKS_SHA256=\"551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb\"",
+      "remplace": "GITLEAKS_SHA256=\"latest\"",
+      "runner": "python",
+      "preuve": "backend/tests/test_secret_scan_workflow.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_secret_scan_workflow.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_secret_scan_workflow.py::TestInstallation::test_le_script_epingle_une_version_et_son_empreinte"
+      ]
+    },
+    {
+      "id": "worker-og-contract: interpréteur absent tolere en CI",
+      "garde": "frontend/scripts/check-worker-og-contract.js",
+      "cible": "frontend/scripts/check-worker-og-contract.js",
+      "trouve": "    if (process.env.CI) errors.push(message);",
+      "remplace": "    if (false) errors.push(message);",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-worker-og-contract.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-worker-og-contract.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "échoue en CI, avise seulement ailleurs"
       ]
     }
   ]

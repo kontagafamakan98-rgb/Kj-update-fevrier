@@ -441,7 +441,8 @@ class TestCablage:
     def test_le_seul_executeur_est_l_etape_du_job_backend(self):
         """La preuve est payée une fois par push, ici et nulle part ailleurs : le
         garde importe `kojo_retention`, donc `kojo_settings` — le job doit avoir
-        installé `backend/requirements.txt`."""
+        installé les dépendances backend depuis `backend/requirements.lock`,
+        empreintes vérifiées."""
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 
         assert workflow.count(COMMAND) == 1, (
@@ -449,4 +450,4 @@ class TestCablage:
         )
         job = workflow.split("  backend-tests:", 1)[1].split("\n  frontend-build:", 1)[0]
         assert COMMAND in job, "le garde doit tourner là où le backend est installé"
-        assert "-r requirements.txt" in job
+        assert "--require-hashes -r requirements.lock" in job

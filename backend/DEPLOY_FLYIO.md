@@ -352,6 +352,27 @@ Valeurs de référence contrôlées : `backend/fly.toml [env]` (config de prod),
 sont ignorées) et `backend/DEPLOY_FLYIO.md` (bloc `fly secrets set`, les
 placeholders `...` ignorés).
 
+### 4ter. Métriques Prometheus (optionnel)
+
+`GET /metrics` publie les compteurs que le backend tient déjà (bus temps réel,
+flux SSE, repli du rate-limiter, échecs de révocation) au format texte
+Prometheus. La route est **fermée par défaut** : sans `METRICS_TOKEN` elle
+répond 503 nommée, avec un jeton absent ou faux 401 — jamais 200.
+
+```bash
+# Activer la collecte (secret, jamais dans fly.toml)
+fly secrets set METRICS_TOKEN=<jeton> -a kojo-backend
+
+# Vérifier
+curl -fsS -H "Authorization: Bearer <jeton>" \
+  https://api.kojoforafrica.cc.cd/metrics | head
+```
+
+La collecte (bloc `scrape_configs`, cadence de 30 s, rotation du jeton, liste
+des familles exposées et ce que ces chiffres ne disent pas) est décrite dans
+[`METRIQUES.md`](METRIQUES.md). Le jeton est OPTIONNEL côté déploiement : son
+absence n'empêche pas le backend de démarrer, elle éteint la collecte.
+
 ## 5. Mettre à jour le frontend Vercel
 
 Le frontend doit pointer vers Fly (`VITE_API_URL`). Vérifier la valeur dans le

@@ -3,9 +3,16 @@
 # Utilisée par Fly.io via backend/fly.toml. Fonctionne aussi sur tout hôte Docker.
 #
 # Runtime : Python 3.11 (même version que le déploiement Render actuel).
-# Note : requirements.txt contient aussi les outils de dev (pytest, black, mypy…).
-#        Ils ne gênent pas le fonctionnement et évitent de dupliquer le fichier
-#        de dépendances ; on pourra alléger l'image plus tard si besoin.
+# Note : requirements.lock contient aussi les outils de dev (pytest, black,
+#        mypy…). Ils ne gênent pas le fonctionnement et évitent de dupliquer le
+#        fichier de dépendances ; on pourra alléger l'image plus tard si besoin.
+#
+# L'installation passe par requirements.lock avec --require-hashes : chaque
+# distribution est ÉPINGLÉE et son fichier est VÉRIFIÉ contre l'empreinte
+# SHA-256 publiée sur PyPI. Un dépôt compromis ou un fichier remplacé entre deux
+# builds fait donc échouer le build, au lieu de s'installer en silence (c'est
+# la raison d'être du lock, cf. AGENTS.md). requirements.txt reste l'INTENTION
+# (les plages) ; il n'est pas installé ici.
 
 FROM python:3.11-slim
 
@@ -29,8 +36,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # --- Dépendances (couche séparée : mise en cache des builds) ---
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt requirements.lock ./
+RUN pip install --no-cache-dir --require-hashes -r requirements.lock
 
 # --- Polices DejaVu pour les cartes Open Graph dynamiques (/api/og/jobs/:id)
 # --- rendues avec Pillow : sans police système, le texte serait illisible

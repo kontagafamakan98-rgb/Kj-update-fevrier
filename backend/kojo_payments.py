@@ -333,8 +333,14 @@ def _paydunya_call(method: str, url: str, *, json: Optional[Dict[str, Any]] = No
 
     - Circuit OPEN → requests.ConnectionError immédiate (fail fast, ~0 ms) :
       tous les appelants la convertissent en 502 SANS toucher le réseau — le
-      checkout, l'IPN disburse et le sweeper ne martèlent plus une API down
-      et ne gèlent plus l'event loop sur des timeouts de 30 s.
+      checkout, l'IPN disburse et le sweeper ne martèlent plus une API down.
+
+    CE QUI PROTÈGE LA BOUCLE, CE N'EST PAS CE DISJONCTEUR, c'est l'appelant :
+    `requests` est SYNCHRONE, et ce module n'est PAS async — toute fonction
+    ci-dessous appelée depuis une route `async def` doit passer par
+    `asyncio.to_thread` (règle du dépôt, garde : tests/test_event_loop_non_blocage.py).
+    Le disjoncteur évite le martèlement ; il ne rend pas l'appel non bloquant,
+    et le dire ici évite qu'un futur lecteur croie la boucle protégée.
     - Échec RÉSEAU (RequestException / réponse non-JSON) → compté ; au-delà du
       seuil, le circuit passe OPEN pour la durée du cooldown.
     - Réussite HTTP (y compris response_code != '00', refus MÉTIER) → circuit
@@ -439,28 +445,61 @@ def build_disburse_callback_url() -> str:
         return f"{BACKEND_PUBLIC_URL}/api/payments/disburse-ipn"
     return '/api/payments/disburse-ipn'
 
-# Champs fournisseur/payloads bruts JAMAIS exposés via l'API : ils peuvent
-# contenir des données client (email, téléphone), du texte d'erreur interne
-# ou des jetons PayDunya. Les endpoints /payments/status/* et /payments/my
-# renvoient le statut métier (status, payout_status, montants...), pas ces
-# détails bruts — le serveur les lit toujours depuis la base (IPN, recheck).
-PROVIDER_SENSITIVE_FIELDS = {
-    "provider_confirm_payload",
-    "provider_response_text",
-    "disburse_token",
-    "disburse_provider_response",
-    "disburse_verified_payload",
-    "disburse_callback_payload",
-    "disburse_error",
-}
+# ── Ce qu'un paiement peut MONTRER : une ALLOWLIST, pas une denylist ───���──
+# La vue publique des missions impose déjà une allowlist (`JobPublic`) ; le
+# chemin de l'argent, lui, retirait SEPT champs nommés de ce qu'il renvoyait.
+# Une denylist échoue par défaut : le premier champ ajouté demain —
+# `provider_*`, un identifiant de compte, une réponse brute du fournisseur —
+# sort chez le client sans qu'aucun test ne bronche, sur la route qui porte
+# des montants et des numéros de paiement.
+#
+# Un champ qui doit sortir se déclare ICI. C'est plus contraignant, et c'est
+# le but : l'ajout est une DÉCISION visible en revue.
+PAYMENT_PUBLIC_FIELDS = frozenset({
+    # Identité et rattachement
+    "id",
+    "job_id",
+    "payer_id",
+    "receiver_id",
+    # Montants et commission
+    "amount",
+    "commission_amount",
+    "commission_rate",
+    "worker_amount",
+    # Statut métier
+    "status",
+    "provider_status",
+    "payout_status",
+    "payout_kind",
+    "payout_failure_reason",
+    # Moyen de paiement et redirection
+    "payment_method",
+    "provider",
+    "provider_channel",
+    "country",
+    "checkout_url",
+    "invoice_token",
+    # Durées et jalons
+    "expires_at",
+    "created_at",
+    "updated_at",
+    "completed_at",
+    # Clé d'idempotence du checkout : c'est le client qui l'a fournie, la
+    # renvoyer lui permet de reconnaître sa propre requête rejouée.
+    "idempotency_key",
+})
 
 
 def serialize_payment_record(record: Dict[str, Any]) -> Dict[str, Any]:
-    serialized = dict(record)
-    serialized.pop('_id', None)
-    for field in PROVIDER_SENSITIVE_FIELDS:
-        serialized.pop(field, None)
-    return serialized
+    """Vue PUBLIQUE d'un paiement : uniquement les champs déclarés.
+
+    Tout ce qui n'est pas dans `PAYMENT_PUBLIC_FIELDS` est écarté — payloads
+    fournisseur (`provider_confirm_payload`, réponses brutes), jetons de
+    décaissement (`disburse_token`), textes d'erreur internes. Le serveur les
+    lit toujours depuis la base (IPN, re-vérification) : les exposer n'a jamais
+    servi qu'à faire fuiter des coordonnées client et des secrets de paiement.
+    """
+    return {cle: valeur for cle, valeur in record.items() if cle in PAYMENT_PUBLIC_FIELDS}
 
 def create_paydunya_invoice(payload: Dict[str, Any]) -> Dict[str, Any]:
     if not is_paydunya_configured():
@@ -579,7 +618,14 @@ async def sync_payment_status_with_paydunya(payment_record: Dict[str, Any]) -> D
     if not invoice_token or not is_paydunya_configured():
         return payment_record
 
-    payload = confirm_paydunya_invoice(invoice_token)
+    # HORS DE LA BOUCLE : `confirm_paydunya_invoice` fait un `requests.get`
+    # synchrone (timeout 30 s). Appelée directement depuis cette coroutine,
+    # elle gelait TOUTES les requêtes du worker — mesuré ailleurs dans le dépôt
+    # (email : p99 des autres requêtes 22 ms → 1 988 ms pour un envoi de 2 s).
+    # Ce chemin est le plus exposé des trois : il sert `/payments/status/{id}`,
+    # `/payments/status/token/{token}` ET l'IPN public. Le checkout et l'échange
+    # de code Google passaient déjà par `asyncio.to_thread` ; c'était un oubli.
+    payload = await asyncio.to_thread(confirm_paydunya_invoice, invoice_token)
     invoice_data = payload.get('invoice', {}) if isinstance(payload, dict) else {}
     provider_status = invoice_data.get('status') or payload.get('status')
     local_status = map_paydunya_status(provider_status)

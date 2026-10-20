@@ -83,6 +83,9 @@ SORTS = {
     ("notifications", "user_id"): EFFACE,
     ("support_tickets", "user_id"): EFFACE,
     ("push_tokens", "user_id"): EFFACE,
+    # Une veille emploi porte l'adresse et les critères du compte : elle n'a
+    # plus de destinataire une fois le compte supprimé, donc elle s'efface.
+    ("job_alerts", "user_id"): EFFACE,
     # Journal des jalons : il décrit missions et paiements, conservés pour la
     # comptabilité. Le lien au compte suit celui du job (`jobs.client_id`).
     ("business_events", "user_id"): CONSERVE,
@@ -215,6 +218,9 @@ def _documents_a_semer(user_id: str, email: str):
          {"id": "ticket-1", "user_id": user_id, "message": "Question"}),
         (("push_tokens", "user_id"), "push_tokens",
          {"id": "jeton-1", "user_id": user_id, "push_token": "jeton-de-test"}),
+        (("job_alerts", "user_id"), "job_alerts",
+         {"id": "alerte-1", "user_id": user_id, "email": email,
+          "city": "Dakar", "active": True}),
         (("business_events", "user_id"), "business_events",
          {"id": "evenement-1", "user_id": user_id, "type": "mission_created",
           "cle": "mission_created:job-1", "job_id": "job-1"}),

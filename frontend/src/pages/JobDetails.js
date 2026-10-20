@@ -57,6 +57,7 @@ const getReadableUserName = (person, fallback) => {
 function ProposalCard({ proposal, isSelected, isAccepted, onOpenDiscussion, onAccept, canAccept }) {
   const { t } = useLanguage();
   const workerName = extractProposalWorkerName(proposal, t('worker'));
+  const workerProfileId = extractProposalWorkerId(proposal);
   const workerPhoto = proposal?.worker_photo || proposal?.worker?.profile_photo || null;
   const amount = proposal.proposed_amount ?? proposal.amount ?? null;
   const message = extractProposalMessage(proposal);
@@ -89,7 +90,20 @@ function ProposalCard({ proposal, isSelected, isAccepted, onOpenDiscussion, onAc
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <div className="font-semibold text-stone-900">{workerName}</div>
+              {/* Le NOM mène à son profil public : c'est au moment de choisir
+                  qu'on veut lire la réputation, et le seul endroit où elle est
+                  publiée est `/workers/:id`. Sans ce lien, la page existait
+                  mais aucun écran n'y menait. */}
+              {workerProfileId ? (
+                <Link
+                  to={`/workers/${encodeURIComponent(workerProfileId)}`}
+                  className="font-semibold text-stone-900 underline decoration-stone-300 underline-offset-2 hover:text-orange-700"
+                >
+                  {workerName}
+                </Link>
+              ) : (
+                <div className="font-semibold text-stone-900">{workerName}</div>
+              )}
               <VerifiedBadge verified={workerPerson?.is_verified} />
               <WorkerTrustBadge person={workerPerson} />
             </div>

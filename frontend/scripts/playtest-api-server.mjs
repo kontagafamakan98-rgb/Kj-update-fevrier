@@ -341,6 +341,47 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'GET' && path === '/notifications/vapid-public-key') return send(res, 200, { vapid_public_key: '' });
     if (req.method === 'GET' && path === '/workers/profile') return send(res, 200, { profile: null });
+    // ── Le profil PUBLIC d'un travailleur (`GET /workers/:id`) ──────────────
+    // La fiche mission MÈNE à cette page (le nom, sur une proposition, est un
+    // lien) : sans cette route, le parcours qui clique ce nom mesurerait l'état
+    // « lecture échouée » du double au lieu de la page qu'un visiteur voit.
+    //
+    // La réponse imite l'ALLOWLIST du backend (`kojo_routers_workers_public.py`) :
+    // aucun email, aucun téléphone, aucun compte de paiement — même si le
+    // document de la fixture en porte. Les valeurs sont FIXES : deux passes
+    // doivent peindre la même page. Un identifiant inconnu, ou celui d'un
+    // compte qui n'est pas un travailleur, répond 404 comme le vrai backend.
+    if (req.method === 'GET' && /^\/workers\/[^/]+$/.test(path) && path !== '/workers/profile') {
+      const travailleur = users.get('demo@example.com');
+      const identifiant = path.split('/').pop();
+      if (!travailleur || identifiant !== travailleur.id) {
+        return send(res, 404, { detail: 'Travailleur introuvable' });
+      }
+      return send(res, 200, {
+        id: travailleur.id,
+        first_name: 'Awa',
+        last_name: 'Diallo',
+        user_type: 'worker',
+        photo_url: null,
+        city: 'Dakar',
+        country: 'senegal',
+        created_at: '2024-05-17T10:00:00+00:00',
+        skills: ['plomberie', 'soudure'],
+        bio: 'Artisan plombier depuis dix ans.',
+        languages: ['fr', 'wo'],
+        verified: true,
+        member_since: 2024,
+        stats: { missions_completed: 12, rating_average: 4.7, rating_count: 2 },
+        reviews: [
+          {
+            rating: 5,
+            comment: 'Travail impeccable.',
+            created_at: '2025-03-04T09:00:00+00:00',
+            reviewer_first_name: 'Moussa',
+          },
+        ],
+      });
+    }
     if (req.method === 'GET' && /^\/users\/[^/]+\/reviews$/.test(path)) return send(res, 200, { reviews: [] });
     if (req.method === 'GET' && path === '/users/referral') return send(res, 200, { referral_code: null, reward_balance: 0 });
     if (req.method === 'GET' && path === '/users/referral/filleuls') return send(res, 200, { filleuls: [] });

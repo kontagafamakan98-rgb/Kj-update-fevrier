@@ -18,9 +18,10 @@ import os
 import re
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from typing import Optional
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, FastAPI, Query, Response
+from fastapi import APIRouter, FastAPI, Header, HTTPException, Query, Response
 from fastapi.responses import JSONResponse
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -28,6 +29,7 @@ from starlette.middleware.cors import CORSMiddleware
 
 from kojo_core import (
     RateLimitMiddleware,
+    RequestIdMiddleware,
     WestAfricaSecurityMiddleware,
     _rate_limit_cleanup_loop,
     build_allowed_origins,
@@ -46,6 +48,13 @@ from kojo_email import (
     generate_email_otp_code,
     hash_email_otp,
 )
+from kojo_metrics import (
+    CHEMIN as METRICS_PATH,
+    CONTENT_TYPE as METRICS_CONTENT_TYPE,
+    jeton_attendu as metrics_token_configured,
+    jeton_valide as metrics_token_valid,
+    rendre as render_metrics,
+)
 from kojo_payments import (
     init_paydunya_circuit,
     paydunya_circuit_state,
@@ -54,6 +63,7 @@ from kojo_payments import (
 import kojo_live
 from kojo_scheduler import (
     email_provider_alert_loop,
+    job_alert_digest_loop,
     payout_stuck_sweeper_loop,
     retention_purge_loop,
 )
@@ -95,10 +105,16 @@ from kojo_routers_messages import router as messages_router
 from kojo_routers_notifications import router as notifications_router
 from kojo_routers_owner import router as owner_router
 from kojo_routers_payments import router as payments_router
+# Alertes emploi (kojo_job_alerts) : le résumé périodique qui ramène un
+# travailleur sur une mission publiée après sa visite.
+from kojo_routers_job_alerts import router as job_alerts_router
 from kojo_routers_public import router as public_router
 from kojo_routers_reviews import router as reviews_router
 from kojo_routers_support import router as support_router
 from kojo_routers_users import router as users_router
+# Profil PUBLIC d'un travailleur : la réputation qu'un client peut lire avant
+# de confier une mission (allowlist stricte, voir le module).
+from kojo_routers_workers_public import router as workers_public_router
 
 # ---------------------------------------------------------------------------
 # App principale (sans préfixe)
@@ -185,6 +201,14 @@ api_router.include_router(payments_router)
 api_router.include_router(reviews_router)
 api_router.include_router(owner_router)
 api_router.include_router(public_router)
+# APRÈS `jobs_router` : `/workers/profile` (route authentifiée, déclarée par
+# `kojo_routers_jobs_workers`) doit gagner sur `/workers/{worker_id}`. L'ordre
+# d'enregistrement décide, et `tests/surface/` fige la surface route par route.
+api_router.include_router(workers_public_router)
+# Alertes emploi : routes `job-alerts` (lire/régler/couper) et le lien public de
+# désinscription. Aucun conflit de chemin avec `jobs_router` — `job-alerts`
+# n'est pas un préfixe de `jobs`, et l'ordre n'y change rien.
+api_router.include_router(job_alerts_router)
 
 
 # ---------------------------------------------------------------------------
@@ -442,6 +466,56 @@ async def monitor_composite(
     return payload
 
 
+# ---------------------------------------------------------------------------
+# Métriques Prometheus — protégées, et FERMÉES par défaut
+# ---------------------------------------------------------------------------
+# Les compteurs servis ici sont ceux que le produit tient DÉJÀ (bus temps réel,
+# plafonds et compteurs de flux, repli du rate-limiter, échecs de révocation) :
+# aucun n'est mesuré à la demande, et la route ne fait aucune I/O. Elle existe
+# pour qu'une dérive lente se voie sur un tableau de bord au lieu d'exiger un
+# shell — et elle est PROTÉGÉE parce qu'elle décrit la topologie interne.
+#
+# Collecte (scrape, secret, cadence) : `backend/METRIQUES.md`. Hors `/api`,
+# comme les autres moniteurs d'infra : Prometheus n'a pas de cookie de session,
+# et le jeton est la seule preuve d'accès.
+@app.api_route(METRICS_PATH, methods=["GET", "HEAD"], include_in_schema=False)
+async def metrics_prometheus(authorization: Optional[str] = Header(default=None)):
+    """Exposition Prometheus des compteurs internes (bus, flux, rate-limit,
+    révocation), réservée au porteur de `METRICS_TOKEN`.
+
+    Raises:
+        HTTPException: 503 quand `METRICS_TOKEN` n'est pas posé sur la machine —
+            la route refuse au lieu de publier sans jeton ; 401 quand l'en-tête
+            manque ou ne porte pas le bon jeton (aucun nom de métrique ne sort).
+
+    Returns:
+        Response: `text/plain; version=0.0.4` — une famille par compteur, jamais
+        de valeur libre en étiquette.
+    """
+    if not metrics_token_configured():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Métriques non configurées : poser METRICS_TOKEN sur la machine "
+                "(fly secrets set METRICS_TOKEN=…). La route refuse de publier "
+                "les compteurs sans jeton."
+            ),
+        )
+    if not metrics_token_valid(authorization):
+        raise HTTPException(
+            status_code=401,
+            detail="Jeton de métriques absent ou invalide",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return Response(
+        content=render_metrics(),
+        media_type=METRICS_CONTENT_TYPE,
+        # Des compteurs sont un instantané : un cache intermédiaire servirait
+        # une valeur périmée en croyant mesurer le présent.
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 # Favicon & racine — cette API ne sert pas de frontend, mais les navigateurs/
 # bots/moniteurs pingent GET /favicon.ico et GET / par défaut. Sans handler
 # explicite, ce sont des 404 bruyants dans les logs Render. Un 204 (no
@@ -558,7 +632,10 @@ app.add_middleware(
         "X-CSRFToken",
         "Cache-Control"
     ],
-    expose_headers=["Content-Range", "X-Content-Range", "X-Kojo-CSRFToken"],
+    # `X-Request-ID` est EXPOSÉ : sans ça, le JavaScript ne peut pas le lire
+    # (il est là, mais invisible), et un utilisateur qui signale une panne n'a
+    # aucun moyen de la nommer.
+    expose_headers=["Content-Range", "X-Content-Range", "X-Kojo-CSRFToken", "X-Request-ID"],
     max_age=86400,
 )
 
@@ -574,6 +651,10 @@ if ENABLE_TRUSTED_HOST_MIDDLEWARE:
 # add_middleware est le plus externe).
 app.add_middleware(WestAfricaSecurityMiddleware)
 app.add_middleware(RateLimitMiddleware)
+# Monté en DERNIER, donc le plus EXTERNE : un 429 du rate-limiter, un refus de
+# taille ou une réponse d'erreur reçoivent aussi un identifiant — or ce sont
+# exactement les réponses qu'un utilisateur signale au support.
+app.add_middleware(RequestIdMiddleware)
 
 
 @asynccontextmanager
@@ -619,6 +700,10 @@ async def lifespan(application: FastAPI):
     # sonde de /monitor/email, et prévient le propriétaire UNE FOIS PAR PANNE.
     # La sonde externe du dépôt reste un second témoin, jamais le seul.
     email_alert_task = asyncio.create_task(email_provider_alert_loop())
+    # RÉSUMÉ DES ALERTES EMPLOI : c'est le seul chemin de RETOUR du produit —
+    # sans lui, une mission publiée ne touche un travailleur que s'il repasse de
+    # lui-même sur /jobs. Passage horaire, bail partagé, un email par veille.
+    job_alert_task = asyncio.create_task(job_alert_digest_loop())
     # BUS TEMPS RÉEL (Redis pub/sub) : le fan-out reste en mémoire, le bus le
     # PROLONGE aux autres workers et machines. Sans REDIS_URL, rien ne change
     # (le process publie et sert ses propres flux) — et `start_bus` DIT la perte
@@ -636,9 +721,14 @@ async def lifespan(application: FastAPI):
     payout_sweeper_task.cancel()
     retention_task.cancel()
     email_alert_task.cancel()
+    job_alert_task.cancel()
     try:
         await asyncio.gather(
-            rate_limit_task, payout_sweeper_task, retention_task, email_alert_task
+            rate_limit_task,
+            payout_sweeper_task,
+            retention_task,
+            email_alert_task,
+            job_alert_task,
         )
     except asyncio.CancelledError:
         pass

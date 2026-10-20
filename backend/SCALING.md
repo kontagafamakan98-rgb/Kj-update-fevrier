@@ -335,10 +335,16 @@ Garde : `tests/test_live_stream.py` (serveur), `frontend/src/services/__tests__/
    `kojo_settings.py` : sans Redis le rate-limit serait multiplié par le nombre
    de workers — et le bus SSE, lui, ne franchirait pas la frontière du process).
 2. **Le rate-limit par IP est incompatible avec le CGNAT d'Afrique de l'Ouest.**
-   `auth-session` = **20 requêtes / 5 min / IP** : derrière une IP partagée par
-   des milliers d'abonnés Orange/Sonatel, un pic de connexions produit des 429
-   massifs et légitimes. Un bucket par couple (IP, compte) ou un quota par
-   compte est nécessaire avant 100k.
+   `auth-session` valait **20 requêtes / 5 min / IP** : derrière une IP partagée
+   par des milliers d'abonnés Orange/Sonatel, un pic de connexions produisait des
+   429 massifs et légitimes. Réglé en deux temps (20/10/2026) : la CONNEXION a
+   son propre bucket (`auth-login`, 300/5 min — un garde-fou de débit brut, pas
+   un juge d'attaque) et l'attaque est plafonnée là où elle se décrit,
+   `kojo_login_reseau` : 120 ÉCHECS / 15 min par `/24` (`/64` en IPv6), puis
+   goutte-à-goutte à une tentative / 5 s. `auth-session` 20/5 min ne garde plus
+   que l'INSCRIPTION, où un abus crée des comptes. Ce qui reste à dimensionner
+   pour 100k : le compteur réseau est PAR PROCESS sans `REDIS_URL` (avec Redis il
+   est partagé) — c'est la même dépendance que le rate-limiter.
 3. **Un index manquant** : `GET /jobs?mine=assigned` filtre sur
    `assigned_worker_id`, qui **n'était pas indexé** — scan complet de la
    collection à chaque ouverture de « mes missions ». Ajouté (§8).

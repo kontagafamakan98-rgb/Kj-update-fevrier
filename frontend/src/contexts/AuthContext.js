@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { authAPI, handleApiError, markSoftRedirectConsumed, getAuthToken, hasSessionTrace, isNativeShell } from '../services/api';
+import { authAPI, handleApiError, markSoftRedirectConsumed, getAuthToken, hasSessionTrace, isNativeShell, SESSION_TRACE_KEY } from '../services/api';
 import { devLog, safeLog } from '../utils/env';
 import kojoCache, { CACHE_KEYS } from '../utils/cache';
 import networkOptimizer from '../utils/networkOptimizer';
@@ -30,7 +30,7 @@ export function AuthProvider({ children }) {
 
   const clearToken = () => {
     const keys = [
-      'token', 'token_expires_at', 'user', 'auth_token', 'access_token',
+      'token', 'token_expires_at', 'user', SESSION_TRACE_KEY, 'auth_token', 'access_token',
       'accessToken', 'kojo_token', 'jwt', 'bearer_token', 'auth',
       'auth_user', 'session_user', 'currentUser', 'kojo_user',
     ];
@@ -95,6 +95,70 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // ── Plus de DONNÉES PERSONNELLES au repos sur le web (20/10/2026) ────────
+  // Le profil (nom, email, téléphone) était réécrit dans localStorage à chaque
+  // amorçage — au login, à l'inscription, et à CHAQUE réponse de /auth/me —
+  // pour la seule utilité de savoir s'il fallait sonder le serveur. C'était de
+  // la donnée personnelle au repos gratuite : un appareil partagé, une XSS ou
+  // une sauvegarde de navigateur l'emportaient.
+  //
+  // Désormais : un MARQUEUR sans PII (`SESSION_TRACE_KEY`) dit « une connexion
+  // a eu lieu ici », et le profil ne vit qu'en MÉMOIRE — sauf dans le shell
+  // natif, qui n'a pas de cookie de session fiable et a besoin d'un affichage
+  // immédiat (son jeton en stockage est déjà un secret, la PII ne change donc
+  // pas la nature du lieu).
+  const persisterTraceDeSession = () => {
+    try {
+      localStorage.setItem(SESSION_TRACE_KEY, '1');
+    } catch (_error) {
+      // Stockage indisponible (navigation privée) : la session vit, l'amorçage
+      // suivant ne sondera simplement pas /auth/me avant le premier 200.
+    }
+  };
+
+  /**
+   * Profil persistant : natif seulement. Sur le web, la mémoire suffit.
+   *
+   * @returns {boolean} Vrai si le profil a été persisté (natif).
+   */
+  const persisterProfil = (profil, cacheHours = 24) => {
+    if (!isNativeShell()) return false;
+    try {
+      localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(profil)));
+    } catch (_error) {
+      // Stockage indisponible : le cache kojoCache reste la source hors-ligne.
+    }
+    kojoCache.set(CACHE_KEYS.USER_PROFILE, sanitizeUserForStorage(profil), cacheHours * 60 * 60 * 1000);
+    return true;
+  };
+
+  /**
+   * Migration privacy : retire le profil laissé par une version antérieure.
+   *
+   * Le marqueur est posé AVANT la suppression, et seulement si un profil
+   * existait : sans cela, une mise à jour déconnecterait visuellement tous les
+   * utilisateurs dont la session est portée par le cookie (l'amorçage ne
+   * saurait plus qu'il faut sonder /auth/me).
+   */
+  const purgerProfilWebPersistant = () => {
+    if (isNativeShell()) return;
+    try {
+      if (localStorage.getItem('user')) {
+        localStorage.setItem(SESSION_TRACE_KEY, '1');
+      }
+      localStorage.removeItem('user');
+    } catch (_error) {
+      // Stockage indisponible : rien à purger.
+    }
+    try {
+      Object.keys(localStorage)
+        .filter((key) => key.includes('user_profile'))
+        .forEach((key) => localStorage.removeItem(key));
+    } catch (_error) {
+      // Idem.
+    }
+  };
+
   // Web : supprime les jetons laissés par les versions précédentes, dans les
   // deux stockages, pour qu'ils ne soient ni relus ni envoyés. Le natif garde le
   // sien (isNativeShell).
@@ -149,8 +213,10 @@ export function AuthProvider({ children }) {
     // anonyme ne déclenche donc AUCUNE requête réseau, et plus aucun 401 dans
     // la console. Voir le court-circuit en tête de loadUser.
     // Migration privacy : purge les numéros de paiement stockés par une
-    // ancienne version du code dans le profil localStorage.
+    // ancienne version du code dans le profil localStorage, puis retire le
+    // profil lui-même sur le web (le marqueur de session le remplace).
     purgeStoredPaymentAccounts();
+    purgerProfilWebPersistant();
     purgeWebSessionTokens();
     const token = localStorage.getItem('token');
     if (token && isTokenExpiredLocally()) {
@@ -232,25 +298,17 @@ export function AuthProvider({ children }) {
       // globale de api.js avant que ProtectedRoute ait décidé quoi faire.
       const userData = await authAPI.getProfile({ skipUnauthorizedRedirect: true });
       setUser(userData);
-      
-      // Cache user data for offline access (sans les numéros de paiement)
-      kojoCache.set(CACHE_KEYS.USER_PROFILE, sanitizeUserForStorage(userData), 60 * 60 * 1000); // 1 hour
 
-      // COHÉRENCE du snapshot localStorage 'user' : écrit au login/register, il
-      // resterait sinon figé au pays d'origine après une mise à jour de profil
-      // (ex. pays changé depuis le formulaire — détecté par téléphone ou choisi
-      // manuellement) jusqu'au prochain login. loadUser rafraîchit donc aussi
-      // ce snapshot avec la vérité backend. Aucun effet de bord multi-onglets
-      // (le listener storage ne réagit qu'à la clé 'token'), et la
-      // sanitisation privacy est identique à establishSession (jamais les
-      // numéros de paiement).
-      try {
-        localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(userData)));
-      } catch (_error) {
-        // localStorage indisponible (tests jsdom / privé) : le cache kojoCache
-        // reste la source hors-ligne.
-      }
-      devLog.info('✅ User profile loaded and cached');
+      // 200 = session VIVANTE : c'est le seul instant où le marqueur peut être
+      // reposé sans mentir (il a pu être purgé par une version antérieure, ou
+      // par la migration du profil web, alors que le cookie vivait encore).
+      persisterTraceDeSession();
+      // Profil persistant : natif seulement (sur le web il reste en mémoire,
+      // cf. `persisterProfil`). Si l'utilisateur a changé de pays, le natif
+      // rafraîchit son snapshot ici — c'est ce qui le protège de rester figé
+      // jusqu'au prochain login.
+      persisterProfil(userData, 1);
+      devLog.info('✅ User profile loaded');
       
     } catch (error) {
       // 401 = visiteur anonyme OU session expirée/révoquée : cas NORMAL au
@@ -327,10 +385,10 @@ export function AuthProvider({ children }) {
 
   const establishSession = (user, accessToken = null, cacheHours = 24) => {
     persistSessionToken(accessToken);
-    // Ne persiste PAS les numéros de paiement en localStorage (privacy).
-    localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(user)));
+    // La trace est SANS PII ; le profil n'est persisté que dans le natif.
+    persisterTraceDeSession();
+    persisterProfil(user, cacheHours);
     setUser(user);
-    kojoCache.set(CACHE_KEYS.USER_PROFILE, sanitizeUserForStorage(user), cacheHours * 60 * 60 * 1000);
     if (isPushSupported()) {
       registerPushSubscription(user.id).catch(() => {});
     }
@@ -423,11 +481,9 @@ export function AuthProvider({ children }) {
       // Web : le cookie httpOnly posé par /auth/register-verified porte la
       // session ; le jeton n'est persisté que dans le shell natif.
       persistSessionToken(token);
-      localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(userData)));
+      persisterTraceDeSession();
+      persisterProfil(userData, 24);
       setUser(userData);
-      
-      // Cache user data (sans les numéros de paiement)
-      kojoCache.set(CACHE_KEYS.USER_PROFILE, sanitizeUserForStorage(userData), 24 * 60 * 60 * 1000); // 24 hours
       
       devLog.info('✅ User auto-logged in after registration');
 
@@ -452,11 +508,9 @@ export function AuthProvider({ children }) {
       const { user } = response;
       // Web : le cookie httpOnly porte la session ; rien n'est stocké.
       persistSessionToken(response.access_token);
-      localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(user)));
+      persisterTraceDeSession();
+      persisterProfil(user, 24);
       setUser(user);
-      
-      // Cache user data (sans les numéros de paiement)
-      kojoCache.set(CACHE_KEYS.USER_PROFILE, sanitizeUserForStorage(user), 24 * 60 * 60 * 1000); // 24 hours
       
       devLog.info('✅ User registered successfully');
       return { success: true };

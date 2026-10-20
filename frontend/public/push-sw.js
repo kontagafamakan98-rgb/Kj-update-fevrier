@@ -119,7 +119,15 @@ self.addEventListener('notificationclick', (event) => {
 
   const data = event.notification.data || {};
   const jobId = data.job_id;
-  const targetUrl = jobId ? `/jobs/${jobId}` : '/dashboard';
+  // `url` est fournie par le serveur pour une notification qui ne désigne pas UNE
+  // fiche (alertes emploi : leur résumé renvoie à la liste `/jobs`). Elle n'est
+  // acceptée que si elle désigne une page DU SITE — `//hote` est une origine
+  // tierce déguisée en chemin — sinon on retombe sur la cible historique.
+  const cheminFourni =
+    typeof data.url === 'string' && data.url.startsWith('/') && !data.url.startsWith('//')
+      ? data.url
+      : null;
+  const targetUrl = cheminFourni || (jobId ? `/jobs/${jobId}` : '/dashboard');
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {

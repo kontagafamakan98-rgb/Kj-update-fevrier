@@ -66,6 +66,10 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Jobs = lazy(() => import("./pages/Jobs"));
 const JobDetails = lazy(() => import("./pages/JobDetails"));
+// Le profil PUBLIC d'un travailleur : la page qu'un client lit avant de
+// confier une mission, et qu'un travailleur partage. Lazy comme les autres
+// routes dynamiques — elle n'est pas dans le chemin d'entrée du site.
+const WorkerProfile = lazy(() => import("./pages/WorkerProfile"));
 const Messages = lazy(() => import("./pages/Messages"));
 const Profile = lazy(() => import("./pages/Profile"));
 const CreateJob = lazy(() => import('./pages/CreateJob'));
@@ -126,11 +130,16 @@ function ProtectedRoute({ children }) {
     return <Navigate to="/login" replace />;
   }
 
-  const requiredMinimum = user.user_type === 'worker' ? 2 : 1;
-  const paymentAccountsCount = Number(user.payment_accounts_count || 0);
-  const requiresRegistrationCompletion = !user.is_verified || paymentAccountsCount < requiredMinimum;
-
-  if (requiresRegistrationCompletion) {
+  // ── CE QUI BLOQUE L'ENTRÉE, ET CE QUI NE LA BLOQUE PAS (20/10/2026) ─────
+  // Seule la VÉRIFICATION EMAIL bloque : un compte non vérifié n'est pas
+  // encore un compte. Les COMPTES DE PAIEMENT, eux, ne servent qu'au PREMIER
+  // versement (ou au premier paiement) — les exiger ici obligeait un
+  // travailleur à en ouvrir DEUX avant d'atteindre son tableau de bord ou ses
+  // messages, alors qu'il n'a rien à encaisser à ce moment-là. Ce n'était pas
+  // une protection de l'argent : le backend refuse un décaissement sans
+  // compte (`get_mobile_money_account` → 400), donc la garantie tient sans
+  // cette porte. Ils sont demandés là où ils servent : /payment et le retrait.
+  if (!user.is_verified) {
     return <Navigate to="/payment-verification" replace state={{ resumeAfterLogin: true, userData: user }} />;
   }
   
@@ -302,7 +311,11 @@ function AppRoutes() {
           body: payload.body || '',
           type: payload.data?.type || 'general',
           related_id: payload.data?.job_id || null,
-          related_type: payload.data?.job_id ? 'job' : null,
+          // Une alerte emploi ne désigne pas UNE fiche : son résumé renvoie à la
+          // liste (`/jobs`), et c'est `job_alert` que le panneau sait ouvrir.
+          related_type: payload.data?.job_id
+            ? 'job'
+            : (payload.data?.type === 'job_alert' ? 'job_alert' : null),
           is_read: false,
           created_at: new Date().toISOString(),
         });
@@ -417,6 +430,15 @@ function AppRoutes() {
             <Route path="/jobs/:id" element={
               <Suspense fallback={<JobDetailsSkeleton />}>
                 <JobDetails />
+              </Suspense>
+            } />
+            {/* Profil public d'un travailleur : route PUBLIQUE, sans
+                authentification (le backend ne publie qu'une allowlist, et
+                aucune coordonnée n'y figure). Un lien partagé doit s'ouvrir
+                pour un visiteur qui n'a pas de compte. */}
+            <Route path="/workers/:id" element={
+              <Suspense fallback={<PageSkeleton />}>
+                <WorkerProfile />
               </Suspense>
             } />
             {/* /messages et /payment ont aussi un skeleton Suspense DÉDIÉ :

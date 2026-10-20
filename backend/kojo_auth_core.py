@@ -180,17 +180,43 @@ async def revoke_token(jti: str, expire_at: datetime):
         )
     except Exception as e:
         logger.error(f"⚠️ Impossible d'enregistrer la révocation du token: {e}")
+# ── Le repli de la révocation : FAIL-OPEN, MAIS PLUS MUET ────────────────
+# Lire la liste noire demande une requête Mongo. Quand elle échoue, on choisit
+# de ne pas refuser TOUS les jetons (fail-open) : la signature et l'expiration
+# JWT, elles, restent toujours vérifiées, et `get_current_user` lit le compte
+# juste après — une base réellement muette fait donc échouer la requête de
+# toute façon. Ce qui n'était PAS acceptable, c'est que ce repli soit
+# indiscernable d'une vérification réussie : un jeton révoqué (déconnexion,
+# réinitialisation de mot de passe) repassait, et rien ne le disait. La panne
+# est donc COMPTÉE, horodatée et journalisée en erreur — `revocation_stats()`
+# est le relevé qu'une sonde ou la console propriétaire peut lire.
+REVOCATION_STATS = {"verifications": 0, "echecs": 0, "dernier_echec": None}
+
+
+def revocation_stats() -> dict:
+    """Relevé du repli de révocation (copie : l'appelant ne peut pas le muter)."""
+    return dict(REVOCATION_STATS)
+
+
 async def is_token_revoked(jti: Optional[str]) -> bool:
     if not jti:
         return False
     try:
         revoked = await db.revoked_tokens.find_one({"jti": jti}, {"_id": 1})
+        REVOCATION_STATS["verifications"] += 1
         return revoked is not None
     except Exception as e:
-        # En cas de panne de la vérification de révocation, on choisit de ne
-        # PAS bloquer tous les utilisateurs (fail-open) - la vérification de
-        # signature/expiration JWT reste, elle, toujours appliquée.
-        logger.error(f"⚠️ Erreur vérification révocation token: {e}")
+        # Fail-open ASSUMÉ (voir le commentaire ci-dessus) — mais la panne est
+        # comptée : sans ce compteur, un jeton révoqué qui repasse pendant une
+        # panne de la base laissait zéro trace.
+        REVOCATION_STATS["echecs"] += 1
+        REVOCATION_STATS["dernier_echec"] = datetime.now(timezone.utc).isoformat()
+        logger.error(
+            "🚨 Vérification de révocation impossible (%s) : le jeton présenté "
+            "est ACCEPTÉ sans contrôle de la liste noire (signature et "
+            "expiration restent vérifiées). Relevé : revocation_stats().",
+            e,
+        )
         return False
 async def get_current_user(
     request: Request,

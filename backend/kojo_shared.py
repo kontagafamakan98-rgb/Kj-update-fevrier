@@ -133,10 +133,15 @@ async def notify_user(
     related_id: Optional[str] = None,
     related_type: Optional[str] = None,
     push_data: Optional[dict] = None,
-):
+) -> Optional[Notification]:
     """
     Fonction principale : stocke la notification en base ET envoie le push Web.
     Silencieuse en cas d'erreur pour ne jamais bloquer un flux métier.
+
+    Retourne la notification ÉCRITE, ou `None` quand rien n'a été déposé (destinataire
+    supprimé, ou stockage en échec). L'appelant qui doit décider « cette information
+    est-elle passée ? » — les alertes emploi le font pour avancer leur fenêtre — lit
+    ce retour au lieu de le supposer.
 
     Garde-fou anti-notification orpheline : un destinataire SUPPRIMÉ
     (deleted=True, compte anonymisé) ne reçoit plus rien. Cas réel (audit
@@ -186,6 +191,8 @@ async def notify_user(
         )
     except Exception as exc:
         logger.error(f"Erreur envoi push pour {user_id}: {exc}")
+
+    return notif
 
 _ADDRESS_MSG: Dict[str, Dict[str, str]] = {
     "fr": {
@@ -240,6 +247,12 @@ _NOTIF_MSG: Dict[str, Dict[str, Dict[str, str]]] = {
         "bonus_filleul_first_mission": {"title": "🎁 Bonus de parrainage débloqué", "body": "Votre première mission « {job_title} » est terminée : +{amount} FCFA de bonus vous ont été crédités."},
         "bonus_sponsor_first_mission": {"title": "🎁 Votre filleul a terminé sa première mission", "body": "« {job_title} » est terminée : +{amount} FCFA de récompense de parrainage crédités."},
         "new_job_matching": {"title": "🔔 Nouveau job dans votre domaine", "body": "{job_title}"},
+        # Résumé d'une VEILLE (`kojo_job_alerts.passage_digest`) : la même
+        # décision que l'email — un message par passage, jamais un par mission.
+        # Deux clés parce que l'interpolation ne sait pas accorder : le nombre
+        # est dans le titre, et « 1 missions » se verrait.
+        "job_alert_digest_one": {"title": "🔔 1 nouvelle mission pour votre alerte", "body": "« {job_title} » correspond à votre veille emploi."},
+        "job_alert_digest_many": {"title": "🔔 {count} nouvelles missions pour votre alerte", "body": "{count} missions correspondent à votre veille emploi. La plus récente : « {job_title} »."},
         "mission_cancelled_client_refunded": {"title": "Mission annulée", "body": "Votre paiement de {amount} FCFA pour « {job_title} » a été intégralement remboursé."},
         "mission_cancelled_client_refunding": {"title": "Mission annulée", "body": "Votre remboursement de {amount} FCFA pour « {job_title} » est en cours de traitement."},
         "mission_cancelled_client_refund_failed": {"title": "Mission annulée", "body": "Mission annulée, mais le remboursement automatique a échoué : contactez le support pour un remboursement manuel."},
@@ -269,11 +282,19 @@ _NOTIF_MSG: Dict[str, Dict[str, Dict[str, str]]] = {
         # wolof/bambara/mooré vaudrait moins que ce repli : sur une panne qui
         # empêche l'envoi des codes de connexion, on publie ce qu'on sait dire.
         "owner_email_provider_down": {"title": "🚨 Fournisseur email muet", "body": "Le fournisseur email actif « {provider} » ne peut plus envoyer ({motif}) : {detail}. Aucun email de Kojo ne part (codes de connexion, réinitialisations). Vérifier EMAIL_PROVIDER, les clés et l'expéditeur, puis /monitor/email."},
+        # Alerte d'EXPLOITATION, fr et en seulement, même raison que
+        # `owner_email_provider_down` : elle nomme une variable d'environnement
+        # et l'état d'un service, et `_get_notif_msgs` sert déjà le repli
+        # français pour une langue qui ne la porte pas. Une traduction
+        # approximative en wolof/bambara/mooré dirait moins que ce repli.
+        "owner_rate_limit_repli_memoire": {"title": "🚨 Rate-limit en repli mémoire", "body": "Redis est injoignable : les limites sont comptées PAR PROCESS depuis {replis} bascule(s). Elles restent appliquées, mais multiples par le nombre de workers tant que la panne dure. Vérifier REDIS_URL et l'état du service Redis."},
     },
     "en": {
         "bonus_filleul_first_mission": {"title": "🎁 Referral bonus unlocked", "body": "Your first job « {job_title} » is complete: +{amount} FCFA bonus credited to you."},
         "bonus_sponsor_first_mission": {"title": "🎁 Your referral completed their first job", "body": "« {job_title} » is complete: +{amount} FCFA referral reward credited."},
         "new_job_matching": {"title": "🔔 New job in your field", "body": "{job_title}"},
+        "job_alert_digest_one": {"title": "🔔 1 new job for your alert", "body": "« {job_title} » matches your job alert."},
+        "job_alert_digest_many": {"title": "🔔 {count} new jobs for your alert", "body": "{count} jobs match your job alert. Most recent: « {job_title} »."},
         "mission_cancelled_client_refunded": {"title": "Job cancelled", "body": "Your payment of {amount} FCFA for « {job_title} » has been fully refunded."},
         "mission_cancelled_client_refunding": {"title": "Job cancelled", "body": "Your refund of {amount} FCFA for « {job_title} » is being processed."},
         "mission_cancelled_client_refund_failed": {"title": "Job cancelled", "body": "Job cancelled, but the automatic refund failed: contact support for a manual refund."},
@@ -297,11 +318,14 @@ _NOTIF_MSG: Dict[str, Dict[str, Dict[str, str]]] = {
         "address_dispatched": {"title": "📍 Job address received", "body": "The address for « {job_title} » has been sent to you."},
         "owner_payout_stuck_alert": {"title": "🚨 Stuck payout", "body": "Payment {payment_id}: {amount} FCFA still in « {status} » for over {hours} h. Manual check required."},
         "owner_email_provider_down": {"title": "🚨 Email provider silent", "body": "The active email provider « {provider} » can no longer send ({motif}): {detail}. No Kojo email is going out (login codes, resets). Check EMAIL_PROVIDER, its keys and sender, then /monitor/email."},
+        "owner_rate_limit_repli_memoire": {"title": "🚨 Rate limiter fell back to memory", "body": "Redis is unreachable: limits are counted PER PROCESS since {replis} failover(s). They still apply, but multiplied by the number of workers while the outage lasts. Check REDIS_URL and the Redis service."},
     },
     "wo": {
         "bonus_filleul_first_mission": {"title": "🎁 Bonus bu parrainage bi", "body": "Sa njëkk liggéey « {job_title} » mujj na: +{amount} FCFA bonus ñu la jox."},
         "bonus_sponsor_first_mission": {"title": "🎁 Sa filleul mujj na ci sa njëkk liggéey", "body": "« {job_title} » mujj na: +{amount} FCFA récompense ñu la jox."},
         "new_job_matching": {"title": "🔔 Liggéey bu bees ci sa yoon", "body": "{job_title}"},
+        "job_alert_digest_one": {"title": "🔔 1 liggéey bu bees ci sa alerta", "body": "« {job_title} » mel na ni li nga seet."},
+        "job_alert_digest_many": {"title": "🔔 {count} liggéey yu bees ci sa alerta", "body": "{count} liggéey ñoo mel ni li nga seet. Bi weesu: « {job_title} »."},
         "mission_cancelled_client_refunded": {"title": "Mission biy dindi", "body": "Sa paay bu {amount} FCFA ci « {job_title} » ñu ko dëbbal."},
         "mission_cancelled_client_refunding": {"title": "Mission biy dindi", "body": "Sa dëbbal bu {amount} FCFA ci « {job_title} » moo ngi ci yoon."},
         "mission_cancelled_client_refund_failed": {"title": "Mission biy dindi", "body": "Mission bi dindi na, waaye dëbbal bi amul: wacc support bi ngir dëbbal bu loxo."},
@@ -329,6 +353,8 @@ _NOTIF_MSG: Dict[str, Dict[str, Dict[str, str]]] = {
         "bonus_filleul_first_mission": {"title": "🎁 Bonus parrainage bɔlen", "body": "I ka baara fɔlɔ « {job_title} » dafara: +{amount} FCFA bonus bɛ i ka konti la."},
         "bonus_sponsor_first_mission": {"title": "🎁 I ka filleul dafara a ka baara fɔlɔ", "body": "« {job_title} » dafara: +{amount} FCFA récompense bɛ i ka konti la."},
         "new_job_matching": {"title": "🔔 Baara kura i ka yɔrɔ la", "body": "{job_title}"},
+        "job_alert_digest_one": {"title": "🔔 Baara kura 1 i ka kumaseli kɔnɔ", "body": "« {job_title} » bɛ i ka ɲini kɔnɔ."},
+        "job_alert_digest_many": {"title": "🔔 Baara kura {count} i ka kumaseli kɔnɔ", "body": "{count} baara bɛ i ka ɲini kɔnɔ. Laban: « {job_title} »."},
         "mission_cancelled_client_refunded": {"title": "Baara banna", "body": "I ka wari {amount} FCFA « {job_title} » kɔnɔ, a sɛgɛnen bɛ i ma."},
         "mission_cancelled_client_refunding": {"title": "Baara banna", "body": "I ka sɛgɛnli {amount} FCFA « {job_title} » kɔnɔ bɛ taa."},
         "mission_cancelled_client_refund_failed": {"title": "Baara banna", "body": "Baara banna, nka automatique sɛgɛnli ma kɛ: support dɛmɛ ɲini sɛgɛnli ma kɛ."},
@@ -356,6 +382,8 @@ _NOTIF_MSG: Dict[str, Dict[str, Dict[str, str]]] = {
         "bonus_filleul_first_mission": {"title": "🎁 Parrainage bonus", "body": "F tʋʋm rẽgenga « {job_title} » sɑɑme: +{amount} FCFA bonus b tʋm ne fo."},
         "bonus_sponsor_first_mission": {"title": "🎁 F filleul sɑɑm a rẽgeng tʋʋm", "body": "« {job_title} » sɑɑme: +{amount} FCFA sɩd n kõo fo."},
         "new_job_matching": {"title": "🔔 Tʋʋm paalle f yĩngre", "body": "{job_title}"},
+        "job_alert_digest_one": {"title": "🔔 Tʋʋm paal 1 yãmb kibare pʋgẽ", "body": "« {job_title} » zemsa ne yãmb sẽn baoodã."},
+        "job_alert_digest_many": {"title": "🔔 Tʋʋm paall {count} yãmb kibare pʋgẽ", "body": "{count} tʋʋm zemsa ne yãmb sẽn baoodã. A menga: « {job_title} »."},
         "mission_cancelled_client_refunded": {"title": "Tʋʋm yãaga", "body": "F ligdi {amount} FCFA « {job_title} » yĩngre, b lebsa-la f nengẽ."},
         "mission_cancelled_client_refunding": {"title": "Tʋʋm yãaga", "body": "F lebsg {amount} FCFA « {job_title} » yĩngre b tʋmda."},
         "mission_cancelled_client_refund_failed": {"title": "Tʋʋm yãaga", "body": "Tʋʋmã yãaga, la bɑɑs n lebsg ka tõog: tall support n na n lebs f ligdi."},
@@ -493,7 +521,7 @@ async def notify_user_localized(
     """
     lang = await get_user_language(user_id)
     title, body = _get_notif_msgs(lang, key, **kwargs)
-    await notify_user(
+    return await notify_user(
         user_id=user_id,
         title=title,
         body=body,

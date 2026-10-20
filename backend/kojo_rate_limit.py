@@ -11,6 +11,7 @@ etre servi (`from kojo_core import X`) pour ses importeurs. La surface
 publique de la facade est figee par `tests/test_core_surface.py`.
 """
 from collections import defaultdict
+from datetime import datetime, timezone
 from kojo_settings import APP_ENV, logger
 from typing import Any, Dict, List, Optional
 import asyncio
@@ -36,9 +37,12 @@ def _try_init_redis() -> Optional[Any]:
         return client
     except ImportError:
         logger.warning(
-            "⚠️ Rate-limiter: package 'redis' non installé (pip install redis). "
-            "Ajoutez 'redis>=5.0.0' à requirements.txt pour activer le mode "
-            "Redis partagé. Fallback sur compteur en mémoire."
+            "⚠️ Rate-limiter: package 'redis' non installé. 'redis>=5.0.0' est "
+            "DÉJÀ déclaré dans requirements.txt : l'installation vient de "
+            "requirements.lock (empreintes). Régénérer le lock "
+            "(scripts/maj_lock_requirements.py) puis réinstaller avec "
+            "`pip install --require-hashes -r requirements.lock` pour activer le "
+            "mode Redis partagé. Fallback sur compteur en mémoire."
         )
         return None
     except Exception as e:
@@ -46,6 +50,104 @@ def _try_init_redis() -> Optional[Any]:
         return None
 _redis_client = _try_init_redis()
 _using_redis = _redis_client is not None
+
+# ── État du repli : ce qui permet de DIRE qu'une panne a eu lieu ───────────
+_ALERTE_PANNE_INTERVALLE_SECONDS = 3600
+_rate_limit_stats: Dict[str, Any] = {
+    "replis": 0,              # nombre de bascules Redis → mémoire
+    "en_memoire": False,      # vrai tant que la panne n'est pas levée
+    "derniere_panne": None,   # horodatage ISO de la dernière bascule
+    "alerte_envoyee_le": None,
+}
+
+
+def rate_limit_stats() -> Dict[str, Any]:
+    """Relevé lisible du repli (console owner, sondes) : un repli silencieux
+    serait indiscernable d'un rate-limit qui fonctionne."""
+    return dict(_rate_limit_stats)
+
+
+def rate_limit_en_redis() -> bool:
+    """Le limiteur partage-t-il ses compteurs par Redis EN CE MOMENT ?
+
+    Distinct de `rate_limit_stats()["en_memoire"]`, et c'est la raison d'être
+    de cet accesseur : `en_memoire` dit qu'un REPLI a eu lieu, celui-ci dit où
+    en sont les compteurs. Déployé sans `REDIS_URL`, aucun repli n'a eu lieu et
+    les limites sont pourtant comptées PAR PROCESS — une sonde qui lit
+    `en_memoire` seul croirait le partage actif.
+    """
+    return _using_redis
+
+
+def _basculer_en_memoire(exc: Exception) -> None:
+    """Redis est tombé : oublie le client, compte la panne, alerte une fois.
+
+    Idempotent et sans I/O dans le chemin de la requête : l'alerte est
+    planifiée sur la boucle, jamais attendue ici.
+    """
+    global _redis_client, _using_redis, _redis_retry_after
+    premier_incident = _rate_limit_stats["en_memoire"] is False
+    _redis_client = None
+    _using_redis = False
+    # Ré-init paresseuse : au plus une tentative par minute, pour ne pas
+    # marteler un Redis en panne à chaque requête.
+    _redis_retry_after = time.monotonic() + 60
+    _rate_limit_stats["en_memoire"] = True
+    _rate_limit_stats["replis"] += 1
+    _rate_limit_stats["derniere_panne"] = datetime.now(timezone.utc).isoformat()
+    if premier_incident:
+        logger.error(
+            "🚨 Rate-limiter : Redis injoignable (%s) — bascule sur le compteur "
+            "MÉMOIRE (par process). Les limites restent appliquées, mais "
+            "multiples par le nombre de workers tant que la panne dure.",
+            exc,
+        )
+    else:
+        logger.warning(f"⚠️ Rate-limiter : Redis toujours indisponible ({exc}), repli mémoire")
+    _alerter_proprietaire_une_fois()
+
+
+def _alerter_proprietaire_une_fois() -> None:
+    """Prévient le propriétaire (au plus une fois par heure) qu'un repli a lieu.
+
+    Best-effort, et planifié : la requête qui a découvert la panne ne doit ni
+    attendre une écriture en base ni échouer parce que la notification a raté.
+    """
+    maintenant = time.time()
+    derniere = _rate_limit_stats["alerte_envoyee_le"]
+    if derniere is not None and (maintenant - derniere) < _ALERTE_PANNE_INTERVALLE_SECONDS:
+        return
+    _rate_limit_stats["alerte_envoyee_le"] = maintenant
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return  # hors boucle (script, test sync) : le log suffit
+    loop.create_task(_notifier_repli_rate_limit())
+
+
+async def _notifier_repli_rate_limit() -> None:
+    """Notification in-app au compte propriétaire, jamais bloquante."""
+    try:
+        # Imports tardifs : ce module est chargé TRÈS tôt (middlewares), et
+        # tirer la couche notifications à l'import créerait un cycle avec la
+        # base — le repli ne doit pas pouvoir empêcher le serveur de démarrer.
+        from kojo_core import resolve_owner_id
+        from kojo_models import NotificationType
+        from kojo_shared import notify_user_localized
+
+        owner_id = await resolve_owner_id()
+        if not owner_id:
+            return
+        await notify_user_localized(
+            user_id=owner_id,
+            key="owner_rate_limit_repli_memoire",
+            notif_type=NotificationType.GENERAL,
+            related_id="rate-limit",
+            related_type="rate_limit",
+            replis=_rate_limit_stats["replis"],
+        )
+    except Exception as exc:  # une alerte ratée n'affecte jamais la requête
+        logger.warning(f"⚠️ Notification de repli rate-limit échouée: {exc}")
 # Garde-fou anti-boucle : si Redis est down au boot, on ne ré-essaie pas à
 # chaque requête (ça spammerait un Redis en panne), mais on ré-essaie au plus
 # une fois par minute via _get_redis_client().
@@ -105,12 +207,17 @@ async def _rate_limit_check_redis(client_ip: str, max_requests: int, window_minu
         current_count = results[1]
         return current_count < max_requests
     except Exception as exc:
-        # Redis indisponible pendant la vérification : on laisse passer
-        # (fail-open) plutôt que de bloquer tous les utilisateurs. Le
-        # fallback mémoire prend le relais pour les requêtes suivantes si
-        # Redis reste down.
-        logger.warning(f"⚠️ Rate-limit Redis check échoué: {exc}, fail-open")
-        return True
+        # Redis indisponible pendant la vérification. « Laisser passer » n'est
+        # PAS un repli : c'était supprimer toutes les limites (OTP, login,
+        # support, robot IA) pendant toute la panne, sans un mot. Le repli
+        # mémoire prend le relais POUR DE VRAI, sur CETTE requête :
+        #   • on oublie le client Redis (sinon `rate_limit_check` rappelle la
+        #     voie Redis à chaque requête et ne retombe jamais en mémoire) ;
+        #   • la ré-init paresseuse de `_get_redis_client` retentera au plus
+        #     une fois par minute, donc une panne passagère se répare seule ;
+        #   • la panne est COMPTÉE et alerte le propriétaire une fois.
+        _basculer_en_memoire(exc)
+        return _rate_limit_check_memory(client_ip, max_requests, window_minutes)
 def _rate_limit_check_memory(client_ip: str, max_requests: int, window_minutes: int) -> bool:
     """Rate limiting en mémoire (par process, comportement original)."""
     now = time.time()
@@ -157,7 +264,22 @@ async def _rate_limit_cleanup_loop():
 def get_rate_limit_bucket(path: str) -> tuple[str, int, int]:
     if path.startswith("/api/auth/email/") or path.startswith("/api/auth/password/"):
         return ("auth-otp", 12, 5)
-    if path.startswith("/api/auth/login") or path.startswith("/api/auth/register"):
+    if path.startswith("/api/auth/login"):
+        # CONNEXION : 300 / 5 min par IP, et non 20. Vingt requêtes pour cinq
+        # minutes, c'est une limite pour UNE personne — or en CGNAT ouest-
+        # africain une seule IP publique porte des milliers d'abonnés d'un
+        # opérateur : 20 punissait donc des voisins qui n'avaient rien fait.
+        # Cette borne reste un garde-fou de DÉBIT brut (elle ne laisse pas une
+        # source unique marteler la route) ; le plafond qui décrit l'ATTAQUE
+        # est celui de `kojo_login_reseau` : 120 échecs / 15 min par /24, puis
+        # goutte-à-goutte. Pour que cette règle soit ATTEIGNABLE, le bucket doit
+        # laisser passer au moins `SEUIL_ECHECS` requêtes (garde :
+        # tests/test_login_reseau.py).
+        return ("auth-login", 300, 5)
+    if path.startswith("/api/auth/register"):
+        # INSCRIPTION : la borne serrée reste. C'est là qu'on CRÉE des comptes,
+        # donc un abus ne se mesure pas en échecs de mot de passe mais en
+        # comptes créés — le plafond par réseau ne le verrait pas.
         return ("auth-session", 20, 5)
     if path.startswith("/api/messages"):
         # Envoi de messages : 60 POST/min/IP (les GET/HEAD/OPTIONS de
@@ -174,6 +296,16 @@ def get_rate_limit_bucket(path: str) -> tuple[str, int, int]:
         return ("support", 10, 5)
     if path.startswith("/api/owner"):
         return ("owner", 30, 1)
+    # Les DEUX webhooks de paiement, et eux seuls (préfixes exacts : un
+    # `GET /api/payments/my` ne doit pas tomber dans un bucket de 120/min).
+    # Ces routes sont anonymes par nature et déclenchaient un appel sortant
+    # PayDunya à chaque requête : c'est le seul endroit où un tiers choisit
+    # combien d'appels le serveur fait. 120/min/IP laisse passer une rafale
+    # légitime de callbacks tout en rendant l'amplification inintéressante ;
+    # les bornes de fond (paiement déjà confirmé, cache 15 s) sont dans
+    # `kojo_routers_payments.paydunya_payment_ipn`.
+    if path.startswith("/api/payments/ipn/") or path.startswith("/api/payments/disburse-ipn"):
+        return ("payments-ipn", 120, 1)
     return ("general-api", 240, 1)
 request_counts: Dict[str, List[float]] = defaultdict(list)
 RATE_LIMIT_MAX_TRACKED_KEYS = 50_000  # garde-fou anti-DoS mémoire

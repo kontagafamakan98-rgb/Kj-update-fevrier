@@ -32,6 +32,7 @@ import threading
 import pytest
 
 import kojo_email
+import kojo_payments
 import kojo_routers_public
 
 
@@ -61,6 +62,50 @@ async def test_l_envoi_email_ne_tourne_pas_sur_la_boucle(monkeypatch):
     assert threads[0] is not threading.main_thread(), (
         "l'envoi d'email tourne sur la boucle : un timeout de 30 s du "
         "fournisseur gèlerait TOUTES les requêtes du worker"
+    )
+
+
+@pytest.mark.asyncio
+async def test_la_reconfirmation_paydunya_ne_tourne_pas_sur_la_boucle(monkeypatch):
+    """Le troisième chemin synchrone, et le plus exposé : le paiement.
+
+    `sync_payment_status_with_paydunya` est `async`, mais appelait
+    `confirm_paydunya_invoice` — un `requests.get(..., timeout=30)` —
+    DIRECTEMENT. Trois routes l'attendent : `/payments/status/{id}`,
+    `/payments/status/token/{token}` et l'IPN public. Sur la boucle, un
+    PayDunya lent arrêtait donc toutes les requêtes du worker (mono-worker en
+    production). Le checkout, lui, passait déjà par `asyncio.to_thread` :
+    c'était un oubli, pas un choix.
+    """
+    threads = []
+
+    def faux_confirm(invoice_token):
+        threads.append(threading.current_thread())
+        return {"invoice": {"status": "pending"}}
+
+    class _Collection:
+        async def update_one(self, *args, **kwargs):
+            return None
+
+        async def find_one(self, *args, **kwargs):
+            return {"id": "paiement-1", "status": "pending", "invoice_token": "tok"}
+
+    class _Base:
+        payments = _Collection()
+
+    monkeypatch.setattr(kojo_payments, "is_paydunya_configured", lambda: True)
+    monkeypatch.setattr(kojo_payments, "confirm_paydunya_invoice", faux_confirm)
+    monkeypatch.setattr(kojo_payments, "db", _Base())
+
+    await kojo_payments.sync_payment_status_with_paydunya(
+        {"id": "paiement-1", "status": "pending", "invoice_token": "tok"}
+    )
+
+    assert len(threads) == 1, "la reconfirmation n'a pas eu lieu"
+    assert threads[0] is not threading.main_thread(), (
+        "la reconfirmation PayDunya tourne sur la boucle : un timeout de 30 s "
+        "du fournisseur gèlerait TOUTES les requêtes, y compris la page "
+        "d'accueil et l'IPN"
     )
 
 

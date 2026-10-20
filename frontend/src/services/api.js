@@ -3,6 +3,29 @@
 // historique de double préfixe /api/api quand deux helpers normalisent
 // différemment la même variable d'environnement.
 import { buildApiUrl } from '../utils/backendUrl';
+import { safeLog } from '../utils/env';
+
+// Identifiant de requête publié par le backend (`X-Request-ID`) : il relie une
+// réponse à SES lignes de journal. Le backend l'EXPOSE en CORS (server.py,
+// `expose_headers`) — sans cette exposition, l'en-tête arriverait et resterait
+// illisible ici, donc inutile au support.
+const ENTETE_REQUETE = 'X-Request-ID';
+
+/**
+ * En-tête de corrélation d'une réponse, ou chaîne vide.
+ *
+ * @param {Response} response Réponse du backend.
+ * @returns {string}
+ */
+const identifiantDeRequete = (response) => {
+  try {
+    return String(response?.headers?.get?.(ENTETE_REQUETE) || '').trim();
+  } catch (_error) {
+    // En-têtes illisibles (réponse opaque, proxy qui les masque) : un incident
+    // sans identifiant reste un incident.
+    return '';
+  }
+};
 
 const getStorageBuckets = () => {
   if (typeof window === 'undefined') return [];
@@ -203,12 +226,19 @@ export const handleApiError = (error, fallback = 'Une erreur est survenue') => {
 // pas déclencher la redirection globale pendant la déconnexion.
 const BUSINESS_401_PREFIXES = ['/auth/login', '/auth/register', '/auth/email/', '/auth/password/', '/auth/logout'];
 
+// Marqueur de session, SANS donnée personnelle : il dit seulement « une
+// connexion a eu lieu dans ce navigateur », et c'est le signal d'amorçage du
+// web (voir `hasSessionArtifact` plus bas pour le pourquoi et l'historique).
+// Déclaré ICI parce que `AUTH_STORAGE_KEYS` le référence : une constante
+// déclarée plus bas lèverait un ReferenceError (TDZ) au chargement du module.
+export const SESSION_TRACE_KEY = 'kojo_session_trace';
+
 // Clés de session auth purgeables en cas de 401 — dans localStorage ET
 // sessionStorage (getAuthToken lit les deux buckets, la purge doit donc
 // couvrir les deux, sinon un token stocké en sessionStorage survivait au
 // 401 et l'app restait bloquée en boucle de redirection).
 const AUTH_STORAGE_KEYS = [
-  'token', 'token_expires_at', 'user',
+  'token', 'token_expires_at', 'user', SESSION_TRACE_KEY,
   'auth_token', 'access_token', 'accessToken', 'kojo_token', 'jwt',
   'bearer_token', 'auth', 'auth_user', 'session_user', 'currentUser', 'kojo_user',
 ];
@@ -340,18 +370,33 @@ const readCsrfCookie = () => {
 
 // TRACE NON SECRÈTE DE SESSION — le SEUL signal d'amorçage du web.
 //
-// Ce n'est ni un jeton ni une preuve : c'est le profil laissé par une
-// connexion réussie ('user'). Il ne sert qu'à décider s'il vaut la peine de
-// poser la question au serveur (/auth/me) ; jamais à afficher quoi que ce soit
-// (un profil n'est montré que sur un 200 du serveur).
+// Ce n'est ni un jeton ni une preuve : c'est un MARQUEUR (`'1'`), sans aucune
+// donnée personnelle, posé par une connexion réussie. Il ne sert qu'à décider
+// s'il vaut la peine de poser la question au serveur (/auth/me) ; jamais à
+// afficher quoi que ce soit (un profil n'est montré que sur un 200).
+//
+// POURQUOI UN MARQUEUR ET PLUS LE PROFIL (20/10/2026). La trace était le
+// profil lui-même (`'user'`, nom + email + téléphone) réécrit à CHAQUE
+// amorçage : c'est-à-dire des données personnelles au repos dans le navigateur,
+// pour la seule utilité de savoir qu'il faut sonder. Le marqueur dit la même
+// chose sans rien dire de la personne — le profil vit désormais en mémoire, et
+// sur le natif seulement en cache (qui a besoin d'un affichage hors-ligne).
+//
+// COMPATIBILITÉ : un `'user'` laissé par une version antérieure reste une
+// trace valable jusqu'à sa purge (le démarrage le retire, cf.
+// `AuthContext.purgerProfilWebPersistant`), donc une session en cours ne se
+// perd pas à la mise à jour.
 //
 // INVARIANT : la trace est purgée par les MÊMES chemins que la session —
 // clearToken (logout) et la purge de handleUnauthorized (401) — toutes deux
-// couvrent 'user' via AUTH_STORAGE_KEYS. Une trace qui survivrait à la mort de
+// couvrent la clé via AUTH_STORAGE_KEYS. Une trace qui survivrait à la mort de
 // la session ferait sonder /auth/me à chaque chargement, indéfiniment.
 export const hasSessionArtifact = () => {
   try {
     if (typeof localStorage === 'undefined') return false;
+    if (localStorage.getItem(SESSION_TRACE_KEY)) return true;
+    // Vestige d'une version antérieure (profil persisté) : encore une trace,
+    // le temps que le démarrage le remplace par le marqueur.
     return Boolean(localStorage.getItem('user'));
   } catch (_error) {
     // Stockage indisponible (navigation privée) : aucune trace lisible.
@@ -384,6 +429,28 @@ export const hasSessionArtifact = () => {
  * @returns {boolean} Vrai s'il faut poser la question au serveur.
  */
 export const hasSessionTrace = () => Boolean(getAuthToken()) || hasSessionArtifact();
+
+/**
+ * Nomme une PANNE serveur dans la console, avec son identifiant de requête.
+ *
+ * Seul un 5xx est journalisé : les 4xx sont des RÉSULTATS (mot de passe
+ * refusé, doublon, quota) que les pages traitent déjà, et les journaliser
+ * noierait le seul cas où le support a besoin de retrouver la requête dans
+ * les journaux du serveur. Le chemin est journalisé sans query string : une
+ * URL peut porter un jeton.
+ *
+ * @param {string} method Méthode HTTP.
+ * @param {string} path Chemin appelé (sans paramètres).
+ * @param {number} status Statut de la réponse.
+ * @param {string} requete Identifiant de requête publié par le backend.
+ */
+const signalerPanneServeur = (method, path, status, requete) => {
+  if (status < 500) return;
+  safeLog.error(
+    `[api] ${method} ${path} → ${status}` +
+      (requete ? ` (requête ${requete})` : ' (aucun identifiant de requête)')
+  );
+};
 
 const request = async (method, path, { params, data, headers, signal, skipUnauthorizedRedirect = false, skipRecovery = false, sessionProbe = false } = {}) => {
   const normalizedPath = String(path || '').startsWith('/') ? path : `/${path || ''}`;
@@ -513,6 +580,7 @@ const request = async (method, path, { params, data, headers, signal, skipUnauth
     }
 
     const messageDuServeur = messageUtilisable(payload);
+    const requete = identifiantDeRequete(response);
 
     if (!messageDuServeur) {
       // Le statut brut (« HTTP 502 ») n'est pas une phrase du produit : la page
@@ -520,7 +588,8 @@ const request = async (method, path, { params, data, headers, signal, skipUnauth
       // lisent directement `error.message`.
       const error = new Error(SERVER_FAILURE_MESSAGE);
       error.hasServerMessage = false;
-      error.response = { status: response.status, data: {} };
+      error.response = { status: response.status, data: {}, requestId: requete };
+      signalerPanneServeur(method, normalizedPath, response.status, requete);
       throw error;
     }
 
@@ -528,7 +597,9 @@ const request = async (method, path, { params, data, headers, signal, skipUnauth
     error.response = {
       status: response.status,
       data: typeof payload === 'string' ? { detail: messageDuServeur } : payload,
+      requestId: requete,
     };
+    signalerPanneServeur(method, normalizedPath, response.status, requete);
     throw error;
   }
 

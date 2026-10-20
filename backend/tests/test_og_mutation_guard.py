@@ -205,14 +205,16 @@ class TestCablage:
     def test_le_seul_executeur_est_l_etape_du_job_backend(self):
         """La preuve est payée une fois par push, ici et nulle part ailleurs : le
         commandement n'apparaît qu'une fois dans le workflow, dans le job qui installe
-        `backend/requirements.txt` — donc Pillow, que le fichier de test importe et que
-        les copies du garde exécutent."""
+        `backend/requirements.lock` (empreintes vérifiées) — donc Pillow, que le fichier
+        de test importe et que les copies du garde exécutent."""
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
         backend = job_block("backend-tests", workflow)
 
         assert workflow.count(COMMAND) == 1, "un second exécutant paierait la même preuve deux fois"
         assert COMMAND in backend
-        assert "-r requirements.txt" in backend, "sans ses dépendances, l'étape ne peut pas tourner"
+        assert "--require-hashes -r requirements.lock" in backend, (
+            "sans ses dépendances (lock + empreintes), l'étape ne peut pas tourner"
+        )
 
     def test_la_derivation_couvre_chaque_raise_du_generateur(self):
         """Ce que le garde verra en CI, sur le vrai générateur : chaque refus a une

@@ -407,6 +407,74 @@ n'y en a pas — le canari juge la forme d'UNE fiche, il ne publie pas de corpus
   un job exempté qui disparaîtrait de `ci.yml` fait rougir le garde
   (« exemption PÉRIMÉE ») : une exemption ne survit pas à sa cause.
 
+### 3 bis. La dette de sécurité qui RESTE (P2 assumée, dite)
+
+Ces points ne sont pas des vérifications de la CI qui ne bloquent pas : ce sont
+des moyens de PREUVE qu'un incident a eu lieu. Ils restent absents, et chaque
+ligne dit ce qu'elle coûte — une dette déclarée se surveille, une dette tuée
+ne se voit pas.
+
+- **Empreintes de dépendances backend — FERMÉ le 20/10/2026.** Le backend a
+  désormais l'équivalent de `package-lock.json` : `backend/requirements.lock`,
+  72 distributions épinglées avec 1 774 empreintes SHA-256 (tous les fichiers
+  publiés, wheels et sdist), consommé par `pip install --require-hashes` dans
+  `backend/Dockerfile`, les deux installs de `ci.yml`, `backup-db.yml` et le
+  README. Un dépôt PyPI compromis ou un fichier remplacé entre deux
+  déploiements fait donc rougir l'INSTALLATION, au lieu de s'installer en
+  silence. Mesuré : lock installé dans un venv 3.11 neuf (`pip check` : aucune
+  incohérence), suite backend complète jouée sur ces versions ; `pip-audit`
+  juge le lock et relève **0 avis** ; quatre mutations du garde (empreintes
+  retirées d'une distribution, version hors plage, Dockerfile revenu aux
+  plages, CI sans `--require-hashes`) le font rougir, chacune nommée. **Ce qui reste ouvert** :
+  les pins ne sont pas re-résolus automatiquement (un avis futur exige un bump,
+  comme avant) et la génération se fait sur un interpréteur 3.11 — un
+  environnement d'une autre version produirait un autre lock.
+- **`dependency-audit` est DÉJÀ un gate** (mesuré le 20/10/2026 : le job figure
+  dans `.github/scripts/gate-perimetre.json`, nom « Dépendances (avis de
+  sécurité) », et §2.1 raconte pourquoi). La ligne de la dette d'origine est donc
+  périmée, et elle n'est plus vraie sous cette forme : un avis critique fait
+  rougir une PR. Ce qui reste VRAI, et qui est le vrai manque, c'est qu'un avis
+  ne dit rien d'une dépendance DÉPLACÉE ou d'un dépôt PyPI compromis : l'audit
+  compare des versions à une base d'avis, il ne vérifie pas le CONTENU installé
+  — d'où la ligne suivante sur les empreintes.
+- **Aucun scan de SECRETS** (gitleaks/trufflehog) : rien ne vérifie qu'une clé
+  n'entre dans un commit. La règle « secrets hors du frontend » (point 3 de
+  `AUDIT-CONFORMITE.md`) est tenue par la revue et par `check-origines-bundles.js`
+  côté bundle, pas par un passage sur l'HISTORIQUE. Fermer : un job
+  `gitleaks detect` en `pull_request` (bloquant) + un passage sur tout
+  l'historique une fois.
+- **Aucun SAST** (CodeQL/Semgrep/Bandit) : les motifs dangereux sont couverts par
+  des gardes écrits à la main (`test_email_send_points.py`, `test_cors_origins.py`,
+  les sondes de production), donc par ce qu'on a déjà pensé — pas par ce qu'on a
+  oublié. Fermer : CodeQL sur `python` + `javascript` en `pull_request`.
+- **Pas de MÉTRIQUES d'exploitation** (pas d'export Prometheus, pas de latence
+  par route) : `backend/SCALING.md` porte des courbes MESURÉES, pas une série
+  temporelle, et le dimensionnement se lit dans les bancs
+  (`backend/scripts/charge/`). C'est suffisant pour choisir une machine, pas
+  pour voir une dégradation arriver. Ce qui existe, à ne pas confondre avec des
+  métriques : `/monitor` et `/monitor/email` (état jugé), `rate_limit_stats()`, `bus_stats()`,
+  `revocation_stats()`, `partage_stats()`. Fermer : un export Prometheus des
+  compteurs déjà tenus + un collecteur ; c'est une décision d'hébergement
+  (Fly ne fournit pas de séries), pas une ligne de code.
+- **L'identifiant de requête n'est pas encore une TRACE** (20/10/2026) :
+  `X-Request-ID` est posé sur chaque réponse, journalisé sur les échecs non
+  gérés, et le client le porte ; mais aucun journal de production n'est
+  REQUÊTABLE par cet identifiant (pas d'agrégateur de logs configuré). La
+  corrélation fonctionne donc pour un incident qui a laissé une trace serveur
+  lisible dans `fly logs`, pas pour une recherche à froid.
+- **Débits de connexion et de vérification email** — *fermé le 20/10/2026 pour
+  la connexion* : le verrou par compte (`kojo_login_guard.py`) ferme le
+  credential stuffing sur un COMPTE, et `kojo_login_reseau.py` plafonne
+  désormais les ÉCHECS par RÉSEAU (120 / 15 min par `/24`, puis goutte-à-goutte
+  d'une tentative / 5 s), ce qui voit l'attaque répartie sur des comptes
+  différents. Le bucket par IP de la connexion est passé à `auth-login`
+  300 / 5 min (débit brut) pour que la règle réseau soit ATTEIGNABLE ;
+  `auth-session` 20 / 5 min ne garde que l'inscription. **Reste ouvert** : le
+  compteur réseau est PAR PROCESS sans `REDIS_URL`, donc un déploiement
+  multi-workers le multiplierait — même dépendance que le rate-limiter ; et la
+  VÉRIFICATION email garde son bucket `auth-otp` 12 / 5 min par IP, dont le
+  compromis CGNAT n'a pas été retravaillé.
+
 ## 4. Mesures brutes (rejouables)
 
 ```bash
@@ -444,6 +512,24 @@ cd frontend && node scripts/check-job-form-canari.js
 
 # les sondes de production : fréquence réelle de leurs rouges
 gh run list -R kontagafamakan98-rgb/Kj-update-fevrier --workflow seo-production-probe.yml --limit 30
+
+# le lock backend : les empreintes existent, et l'installation les EXIGE
+# (1 774 empreintes au 20/10/2026 ; 0 = le lock a été vidé)
+grep -c -- "--hash=sha256" backend/requirements.lock
+grep -rn -- "--require-hashes -r requirements.lock" backend/Dockerfile .github/workflows/ci.yml
+grep -o '"[a-z-]*"' .github/scripts/gate-perimetre.json | head -20
+
+# les preuves du verrou par compte, du plafond par réseau et de l'identifiant
+# de requête (les deux fichiers de connexion se jugent ENSEMBLE : le plafond
+# réseau change le bucket par IP que le verrou de compte décrit)
+cd backend && .venv/Scripts/python.exe -m pytest tests/test_login_lockout.py \
+  tests/test_login_reseau.py tests/test_rate_limit_repli.py \
+  tests/test_token_revocation_fail_open.py tests/test_request_id.py -q
+
+# et le refus d'un identifiant forgé, mesuré sur la vraie pile
+# (l'identifiant publié ne doit PAS être celui qu'on a écrit : il est remplacé)
+curl -si -H $'X-Request-ID: id\r\nX-Forgé: 1' https://api.kojoforafrica.cc.cd/api/health \
+  | grep -i '^x-request-id'
 ```
 
 Relevés du 12/10/2026, pour mémoire : `seo-production-probe` **22 verts / 3 rouges**

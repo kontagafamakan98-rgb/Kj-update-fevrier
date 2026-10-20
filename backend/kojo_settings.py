@@ -232,6 +232,13 @@ RETENTION_SWEEP_INTERVAL_MINUTES = int(os.environ.get('RETENTION_SWEEP_INTERVAL_
 # (`backend/scripts/check_health_probe.py`, cron 06:30) : il la double.
 EMAIL_HEALTH_ALERT_INTERVAL_MINUTES = int(os.environ.get('EMAIL_HEALTH_ALERT_INTERVAL_MINUTES', '15'))
 
+# Fréquence du résumé d'alertes emploi (minutes). Une heure : c'est un RÉSUMÉ
+# (kojo_job_alerts.passage_digest), pas un envoi par publication — dix missions
+# dans l'heure font un email, et une veille qui écrirait à chaque annonce serait
+# indiscernable d'un spam. Le bail `job_alert_digest` empêche N machines Fly de
+# résumer N fois.
+JOB_ALERT_DIGEST_INTERVAL_MINUTES = int(os.environ.get('JOB_ALERT_DIGEST_INTERVAL_MINUTES', '60'))
+
 # --- Vérification email (OTP) ---
 _env_email_otp_secret = os.environ.get('EMAIL_OTP_SECRET', '').strip()
 if _env_email_otp_secret:
@@ -380,6 +387,37 @@ FRONTEND_APP_URL = os.environ.get('FRONTEND_APP_URL', '').rstrip('/')
 
 BACKEND_PUBLIC_URL = os.environ.get('BACKEND_PUBLIC_URL', '').rstrip('/')
 
+# ── BACKEND_PUBLIC_URL : OBLIGATOIRE dès que les paiements sont branchés ───
+# Elle ne sert pas à l'API : elle sert à PayDunya, qui doit nous RAPPELER. Sans
+# elle, `build_payment_callback_url` rendait une URL RELATIVE
+# (`/api/payments/ipn/paydunya`) : le fournisseur recevait une callback
+# inutilisable, l'IPN n'arrivait jamais, et le paiement n'était plus confirmé
+# que par le polling du client — une panne silencieuse, visible seulement sur
+# les paiements qui n'aboutissent pas.
+#
+# Le validateur existait (`kojo_env_validators.validate_https_url`) mais
+# l'application ne l'appelait jamais : seuls la CI et le script de dérive Fly
+# s'en servaient. Il est donc BRANCHÉ ici, avec le même parti pris que
+# JWT_SECRET (refus de démarrer plutôt que servir une configuration fausse) —
+# la production porte déjà la variable, la sonde de dérive Fly l'exige.
+if BACKEND_PUBLIC_URL:
+    from kojo_env_validators import validate_https_url as _validate_https_url
+
+    try:
+        BACKEND_PUBLIC_URL = _validate_https_url(BACKEND_PUBLIC_URL, "BACKEND_PUBLIC_URL")
+    except ValueError as exc:
+        raise RuntimeError(
+            f"BACKEND_PUBLIC_URL mal formée : {exc} Corrigez le secret Fly "
+            "(https://api.kojoforafrica.cc.cd, sans slash final) puis redéployez."
+        )
+elif APP_ENV in ("production", "prod") and PAYDUNYA_MASTER_KEY and PAYDUNYA_PRIVATE_KEY and PAYDUNYA_TOKEN:
+    raise RuntimeError(
+        "BACKEND_PUBLIC_URL n'est pas définie alors que PayDunya est configuré : "
+        "les callbacks IPN partiraient en URL relative, PayDunya ne pourrait pas "
+        "nous rappeler, et un paiement ne serait plus confirmé que par le polling "
+        "du client. Définir BACKEND_PUBLIC_URL sur Fly.io (secret) puis redéployer."
+    )
+
 EMAIL_OTP_RESEND_COOLDOWN_SECONDS = int(os.environ.get('EMAIL_OTP_RESEND_COOLDOWN_SECONDS', '60'))
 
 EMAIL_VERIFICATION_TOKEN_MINUTES = int(os.environ.get('EMAIL_VERIFICATION_TOKEN_MINUTES', '30'))
@@ -485,6 +523,14 @@ VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', '').strip()
 # fonctionne vraiment, et rester aligné sur les références du dépôt
 # (verrouillé par tests/test_vapid_sub_claim.py::TestReferencesProd).
 VAPID_CLAIMS_EMAIL = os.environ.get('VAPID_CLAIMS_EMAIL', 'mailto:kojoapp98@gmail.com').strip()
+
+# Jeton de l'endpoint Prometheus (`/metrics`, kojo_metrics). OPTIONNEL, et VIDE
+# par défaut DÉLIBÉRÉMENT : sans jeton la route refuse (503 nommée) au lieu de
+# publier la topologie interne. Le laisser vide n'empêche pas le backend de
+# démarrer — c'est un choix d'exploitation (collecte active ou non), pas un
+# secret requis au boot (voir OPTIONAL_KEYS de check-fly-env-drift.py).
+# Comparé en temps constant, et lu à CHAQUE requête (pas de valeur figée).
+METRICS_TOKEN = os.environ.get('METRICS_TOKEN', '').strip()
 
 # Validateurs de format des variables d'env — extraits dans
 # kojo_env_validators.py (module stdlib-only, importable sans dépendances

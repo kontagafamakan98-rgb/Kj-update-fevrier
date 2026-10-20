@@ -14,6 +14,7 @@ from pydantic import ValidationError
 import kojo_job_effects as effets
 from kojo_business_events import enregistrer_evenement
 from kojo_core import db, get_current_user
+from kojo_job_alerts import comptes_couverts
 from kojo_job_categories import _CATEGORY_GROUPS, _normalize_job_category
 from kojo_models import Job, JobCreate, NotificationType, User, UserType
 from kojo_settings import logger
@@ -24,6 +25,14 @@ async def _notify_matching_workers(job: Job):
     """Notifie par push les travailleurs dont les spécialités correspondent à la
     catégorie du job (repli : travailleurs du même pays). Fire-and-forget : une
     erreur ici ne doit jamais faire échouer la création du job.
+
+    UNE SEULE ANNONCE PAR MISSION ET PAR TRAVAILLEUR. Ce push et l'alerte
+    emploi (`kojo_job_alerts`) pouvaient prévenir le même compte DEUX fois pour
+    la même mission. Les comptes qu'une veille ACTIVE couvre déjà en sont donc
+    retirés : la veille porte l'annonce (son résumé inclut la mission), et le
+    push de publication se tait pour eux. La veille reste consultée par la
+    route de publication (`comptes_couverts`), pas recopiée ici : les critères
+    de correspondance vivent dans `kojo_job_alerts.correspond`.
     """
     try:
         category = _normalize_job_category(job.category)
@@ -60,8 +69,35 @@ async def _notify_matching_workers(job: Job):
         if not worker_ids:
             return
 
-        logger.info(f"🔔 Push matching {method} : {len(worker_ids)} travailleurs pour « {job.title} »")
-        for uid in worker_ids[:30]:
+        # Au plus 30 cibles, sans doublon et dans l'ordre de la requête : la
+        # borne est celle du push, et la veille est consultée sur CES cibles.
+        cibles = []
+        for uid in worker_ids:
+            if uid and uid not in cibles:
+                cibles.append(uid)
+        cibles = cibles[:30]
+        if not cibles:
+            return
+
+        # La mission telle que la veille la lira (mêmes champs que la base) :
+        # `model_dump(mode="json")` rend les valeurs sérialisées, donc
+        # `status` y est la chaîne « open » et non l'énumération.
+        couverts = set()
+        try:
+            couverts = await comptes_couverts(cibles, job.model_dump(mode="json"))
+        except Exception as exc:  # noqa: BLE001 - le push ne doit pas se perdre ici
+            # Dégrader vers « pousser tout le monde » plutôt que vers « ne
+            # pousser personne » : une panne de la lecture des veilles ne doit
+            # pas rendre les travailleurs muets. Le doublon redevient possible
+            # dans cette seule fenêtre, et le journal le dit.
+            logger.warning(f"⚠️ Veilles emploi illisibles (anti-doublon ignoré) : {exc}")
+
+        a_notifier = [uid for uid in cibles if uid not in couverts]
+        logger.info(
+            f"🔔 Push matching {method} : {len(a_notifier)} travailleurs pour « {job.title} »"
+            + (f" ({len(couverts)} laissé(s) à la veille emploi)" if couverts else "")
+        )
+        for uid in a_notifier:
             try:
                 await effets.notify_user_localized(
                     user_id=uid,

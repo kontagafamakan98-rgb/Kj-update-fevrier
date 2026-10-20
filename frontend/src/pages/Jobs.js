@@ -4,6 +4,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
 import JobCreateModal from '../components/JobCreateModal';
+// Le seul chemin de RETOUR du produit : une veille qui envoie un email quand
+// une mission correspond (backend/kojo_job_alerts.py). Montée ici parce que
+// c'est la page où un travailleur cherche — et seulement pour lui.
+import AlerteEmploi from '../components/AlerteEmploi';
 import { ListSkeleton } from '../components/SkeletonLoader';
 import { jobsAPI } from '../services/apiEndpoints';
 import { getLocaleForLanguage } from '../utils/pack2PageI18n/core';
@@ -343,6 +347,14 @@ export default function Jobs() {
           </span>
         )}
       </div>
+
+      {/* Alertes emploi : un travailleur peut demander à être PRÉVENU, au lieu
+          de revenir voir si quelque chose est paru. Les catégories sont les
+          mêmes puces que les filtres ci-dessous (une seule liste), et le pays
+          est celui du compte — la veille ne sort pas de son marché. */}
+      {user?.user_type === 'worker' && (
+        <AlerteEmploi categories={categories} pays={user?.country || ''} />
+      )}
 
       {/* ── Recherche et filtres : UNE carte, lisible d'un coup d'œil ───────
           Trois contrôles empilés dans la page (champ, catégorie, rayon) se

@@ -361,8 +361,9 @@ def _creer_client_redis() -> Any:
     except ImportError:
         logger.warning(
             "⚠️ Temps réel : package 'redis' absent — bus partagé DÉSACTIVÉ, "
-            "le fan-out reste en mémoire par process. Ajouter 'redis>=5.0.0' "
-            "à requirements.txt pour l'activer."
+            "le fan-out reste en mémoire par process. 'redis>=5.0.0' est déclaré "
+            "dans requirements.txt et épinglé dans requirements.lock : réinstaller "
+            "avec `pip install --require-hashes -r requirements.lock` pour l'activer."
         )
         return None
     try:
