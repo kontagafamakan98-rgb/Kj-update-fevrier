@@ -279,9 +279,15 @@ retombe sur le repli.
   enveloppes publiées pendant la fenêtre, zéro livrée — et non caché : la
   fenêtre est comptée (`bus_stats()['reprises']`) et chaque flux local reçoit
   `resync` au rétablissement, c’est-à-dire RELIT la source de vérité. La
-  cadence des relectures est bornée (`RESYNC_MIN_INTERVAL_SECONDS`, 10 s) pour
-  ne pas redevenir plus bavarde que le sondage remplacé (2 req/min), avec une
-  relecture différée pour la dernière fenêtre d’une rafale. Et une lecture qui
+  cadence des relectures est bornée (`RESYNC_MIN_INTERVAL_SECONDS`, **30 s**)
+  pour ne pas redevenir plus bavarde que le sondage remplacé (2 req/min), avec
+  une relecture différée pour la dernière fenêtre d’une rafale. Ce plancher
+  n’est pas un réglage : à 10 s — sa valeur d’origine — une rafale de
+  reconnexions relisait les flux six fois par minute, trois fois plus bavard
+  que le mécanisme remplacé. La parité est JUGÉE
+  (`.github/scripts/check-resync-parite.py`, étape de `workflow-lint`) contre le
+  seuil **lu** dans la sonde (`ANCIEN_SONDAGE_MS`), jamais recopié. Et une
+  lecture qui
   expire n’est pas une panne : la lecture par `get_message` avec un délai
   explicite rend `None` sur un canal calme ; `listen()`, lui, héritait du
   `socket_timeout` du client (2 s) et rompait l’abonnement toutes les 2,2 s —

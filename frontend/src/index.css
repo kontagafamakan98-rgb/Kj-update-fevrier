@@ -216,7 +216,19 @@
    rendus par elles, et non par une case vide.
 
    MAIS `swap` VEUT DIRE PEINDRE DEUX FOIS, et c'est ce que la face suivante
-   atténue : voir « LE REPLI EST ALIGNÉ SUR LE DESSIN D'INTER », juste après. */
+   atténue : voir « LE REPLI EST ALIGNÉ SUR LE DESSIN D'INTER », juste après.
+
+   CE QUE ÇA COÛTE EN LCP, mesuré le 20/10/2026 sur un cache VIDE (/jobs,
+   412×823, navigateur neuf) : la coquille peint avec le repli au premier paint
+   (`taille` 36 750 px²), le fichier arrive, et le MÊME élément est repeint à
+   37 240 px² — boîte IDENTIQUE (39 520 px²), donc c'est bien l'encre du dessin,
+   pas une géométrie qui a bougé. Chrome enregistre cette seconde peinture comme
+   une nouvelle candidate LCP, plus grande de 1,3 % : le LCP d'une PREMIÈRE
+   visite porte donc l'arrivée du fichier. C'est le prix assumé de `swap` (un
+   `optional` supprimerait le repaint au prix d'un premier visite en repli), et
+   il est jugé là où il se mesure : les sondes LCP mesurent une visite à police
+   CHAUDE, et `e2e/lcp-geometrie-declaree.spec.js` juge en plus la visite froide
+   en exigeant que la seconde peinture soit CE fichier-là et pas React. */
 @font-face {
     font-family: 'Inter';
     font-style: normal;
@@ -1215,10 +1227,28 @@ body {
 /* La CARTE : un filet, pas une ombre. `cliquable` n'ajoute que ce qui répond au
    survol d'une carte qui mène quelque part — une carte informative n'a rien à
    promettre, donc elle ne porte pas cette classe. */
+/* LA CARTE EST DU VERRE, PAS DU PAPIER PLEIN (20/10/2026).
+
+   Le verre du site s'arrêtait aux surfaces FLOTTANTES (barres, panneaux,
+   toasts). Une carte éditoriale est posée SUR le papier de la page : elle n'a
+   rien à recouvrir, donc son verre est une MATIÈRE, pas une protection — un
+   fond à 94 % de papier chaud, un filet de crème, un reflet blanc en tête et
+   un flou court qui ne fait que marier la carte au sable qu'elle touche.
+
+   94 % n'est pas un réglage : c'est ce qui garde le texte lisible au PIRE fond
+   composé (l'encre du site sous la carte). À cette opacité, la surface reste un
+   papier clair même posée sur #1c1917, et `--kojo-encre` y tient 13:1. Une
+   carte à 82 % (le verre neutre d'une surface flottante) aurait laissé le fond
+   décider du contraste d'un paragraphe, ce qu'aucune carte ne peut se
+   permettre. La paire est MESURÉE par `scripts/verre-contraste.js`. */
 .carte-editoriale {
-  background-color: var(--kojo-papier);
-  border: 1px solid var(--kojo-filet);
+  background-color: rgba(252, 249, 242, 0.94);
+  border: 1px solid rgba(240, 220, 195, 0.9);
   border-radius: 0.5rem;
+  color: var(--kojo-encre);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  -webkit-backdrop-filter: blur(10px) saturate(1.1);
+  backdrop-filter: blur(10px) saturate(1.1);
 }
 
 /* LA CARTE CHOISIE d'une liste — ici, la proposition qu'on est en train de
@@ -2837,11 +2867,16 @@ form label {
   width: 2.5rem;
   height: 2.5rem;
   overflow: hidden;
-  border-radius: 9999px;
+  /* La pastille de l'avatar est un GALET, pas un cercle parfait : elle porte la
+     même morphose que la tache du bandeau (`kojo-morphe`), à la même cadence.
+     Le rayon de repos est déjà organique — sous `prefers-reduced-motion`, où
+     l'animation s'éteint, le dessin reste celui-là, arrêté. */
+  border-radius: 46% 54% 52% 48% / 52% 46% 54% 48%;
   background-color: var(--kojo-creme);
   color: var(--kojo-orange-fonce);
   font-size: 0.8125rem;
   font-weight: 700;
+  animation: kojo-morphe 18s var(--kojo-ease) infinite;
 }
 
 /* LES DEUX BULLES D'UNE CONVERSATION. Elles ne portent que ce qui les
@@ -3161,31 +3196,41 @@ form label {
    Un reflet de marque TRAVERSE les glyphes, lentement, sans jamais changer la
    boîte du titre : `background-clip: text` peint le dégradé DANS les lettres,
    et seule `background-position` bouge. C'est le seul effet continu du site, et
-   il est borné au titrage — trois porteurs, un seul nom d'animation.
+   il est borné au titrage — quatre porteurs, un seul nom d'animation.
 
-   POURQUOI PAS `.titre-page` PARTOUT, ET C'EST MESURÉ : le 19/10/2026, le
-   dégradé posé sur `.titre-page` a fait PERDRE son candidat texte à /about
-   (mobile) — le navigateur a élu le conteneur (`min-h-screen fond-sable …`)
-   au lieu du paragraphe déclaré (`introClass`), `lcp-geometrie-declaree.spec.js`
-   l'a nommé, et le retrait du dégradé a fait repasser le cas. Un titre dont les
-   glyphes sont peints par un FOND n'est plus, pour Chrome, une peinture de
-   texte : l'élection se déplace, et une page peut élire une boîte qu'aucun plan
-   ne décrit. L'effet est donc posé sur l'explicite (`.titre-cinetique`, que les
-   titres d'écran portent depuis `src/config/app-cadres.js`) et sur les deux
-   classes dont l'élection est mesurée ailleurs (`.titre-section`, `.titre-heros`
-   — les titres de section et le héros, dont le LCP de « / » est la PHOTO). Une
-   page publique garde son titre plein : c'est le prix de son LCP.
+   `.titre-page` EST ANIMÉ — DÉCISION DU 20/10/2026, ET LE LCP SUIT. Les titres
+   de page PUBLICS prennent le reflet comme ceux de l'accueil : un site dont le
+   titrage s'anime sur une page et pas sur l'autre se lit comme deux sites. La
+   BOÎTE du titre ne bouge pas d'un pixel (seule `background-position` bouge),
+   donc la géométrie des deux canaux ne change pas et le CLS non plus.
+
+   Ce que la mesure a dit du LCP, et ce qu'elle a démenti : la SONDE a nommé le
+   conteneur élu sur /about (191 786 / 196 500 px²) — mais le titrage n'en est
+   PAS la cause. Mesure A/B de la même journée, sous `prefers-reduced-motion`
+   (la feuille éteint alors le reflet, donc le titre redevient un texte peint) :
+   la colonne du chrome est élue À L'IDENTIQUE. Un conteneur de 191 786 px² est
+   la plus grande peinture de cette page, titre animé ou non.
+
+   La décision est donc d'ACCEPTER cette élection et de la DÉCLARER : chaque
+   plan de route publique nomme son élément élu (`lcpChamp`, ou `lcpColonne:
+   COLONNE_CLASS` pour la colonne du chrome — `src/config/page-sections.js`),
+   et `e2e/lcp-geometrie-declaree.spec.js` lit cette déclaration. La
+   contrepartie, dite là-bas : sur ces routes la garantie « React ne peint pas
+   plus grand que la coquille » porte sur le conteneur, et le COÛT de la chaîne
+   JavaScript reste jugé par les budgets LCP par route et `e2e/lcp-app.spec.js`.
+
+   Les titres POSÉS SUR L'ORANGE sortent de l'effet (`.bande-page`,
+   `.cta-final`) : un reflet d'encre sur un fond orange serait illisible, et
+   c'est exactement le défaut que la règle de couleur de
+   `.bande-page .titre-page` corrige depuis le 28/09/2026. L'exception est
+   écrite ICI, à côté de ce qu'elle excepte, et elle se répète plus bas pour
+   chaque famille de porteurs.
 
    Les deux teintes du reflet sont des JETONS : l'encre et l'orange foncé sur
    papier, le blanc et la crème sur l'orange du héros. Aucune couleur nouvelle,
    donc aucun contraste à re-mesurer : le pire état du reflet est l'orange foncé
    (#c2410c) sur le papier, 4,9:1 — au-dessus du seuil du grand texte, et le
-   titre est toujours du grand texte.
-
-   Les titres POSÉS SUR L'ORANGE sortent de l'effet (`.bande-page`, `.cta-final`) :
-   un reflet d'encre sur un fond orange serait illisible, et c'est exactement le
-   défaut que la règle de couleur de `.bande-page .titre-page` corrige depuis le
-   28/09/2026. L'exception est écrite ICI, à côté de ce qu'elle excepte. */
+   titre est toujours du grand texte. */
 @keyframes kojo-cinetique {
   from {
     background-position: 130% 50%;
@@ -3197,7 +3242,8 @@ form label {
 
 .titre-section,
 .titre-heros,
-.titre-cinetique {
+.titre-cinetique,
+.titre-page {
   --cinetique-a: var(--kojo-encre);
   --cinetique-b: var(--kojo-orange-fonce);
   background-image: linear-gradient(
@@ -3236,8 +3282,10 @@ form label {
    pose (#fff), donc l'exception ne recopie aucune teinte. */
 .bande-page .titre-cinetique,
 .bande-page .titre-section,
+.bande-page .titre-page,
 .cta-final .titre-cinetique,
 .cta-final .titre-section,
+.cta-final .titre-page,
 .cta-final h2 {
   background-image: none;
   -webkit-text-fill-color: currentColor;
@@ -3254,9 +3302,14 @@ form label {
 
   .titre-section,
   .titre-heros,
-  .titre-cinetique {
+  .titre-cinetique,
+  .titre-page {
     background-image: none;
     -webkit-text-fill-color: currentColor;
+    animation: none;
+  }
+
+  .avatar-app {
     animation: none;
   }
 
@@ -3275,7 +3328,8 @@ form label {
 @media (forced-colors: active) {
   .titre-section,
   .titre-heros,
-  .titre-cinetique {
+  .titre-cinetique,
+  .titre-page {
     background-image: none;
     -webkit-text-fill-color: currentColor;
   }

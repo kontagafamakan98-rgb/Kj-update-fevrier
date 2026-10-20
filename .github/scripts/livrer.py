@@ -24,7 +24,11 @@ par une fusion manuelle passée sous un check rouge.
      révisions ATTENDUES se lisent sur la BASE DISTANTE (`origin/main`, relu
      après la fusion), jamais sur le `main` local : l'étape 6 est best-effort,
      donc un dépôt local périmé ne doit pas faire refuser une production qui
-     sert pourtant le bon commit (faux refus, code 2).
+     sert pourtant le bon commit (faux refus, code 2). La base est relue UNE
+     SEULE FOIS par livraison (`lire_base_distante`) et PASSÉE aux deux
+     confirmations : deux lectures séparées feraient deux `git fetch` pour un
+     même fait, et pourraient tomber de part et d'autre d'un `main` qui avance —
+     deux verdicts qui ne parlent plus du même état du dépôt.
      - Vercel (frontend) : balise meta `kojo-build-revision` sur https://kojoforafrica.cc.cd
      - SEO (frontend)    : sonde stricte `check-seo-production.js --strict`, lancée JUSTE
        APRÈS la confirmation de la révision servie — la MÊME commande que la CI, et son
@@ -505,8 +509,44 @@ def synchroniser_et_nettoyer_local(branche_travail: str):
 REF_BASE_DISTANTE = "origin/main"
 
 
-def rafraichir_base_distante(merge_sha: str) -> None:
-    """Relit `origin/main` et vérifie qu'il porte la fusion qui vient d'avoir lieu.
+class BaseDistante:
+    """`origin/main`, RELUE UNE FOIS par livraison, puis partagée.
+
+    Les deux confirmations de production (Vercel, Fly) répondent à la MÊME
+    question : la base distante porte-t-elle la fusion, et quel commit chaque
+    surface doit-elle servir ? Les laisser relire la référence chacune de leur
+    côté coûtait deux `git fetch` pour un seul fait — et surtout deux occasions
+    de lire deux états différents, si un `main` avance entre les deux : les deux
+    verdicts n'auraient alors plus parlé du même dépôt.
+
+    Cette classe porte donc ce qui a été LU (`fusion`, `ref`), et la seule
+    opération qui reste propre à une surface : le dernier commit qui touche SES
+    chemins. Elle ne relit jamais rien — la relecture est celle de
+    `lire_base_distante`, et elle n'a lieu qu'une fois.
+    """
+
+    def __init__(self, fusion: str, ref: str = REF_BASE_DISTANTE):
+        self.fusion = fusion
+        self.ref = ref
+
+    def revision(self, chemins: list[str]) -> str:
+        """Dernier commit de la référence distante touchant `chemins`.
+
+        Aucun `fetch` ici (voir la classe) : un `rev-list` local, par surface.
+        Un résultat vide est un REFUS, jamais une révision vide comparée en
+        silence.
+        """
+        revision = exec_cmd(["git", "rev-list", "-1", self.ref, "--", *chemins])
+        if not revision:
+            raise RuntimeError(
+                f"aucun commit de {self.ref} ne touche {', '.join(chemins)} — "
+                "la référence ou les chemins ne sont pas ceux du dépôt."
+            )
+        return revision
+
+
+def lire_base_distante(merge_sha: str) -> BaseDistante:
+    """Relit `origin/main`, vérifie qu'il porte la fusion, et rend la base PARTAGÉE.
 
     L'étape 6 (`synchroniser_et_nettoyer_local`) est BEST-EFFORT : son échec est
     journalisé et le trajet continue. Lire les révisions attendues sur `HEAD`
@@ -517,7 +557,9 @@ def rafraichir_base_distante(merge_sha: str) -> None:
 
     On relit donc la référence DISTANTE ici, et on refuse de conclure quand
     elle ne porte pas la fusion : comparer à une référence non relue rendrait
-    le même faux verdict, en silence.
+    le même faux verdict, en silence. L'appelant lit cette base UNE fois et la
+    passe aux deux confirmations — c'est ce qui fait qu'une livraison ne fait
+    qu'un `fetch` et qu'elle juge ses deux surfaces contre le MÊME état.
     """
     if not merge_sha:
         raise RuntimeError(
@@ -539,44 +581,29 @@ def rafraichir_base_distante(merge_sha: str) -> None:
             "référence distante n'a pas été relue, et un verdict rendu contre elle "
             "serait faux. Vérifier le réseau puis relancer (`git fetch origin main`)."
         )
+    return BaseDistante(merge_sha)
 
 
-def revision_attendue(chemins: list[str], merge_sha: str) -> str:
-    """Dernier commit de `origin/main` touchant `chemins` — jamais celui de `HEAD`.
-
-    Les deux confirmations de production lisent la même référence : un `main`
-    local en retard ne doit plus pouvoir décider du verdict.
-    """
-    rafraichir_base_distante(merge_sha)
-    revision = exec_cmd(["git", "rev-list", "-1", REF_BASE_DISTANTE, "--", *chemins])
-    if not revision:
-        raise RuntimeError(
-            f"aucun commit de {REF_BASE_DISTANTE} ne touche {', '.join(chemins)} — "
-            "la référence ou les chemins ne sont pas ceux du dépôt."
-        )
-    return revision
-
-
-def verifier_production_frontend(sha_attendu: str, timeout_minutes: int = 10) -> bool:
+def verifier_production_frontend(base: BaseDistante, timeout_minutes: int = 10) -> bool:
     log(f"Contrôle de la révision servie par VERCEL (frontend sur {URL_FRONTEND_PROD})...")
     try:
-        # Le dernier commit frontend se lit sur la base DISTANTE (relue après la
-        # fusion), pas sur le `main` local : c'est ce qui rend le verdict
-        # indépendant de l'étape de synchronisation, best-effort.
-        dernier_frontend = revision_attendue(["frontend/"], sha_attendu)
+        # Le dernier commit frontend se lit sur la base DISTANTE PARTAGÉE (relue
+        # une fois par la livraison), jamais sur le `main` local : c'est ce qui
+        # rend le verdict indépendant de l'étape de synchronisation, best-effort.
+        dernier_frontend = base.revision(["frontend/"])
     except Exception as exc:
         log_erreur(f"Révision frontend non établie : {exc}")
         return False
     log(
-        f"Révisions acceptées : {sha_attendu[:10]} (merge) ou "
-        f"{dernier_frontend[:10]} (dernier commit frontend sur {REF_BASE_DISTANTE})"
+        f"Révisions acceptées : {base.fusion[:10]} (merge) ou "
+        f"{dernier_frontend[:10]} (dernier commit frontend sur {base.ref})"
     )
 
     cmd = [
         "node",
         "scripts/check-deployed-revision.js",
         "--attendu",
-        sha_attendu,
+        base.fusion,
         "--sinon",
         dernier_frontend,
         "--tentatives",
@@ -635,17 +662,15 @@ def verifier_seo_production_strict() -> bool:
     return False
 
 
-def verifier_production_backend(sha_attendu: str, timeout_minutes: int = 10) -> bool:
+def verifier_production_backend(base: BaseDistante, timeout_minutes: int = 10) -> bool:
     log(f"Contrôle de la révision servie par FLY.IO (backend sur {URL_BACKEND_HEALTH})...")
     try:
-        # Même référence que le frontend : la base DISTANTE relue après la fusion.
-        dernier_backend = revision_attendue(
-            ["backend/", ".github/workflows/ci.yml"], sha_attendu
-        )
+        # MÊME base que le frontend : elle a été relue une seule fois, en amont.
+        dernier_backend = base.revision(["backend/", ".github/workflows/ci.yml"])
     except Exception as exc:
         log_erreur(f"Révision backend non établie : {exc}")
         return False
-    log(f"Révision backend attendue : {dernier_backend[:10]} (sur {REF_BASE_DISTANTE})")
+    log(f"Révision backend attendue : {dernier_backend[:10]} (sur {base.ref})")
 
     cmd = [
         sys.executable,
@@ -792,7 +817,24 @@ def main(argv=None) -> int:
     # On attend quelques secondes que les déploiements Vercel/Fly soient initiés sur GitHub push
     time.sleep(5)
 
-    ok_front = verifier_production_frontend(merge_sha, options.timeout_prod)
+    # LA BASE DISTANTE SE LIT ICI, UNE FOIS, et sert aux DEUX confirmations.
+    # Deux lectures séparées (une par surface) feraient deux `git fetch` pour un
+    # seul fait, et surtout deux instants de mesure : un `main` qui avance entre
+    # les deux rendrait les deux verdicts étrangers l'un à l'autre. Ici, les
+    # deux surfaces sont jugées contre le MÊME état, et l'échec de la lecture
+    # est UNE cause, nommée une fois.
+    try:
+        base = lire_base_distante(merge_sha)
+        log_succes(f"Base distante relue : {base.ref} porte la fusion {merge_sha[:10]}.")
+    except Exception as exc:
+        base = None
+        log_erreur(f"Base distante NON relue : {exc}")
+        log(
+            "Confirmations de production NON exécutées : sans base distante relue, "
+            "aucun verdict ne peut être rattaché à la fusion qui vient d'avoir lieu."
+        )
+
+    ok_front = verifier_production_frontend(base, options.timeout_prod) if base else False
 
     # La sonde SEO stricte se lance JUSTE APRÈS la révision servie : elle juge le même
     # artefact que celle-ci vient de confirmer. Tant qu'elle n'est pas confirmée, la
@@ -805,7 +847,7 @@ def main(argv=None) -> int:
             "la sonde porterait sur une autre production que celle qui vient d'être livrée."
         )
 
-    ok_back = verifier_production_backend(merge_sha, options.timeout_prod)
+    ok_back = verifier_production_backend(base, options.timeout_prod) if base else False
 
     refus = [
         nom

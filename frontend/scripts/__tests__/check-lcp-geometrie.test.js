@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 //
 //   route            élément LCP (élu)                        coquille / React
 //   /jobs            <p> l'introduction                        35 640 / 36 002 px²
-//   /about           <p> l'introduction                        74 466 / 80 262 px²
+//   /about           <div> la COLONNE DU CHROME (20/10/2026)  191 786 / 196 500 px²
 //   /privacy         <p> le CORPS d'une section                84 360 / 86 676 px²
 //   /how-it-works    <p> le sous-titre du héros                30 320 / 32 656 px²
 //                    (sa couleur a changé le 28/09/2026 — voir plus bas —, sa
@@ -47,6 +47,16 @@ import { fileURLToPath } from 'node:url';
 // React reconstruit le même texte, et un remplacement de MÊME TAILLE n'enregistre
 // aucun nouvel élément LCP). Sur /privacy, l'élément élu est un CORPS DE SECTION
 // et non l'introduction : la géométrie à déclarer est donc celle de la section.
+//
+// ── ET CHAQUE PLAN NOMME SON ÉLU : `lcpChamp` (20/10/2026) ──────────────────
+// Le plan ne se contente plus de déclarer la géométrie : il dit QUEL champ est
+// élu (`lcpChamp: 'introClass'`, ou `{ mobile, desktop }` quand le camp change
+// selon la taille, comme sur /support). La sonde e2e LIT ce nom ; ce garde
+// refuse qu'il en manque un ou qu'il désigne un champ que la route ne déclare
+// pas. Sur /about le nom est `frameClass` : le navigateur élit la COLONNE
+// (191 786 / 196 500 px², mesuré le 20/10/2026), et la mesure A/B sous
+// `prefers-reduced-motion` (titrage immobile) donne la MÊME élection — ce n'est
+// donc pas l'effet cinétique qui l'a déplacée, il accompagne la décision.
 //
 // Les chaînes qui décident de ces aires étaient recopiées face à face dans
 // `src/pages/*.js` et `vite-plugins/prerender/shells-routes.js` — le commentaire
@@ -371,6 +381,59 @@ export function refusDuLcpDesRoutes({ plan, pages, coquille, routes = ROUTES_LCP
         );
       }
     }
+    // 1bis. QUEL élément est élu : le plan le NOMME (`lcpChamp`), par le nom
+    //       d'un de SES champs. C'est la déclaration que lit la sonde
+    //       `e2e/lcp-geometrie-declaree.spec.js` ; un nom qui ne désigne rien
+    //       de déclaré ferait mesurer un autre élément en croyant mesurer
+    //       celui-ci.
+    const declarationElu = bloc.match(/^\s*lcpChamp:\s*(.+)$/m);
+    const colonneElue = bloc.match(/^\s*lcpColonne:\s*(.+)$/m);
+    if (declarationElu && colonneElue) {
+      refus.push(
+        `le plan (${PLAN}) déclare DEUX éléments élus pour ${route} (\`lcpChamp\` et \`lcpColonne\`) : ` +
+          'la sonde en lirait un et le second décrirait un élément que personne ne vérifie'
+      );
+    }
+    if (!declarationElu && !colonneElue) {
+      refus.push(
+        `le plan (${PLAN}) ne nomme plus l'élément LCP de ${route} (\`lcpChamp\` ou \`lcpColonne\`) : plus ` +
+          'rien ne dit quel élément le navigateur doit élire, donc la sonde ne vérifie plus qu\'une peinture au hasard'
+      );
+    }
+    if (colonneElue) {
+      // La colonne du chrome se cite à son DOMICILE : le plan nomme la constante,
+      // il ne recopie pas sa valeur. Et cette constante doit exister là-bas.
+      if (!/^COLONNE_CLASS\b/.test(colonneElue[1].trim())) {
+        refus.push(
+          `la déclaration \`lcpColonne\` de ${route} n'est plus la constante \`COLONNE_CLASS\` ` +
+            `(${colonneElue[1].trim()}) : la colonne du chrome n'a plus de domicile, donc sa classe ` +
+            'peut diverger de celle que publient les deux canaux'
+        );
+      }
+      if (!/import\s*\{[^}]*\bCOLONNE_CLASS\b[^}]*\}\s*from\s*'\.\/classes-chrome\.js'/.test(plan)) {
+        refus.push(
+          `le plan (${PLAN}) ne cite plus \`COLONNE_CLASS\` depuis src/config/classes-chrome.js : ` +
+            `la colonne élue de ${route} n'aurait plus de propriétaire`
+        );
+      }
+    }
+    if (declarationElu) {
+      const nommes = [...declarationElu[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
+      if (!nommes.length) {
+        refus.push(
+          `la déclaration \`lcpChamp\` de ${route} ne nomme aucun champ (${declarationElu[1].trim()}) : ` +
+            "l'élément élu n'est plus nommable, donc la sonde ne peut plus le désigner"
+        );
+      }
+      for (const nom of nommes) {
+        if (!champs.some(({ champ }) => champ === nom)) {
+          refus.push(
+            `la déclaration \`lcpChamp\` de ${route} nomme \`${nom}\`, qui n'est pas un champ de ` +
+              "géométrie déclaré pour cette route : le plan désignerait un élément qu'il ne décrit pas"
+          );
+        }
+      }
+    }
     // Les valeurs elles-mêmes : la chaîne mesurée doit être CELLE que le plan
     // déclare (un champ renommé avec une autre valeur passerait pour un champ
     // présent).
@@ -488,6 +551,58 @@ describe('le LCP des routes pré-rendues a un propriétaire unique', () => {
       const refus = refusDuLcpDesRoutes(muté);
       expect(refus.join('\n')).toContain(`la coquille de ${route.route} (${COQUILLE}) recopie la géométrie`);
     }
+  });
+
+  it('refuse un plan qui ne nomme plus l’élément élu (lcpChamp)', () => {
+    const debutBloc = sources.plan.indexOf("'/jobs': {");
+    const bloc = sources.plan.slice(debutBloc);
+    const muté = {
+      ...sources,
+      plan: sources.plan.slice(0, debutBloc) + bloc.replace('lcpChamp:', 'eluRetire:'),
+    };
+    const refus = refusDuLcpDesRoutes(muté);
+    expect(refus.join('\n')).toContain("ne nomme plus l'élément LCP de /jobs");
+  });
+
+  it('refuse un élément élu qui ne désigne aucun champ déclaré', () => {
+    const debutBloc = sources.plan.indexOf("'/jobs': {");
+    const bloc = sources.plan.slice(debutBloc);
+    const muté = {
+      ...sources,
+      plan: sources.plan.slice(0, debutBloc) + bloc.replace("lcpChamp: 'introClass'", "lcpChamp: 'introClasse'"),
+    };
+    const refus = refusDuLcpDesRoutes(muté);
+    expect(refus.join('\n')).toContain('nomme `introClasse`, qui n\'est pas un champ de géométrie déclaré');
+  });
+
+  it('déclare la COLONNE DU CHROME comme élément élu de /about (20/10/2026)', () => {
+    // Mesuré trois fois le 20/10/2026 (et deux fois de plus, titre animé ET
+    // titre immobile sous `prefers-reduced-motion`) : /about élit la colonne du
+    // chrome, 191 786 / 196 500 px². La décision est d'accepter cette élection
+    // et de la DÉCLARER ; revenir au paragraphe d'introduction sans re-mesurer
+    // rougit donc ici, pas seulement dans le navigateur.
+    const { bloc } = blocDuPlan(sources.plan, '/about');
+    expect(bloc).toMatch(/lcpColonne:\s*COLONNE_CLASS/);
+    // Une seulement des deux formes : un `lcpChamp` laissé à côté ferait lire
+    // l'autre élément par la sonde.
+    expect(bloc).not.toMatch(/^\s*lcpChamp:/m);
+    // Et la constante citée existe, avec la colonne qu'elle publie.
+    expect(lire('src/config/classes-chrome.js')).toMatch(
+      /export const COLONNE_CLASS = 'min-h-screen fond-sable relative flex flex-col'/
+    );
+  });
+
+  it('refuse un plan qui déclare DEUX éléments élus', () => {
+    const debutBloc = sources.plan.indexOf("'/about': {");
+    const bloc = sources.plan.slice(debutBloc);
+    const muté = {
+      ...sources,
+      plan:
+        sources.plan.slice(0, debutBloc) +
+        bloc.replace('lcpColonne:', "lcpChamp: 'introClass',\n    lcpColonne:"),
+    };
+    const refus = refusDuLcpDesRoutes(muté);
+    expect(refus.join('\n')).toContain('déclare DEUX éléments élus pour /about');
   });
 
   it('refuse une déclaration qui perd la géométrie du plus grand texte', () => {
