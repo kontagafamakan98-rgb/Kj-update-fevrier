@@ -2432,8 +2432,15 @@ jobs:
           # part pas, ou rouge sur une version qui ne part pas non plus.
           # pip-audit sort 0 si aucun avis, 1 si au moins un avis (ou si la
           # résolution échoue : le gate échoue alors aussi, c'est voulu).
-          python -m pip_audit -r requirements.lock --progress-spinner off > /tmp/pip-audit.txt 2>&1
-          STATUT=$?
+          #
+          # Le statut est CAPTURÉ sans laisser `set -e` tuer l'étape : mesuré le
+          # 20/10/2026, un avis réel (Pillow 12.3.0, 8 CVE) terminait le job sur
+          # `Process completed with exit code 1` SANS un seul nom de paquet — la
+          # boucle qui publie le tableau et les `::error` ne s'exécutait jamais.
+          # Une sonde qui échoue sans dire ce qu'elle a vu est le défaut que ce
+          # job existe pour éviter.
+          STATUT=0
+          python -m pip_audit -r requirements.lock --progress-spinner off > /tmp/pip-audit.txt 2>&1 || STATUT=$?
           echo "### Avis de sécurité — dépendances Python (backend/requirements.lock)" >> "$GITHUB_STEP_SUMMARY"
           if [ "$STATUT" -eq 0 ]; then
             echo "Aucun avis : les versions épinglées de requirements.lock sont à jour." | tee -a "$GITHUB_STEP_SUMMARY"

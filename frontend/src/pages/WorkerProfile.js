@@ -44,7 +44,7 @@
  * fois ; tant qu'un libellé existant dit la même chose, il n'y a rien à
  * traduire — et rien qui puisse rompre la parité des dictionnaires.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Star } from 'lucide-react';
 import Link from '../components/LienVue';
@@ -65,33 +65,56 @@ const WorkerProfile = () => {
   const [profil, setProfil] = useState(null);
   const [etat, setEtat] = useState('chargement'); // chargement | pret | absent | erreur
 
-  const charger = useMemo(
-    () => async () => {
-      setEtat('chargement');
-      try {
-        // Route PUBLIQUE : aucun jeton, aucun en-tête d'authentification. Un
-        // visiteur qui arrive par un lien partagé doit voir la page.
-        const reponse = await fetch(buildApiUrl(`/workers/${encodeURIComponent(id)}`), {
-          headers: { Accept: 'application/json' },
-        });
-        if (reponse.status === 404) {
-          setProfil(null);
-          setEtat('absent');
-          return;
-        }
-        if (!reponse.ok) throw new Error(`HTTP ${reponse.status}`);
-        const donnees = await reponse.json();
-        setProfil(donnees);
-        setEtat('pret');
-      } catch (_error) {
-        setEtat('erreur');
+  // ── Une réponse TARDIVE n'écrit rien ─────────────────────────────────────
+  // La lecture est asynchrone, et rien ne garantit qu'elle se termine pendant
+  // que la page existe : un visiteur qui suit un autre lien, un identifiant qui
+  // change, ou simplement la fin d'un test (jsdom démonté avant que la réponse
+  // n'arrive). Écrire l'état à ce moment-là ne « met pas à jour une page
+  // disparue » : React lit `window` pour choisir la priorité de l'événement, et
+  // lève `ReferenceError: window is not defined` — mesuré en CI le 20/10/2026
+  // par `pages-render.test.jsx`, où le fichier entier rougissait sur cette
+  // rejet non gérée alors que ses 1 993 tests passaient.
+  //
+  // Le remède est un JETON de requête, pas un booléen : au démontage comme à un
+  // changement d'identifiant, le compteur avance, donc une réponse de l'ancienne
+  // requête est reconnue comme périmée (un booléen remis à vrai par l'effet
+  // suivant laisserait passer la réponse de l'ancien identifiant).
+  const requete = useRef(0);
+
+  const charger = useCallback(async () => {
+    const mienne = requete.current + 1;
+    requete.current = mienne;
+    const encoreValide = () => mienne === requete.current;
+    setEtat('chargement');
+    try {
+      // Route PUBLIQUE : aucun jeton, aucun en-tête d'authentification. Un
+      // visiteur qui arrive par un lien partagé doit voir la page.
+      const reponse = await fetch(buildApiUrl(`/workers/${encodeURIComponent(id)}`), {
+        headers: { Accept: 'application/json' },
+      });
+      if (!encoreValide()) return;
+      if (reponse.status === 404) {
+        setProfil(null);
+        setEtat('absent');
+        return;
       }
-    },
-    [id],
-  );
+      if (!reponse.ok) throw new Error(`HTTP ${reponse.status}`);
+      const donnees = await reponse.json();
+      if (!encoreValide()) return;
+      setProfil(donnees);
+      setEtat('pret');
+    } catch (_error) {
+      if (!encoreValide()) return;
+      setEtat('erreur');
+    }
+  }, [id]);
 
   useEffect(() => {
     charger();
+    // Le démontage (ou le changement d'identifiant) périme la requête en vol.
+    return () => {
+      requete.current += 1;
+    };
   }, [charger]);
 
   // Le titre, la description, le canonical et la carte se décident dans
