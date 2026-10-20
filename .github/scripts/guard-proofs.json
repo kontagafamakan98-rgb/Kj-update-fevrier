@@ -457,6 +457,14 @@
       "runner": "pytest"
     },
     {
+      "chemin": ".github/scripts/check-resync-parite.py",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "backend/tests/test_resync_parite.py",
+      "runner": "pytest",
+      "motif": "refuse un plancher de resync (RESYNC_MIN_INTERVAL_SECONDS dans backend/kojo_live.py) SOUS la parité avec le sondage que le flux remplace : la réparation du bus est une relecture TOTALE des flux, bornée par ce plancher, et à 10 s — la valeur d'origine, mesurée à la pose — une rafale de reconnexions relisait les flux six fois par minute, trois fois plus bavard que les 2 req/min remplacées. Le seuil est LU dans la sonde (ANCIEN_SONDAGE_MS dans .github/scripts/check-fly-env-drift.py, sa seule déclaration) et JAMAIS recopié : un second littéral serait un second seuil, et deux seuils divergent en silence (incident du 18/10/2026 côté battement). Refuse aussi une constante déclarée deux fois, une constante que la borne ne consomme pas, un seuil introuvable ou déclaré deux fois, un plancher nul, et refuse de conclure sous ses planchers de lecture"
+    },
+    {
       "chemin": ".github/scripts/check-seo-probe-strict.py",
       "role": "garde",
       "invoque_par": "ci",
@@ -5530,7 +5538,7 @@
       "id": "livraison: confirmation Vercel retiree du trajet (la fusion se dit complete sans production jugee)",
       "garde": ".github/scripts/livrer.py",
       "cible": ".github/scripts/livrer.py",
-      "trouve": "    ok_front = verifier_production_frontend(merge_sha, options.timeout_prod)",
+      "trouve": "    ok_front = verifier_production_frontend(base, options.timeout_prod) if base else False",
       "remplace": "    ok_front = True",
       "runner": "python",
       "preuve": "backend/tests/test_gate_perimetre.py",
@@ -5733,6 +5741,48 @@
       "cwd": "frontend",
       "attend": [
         "paires en défaut"
+      ]
+    },
+    {
+      "id": "livraison: la base distante est relue par confirmation (deux lectures pour un seul fait)",
+      "garde": ".github/scripts/livrer.py",
+      "cible": ".github/scripts/livrer.py",
+      "trouve": "    ok_back = verifier_production_backend(base, options.timeout_prod) if base else False",
+      "remplace": "    ok_back = verifier_production_backend(lire_base_distante(merge_sha), options.timeout_prod) if base else False",
+      "runner": "python",
+      "preuve": "backend/tests/test_gate_perimetre.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_gate_perimetre.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_gate_perimetre.py::TestBaseDistantePartagee::test_main_lit_la_base_une_fois_et_la_donne_aux_deux"
+      ]
+    },
+    {
+      "id": "resync-parite: plancher de resync sous le sondage remplace tolere",
+      "garde": ".github/scripts/check-resync-parite.py",
+      "cible": ".github/scripts/check-resync-parite.py",
+      "trouve": "    if resync_ms < seuil_ms:",
+      "remplace": "    if False and resync_ms < seuil_ms:",
+      "runner": "python",
+      "preuve": "backend/tests/test_resync_parite.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_resync_parite.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_resync_parite.py::TestLeRefus::test_un_plancher_sous_la_parite_est_refuse"
       ]
     }
   ]

@@ -310,6 +310,30 @@ jobs:
       - name: Check the dated restoration drill is still recent
         run: python3 .github/scripts/check-exercice-restauration.py
 
+      # ── LA RÉPARATION DU BUS N'EST PAS PLUS BAVARDE QUE CE QU'ELLE REMPLACE ─
+      # Le pub/sub Redis n'a pas d'historique : chaque interruption de
+      # l'abonnement ouvre une fenêtre aveugle, et la réparation est une
+      # relecture TOTALE des flux locaux (`resync`, backend/kojo_live.py). Un
+      # plancher borne cette cadence pour qu'un Redis qui bat de l'aile ne la
+      # transforme pas en tornade de requêtes. Le module ÉNONCE la règle —
+      # « relire à chaque reprise serait plus bavard que le sondage remplacé
+      # (2 req/min) » — mais rien ne la vérifiait : le plancher valait 10 s,
+      # TROIS FOIS plus bavard que le sondage remplacé, et aucune suite ne
+      # confrontait les deux. Une rafale de reconnexions produisait donc six
+      # relectures par minute et par flux, chacune un aller-retour complet côté
+      # client — plus d'allers-retours que le mécanisme remplacé.
+      #
+      # Le seuil du sondage remplacé est LU là où il est déclaré une seule fois
+      # (`ANCIEN_SONDAGE_MS`, .github/scripts/check-fly-env-drift.py — que la
+      # sonde en ligne et le test du repli client lisent déjà), jamais recopié :
+      # deux seuils divergeraient en silence, ce qui est l'incident du 18/10/2026
+      # côté battement de cœur (15 s contre 20 s, deux sources).
+      #
+      # Aucune neutralisation : une étape qui ne peut pas rougir ne surveille
+      # rien (cf. check-informative-steps.py).
+      - name: Check the resync floor is not chattier than the poll it replaced
+        run: python3 .github/scripts/check-resync-parite.py
+
       # shellcheck (pré-installé sur ubuntu-latest) : analyse statique des
       # scripts shell du dépôt. Échoue sur les erreurs (les warnings restent
       # informatifs — comportement par défaut de shellcheck).

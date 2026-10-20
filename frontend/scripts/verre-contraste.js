@@ -150,6 +150,15 @@ export const EXIGENCES = [
     encre: texte('.verre-panneau'),
     seuil: SEUIL_TEXTE,
   },
+  {
+    // LA CARTE ÉDITORIALE, devenue du verre le 20/10/2026 : elle est posée SUR
+    // la page, donc son pire fond reste l'encre du site — c'est ce qui a décidé
+    // son opacité (94 %, pas les 82 % d'une surface flottante).
+    nom: 'carte — texte',
+    couches: [['.carte-editoriale', 'background-color']],
+    encre: texte('.carte-editoriale'),
+    seuil: SEUIL_TEXTE,
+  },
 ];
 
 /** Un commentaire CSS peut contenir des accolades : on le retire AVANT de lire. */

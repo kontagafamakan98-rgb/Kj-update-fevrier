@@ -7,6 +7,11 @@ import { CONTACT, mailtoHref, telHref } from './contact.js';
 // register, profile) : il a un propriétaire (./classes-champ.js) et ces plans le
 // lisent, plutôt que d'écrire chacun leur bordure et leur anneau de focus.
 import { CHAMP, CHAMP_TELEPHONE, CHAMP_PREFIXE, CHAMP_SELECTEUR } from './classes-champ.js';
+// La colonne du chrome (l'enveloppe de l'application, publiée UNE fois par
+// `vite-plugins/prerender/app-chrome.js` pour les deux canaux) : un plan peut la
+// désigner comme élément élu d'une route, et il cite alors le DOMICILE de la
+// chaîne au lieu de la recopier.
+import { COLONNE_CLASS } from './classes-chrome.js';
 
 // Plan UNIQUE du corps des six pages dont la coquille publie une LISTE :
 // / (catégories, promesses, étapes, chiffres), /support (modes et lignes de
@@ -42,6 +47,40 @@ import { CHAMP, CHAMP_TELEPHONE, CHAMP_PREFIXE, CHAMP_SELECTEUR } from './classe
 // contact devient donc une ENTRÉE : ce qu'elle publie tient dans une liste dont
 // l'ordre se lit, au lieu d'une boîte posée à côté d'une autre.
 const LIGNE_CONTACT = 'ligne-editoriale ligne-contact';
+
+// ── QUEL ÉLÉMENT PORTE LE LCP (doctrine du 20/10/2026) ──────────────────────
+// Un plan de route PUBLIQUE ne déclare pas seulement la géométrie du plus grand
+// texte : il dit QUEL élément le navigateur élit. C'est une DÉCLARATION, pas une
+// préférence — `e2e/lcp-geometrie-declaree.spec.js` la lit (jamais une copie),
+// exige que l'élément élu porte les classes désignées et que son aire dépasse un
+// plancher, et `scripts/__tests__/check-lcp-geometrie.test.js` refuse un nom qui
+// ne désigne pas un champ de géométrie déclaré pour cette route, un élément élu
+// nommé deux fois, et l'absence de nom. Les routes qui n'en portent pas (/, dont
+// le LCP est l'image du héros, et /contact) ont leur propre sonde et leur propre
+// garde : `check-home-hero-lcp.test.js`, `check-contact-lcp.test.js`.
+//
+// DEUX FORMES, et deux seulement :
+//   • `lcpChamp: 'introClass'` — le nom d'un champ de CE plan (ou, quand le plus
+//     grand texte change de camp selon la taille, `{ mobile, desktop }`) ;
+//   • `lcpColonne: COLONNE_CLASS` — la colonne du CHROME, citée à son domicile
+//     (`classes-chrome.js`) : c'est l'enveloppe que `app-chrome.js` publie une
+//     seule fois pour les deux canaux, donc la déclaration ne recopie rien.
+//
+// Pourquoi le CONTENEUR est ACCEPTÉ là où il est élu : le titrage public est
+// animé (`.titre-page`, src/index.css), et /about élit la COLONNE DU CHROME
+// (`min-h-screen fond-sable relative flex flex-col`, 191 786 / 196 500 px²
+// mesurés le 20/10/2026, trois passages d'affilée). La mesure A/B sous
+// `prefers-reduced-motion` — titrage immobile — donne la MÊME élection : l'effet
+// n'est pas la CAUSE, il est la décision de cohérence qui l'accompagne.
+// POURQUOI CETTE PAGE ET PAS /jobs, la mesure ne le dit pas : elle dit ce qui
+// est élu, route par route et taille par taille, et c'est cette élection-là que
+// le plan déclare — pas une règle générale qu'on supposerait valable partout
+// (sur /jobs et les sept autres, l'élu reste un texte, mesuré le même jour).
+//
+// La contrepartie est nommée à l'endroit de l'effet : la garantie « React ne
+// peint pas plus grand que la coquille » porte alors sur la colonne entière, et
+// les budgets LCP par route (`scripts/lcp-app-budgets.cjs`) restent seuls juges
+// du COÛT de la chaîne JavaScript.
 
 // Les quatre classes du BLOC de contact (la liste, la pastille, le libellé, la
 // valeur) : elles sont portées par /contact et par /support, donc déclarées une
@@ -586,6 +625,10 @@ export const PAGE_SECTIONS = {
     // la page publiait un paragraphe illisible depuis sa mise en ligne.
     // `text-orange-50` mesure 7,3:1 sur `#ea580c`.
     heroSubtitleClass: 'text-xl leading-relaxed text-orange-50 max-w-2xl mx-auto',
+    // L'élément élu : le SOUS-TITRE du héros, pas le titre — la bande est
+    // exclue de l'effet cinétique (`.bande-page`, src/index.css), donc le titre
+    // y reste un texte peint et ne prend pas le LCP (20/10/2026).
+    lcpChamp: 'heroSubtitleClass',
     escrowTitleKey: 'escrowWhatTitle',
     escrowTextKey: 'escrowWhatText',
     // L'illustration et l'estampille du panneau de séquestre : le MÊME fichier et
@@ -674,6 +717,9 @@ export const PAGE_SECTIONS = {
     frameClass: 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 cadre-page min-h-screen',
     titleClass: 'titre-page',
     introClass: 'mb-6 max-w-3xl text-base leading-relaxed text-stone-600 min-h-[104px] md:min-h-[52px]',
+    // L'élément élu : le PARAGRAPHE d'introduction, pas le titre animé —
+    // mesuré le 20/10/2026 après l'animation de `.titre-page`.
+    lcpChamp: 'introClass',
   },
 
   '/login': {
@@ -709,6 +755,9 @@ export const PAGE_SECTIONS = {
     // faisait diverger les deux peintures en silence, et une seconde peinture
     // PLUS GRANDE devient un nouvel élément LCP.
     legalContactClass: 'text-xs text-stone-600',
+    // L'élément élu : la LIGNE LÉGALE, pas le titre (voir le relevé en tête de
+    // `e2e/lcp-geometrie-declaree.spec.js`) — toujours vrai le 20/10/2026.
+    lcpChamp: 'legalContactClass',
     // Classes de la page : lues par src/pages/Login.js ET par la coquille.
     //
     // ── LE DESSIN DE L'ÉCRAN (17/10/2026) ───────────────────────────────────
@@ -825,6 +874,8 @@ export const PAGE_SECTIONS = {
     // site — UNE candidate au premier paint) — déclarée ici pour que les deux
     // canaux la lisent (voir /login).
     stepNoticeClass: 'text-xs text-amber-800 mt-3',
+    // L'élément élu : la NOTICE D'ÉTAPE (20/10/2026).
+    lcpChamp: 'stepNoticeClass',
     stepNoticeIcon: 'stepNotice',
     clientIcon: 'client',
     // Le marteau du travailleur est le wrench déjà dessiné pour la catégorie
@@ -895,6 +946,8 @@ export const PAGE_SECTIONS = {
     // Le sous-titre est l'élément LCP de la page (mesuré : 14 001 px² mobile /
     // 16 458 desktop, UNE candidate au premier paint) — voir /login.
     subtitleClass: 'mt-3 text-sm text-stone-600',
+    // L'élément élu : le SOUS-TITRE de la carte (20/10/2026).
+    lcpChamp: 'subtitleClass',
     stepEmailKey: 'forgotPasswordStepEmail',
     stepCodeKey: 'forgotPasswordStepCode',
     stepPasswordKey: 'forgotPasswordStepPassword',
@@ -972,6 +1025,10 @@ export const PAGE_SECTIONS = {
     // porte une classe du plan, sinon la géométrie du LCP n'a plus de
     // propriétaire et la sonde ne peut plus rien vérifier.
     noJobTextClass: 'text-stone-600 max-w-lg mx-auto mb-5',
+    // L'élément élu : le CORPS de la carte « mission requise » — l'état par
+    // défaut, celui que la coquille publie ; le repli de `<Suspense>` ne
+    // l'énonce pas (20/10/2026).
+    lcpChamp: 'noJobTextClass',
   },
 
   // /support : le bloc de contact de la coquille était recopié, libellé par
@@ -1046,6 +1103,10 @@ export const PAGE_SECTIONS = {
       'carte-editoriale carte-editoriale-cliquable carte-publique flex flex-col items-center gap-3 text-center',
     pastilleModeClass: 'pastille-rond pastille-rond-large',
     titreEntreeClass: 'titre-entree',
+    // L'élément élu CHANGE DE CAMP selon la taille depuis le 28/09/2026 (le
+    // titre d'entrée est passé devant en desktop) : la déclaration porte donc
+    // les deux, comme la sonde qui la lit.
+    lcpChamp: { mobile: 'subtitleClass', desktop: 'titreEntreeClass' },
     ...BLOC_CONTACT,
     modes: [
       // Le glyphe du mode est DESSINÉ : la page publiait déjà un composant
@@ -1107,22 +1168,37 @@ export const PAGE_SECTIONS = {
     titleKey: 'aboutTitle',
     introKey: 'aboutIntro',
     // ── La GÉOMÉTRIE du plus grand texte peint ────────────────────────────
-    // L'élément LCP de /about est le paragraphe d'introduction. Mesuré le
-    // 25/09/2026 comme sur /jobs (deux canaux, deux tailles) : UNE SEULE
-    // candidate, au premier paint (coquille t = 112 / 116 ms, React 88 / 112),
-    // sur ce paragraphe, d'aire IDENTIQUE — 74 466 px² mobile, 80 262 px²
-    // desktop ; re-mesuré le 26/09/2026 avec la police servie par le site :
-    // 82 940 / 79 540 px² (voir /login). C'est cette ÉGALITÉ qui tient la garantie : createRoot efface
-    // #root, React reconstruit le même paragraphe, et un remplacement de MÊME
-    // TAILLE n'enregistre aucun nouvel élément LCP.
+    // L'élément LCP de /about est sa COLONNE, pas un texte — RE-MESURÉ le
+    // 20/10/2026 : le navigateur élit `frameClass` (191 786 px² mobile,
+    // 196 500 desktop), au premier paint, dans les deux canaux. Jusqu'au
+    // 25/09/2026 c'était le paragraphe d'introduction (74 466 / 80 262 px²) ;
+    // la sonde de cette époque est l'histoire, pas la déclaration.
+    //
+    // Ce que la mesure A/B a établi, et qui décide de la doctrine : sous
+    // `prefers-reduced-motion: reduce` — donc titrage IMMOBILE, la feuille
+    // éteint le reflet — la colonne est élue PAREIL (191 786 / 196 500). La
+    // cause est la page, pas l'effet : un conteneur de 191 786 px² de fond et de
+    // texte est la plus grande peinture, qu'un titre soit animé ou non. La
+    // décision du 20/10/2026 est donc d'ACCEPTER cette élection et de la
+    // DÉCLARER (`lcpChamp`), au lieu de la combattre : le titrage du site est
+    // cohérent, et la garantie « React ne peint pas plus grand que la coquille »
+    // porte ici sur la colonne entière (les deux canaux la peignent depuis le
+    // même `frameClass`, donc elle est de même aire — c'est ce que vérifie
+    // `e2e/lcp-geometrie.spec.js`).
     //
     // Les trois chaînes étaient recopiées dans src/pages/About.js et
-    // vite-plugins/prerender/shells-routes.js. `frameClass` porte la largeur
-    // (donc le retour à la ligne du paragraphe), `introClass` sa hauteur, et
-    // `titleClass` le seul autre texte qui puisse prendre le LCP.
+    // vite-plugins/prerender/shells-routes.js. `frameClass` porte la largeur et
+    // le rembourrage du corps ; `introClass` la hauteur du texte, et
+    // `titleClass` le titre animé.
     frameClass: 'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 cadre-page',
     titleClass: 'titre-page mb-4',
     introClass: 'text-stone-600 mb-8',
+    // L'ÉLÉMENT ÉLU DE CETTE ROUTE EST LA COLONNE DU CHROME, pas un texte du
+    // corps (191 786 / 196 500 px², 20/10/2026, stable sur trois passages).
+    // `COLONNE_CLASS` est son domicile : la chaîne n'est pas recopiée ici, et
+    // les deux canaux la publient depuis `app-chrome.js` — donc ils peignent la
+    // même colonne, de même aire.
+    lcpColonne: COLONNE_CLASS,
     // Le PAS de la carte (28/09/2026) : les trois promesses portaient
     // `carte-editoriale p-6`, la MÊME chaîne écrite deux fois — ici la page, et
     // dans la coquille. `carte-publique` est le pas commun aux cartes du site
@@ -1311,6 +1387,9 @@ export const PAGE_SECTIONS = {
     sectionTitleClass: 'titre-entree mb-2',
     sectionBodyClass: 'text-stone-600',
     sectionWrapClass: 'bloc-de-section',
+    // L'élément élu : le CORPS d'une section, pas l'introduction — mesuré le
+    // 25/09/2026 et toujours vrai le 20/10/2026, titre animé compris.
+    lcpChamp: 'sectionBodyClass',
     sections: [
       { titleKey: 'privacyDataTitle', bodyKey: 'privacyDataBody' },
       { titleKey: 'privacyRetentionTitle', bodyKey: 'privacyRetentionBody' },
@@ -1382,6 +1461,11 @@ export const PAGE_SECTIONS = {
  *
  * Corollaire : un plan ne porte AUCUNE donnée interne. Ce qu'un plan déclare
  * est publié par la coquille, sans exception — y compris la valeur d'un lien.
+ * La SEULE exception est un RENVOI à une autre déclaration du MÊME plan :
+ * `icone`/`*Icon` nomme un dessin (et la coquille en publie le repère), et
+ * `lcpChamp` nomme le champ dont la géométrie est élue comme LCP (voir la
+ * doctrine en tête). Aucun des deux n'est un texte à publier — l'oublier a fait
+ * refuser le build le 20/10/2026, qui réclamait « introClass » dans la coquille.
  *
  * @param {object} plan Plan d'une page (`PAGE_SECTIONS[route]`).
  * Un TROISIÈME champ échappe aux deux : `icone` (dans une LISTE d'entrées) ou
@@ -1405,8 +1489,16 @@ export function pageSectionParts(plan) {
   // publier comme un SVG (repère `data-icone`), jamais comme un glyphe. C'est ce
   // qui retire les emoji du document — voir l'en-tête de page-icons.js.
   const porteUneIcone = (nom) => Boolean(nom) && (nom === 'icone' || /Icon$/.test(nom));
+  // Un RENVOI, pas un texte : `lcpChamp` porte le NOM du champ dont la
+  // géométrie est élue comme LCP (`introClass`, `stepNoticeClass`…) et
+  // `lcpColonne` cite la classe de la colonne du chrome à son domicile
+  // (`classes-chrome.js`). Aucun des deux n'est quelque chose que la coquille
+  // publie. Un renvoi peut être un objet (`{ mobile, desktop }`, /support), donc
+  // l'exclusion se fait à la CLÉ et pas seulement sur la valeur.
+  const porteUnRenvoi = (nom) => nom === 'lcpChamp' || nom === 'lcpColonne';
   const visiter = (valeur, nom) => {
     if (typeof valeur === 'string') {
+      if (porteUnRenvoi(nom)) return;
       if (porteUneIcone(nom)) icones.push(valeur);
       else (porteUneCle(nom) ? cles : textes).push(valeur);
       return;
@@ -1416,7 +1508,10 @@ export function pageSectionParts(plan) {
       return;
     }
     if (valeur && typeof valeur === 'object') {
-      Object.entries(valeur).forEach(([cle, sousValeur]) => visiter(sousValeur, cle));
+      Object.entries(valeur).forEach(([cle, sousValeur]) => {
+        if (porteUnRenvoi(cle)) return;
+        visiter(sousValeur, cle);
+      });
     }
   };
   visiter(plan, null);

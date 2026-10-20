@@ -607,6 +607,9 @@ class TestRevisionsDepuisOriginMain:
     la production servait le nouveau : un faux refus (code 2) sur une livraison
     réussie. Ces cas figent la référence LUE, et le refus quand elle n'a pas pu
     être relue.
+
+    La base n'est plus relue PAR confirmation : elle est lue une fois, puis
+    passée aux deux (classe `TestBaseDistantePartagee`).
     """
 
     FUSION = "a" * 40
@@ -634,7 +637,8 @@ class TestRevisionsDepuisOriginMain:
 
     def test_le_frontend_lit_le_dernier_commit_sur_origin_main(self, livraison, monkeypatch):
         appels = self._faux_outils(livraison, monkeypatch)
-        assert livraison.verifier_production_frontend(self.FUSION, timeout_minutes=1) is True
+        base = livraison.lire_base_distante(self.FUSION)
+        assert livraison.verifier_production_frontend(base, timeout_minutes=1) is True
         assert ["git", "fetch", "origin", "main"] in appels, "la base distante n'a pas été relue"
         assert any(
             a[:4] == ["git", "rev-list", "-1", livraison.REF_BASE_DISTANTE]
@@ -648,7 +652,8 @@ class TestRevisionsDepuisOriginMain:
 
     def test_le_backend_lit_aussi_origin_main(self, livraison, monkeypatch):
         appels = self._faux_outils(livraison, monkeypatch)
-        assert livraison.verifier_production_backend(self.FUSION, timeout_minutes=1) is True
+        base = livraison.lire_base_distante(self.FUSION)
+        assert livraison.verifier_production_backend(base, timeout_minutes=1) is True
         assert any(
             a[:4] == ["git", "rev-list", "-1", livraison.REF_BASE_DISTANTE]
             and ".github/workflows/ci.yml" in a
@@ -664,12 +669,158 @@ class TestRevisionsDepuisOriginMain:
         self, livraison, monkeypatch, capsys
     ):
         appels = self._faux_outils(livraison, monkeypatch, ancestor=1)
-        assert livraison.verifier_production_frontend(self.FUSION, timeout_minutes=1) is False
+        with pytest.raises(RuntimeError) as refus:
+            livraison.lire_base_distante(self.FUSION)
         # Le contrôle de production ne part PAS contre une référence non relue :
         # ce serait le même faux verdict, en silence.
         assert not any(a and a[0] == "node" for a in appels), appels
-        sortie = capsys.readouterr().err
-        assert "origin/main" in sortie and self.FUSION[:10] in sortie, sortie
+        message = str(refus.value)
+        assert "origin/main" in message and self.FUSION[:10] in message, message
+
+
+class TestBaseDistantePartagee:
+    """La base distante est relue UNE fois par livraison, et PARTAGÉE.
+
+    Deux confirmations (Vercel, Fly) posent la même question à la même référence.
+    Relire chacune de son côté, c'était deux `git fetch` pour un seul fait, et
+    deux instants de mesure : un `main` qui avance entre les deux rendrait les
+    deux verdicts étrangers l'un à l'autre. Ces cas figent le fait « une seule
+    lecture par livraison » — dans le COMPORTEMENT (un `fetch` pour deux
+    confirmations) et dans le TRAJET (`main()` lit la base une fois et la donne
+    aux deux, lu par AST et non par expression régulière sur la prose).
+    """
+
+    FUSION = "a" * 40
+    DISTANTE = "b" * 40
+
+    def _faux_outils(self, livraison, monkeypatch):
+        appels = []
+
+        def faux_exec(args, *a, **k):
+            appels.append(list(args))
+            if args[:3] == ["git", "rev-list", "-1"]:
+                return self.DISTANTE
+            return ""
+
+        def faux_run(args, *a, **k):
+            appels.append(list(args))
+            if "merge-base" in args:
+                return SimpleNamespace(returncode=0)
+            return SimpleNamespace(returncode=0)
+
+        monkeypatch.setattr(livraison, "exec_cmd", faux_exec)
+        monkeypatch.setattr(livraison, "subprocess", SimpleNamespace(run=faux_run))
+        return appels
+
+    def test_une_seule_relecture_pour_les_deux_confirmations(self, livraison, monkeypatch):
+        appels = self._faux_outils(livraison, monkeypatch)
+        # Le trajet réel : une lecture, puis les DEUX confirmations sur CETTE base.
+        base = livraison.lire_base_distante(self.FUSION)
+        assert livraison.verifier_production_frontend(base, timeout_minutes=1) is True
+        assert livraison.verifier_production_backend(base, timeout_minutes=1) is True
+
+        fetches = [a for a in appels if a[:3] == ["git", "fetch", "origin"]]
+        assert len(fetches) == 1, f"la base distante a été relue {len(fetches)} fois : {appels}"
+        ancestors = [a for a in appels if "merge-base" in a]
+        assert len(ancestors) == 1, f"la fusion a été vérifiée {len(ancestors)} fois : {appels}"
+        # Une lecture par SURFACE reste nécessaire : chacune a SES chemins.
+        revisions = [a for a in appels if a[:3] == ["git", "rev-list", "-1"]]
+        assert len(revisions) == 2, appels
+        assert {a[-1] for a in revisions} == {"frontend/", ".github/workflows/ci.yml"}, appels
+
+    def test_la_base_ne_relit_jamais_la_reference(self, livraison, monkeypatch):
+        """`BaseDistante.revision` fait un `rev-list` LOCAL : aucun `fetch`."""
+        appels = self._faux_outils(livraison, monkeypatch)
+        base = livraison.BaseDistante(self.FUSION)
+        assert base.revision(["frontend/"]) == self.DISTANTE
+        assert not any(a[:2] == ["git", "fetch"] for a in appels), appels
+        assert not any("merge-base" in a for a in appels), appels
+
+    def test_une_base_sans_commit_pour_ces_chemins_refuse_de_conclure(self, livraison, monkeypatch):
+        monkeypatch.setattr(livraison, "exec_cmd", lambda *a, **k: "")
+        base = livraison.BaseDistante(self.FUSION)
+        with pytest.raises(RuntimeError) as refus:
+            base.revision(["frontend/"])
+        assert "frontend/" in str(refus.value), str(refus.value)
+
+    def test_une_base_illisible_rend_2_sans_jouer_les_confirmations(
+        self, livraison, monkeypatch, capsys
+    ):
+        """Le trajet RÉEL : une cause, trois refus nommés, code 2.
+
+        `main()` est exercé de bout en bout (push, PR, CI et fusion simulés) :
+        une base non relue ne doit lancer AUCUNE confirmation de production, et
+        le refus doit nommer les trois — un code 2 muet se lirait comme une
+        production douteuse sans dire laquelle.
+        """
+
+        def faux_exec(args, *a, **k):
+            if list(args[:3]) == ["git", "status", "--porcelain"]:
+                return ""
+            return "a" * 40
+
+        monkeypatch.setattr(livraison, "exec_cmd", faux_exec)
+        monkeypatch.setattr(
+            livraison,
+            "time",
+            SimpleNamespace(sleep=lambda *_: None, strftime=lambda _fmt: "00:00:00"),
+        )
+        monkeypatch.setattr(livraison, "obtenir_jeton", lambda *a, **k: "jeton-factice")
+        monkeypatch.setattr(livraison, "verifier_prevol_local", lambda *a, **k: None)
+        monkeypatch.setattr(livraison, "verifier_perimetre_du_gate", lambda *a, **k: [])
+        monkeypatch.setattr(livraison, "pousser_branche", lambda *a, **k: None)
+        monkeypatch.setattr(
+            livraison,
+            "trouver_ou_creer_pr",
+            lambda *a, **k: {"number": 7, "head": {"sha": "a" * 40}},
+        )
+        monkeypatch.setattr(livraison, "attendre_checks_ci", lambda *a, **k: True)
+        monkeypatch.setattr(livraison, "fusionner_pr", lambda *a, **k: "a" * 40)
+        monkeypatch.setattr(livraison, "synchroniser_et_nettoyer_local", lambda *a, **k: None)
+
+        def interdit(*a, **k):
+            raise AssertionError(
+                "aucune confirmation de production ne doit partir sans base relue"
+            )
+
+        monkeypatch.setattr(livraison, "verifier_production_frontend", interdit)
+        monkeypatch.setattr(livraison, "verifier_production_backend", interdit)
+        monkeypatch.setattr(livraison, "verifier_seo_production_strict", interdit)
+
+        def base_illisible(_sha):
+            raise RuntimeError("origin/main n'a pas pu être relu (réseau)")
+
+        monkeypatch.setattr(livraison, "lire_base_distante", base_illisible)
+
+        assert livraison.main(["--branche", "feat/exemple"]) == 2
+        capture = capsys.readouterr()
+        sortie = capture.err + capture.out
+        assert "Base distante NON relue" in sortie, sortie
+        assert "Vercel (révision servie)" in sortie, sortie
+        assert "Fly.io (révision servie)" in sortie, sortie
+
+    def test_main_lit_la_base_une_fois_et_la_donne_aux_deux(self):
+        """Le partage est dans le TRAJET : une lecture, deux consommateurs."""
+        arbre = ast.parse(CHEMIN_LIVRAISON.read_text(encoding="utf-8"))
+        main = next(
+            n for n in arbre.body if isinstance(n, ast.FunctionDef) and n.name == "main"
+        )
+        appels = [
+            n for n in ast.walk(main) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+        ]
+        lectures = [n for n in appels if n.func.id == "lire_base_distante"]
+        assert len(lectures) == 1, (
+            "main() relit la base distante %d fois : une livraison ne doit lire la "
+            "référence distante qu'UNE fois, puis la partager" % len(lectures)
+        )
+        for nom in ("verifier_production_frontend", "verifier_production_backend"):
+            controle = [n for n in appels if n.func.id == nom]
+            assert len(controle) == 1, f"{nom} n'est pas appelé exactement une fois par main()"
+            premier = controle[0].args[0] if controle[0].args else None
+            assert isinstance(premier, ast.Name) and premier.id == "base", (
+                "%s ne reçoit pas la base PARTAGÉE en premier argument : il pourrait "
+                "relire la référence de son côté" % nom
+            )
 
 
 class TestArbrePropre:

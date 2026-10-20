@@ -537,3 +537,37 @@ export async function attendreLaStabilite(page, maxMs = 6000, pasMs = PAS_ECHANT
   }
   return false;
 }
+
+/**
+ * Attend que la POLICE servie soit arrêtée d'être chargée dans ce document.
+ *
+ * Pourquoi les sondes LCP en ont besoin, MESURÉ le 20/10/2026 : `font-display:
+ * swap` veut dire PEINDRE DEUX FOIS. Sur une visite à cache VIDE, la coquille
+ * peint son texte avec le repli (`Inter repli Arial`, métriques alignées mais
+ * dessin différent), le fichier arrive, et le même élément est REPEINT : deux
+ * candidates LCP pour une seule peinture logique, la seconde plus grande de
+ * 1,3 % (mesuré sur /jobs mobile, 412×823 : 36 750 → 37 240 px², boîte
+ * identique 39 520 px², la première au premier paint). Ce n'est pas React —
+ * c'est le fichier de police, et une candidate de plus que le `swap` explique
+ * n'appartient pas à un verdict sur la bascule coquille → React.
+ *
+ * Une sonde qui mesure la SECONDE visite (police déjà en cache) ne voit plus
+ * qu'une peinture, comme le diag l'a montré (essais 2 et 3). Ce que ce
+ * garde-ci ne fait pas : décider à la place de la sonde. Il constate l'état
+ * `loaded` du `FontFaceSet`, que la visite suivante trouvera dans le cache —
+ * la peinture froide, elle, reste MESURÉE et jugée (voir
+ * `lcp-geometrie-declaree.spec.js`, passe froide).
+ *
+ * @param {import('@playwright/test').Page} page Page déjà naviguée.
+ * @param {number} [timeout] Plafond d'attente en millisecondes.
+ */
+export async function attendreLaPolice(page, timeout = 15000) {
+  await page.waitForFunction(
+    () => {
+      const faces = [...document.fonts];
+      return document.fonts.status === 'loaded' && faces.some((face) => face.status === 'loaded');
+    },
+    null,
+    { timeout }
+  );
+}

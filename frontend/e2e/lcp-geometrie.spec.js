@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
 // harnais partagé : la table unique `src/config/page-meta.js` en est la source,
 // jamais une copie. `geometrie-coquille-react.spec.js` mesure la même chose par
 // l'autre bout (rect, encre, text-align, navbar).
-import { ROUTES, TAILLES, ouvrirLaPage, MARQUEUR_DE_MONTAGE, attendreLaStabilite } from './helpers/geometrie.js';
+import { ROUTES, TAILLES, ouvrirLaPage, MARQUEUR_DE_MONTAGE, attendreLaPolice, attendreLaStabilite } from './helpers/geometrie.js';
 import { shellFileFor } from '../scripts/site-meta.js';
 
 /**
@@ -113,6 +113,19 @@ async function relever(browser, chemin, { peinture, viewport }) {
   const page = await ouvrirLaPage(browser, peinture, viewport);
   try {
     await page.addInitScript(ESPION_LCP);
+    if (peinture === 'reelle') {
+      // CHAUFFE, JETÉE — et elle sert au verdict : sur un cache de POLICE vide,
+      // `font-display: swap` peint deux fois le même élément (repli, puis
+      // fichier), avec une encre plus grande de 1,3 % et une BOÎTE identique
+      // (mesuré le 20/10/2026 sur /jobs mobile, 412×823 : 36 750 → 37 240 px²,
+      // boîte 39 520 px²). Ce n'est pas React, et cette sonde-ci juge la
+      // bascule coquille → React : elle mesure donc la visite où la police est
+      // en cache. La visite froide a sa propre passe, dans
+      // `lcp-geometrie-declaree.spec.js`, qui exige que la seconde peinture
+      // soit le remplacement de police et rien d'autre.
+      await page.goto(chemin);
+      await attendreLaPolice(page);
+    }
     await page.goto(chemin);
     // Laisse le temps au montage (`first-contentful-paint` déclenche
     // `root.render`, puis le repaint) : une seconde candidate, si elle existe,

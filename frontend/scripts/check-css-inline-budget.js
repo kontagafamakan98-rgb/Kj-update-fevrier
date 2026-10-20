@@ -50,6 +50,13 @@
  * qu'elle remplace. Le budget n'est pas touché : la marge remonte de 494 o à
  * 885 o.
  *
+ * ── Le relevé a bougé le 20/10/2026 : 82 288 o / 1 109 règles / sha
+ *    da7908a025017f5a ────────────────────────────────────────────────────────
+ * L'identité du site s'étend à deux matières qui existaient déjà ailleurs : la
+ * CARTE ÉDITORIALE devient du verre (94 % de papier, filet de crème, reflet en
+ * tête, flou court) et l'AVATAR porte la morphose du bandeau. Le budget n'est
+ * pas touché : +229 o et +1 règle nette sur la feuille inlinée, marge 656 o.
+ *
  * ── Le relevé a bougé le 17/10/2026 : 80 324 o / 15 759 o gzip / 1 083 règles /
  *    sha f5da31364d5a2964 ────────────────────────────────────────────────────
  * Le vocabulaire des ÉCRANS D'APPLICATION (bandeau d'accueil, tuiles de mesure
@@ -149,6 +156,10 @@ export const FEUILLE_DE_REFERENCE = 'index.html';
  * le dire — au lieu de dériver en silence.
  */
 export const CSS_INLINE_BUDGETS = {
+  // Relevé 20/10/2026 (l'identité : carte de verre, avatar morphique) : 82 288 o
+  // / 1 109 règles / sha da7908a025017f5a — budget inchangé, marge 656 o. La
+  // carte éditoriale passe du papier plein à un verre à 94 % (filet, reflet,
+  // flou court) et l'avatar porte `kojo-morphe` : +229 o, +1 règle nette.
   // Relevé 19/10/2026 (verre des messages) : 82 059 o / 16 246 o gzip / 1108
   // règles / sha d527f629095b171b — budget inchangé, marge 885 o.
   // Relevé 19/10/2026 : 82 450 o / 16 144 o gzip / 1107 règles / sha 7f189b682b8d6eec

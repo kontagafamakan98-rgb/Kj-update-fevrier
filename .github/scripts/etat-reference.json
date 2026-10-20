@@ -34,8 +34,8 @@
     "Preuve : backend/tests/test_etat_reference.py"
   ],
   "reference": {
-    "etablie_le": "2026-10-19",
-    "motif": "les trois contrats de temps du flux sont juges hors ligne sur une PR : battement declare, bail qui en decoule et repli du client ; et les revisions attendues de production se lisent sur origin/main relu apres la fusion, pour qu'un main local perime ne fasse plus refuser une production correcte",
+    "etablie_le": "2026-10-20",
+    "motif": "la carte editoriale devient une surface de verre mesuree, a 94 pour cent, pour que son texte tienne au pire fond compose ; le plancher de resync est juge contre le seuil du sondage remplace, lu dans la sonde et jamais recopie ; et la base distante est relue une seule fois par livraison, partagee par les deux confirmations de production",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -49,7 +49,6 @@
       ".github/scripts/check-seo-probe-strict.py": "95e04536ea56191ac3b19c4039ddf0bd74d723b81c19fdbd7ea6b9953354610e",
       ".github/scripts/check-test-existence-assertions.py": "7ec8f91c23750854f3c90749491cccdaf7f0bcaf387fc03312c1384eee6b5213",
       ".github/scripts/check-workflow-pins.py": "16b8576486a9224e6fdd7192aadda61a53f5d354e1321f50796c87bb2eeac516",
-      ".github/scripts/livrer.py": "d15cc0c229ce9d677a4867dd7945fdea36321f3840366c40743cf657b1d86487",
       ".github/scripts/perimetre_gate.py": "5095501bb20d63d788f4f0aa069a85e3583a9295acaaba4bacef54de2bf1179e",
       "backend/kojo_balises.py": "3596f3a55094902f31f1327c93d744551e30c959262c97f64c9b6beb4e437f67",
       "backend/kojo_core.py": "253f62913216b138ccd278b29d9fc7b7aebd21318b0d5e3f7526c0f2ca934e73",
@@ -123,8 +122,10 @@
       "frontend/scripts/style-layout-budgets.cjs": "db93353a147d9be6e84999ea065d3b3df5d08871a62fe943f3346bc80d68ede9",
       "frontend/scripts/validate-vercel-json.mjs": "16a56835e1fb299821c3a1dd7fa4d0957982a970a493e98ed8855d06fc563518",
       ".github/scripts/check-fly-env-drift.py": "34d5475512295ca57ca19ad37a6acb04ba63ffc5cb5c504913d9fcaff103a5e9",
-      "frontend/scripts/check-css-inline-budget.js": "c3a93055a10dacce95259ec4758ebcae1948eb2278d1806368e78197bc96bb5a",
-      "frontend/scripts/verre-contraste.js": "f344515d9368b16b19437aea23b0917ff6704693661d358100f64dbeab28abf2"
+      "frontend/scripts/check-css-inline-budget.js": "cf45fae01f0a25656dad26839dd4b1a4de07abc4023d9be4722e1a3a5a55bedd",
+      "frontend/scripts/verre-contraste.js": "0304f01ae4ccd2fea6db62cff8badcb4085d3a34622f49416ed8944c377c688c",
+      ".github/scripts/check-resync-parite.py": "4bc076c1ae2c39e2d9ccb2f6c17d3f61be7d7b2fd0d3c64c1c5f52db74535911",
+      ".github/scripts/livrer.py": "3f20751305f89a261d3ef27a0f5ae274f8bc85abbf4ed7a90159f6d708f2fbcf"
     }
   },
   "hors_perimetre": [

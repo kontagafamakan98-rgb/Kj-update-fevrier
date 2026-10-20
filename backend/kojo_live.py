@@ -156,7 +156,13 @@ BUS_READ_TIMEOUT_SECONDS = 2.0
 # couvre toutes les fenêtres depuis la précédente — d'où un plancher, et une
 # relecture différée pour que la DERNIÈRE fenêtre d'une rafale ne reste pas la
 # seule non réparée.
-RESYNC_MIN_INTERVAL_SECONDS = 10.0
+#
+# 30 s = la PARITÉ avec ce sondage (2 req/min), et c'est un PLANCHER, pas un
+# choix : à 10 s — la valeur d'origine, trois fois plus bavarde que l'ancien
+# mécanisme — une rafale de reconnexions produisait six relectures par minute et
+# par flux. Le seuil se LIT dans la sonde (`.github/scripts/check-resync-parite.py`,
+# `ANCIEN_SONDAGE_MS`) ; le recopier ici en ferait une seconde source.
+RESYNC_MIN_INTERVAL_SECONDS = 30.0
 
 SSE_HEADERS = {
     # Aucun cache, aucune transformation : un flux mis en cache rejouerait les
