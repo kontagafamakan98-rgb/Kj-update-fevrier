@@ -25,7 +25,7 @@ import PaymentAccountsManager from '../components/PaymentAccountsManager';
 import { usersAPI, reviewAPI, workerProfileAPI } from '../services/apiEndpoints';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/profile';
 import { devLog, safeLog } from '../utils/env';
-import { WorkerTrustBadge, VerifiedBadge } from '../utils/workerTrustLevel';
+import { WorkerTrustBadge, PaymentMethodsBadge } from '../utils/workerTrustLevel';
 import { usePageTitle } from '../utils/seo';
 // Le squelette de la page vient de son PROPRIÉTAIRE unique : il en existait une
 // SECONDE copie ici même (`function ProfileSkeleton` en bas de ce fichier),
@@ -265,7 +265,7 @@ export default function Profile() {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="titre-page">{user.first_name} {user.last_name}</h1>
-              <VerifiedBadge verified={user.is_verified} />
+              <PaymentMethodsBadge onFile={user.is_verified} />
               {user.user_type === 'worker' && <WorkerTrustBadge person={user} />}
             </div>
             {/* Le RÔLE et le pays sont des ÉTIQUETTES, pas une phrase : ce sont
@@ -499,11 +499,19 @@ function ProfileView({ profile, t, pageT }) {
           <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-stone-500">{t('preferredLanguage')}</span>
           <p className="mt-1.5 text-sm font-medium text-stone-900">{getLanguageLabel(profile.preferred_language, t)}</p>
         </div>
+        {/* CE QUE LA TUILE MESURE : `is_verified` vaut « des comptes de
+            paiement sont renseignés » (posé par l'ajout des comptes, cf.
+            `kojo_validation.py`), PAS « identité vérifiée ». L'ancien libellé
+            « Vérifié » promettait un contrôle qui n'existe pas ; la valeur
+            négative était même construite en recollant « Non » devant lui, ce
+            qui aurait donné « Non moyens de paiement renseignés » après le
+            renommage. L'état a donc sa propre phrase, et le libellé est une
+            CATÉGORIE, pas une affirmation. */}
         <div className="rounded-[3px] border border-stone-200 fond-sable px-4 py-3">
-          <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-stone-500">{t('verified')}</span>
+          <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-stone-500">{t('paymentMethods')}</span>
           <p className="mt-1.5">
             <span className={`etiquette-app ${profile.is_verified ? 'etiquette-app-vert' : ''}`}>
-              {profile.is_verified ? t('verified') : `${t('no')} ${t('verified').toLowerCase()}`}
+              {profile.is_verified ? t('paymentMethodsOnFile') : t('paymentMethodsNone')}
             </span>
           </p>
         </div>

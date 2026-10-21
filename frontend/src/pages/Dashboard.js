@@ -23,7 +23,7 @@ import {
   Smartphone,
   Rocket,
   Camera,
-  ShieldCheck
+  CreditCard
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -227,10 +227,16 @@ export default function Dashboard() {
             <span className="etiquette-app etiquette-app-orange">
               {user?.user_type === 'client' ? t('client') : t('worker')}
             </span>
+            {/* CE QUE L'ÉTIQUETTE DIT, ET SEULEMENT ÇA : `is_verified` est posé
+                par l'ajout des comptes de paiement (`kojo_validation.py`), pas
+                par un contrôle d'identité — l'email a son propre
+                `email_verified`. Un bouclier coché disait « identité
+                vérifiée » à la place, et c'était faux (audit du 20/10/2026,
+                prop. 6). La carte de paiement dit ce qui est mesuré. */}
             {user?.is_verified && (
               <span className="etiquette-app etiquette-app-vert">
-                <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-                {t('verified')}
+                <CreditCard className="h-3.5 w-3.5" aria-hidden="true" />
+                {t('paymentMethodsOnFile')}
               </span>
             )}
             {isFamakan && (
