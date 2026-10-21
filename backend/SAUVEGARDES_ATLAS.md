@@ -51,10 +51,17 @@ La seule restauration possible est donc celle du workflow
 `.github/workflows/backup-db.yml` (cron 02:40 UTC) :
 
 1. `mongodump` de la production, archive unique compressée ;
-2. `mongorestore` de CETTE archive dans une base de travail `kojo_verif` ;
+2. base de travail `kojo_verif` vidée, puis `mongorestore` de CETTE archive
+   dedans ;
 3. comparaison source/archive par `backend/scripts/exercice_restauration.py`
-   (empreintes SHA-256 par collection, index compris) — une archive non
-   restaurée n'est pas une sauvegarde ;
+   **`--deja-restauree`** (empreintes SHA-256 par collection, index ET options
+   d'index) — une archive non restaurée n'est pas une sauvegarde.
+   Le mode compte : sans lui le script **détruit** la base que `mongorestore`
+   vient de remplir pour la recopier lui-même depuis la source, et le run
+   devient vert sans avoir jamais jugé l'archive — c'est-à-dire sans avoir jugé
+   le seul objet qui serve le jour d'une perte. Dans ce mode le RTO n'est pas
+   prétendu non plus : `mongorestore` a restauré hors du script, donc le rapport
+   le dit (`rto_mesure_s: null`) au lieu de publier la durée d'une comparaison ;
 4. chiffrement AES-256 (les dumps contiennent des données personnelles) ;
 5. dépôt sur un bucket S3/R2 **privé**, avec empreinte et taille publiées.
 

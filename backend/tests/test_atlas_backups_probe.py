@@ -312,6 +312,18 @@ class TestSauvegardeExterne:
         # La preuve qu'une archive est une sauvegarde : elle est RESTAURÉE et
         # comparée, par le script dont l'exercice daté se sert déjà.
         assert "exercice_restauration.py" in texte
+        # Et comparée à la SOURCE elle-même, pas à une recopie : sans ce mode,
+        # le script détruisait la base restaurée pour la recopier depuis la
+        # source, et le run devenait vert sans avoir jugé l'archive.
+        assert "--deja-restauree" in texte, (
+            "le run doit juger l'archive restaurée (`--deja-restauree`), pas une "
+            "copie faite par le script"
+        )
+        # Un reste d'un run échoué apparaîtrait sinon comme une collection « EN
+        # TROP » — un écart qui ne dit rien de la sauvegarde du jour.
+        assert 'drop_database("kojo_verif")' in texte, (
+            "la base de travail doit être vidée avant restauration"
+        )
         # Données personnelles : jamais en clair hors du runner.
         assert "openssl enc -aes-256-cbc" in texte
         assert "s3 cp" in texte
