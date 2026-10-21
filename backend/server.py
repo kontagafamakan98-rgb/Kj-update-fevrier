@@ -62,6 +62,7 @@ from kojo_payments import (
 )
 import kojo_live
 from kojo_scheduler import (
+    completion_auto_release_loop,
     email_provider_alert_loop,
     job_alert_digest_loop,
     payout_stuck_sweeper_loop,
@@ -704,6 +705,10 @@ async def lifespan(application: FastAPI):
     # sans lui, une mission publiée ne touche un travailleur que s'il repasse de
     # lui-même sur /jobs. Passage horaire, bail partagé, un email par veille.
     job_alert_task = asyncio.create_task(job_alert_digest_loop())
+    # SÉQUESTRE À DEUX TEMPS : libère les missions déclarées terminées que le
+    # client n'a pas validées à l'échéance (kojo_job_completion). Sans cette
+    # boucle, un client injoignable laissait le travailleur impayé pour toujours.
+    completion_task = asyncio.create_task(completion_auto_release_loop())
     # BUS TEMPS RÉEL (Redis pub/sub) : le fan-out reste en mémoire, le bus le
     # PROLONGE aux autres workers et machines. Sans REDIS_URL, rien ne change
     # (le process publie et sert ses propres flux) — et `start_bus` DIT la perte
@@ -722,6 +727,7 @@ async def lifespan(application: FastAPI):
     retention_task.cancel()
     email_alert_task.cancel()
     job_alert_task.cancel()
+    completion_task.cancel()
     try:
         await asyncio.gather(
             rate_limit_task,
@@ -729,6 +735,7 @@ async def lifespan(application: FastAPI):
             retention_task,
             email_alert_task,
             job_alert_task,
+            completion_task,
         )
     except asyncio.CancelledError:
         pass

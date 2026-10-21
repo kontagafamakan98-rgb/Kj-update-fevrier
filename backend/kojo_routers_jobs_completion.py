@@ -1,364 +1,170 @@
 # -*- coding: utf-8 -*-
-"""Clôture d'une mission (`POST /jobs/{id}/complete`) : versement et bonus.
+"""Fin de mission : déclaration du travailleur, validation du client, versement.
 
-Extrait de `kojo_routers_jobs.py` sans changement de comportement (surface
-figée par `tests/surface/route_surface_jobs.json`). L'attribution du bonus de première
-mission vit ici : elle n'a qu'un site d'appel, la clôture.
+La RÈGLE (versement, verrou CAS, notifications, parrainage) vit dans
+`kojo_job_completion.py` — ce module ne fait que la traduire en routes. Il porte
+quatre chemins, dans l'ordre où ils ont existé :
+
+  * `POST /jobs/{id}/complete` — route HISTORIQUE, gardée telle quelle : les
+    applications déjà installées (Capacitor) l'appellent, et un client qui veut
+    payer AVANT que le travailleur ait déclaré doit pouvoir le faire. Elle ne
+    casse rien : elle déclenche la même libération unique ;
+  * `POST /jobs/{id}/completion/proof` — photo de preuve (Cloudinary) ;
+  * `POST /jobs/{id}/completion` — le travailleur DÉCLARE la fin (note
+    obligatoire), ce qui arme l'échéance de libération automatique ;
+  * `POST /jobs/{id}/completion/confirm` — le client VALIDE, ce qui libère
+    immédiatement.
 """
-import asyncio
+import io
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
-import kojo_job_effects as effets
-from kojo_business_events import enregistrer_evenement
-from kojo_core import db, get_current_user
-from kojo_models import Job, JobStatus, Message, NotificationType, User
-from kojo_payments import (
-    build_disburse_callback_url, get_paydunya_withdraw_mode, strip_country_code_for_disburse,
+import kojo_job_completion as completion
+from kojo_core import (
+    db,
+    get_current_user,
+    is_valid_image_content,
+    upload_image_to_cloudinary,
 )
-from kojo_settings import (
-    OWNER_EMAIL,
-    REFERRAL_FILLEUL_REWARD,
-    REFERRAL_SPONSOR_REWARD,
-    logger,
-)
-from kojo_identifiants import dump_stable, identifiant_query, identifiant_job_query
+from kojo_models import Job, JobCompletionMark, JobStatus, User
+from kojo_identifiants import dump_stable, identifiant_job_query
+from kojo_settings import OWNER_EMAIL, logger
 
 router = APIRouter()
 
-async def _marquer_terminee(job_id: str, client_id: str) -> None:
-    """Clôt la mission et journalise sa fin. Idempotent : clé `mission_completed:<job_id>`."""
-    await db.jobs.update_one({**identifiant_job_query(job_id)}, {"$set": {"status": JobStatus.COMPLETED.value}})
-    await enregistrer_evenement(
-        "mission_completed", f"mission_completed:{job_id}", user_id=client_id, job_id=job_id
-    )
+MAX_PROOF_BYTES = 5 * 1024 * 1024
 
 
-async def _maybe_award_first_job_referral_reward(worker_id: str, job_id: str, job_title: str) -> None:
-    """Crédite la récompense de parrainage quand le filleul termine sa PREMIÈRE
-    mission : le parrain reçoit REFERRAL_SPONSOR_REWARD et le filleul reçoit
-    REFERRAL_FILLEUL_REWARD (FCFA).
+async def _job_ou_404(job_id: str) -> dict:
+    job = await db.jobs.find_one({**identifiant_job_query(job_id), "deleted": {"$ne": True}})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
 
-    Idempotent : un compte ne touche sa récompense qu'une seule fois (le flag
-    referral_first_job_rewarded est posé à la première mission terminée), et
-    un code invalide/absent est ignoré silencieusement (non bloquant).
-    """
-    try:
-        worker = await db.users.find_one({**identifiant_query(worker_id)}, {"referred_by": 1, "referral_first_job_rewarded": 1})
-        if not worker:
-            return
-        if worker.get("referral_first_job_rewarded"):
-            return
-        ref_code = str((worker.get("referred_by") or '').strip()).upper()
-        if not ref_code:
-            return
 
-        # Le parrainage est réservé aux travailleurs : un parrain client ne
-        # peut pas recevoir de récompense (le code n'est d'ailleurs plus
-        # applicable à un compte client à l'inscription).
-        # Un travailleur déjà parrainé ne peut pas servir de parrain à son
-        # tour : son code n'est plus applicable, donc aucune récompense de
-        # parrainage pour lui.
-        sponsor = await db.users.find_one(
-            {"referral_code": ref_code}, {"id": 1, "user_type": 1, "referred_by": 1}
-        )
-        if not sponsor or sponsor.get("id") == worker_id:
-            return
-        if sponsor.get("user_type") != "worker":
-            return
-        if sponsor.get("referred_by"):
-            return
+def _est_owner(user: User) -> bool:
+    return bool(OWNER_EMAIL) and str(user.email).strip().lower() == OWNER_EMAIL.strip().lower()
 
-        now = datetime.now(timezone.utc)
-        reward_record = {
-            "type": "first_job",
-            "job_id": job_id,
-            "job_title": job_title,
-            "created_at": now.isoformat(),
-        }
-
-        # Crédit du filleul + pose du flag (même update, atomique)
-        await db.users.update_one(
-            {**identifiant_query(worker_id)},
-            {
-                "$set": {"referral_first_job_rewarded": True, "updated_at": now},
-                "$inc": {"referral_reward_balance": REFERRAL_FILLEUL_REWARD},
-                "$push": {"referral_rewards": {**reward_record, "role": "filleul", "amount": REFERRAL_FILLEUL_REWARD}},
-            },
-        )
-
-        # Crédit du parrain
-        await db.users.update_one(
-            {**identifiant_query(sponsor["id"])},
-            {
-                "$inc": {"referral_reward_balance": REFERRAL_SPONSOR_REWARD},
-                "$push": {"referral_rewards": {**reward_record, "role": "parrain", "amount": REFERRAL_SPONSOR_REWARD}},
-            },
-        )
-
-        # Notifications pour les deux (dans leur langue préférée)
-        asyncio.create_task(effets.notify_user_localized(
-            user_id=worker_id,
-            key="bonus_filleul_first_mission",
-            notif_type=NotificationType.GENERAL,
-            related_id=job_id,
-            related_type="job",
-            job_title=job_title,
-            amount=REFERRAL_FILLEUL_REWARD,
-        ))
-        asyncio.create_task(effets.notify_user_localized(
-            user_id=sponsor["id"],
-            key="bonus_sponsor_first_mission",
-            notif_type=NotificationType.GENERAL,
-            related_id=job_id,
-            related_type="job",
-            job_title=job_title,
-            amount=REFERRAL_SPONSOR_REWARD,
-        ))
-    except Exception as exc:
-        # Non bloquant : une erreur de récompense ne doit jamais casser la
-        # clôture de mission ni le versement au travailleur.
-        logger.error(f"⚠️ Attribution de la récompense de parrainage impossible: {exc}")
 
 @router.post("/jobs/{job_id}/complete")
 async def complete_job_and_release_payment(
     job_id: str,
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Bouton "Travail Termine" : cloture la mission et declenche le versement
-    (decaissement PayDunya) du montant sequestre vers le travailleur.
+    """Route historique : le client clôture et libère le séquestre immédiatement.
 
-    Le paiement collecte reste "sequestre" (payout_status='held') tant que
-    cette route n'a pas ete appelee : c'est ca, l'escrow, dans ce systeme.
-    Si le decaissement automatique echoue (pas de compte mobile money
-    valide, panne PayDunya, etc.), la mission est quand meme cloturee mais
-    le paiement reste marque a traiter manuellement (payout_status=
-    'release_failed') plutot que de bloquer le client indefiniment.
+    Conservée pour les applications déjà installées et pour le client qui veut
+    payer sans attendre la déclaration du travailleur. Le versement passe par
+    `kojo_job_completion.liberer_sequestre`, comme les deux autres chemins.
 
     Returns:
         dict: {message, job (modèle complet), payout_status
-        (released | release_failed | already_released)}.
+        (released | release_failed | already_released | releasing)}.
     """
-    job = await db.jobs.find_one({**identifiant_job_query(job_id), "deleted": {"$ne": True}})
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
+    job = await _job_ou_404(job_id)
 
-    is_owner_user = bool(OWNER_EMAIL) and current_user.email == OWNER_EMAIL
-    if job.get("client_id") != current_user.id and not is_owner_user:
+    if job.get("client_id") != current_user.id and not _est_owner(current_user):
         raise HTTPException(status_code=403, detail="Access denied")
 
-    worker_id = job.get("assigned_worker_id")
-    if not worker_id:
-        raise HTTPException(status_code=400, detail="Aucun travailleur attribué à cette mission")
+    resultat = await completion.liberer_sequestre(job, acteur_id=current_user.id)
 
-    if job.get("status") == JobStatus.COMPLETED.value:
-        raise HTTPException(status_code=409, detail="Cette mission est déjà marquée comme terminée")
-
-    # Trouver le paiement collecte et sequestre pour ce job (le plus recent)
-    payment_record = await db.payments.find_one(
-        {"job_id": job_id, "status": "completed"},
-        sort=[("created_at", -1)]
-    )
-    if not payment_record:
-        raise HTTPException(
-            status_code=400,
-            detail="Aucun paiement confirmé trouvé pour cette mission. Le client doit d'abord payer."
-        )
-
-    # Idempotence : si deja libere ou en cours de liberation, ne pas relancer
-    current_payout_status = payment_record.get("payout_status") or "held"
-    if current_payout_status == "released":
-        # Deja verse : on se contente de cloturer le job si ce n'est pas fait
-        await _marquer_terminee(job_id, job.get("client_id"))
-        await _maybe_award_first_job_referral_reward(worker_id, job_id, job.get("title", ""))
-        updated_job = await db.jobs.find_one({**identifiant_job_query(job_id)})
-        return {"message": "Mission déjà clôturée et paiement déjà versé", "job": dump_stable(Job, updated_job), "payout_status": "released"}
-    if current_payout_status == "releasing":
-        raise HTTPException(status_code=409, detail="Un versement est déjà en cours pour ce paiement, réessayez dans un instant")
-
-    # Verrou : marquer "releasing" seulement si toujours "held", pour eviter
-    # un double-versement en cas de double-clic/appel concurrent.
-    lock_result = await db.payments.update_one(
-        {**identifiant_query(payment_record["id"]), "payout_status": current_payout_status},
-        effets.maj_sequestre("releasing", {"updated_at": datetime.now(timezone.utc).isoformat()})
-    )
-    if lock_result.matched_count == 0:
-        raise HTTPException(status_code=409, detail="Un versement est déjà en cours pour ce paiement, réessayez dans un instant")
-
-    worker = await db.users.find_one({**identifiant_query(worker_id)})
-    worker_payment_accounts = (worker or {}).get("payment_accounts") or {}
-    worker_amount = payment_record.get("worker_amount") or 0
-
-    # On choisit Orange Money en priorite, sinon Wave (le compte bancaire
-    # n'est pas un mode de decaissement automatique supporte par PayDunya
-    # actuellement : dans ce cas on reste en versement manuel).
-    payout_method = None
-    payout_phone = None
-    if worker_payment_accounts.get("orange_money"):
-        payout_method = "orange_money"
-        payout_phone = worker_payment_accounts["orange_money"]
-    elif worker_payment_accounts.get("wave"):
-        payout_method = "wave"
-        payout_phone = worker_payment_accounts["wave"]
-
-    async def _mark_release_failed(reason: str):
-        await db.payments.update_one(
-            {**identifiant_query(payment_record["id"])},
-            effets.maj_sequestre("release_failed", {"payout_failure_reason": reason, "updated_at": datetime.now(timezone.utc).isoformat()})
-        )
-        await _marquer_terminee(job_id, job.get("client_id"))
-        await _maybe_award_first_job_referral_reward(worker_id, job_id, job.get("title", ""))
-
-    if not payout_method or not payout_phone:
-        await _mark_release_failed("Le travailleur n'a pas de compte Orange Money ou Wave configuré")
-        updated_job = await db.jobs.find_one({**identifiant_job_query(job_id)})
-        return {
-            "message": "Mission clôturée, mais le versement automatique est impossible : le travailleur n'a pas de compte Orange Money ou Wave enregistré. Un versement manuel est nécessaire.",
-            "job": dump_stable(Job, updated_job),
-            "payout_status": "release_failed",
-        }
-
-    withdraw_mode = get_paydunya_withdraw_mode(payout_method, worker.get("country"))
-    account_alias = strip_country_code_for_disburse(payout_phone)
-
-    try:
-        invoice = effets.create_paydunya_disburse_invoice(
-            account_alias=account_alias,
-            amount=worker_amount,
-            withdraw_mode=withdraw_mode,
-            callback_url=build_disburse_callback_url(),
-        )
-        disburse_token = invoice.get("disburse_token")
-    except HTTPException as exc:
-        # get-invoice REFUSÉ : PayDunya n'a rien exécuté → échec sûr, relançable.
-        await _mark_release_failed(str(exc.detail))
-        updated_job = await db.jobs.find_one({**identifiant_job_query(job_id)})
-        return {
-            "message": f"Mission clôturée, mais le versement automatique a échoué ({exc.detail}). Un versement manuel est nécessaire.",
-            "job": dump_stable(Job, updated_job),
-            "payout_status": "release_failed",
-        }
-    except Exception as exc:
-        logger.error(f"⚠️ Erreur inattendue lors de la préparation du versement: {exc}")
-        await _mark_release_failed("Erreur inattendue lors de la préparation du versement")
-        updated_job = await db.jobs.find_one({**identifiant_job_query(job_id)})
-        return {
-            "message": "Mission clôturée, mais le versement automatique a échoué. Un versement manuel est nécessaire.",
-            "job": dump_stable(Job, updated_job),
-            "payout_status": "release_failed",
-        }
-
-    # Token persisté AVANT le submit : si le submit lève (timeout réseau), le
-    # versement reste identifiable et confirmable via l'IPN ou un check-status.
-    await db.payments.update_one(
-        {**identifiant_query(payment_record["id"])},
-        {"$set": {
-            "disburse_token": disburse_token,
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }}
-    )
-
-    try:
-        submit_result = effets.submit_paydunya_disburse_invoice(disburse_token, disburse_id=payment_record["id"])
-    except Exception as exc:
-        # Réponse INCERTAINE (timeout réseau…) : PayDunya a peut-être exécuté
-        # le versement. On garde "releasing" (confirmation par l'IPN ou un
-        # check-status) au lieu de "release_failed" : un échec définitif
-        # permettrait une relance → risque de DOUBLE versement au travailleur.
-        logger.error(f"⚠️ Réponse incertaine du submit PayDunya (versement travailleur): {exc}")
-        await db.payments.update_one(
-            {**identifiant_query(payment_record["id"])},
-            effets.maj_sequestre("releasing", {"disburse_error": f"Réponse incertaine du submit: {exc}", "updated_at": datetime.now(timezone.utc).isoformat()})
-        )
-        final_payout_status = "releasing"
-    else:
-        provider_status = str(
-            submit_result.get("status")
-            or ("success" if str(submit_result.get("response_code")) == "00" else "failed")
-        ).strip().lower()
-
-        await db.payments.update_one(
-            {**identifiant_query(payment_record["id"])},
+    # Une déclaration qui existait devient « validée » : la libération est
+    # passée par cette route, pas par le délai. Sans cette écriture, l'écran
+    # continuerait d'afficher « en attente de validation » sur une mission payée.
+    if (job.get("completion") or {}).get("state") == completion.MARKED:
+        await db.jobs.update_one(
+            {**identifiant_job_query(job_id)},
             {"$set": {
-                "disburse_provider_response": submit_result,
-                "updated_at": datetime.now(timezone.utc).isoformat()
-            }}
+                "completion.state": completion.CONFIRMED,
+                "completion.confirmed_at": datetime.now(timezone.utc).isoformat(),
+            }},
         )
+        resultat["job"] = dump_stable(
+            Job, await db.jobs.find_one({**identifiant_job_query(job_id)})
+        )
+    return resultat
 
-        if provider_status == "success":
-            final_payout_status = "released"
-        elif provider_status == "pending":
-            # Statut definitif inconnu pour l'instant (ex: Orange Money Mali
-            # repond toujours "pending") : le callback ou un check-status
-            # ulterieur confirmera. On garde "releasing" pour que le suivi
-            # sache qu'il faut verifier plus tard.
-            final_payout_status = "releasing"
-        else:
-            final_payout_status = "release_failed"
-            await db.payments.update_one(
-                {**identifiant_query(payment_record["id"])},
-                {"$set": {"payout_failure_reason": submit_result.get("response_text") or "Échec du versement PayDunya"}}
-            )
 
-        await db.payments.update_one({**identifiant_query(payment_record["id"])}, effets.maj_sequestre(final_payout_status))
+@router.post("/jobs/{job_id}/completion/proof")
+async def upload_completion_proof(
+    job_id: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    """Téléverse une photo de preuve de fin de mission (travailleur attribué).
 
-    await _marquer_terminee(job_id, job.get("client_id"))
-    await _maybe_award_first_job_referral_reward(worker_id, job_id, job.get("title", ""))
+    La photo n'est PAS attachée à la mission ici : elle l'est au moment de la
+    déclaration, qui valide les URLs. Un téléversement abandonné ne laisse donc
+    jamais une mission à moitié déclarée.
 
-    # Notifier le travailleur et confirmer au client via le chat (canal
-    # fiable existant, pas de vrai systeme de notifications push).
-    conversation_id = f"{min(current_user.id, worker_id)}_{max(current_user.id, worker_id)}"
-    if final_payout_status == "released":
-        worker_message = f"✅ Mission « {job.get('title', '')} » terminée. Votre paiement de {worker_amount} FCFA a été envoyé."
-    elif final_payout_status == "releasing":
-        worker_message = f"✅ Mission « {job.get('title', '')} » terminée. Votre paiement de {worker_amount} FCFA est en cours de traitement."
-    else:
-        worker_message = f"✅ Mission « {job.get('title', '')} » terminée. Votre paiement de {worker_amount} FCFA sera versé manuellement, contactez le support si besoin."
+    Returns:
+        dict: {proof_url} — URL Cloudinary à joindre à la déclaration.
+    """
+    job = await _job_ou_404(job_id)
+    if str(job.get("assigned_worker_id") or "") != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Seul le travailleur attribué peut ajouter une preuve")
+    if job.get("status") != JobStatus.IN_PROGRESS.value:
+        raise HTTPException(status_code=400, detail="La mission n'est pas en cours")
+
+    if not (file.content_type or "").startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    contenu = await file.read()
+    if len(contenu) > MAX_PROOF_BYTES:
+        raise HTTPException(status_code=400, detail="File too large. Maximum size is 5MB")
+    if not is_valid_image_content(contenu):
+        raise HTTPException(status_code=400, detail="Fichier image invalide (JPEG, PNG, GIF ou WebP requis)")
 
     try:
-        await db.messages.insert_one(Message(
-            conversation_id=conversation_id,
-            sender_id=current_user.id,
-            receiver_id=worker_id,
-            content=worker_message,
-            job_id=job_id
-        ).model_dump())
+        resultat = upload_image_to_cloudinary(
+            io.BytesIO(contenu),
+            str(current_user.id),
+            "kojo/completion_proofs",
+            "completion",
+        )
     except Exception as exc:
-        logger.error(f"⚠️ Échec de l'envoi du message automatique de fin de mission: {exc}")
+        logger.error(f"Erreur upload preuve de fin de mission: {exc}")
+        raise HTTPException(status_code=500, detail="Échec de l'envoi de la photo. Veuillez réessayer.")
 
-    # Notifier le travailleur via push selon le statut du versement (sa langue)
-    if final_payout_status == "released":
-        payment_key = "payment_sent_worker"
-    elif final_payout_status == "releasing":
-        payment_key = "payment_releasing_worker"
-    else:
-        payment_key = "payment_manual_worker"
+    return {"proof_url": resultat["photo_url"]}
 
-    asyncio.create_task(effets.notify_user_localized(
-        user_id=worker_id,
-        key=payment_key,
-        notif_type=NotificationType.PAYMENT_RECEIVED,
-        related_id=job_id,
-        related_type="job",
-        job_title=job.get("title") or "",
-        amount=worker_amount,
-    ))
 
-    # Notifier le client que la mission est bien clôturée
-    asyncio.create_task(effets.notify_user_localized(
-        user_id=current_user.id,
-        key="mission_closed",
-        notif_type=NotificationType.JOB_COMPLETED,
-        related_id=job_id,
-        related_type="job",
-        job_title=job.get("title") or "",
-    ))
+@router.post("/jobs/{job_id}/completion")
+async def mark_job_complete(
+    job_id: str,
+    payload: JobCompletionMark,
+    current_user: User = Depends(get_current_user),
+):
+    """Le travailleur DÉCLARE la mission terminée (note + photos).
 
-    updated_job = await db.jobs.find_one({**identifiant_job_query(job_id)})
-    return {
-        "message": "Mission clôturée avec succès",
-        "job": dump_stable(Job, updated_job),
-        "payout_status": final_payout_status,
-    }
+    Pose l'échéance de libération automatique (`COMPLETION_AUTO_RELEASE_DAYS`)
+    et prévient le client. La mission reste `in_progress` : elle ne devient
+    `completed` qu'au versement, décidé par la validation ou par l'échéance.
+
+    Returns:
+        dict: {message, job, completion}.
+    """
+    job = await _job_ou_404(job_id)
+    return await completion.marquer_termine(
+        job,
+        worker_id=current_user.id,
+        note=payload.note,
+        proofs=payload.proofs,
+    )
+
+
+@router.post("/jobs/{job_id}/completion/confirm")
+async def confirm_job_completion(
+    job_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Le client VALIDE la déclaration : le séquestre est libéré immédiatement.
+
+    Returns:
+        dict: {message, job, payout_status, completion_state}.
+    """
+    job = await _job_ou_404(job_id)
+    if job.get("client_id") != current_user.id and not _est_owner(current_user):
+        raise HTTPException(status_code=403, detail="Access denied")
+    return await completion.confirmer_validation(job, client_id=current_user.id)

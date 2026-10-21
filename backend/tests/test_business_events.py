@@ -93,12 +93,22 @@ async def test_type_inconnu_est_une_erreur_de_programmation(journal):
     assert journal.documents == []
 
 
-def test_les_quatre_jalons_sont_declares():
+def test_les_sept_jalons_sont_declares():
+    """Sept faits, pas quatre : le séquestre à deux temps a trois jalons à lui.
+
+    Les fusionner rendrait le journal incapable de dire POURQUOI l'argent est
+    parti (validation du client ou échéance). Ce test est la liste des types
+    admis : un type ajouté sans être déclaré ici est refusé par
+    `enregistrer_evenement`, et ce test le dit avant l'exécution.
+    """
     assert TYPES_EVENEMENTS == {
         "mission_created",
         "proposal_accepted",
         "payment_confirmed",
         "mission_completed",
+        "mission_completion_marked",
+        "mission_completion_confirmed",
+        "mission_auto_released",
     }
 
 
@@ -122,12 +132,23 @@ def test_confirmation_de_paiement_emet_payment_confirmed_a_la_transition():
 
 
 def test_fin_de_mission_passe_par_un_seul_helper_qui_journalise():
-    source = _source("kojo_routers_jobs_completion.py")
+    """Le versement et la clôture ont UN propriétaire : `kojo_job_completion`.
+
+    Le séquestre à deux temps a ajouté deux chemins (validation du client,
+    échéance). S'ils avaient chacun écrit le statut, une mission aurait pu être
+    `completed` sans journal, ou journalisée deux fois. Le test pointe donc le
+    module qui possède la règle, et exige que les trois sites d'appel y passent.
+    """
+    source = _source("kojo_job_completion.py")
     assert re.search(r'enregistrer_evenement\(\s*"mission_completed"', source)
     # Les trois écritures `completed` passent par le helper : aucune n'écrit le statut à part.
     ecritures_brutes = re.findall(r'"\$set": \{"status": JobStatus\.COMPLETED\.value\}', source)
     assert len(ecritures_brutes) == 1, "seule la définition de _marquer_terminee écrit le statut"
     assert source.count('await _marquer_terminee(job_id, job.get("client_id"))') == 3
+    # Le routeur ne réimplémente ni le versement ni la clôture : il appelle.
+    routeur = _source("kojo_routers_jobs_completion.py")
+    assert "liberer_sequestre" in routeur
+    assert '"$set": {"status": JobStatus.COMPLETED.value}' not in routeur
 
 
 # ── Vue propriétaire : journal d'une mission (GET /owner/missions/{id}/evenements) ──
