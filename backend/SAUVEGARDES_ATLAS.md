@@ -361,16 +361,14 @@ Trois choses doivent tenir, dans cet ordre :
    comparée à la source (404 documents, 20 collections, options d'index
    comprises), chiffrée en AES-256 et déposée sur le bucket privé. La sonde
    juge donc une **fraîcheur** au lieu de constater « aucun run réussi ».
-2. **Les quatre clés `ATLAS_*` sont REFUSÉES** (401) depuis le 21/10/2026 :
-   elles rendaient un verdict à 00:10 (M0, `backupEnabled=false`,
-   `pitEnabled=false`) et ne le rendent plus à 02:22. Cause la plus probable :
-   clé supprimée ou roulée pendant la mise en place du compte de sauvegarde,
-   ou **liste d'accès IP** d'Atlas qui exclut les runners GitHub. Tant que
-   c'est le cas, la sonde sort en **2** : elle publie l'âge de la sauvegarde
-   externe (ligne `[MESURÉ]`) mais ne juge PAS le cluster. Remède : Atlas →
-   Access Manager → API Keys, clé « Project Read Only », accès réseau incluant
-   les runners, puis reposer `ATLAS_PUBLIC_KEY`, `ATLAS_PRIVATE_KEY`,
-   `ATLAS_PROJECT_ID`, `ATLAS_CLUSTER`.
+2. **Les clés `ATLAS_*` ont été reposées** (21/10/2026 03:17), après un 401
+   mesuré à 02:22 — la veille du même jour, 00:10, rendait encore un verdict :
+   c'est la CLÉ qui avait changé, pas le code. La sonde rend de nouveau un
+   VERDICT (M0, `backupEnabled=false`, `pitEnabled=false`) et publie à côté la
+   fraîcheur de la sauvegarde externe (run 39537743515 : il y a 1 h, seuil
+   36 h, vert). Leçon à retenir pour la prochaine rotation : un 401 d'Atlas
+   n'est pas une panne de sauvegarde, et la sonde le dit en sortant en 2 au
+   lieu de verdir.
 3. **Passer le cluster en M10+ et activer Continuous Cloud Backup** si la sonde
    répond 1 : c'est le seul moyen d'avoir un RPO court.
 4. **Exécuter un vrai exercice PITR daté** et l'écrire ici (même tableau, même
