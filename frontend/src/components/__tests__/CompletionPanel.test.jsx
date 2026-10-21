@@ -78,9 +78,24 @@ describe('CompletionPanel', () => {
 
   it('le client voit l’échéance et valide le paiement', async () => {
     const onConfirm = vi.fn();
-    render(<CompletionPanel job={{ ...JOB_EN_COURS, completion: MARKED }} isOwner onConfirm={onConfirm} />);
+    const { container } = render(
+      <CompletionPanel job={{ ...JOB_EN_COURS, completion: MARKED }} isOwner onConfirm={onConfirm} />,
+    );
 
-    expect(screen.getByText(/27\/10\/2026/)).toBeInTheDocument();
+    // L'échéance est peinte par `toLocaleDateString`, donc l'ORDRE des nombres
+    // suit la locale du navigateur (fr : 27/10/2026, en-US — celle des runners
+    // de CI — : 10/27/2026). La version qui figeait « 27/10/2026 » mesurait la
+    // locale de la machine, pas le fait que le panneau AFFICHE l'échéance : elle
+    // a rougi en intégration le 21/10/2026 sans qu'aucune ligne de production
+    // n'ait changé. La date attendue se DÉRIVE donc de la même source que le
+    // composant, jamais d'une copie de sa sortie.
+    const attendu = new Date(MARKED.auto_release_at).toLocaleDateString(undefined, {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+    expect(attendu).not.toBe('');
+    expect(container.textContent).toContain(attendu);
     expect(screen.getByText(MARKED.note)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: /valider et payer/i }));

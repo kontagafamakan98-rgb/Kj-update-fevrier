@@ -129,8 +129,7 @@
       ".github/scripts/rapport-secrets.py": "231c6e9b180ac25dea480d9d56d2a8fa3cf5ddfe32e79a1b4b6be8780c51965d",
       "backend/server.py": "caf00c2436703dc74c0896359c14e6dbfbd5bce363367b72e479f0be89bf71ef",
       ".github/scripts/check-exercice-restauration.py": "5b630d1aa76144c52795e6c2fad82295736b696457166cfb5b746fe38390e68e"
-    },
-    "establie_le": "2026-10-21"
+    }
   },
   "hors_perimetre": [
     {
