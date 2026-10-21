@@ -1,9 +1,9 @@
 # Audit général de Kojo — rédigé le 20/10/2026, révisé le 21/10/2026
 
 Périmètre de la révision : `main` @ `876e810c`, **plus 13 fichiers non commités**
-(le renommage du badge, cf. §0.8) — livrés depuis en `25642ef5` (PR #184). Cet audit
-lit le **code réel**, les gardes, les workflows et les documents d'exploitation du
-dépôt. Les relevés de production de
+(le renommage du badge, cf. §0.8) — livrés puis servis en `25642ef5` (PR #184). Cet
+audit lit le **code réel**, les gardes, les workflows et les documents
+d'exploitation du dépôt. Les relevés de production de
 la révision ont été pris le 21/10/2026 et sont datés ; ce qui n'a pas été mesuré
 est dit comme tel.
 
@@ -166,25 +166,43 @@ mais la livraison.
 backend et frontend dont le contrat OG, secrets, lint des workflows, audits, build
 mobile, déploiement Fly).
 
-**La production n'a PAS suivi, et ce n'est pas un défaut du code.** Vercel n'a créé
-**aucun déploiement** pour la fusion : le dernier déploiement `Production` est
-`7221114223` (`876e810c`, 08:11 UTC) et le dernier `Preview` est celui de la
-branche à 15:12 UTC — l'événement du push sur `main` n'a pas produit de build. Deux
-rouges en découlent, tous deux sur le run `39624483759` de `main` :
+**La production a suivi — avec 22 minutes de retard, et le gate de révision l'a
+dit avant elle.** Le déploiement Vercel `Production` `7230235937` du commit
+`25642ef5` a été créé à **15:40:33 UTC**, soit 22 min après la fusion de 15:18:49 ;
+le site sert depuis cette révision. Mesuré dans l'artefact servi, pas seulement dans
+la balise : le bundle répond `paymentMethodsOnFile`, `paymentMethodsNone`,
+`paymentMethodsBadgeTitle` et le libellé « Moyens de paiement renseignés », et les
+trois clés menteuses n'y sont plus des **clés** (leur nom ne survit que dans la
+prose d'un commentaire de `workerTrustLevel.js` que la minification a préservée —
+sans effet visible pour un visiteur, mais c'est du poids mort dans l'artefact).
+
+Entre-temps, l'étape « Vérifier la révision servie » de `frontend-build` a échoué
+(run `39624483759`) après 9 tentatives, 15:26:02 → 15:28:59 : `servi=876e810c`,
+`attendu=25642ef5`. **La mesure était vraie au moment où elle a été prise**, et
+`livrer.py` a rendu **2** pour la même raison — PR fusionnée, production non
+conforme —, ce qui est le comportement voulu : une livraison qui se croit faite
+sans être servie est exactement le silence que ces sondes existent pour empêcher.
+
+**Ce que ce délai apprend, et qui vaut une décision.** La patience du gate est de
+**3 min** (9 × 20 s) ; la file Vercel du jour en a pris **22**. Un build tardif
+laisse donc `main` rouge sur ce run **définitivement** — c'est la livraison
+suivante (PR #185, `4ecf77ae`) qui a rejoué la vérification et l'a rendue verte, la
+révision d'artefact n'ayant pas bougé. Deux remèdes possibles, à trancher si le cas
+se reproduit : allonger la fenêtre au-delà du pire délai observé, ou juger « un
+déploiement est en file côté Vercel » au lieu d'un nombre de tentatives — le second
+distingue *pas encore construit* de *jamais déclenché*, ce que 3 min ne savent pas
+faire.
+
+Un second rouge du même run est **indépendant du badge** :
 
 | Rouge | Cause mesurée | Ce qu'il reste à faire |
 |---|---|---|
-| `Frontend tests + build` — étape « Vérifier la révision servie » | 9 tentatives en 4 min : `servi=876e810c`, `attendu=25642ef5`. Le frontend déployé n'est pas celui de `main`. | Rien côté dépôt : **redéclencher un déploiement Vercel de `main`** (dashboard, ou tout nouvel événement de push). `livrer.py` a rendu **2** pour la même raison — PR fusionnée, production non conforme —, ce qui est le comportement voulu. |
-| `Fly env doc-prod` — sonde email authentifié (`check-email-auth.py --require-secrets`, main only) | L'OTP de production a répondu **200**, puis la lecture IMAP a dépassé son délai (`The read operation timed out`). | Indépendant du badge : c'est la **livraison du message** qui a manqué, pas son authentification. À rejouer ; si le délai se répète, c'est la boîte de sonde qu'il faut regarder. |
+| `Fly env doc-prod` — sonde email authentifié (`check-email-auth.py --require-secrets`, main only) | L'OTP de production a répondu **200**, puis la lecture IMAP a dépassé son délai (`The read operation timed out`). | C'est la **livraison du message** qui a manqué, pas son authentification. À rejouer ; si le délai se répète, c'est la boîte de sonde qu'il faut regarder. |
 
-Ce que ce couple de rouges dit du dispositif, et qui vaut d'être gardé : le gate de
-révision servie a **refusé de conclure à un vert** devant une production en retard
-d'un commit, et l'a nommé en clair. Une livraison qui se croit faite sans être
-servie est exactement le silence que ces sondes existent pour empêcher.
-
-**Ce qui reste ouvert dans ce document** : la production sert toujours `876e810c`
-au moment d'écrire ces lignes ; les relevés de §0.5 restent donc ceux de cette
-révision pour tout ce qui touche au badge (le renommage n'y change aucune mesure).
+**Ce qui reste ouvert dans ce document** : rien d'imputable au renommage. Les
+relevés de §0.5 datent de `876e810c` ; le badge n'y change aucune mesure (les deux
+travailleurs publiés gardent leur drapeau `verified`, qui veut toujours dire
+« moyens de paiement renseignés »).
 
 ---
 
