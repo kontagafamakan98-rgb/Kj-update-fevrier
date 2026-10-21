@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-21",
-    "motif": "Le garde de fraicheur de l'exercice ecrit ses verdicts en UTF-8 : sur une console Windows en cp1252, une fleche du runbook le faisait tomber en UnicodeEncodeError au lieu de juger.",
+    "motif": "Le garde de fraicheur de l'exercice ecrit ses verdicts en UTF-8 : sur une console Windows en cp1252, une fleche du runbook le faisait tomber en UnicodeEncodeError au lieu de juger. Et la sonde Atlas publie desormais la moitie qui se MESURE (age de la derniere sauvegarde externe) quand l'API Atlas refuse la cle, au lieu d'un run muet sur cette moitie.",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -56,7 +56,7 @@
       "backend/kojo_routers_users_push.py": "85a2e4017a51444818caf8fd6042fa2f63b464d034fb830e22310544d73f72b7",
       "backend/scripts/audit_docstrings.py": "fc1092b0f72619462c8d5e056dc652729f0a65e40abf171d249ed3993dc9ff39",
       "backend/scripts/audit_none_signatures.py": "2eef502b52f9c7e3482bd414ba9388105edd000be2b1a03e71195e1f4baa65d1",
-      "backend/scripts/check_atlas_backups.py": "4267bdbd40226f47c5454e9c72def56a4cf119cf36fc5816b05e0a4160223441",
+      "backend/scripts/check_atlas_backups.py": "e41a5b799d7128cfa98e6e34424ad30988a88274a302c484c48c9e8aa0b44c83",
       "backend/scripts/check_deployed_revision.py": "bcd6ef28eab30e1365db3cf3c41b3eb203f6578177e93102cc9830bad82113ae",
       "backend/scripts/check_health_probe.py": "136d30b9c6461d473042782a6d0ed70e649901cd27ba7fd555d74544e39f7e4d",
       "frontend/scripts/audit_api_returns.cjs": "2e54a6a80a65df023c7d75695a0ea00657d3ee7d40bcaa5d42ca12fa9308afa7",

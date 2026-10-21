@@ -188,6 +188,63 @@ def test_avec_cles_le_verdict_de_l_api_est_rendu(sonde, monkeypatch, capsys):
     assert "::error title=Sauvegardes Atlas désactivées::" in capture.out
 
 
+class TestLaPremisseNEnterrePasLAutreMoitie:
+    """Le 21/10/2026, les clés `ATLAS_*` refusées (401) ont rendu un run MUET sur
+    la sauvegarde externe, qui venait pourtant d'aboutir : « on ne sait rien » là
+    où un âge était mesurable. La moitié qui se mesure se publie, et le code
+    reste 2 — un fait rassurant à côté d'un refus ne fait pas un vert.
+    """
+
+    def _lancer(self, sonde, monkeypatch, capsys, dernier):
+        for nom in VARIABLES:
+            monkeypatch.setenv(nom, "valeur-de-test")
+        monkeypatch.setattr("sys.argv", ["check_atlas_backups.py"])
+        monkeypatch.setattr(sonde, "lire_cluster", lambda *a, **k: (401, {}, ""))
+        monkeypatch.setattr(sonde, "dernier_succes_externe", lambda *a, **k: dernier)
+        code = sonde.main()
+        return code, capsys.readouterr().out
+
+    def _il_y_a(self, heures):
+        from datetime import datetime, timedelta, timezone
+
+        instant = datetime.now(timezone.utc) - timedelta(hours=heures)
+        return instant.isoformat().replace("+00:00", "Z")
+
+    def test_une_cle_refusee_publie_quand_meme_l_age_de_la_sauvegarde(
+        self, sonde, monkeypatch, capsys
+    ):
+        code, sortie = self._lancer(sonde, monkeypatch, capsys, ("ok", self._il_y_a(2)))
+        assert code == 2, sortie  # la prémisse Atlas reste une prémisse
+        assert "[MESURÉ] Sauvegarde EXTERNE : il y a 2 h" in sortie, sortie
+        assert "fraîche" in sortie, sortie
+        assert "::error title=Sauvegardes Atlas non vérifiables::" in sortie, sortie
+
+    def test_une_cle_refusee_dit_aussi_qu_aucune_sauvegarde_n_a_abouti(
+        self, sonde, monkeypatch, capsys
+    ):
+        code, sortie = self._lancer(sonde, monkeypatch, capsys, ("ok", None))
+        assert code == 2, sortie
+        assert "[MESURÉ] Aucune sauvegarde EXTERNE n'a jamais abouti" in sortie, sortie
+
+    def test_une_cle_refusee_et_une_api_illisible_le_disent_separement(
+        self, sonde, monkeypatch, capsys
+    ):
+        code, sortie = self._lancer(
+            sonde, monkeypatch, capsys, ("illisible", "API GitHub injoignable")
+        )
+        assert code == 2, sortie
+        assert "[MESURÉ] Sauvegarde EXTERNE non jugeable : API GitHub" in sortie, sortie
+
+    def test_la_ligne_mesuree_nomme_une_sauvegarde_perimee_sans_la_verdir(self, sonde):
+        import time as _time
+
+        ligne = sonde.fraicheur_externe_mesuree(
+            "2026-10-19T04:00:00Z", _time.time(), seuil_heures=36
+        )
+        assert "PÉRIMÉE" in ligne and "il y a " in ligne, ligne
+        assert "ne remplace pas le verdict Atlas" in ligne, ligne
+
+
 def test_le_chemin_interroge_porte_le_projet_et_le_cluster(sonde):
     """Le projet et le cluster viennent de l'environnement, pas d'une valeur en dur."""
     url = sonde.url_cluster("projet-42", "cluster-kojo")
