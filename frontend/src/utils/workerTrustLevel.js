@@ -73,13 +73,23 @@ export const WorkerTrustBadge = ({ person, className = '' }) => {
   );
 };
 
-export const VerifiedBadge = ({ verified, className = '' }) => {
+// LE BADGE DIT CE QUE LE DRAPEAU MESURE (20/10/2026). `is_verified` est posé
+// par l'ajout des comptes de paiement (`kojo_validation.py`), jamais par un
+// contrôle d'identité : l'email vérifié a son propre champ (`email_verified`).
+// Il s'appelait « Vérifié » avec l'infobulle « Identité vérifiée (email) » —
+// faux sur les deux points. Les clés i18n `verified`, `verifiedBadge` et
+// `verifiedBadgeTitle` sont supprimées des cinq dictionnaires : les réintroduire
+// est refusé par `utils/__tests__/badgePaiementHonnete.test.js`. Ce qui reste
+// ouvert, et qui n'est pas décoratif : `getWorkerLevel` ci-dessus exige encore
+// `is_verified` pour les paliers « Confirmé » et « Expert », donc un palier dit
+// toujours plus que ce badge.
+export const PaymentMethodsBadge = ({ onFile, className = '' }) => {
   const { t } = useLanguage();
-  if (!verified) return null;
+  if (!onFile) return null;
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-sm border border-orange-200 bg-orange-50 px-2 py-0.5 text-[11px] font-semibold text-orange-700 ${className}`}
-      title={t('verifiedBadgeTitle')}
+      title={t('paymentMethodsBadgeTitle')}
     >
       {/* Le repère du badge est DESSINÉ (`check`) : c'était un caractère `✓`,
           c'est-à-dire un glyphe qui dépend de la police du poste — la règle du
@@ -95,7 +105,7 @@ export const VerifiedBadge = ({ verified, className = '' }) => {
           une position de classe, `className: CLASSES_ICONE[role]`), et pas
           l'appelant qui a gardé sa classe : un emplacement d'icône dit un rôle,
           jamais une classe, et un rôle inconnu lève. */}
-      <IconePage nom="check" role="badgeRepere" /> {t('verifiedBadge')}
+      <IconePage nom="check" role="badgeRepere" /> {t('paymentMethodsOnFile')}
     </span>
   );
 };

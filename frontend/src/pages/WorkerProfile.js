@@ -204,7 +204,10 @@ const WorkerProfile = () => {
           </h1>
           <p className="mt-1 text-sm text-stone-600">
             {t('worker')}
-            {profil.verified ? ` · ${t('verified')}` : ''}
+            {/* Le champ public `verified` est `is_verified` côté backend
+                (`kojo_routers_workers_public.py`) : des comptes de paiement
+                renseignés, pas une identité contrôlée. */}
+            {profil.verified ? ` · ${t('paymentMethodsOnFile')}` : ''}
             {profil.city || profil.country ? ` · ${[profil.city, profil.country].filter(Boolean).join(', ')}` : ''}
             {profil.member_since ? ` · ${profil.member_since}` : ''}
             {/* La note vit ICI, avec le nom : c'est ce qu'on cherche en arrivant

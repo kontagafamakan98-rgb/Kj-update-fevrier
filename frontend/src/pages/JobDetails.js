@@ -23,7 +23,7 @@ import { JobDetailsSkeleton } from '../components/SkeletonLoader';
 // page ne connaît ni sa largeur ni sa gouttière, elle délègue.
 import CadrePage from '../components/CadrePage';
 import { MapPin, ShieldCheck } from 'lucide-react';
-import { VerifiedBadge, WorkerTrustBadge } from '../utils/workerTrustLevel';
+import { PaymentMethodsBadge, WorkerTrustBadge } from '../utils/workerTrustLevel';
 import { usePageTitle, usePageOpenGraph, absoluteUrl } from '../utils/seo';
 import { jobSeo } from '../utils/jobSeo';
 import {
@@ -107,7 +107,7 @@ function ProposalCard({ proposal, isSelected, isAccepted, onOpenDiscussion, onAc
               ) : (
                 <div className="font-semibold text-stone-900">{workerName}</div>
               )}
-              <VerifiedBadge verified={workerPerson?.is_verified} />
+              <PaymentMethodsBadge onFile={workerPerson?.is_verified} />
               <WorkerTrustBadge person={workerPerson} />
             </div>
             <div className="text-sm text-stone-500">{formatJobDate(proposal.created_at)}</div>
@@ -1011,7 +1011,7 @@ export default function JobDetails() {
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="font-medium text-stone-900">{job.client_name}</div>
-                  <VerifiedBadge verified={job?.client_is_verified || job?.client?.is_verified} />
+                  <PaymentMethodsBadge onFile={job?.client_is_verified || job?.client?.is_verified} />
                 </div>
                 <div className="text-sm text-stone-500">{job.client_email || t('clientProfile')}</div>
               </div>

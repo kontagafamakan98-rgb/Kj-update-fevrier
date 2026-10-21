@@ -154,6 +154,41 @@ la formule d'origine ne dit pas sept jours sur sept, mais sa signification exact
 13. **Mooré, `feesLabel` = « Yaood »** et **bambara, « Sara »** : ces mots
     disent « paiement » ; pour une colonne « frais », est-ce le terme juste ?
 
+## Badge « moyens de paiement renseignés » (21/10/2026)
+
+Le badge s'appelait « Vérifié » / « Verified » / « Saytu nañu ko » /
+« Lakɔlɔsila » / « Gesg-m-meng », avec l'infobulle « Identité vérifiée
+(email) ». `is_verified` ne dit pourtant RIEN de l'identité : il est posé par
+l'ajout des comptes de paiement (`kojo_validation.py`), et l'email vérifié a son
+propre champ (`email_verified`). Les trois clés (`verified`, `verifiedBadge`,
+`verifiedBadgeTitle`) sont supprimées des cinq dictionnaires ; ce sont
+`paymentMethodsOnFile` (le libellé), `paymentMethodsNone` (l'absence, profil) et
+`paymentMethodsBadgeTitle` (l'infobulle) qui les remplacent, et
+`utils/__tests__/badgePaiementHonnete.test.js` refuse leur retour.
+
+Valeurs proposées : `wo` « Konte fey yu ñu bind » / « Amul konte fey » /
+« Konte fey yu ñu bind — identité bi saytuwul » ; `bm` « Sara fɛɛrɛw
+sɛbɛnnenw » / « Sara fɛɛrɛ sɛbɛnnen si tɛ » / « … — identité ma lakɔlɔsi » ;
+`mos` « Yaool soaya sẽn bee » / « Yaool soaya ka be ye » / « … — identité ka ges
+ye ».
+
+Doutes, à trancher par un locuteur :
+
+14. **`wo`, « bind » pour « renseigné »** : le dictionnaire l'emploie pour
+    « écrire / s'inscrire » (`register`, `registerFailed`, `referralText`).
+    Dit-il un compte qu'on a renseigné, ou seulement un formulaire rempli ?
+15. **`wo`, « saytuwul »** : forme forgée sur « saytu » (examiner, cf.
+    `payStatusPending`) + le suffixe négatif attesté (`Fey bi antuwul`). La
+    négation est-elle la bonne ici (« l'identité n'a pas été examinée ») ?
+16. **`bm`, « ma lakɔlɔsi »** : négatif perfectif, sur le modèle de
+    `Sariya-faga ma kɛ` (« le paiement n'a pas eu lieu »). Même question.
+17. **`mos`, « sẽn bee »** (« qui sont là ») pour « renseignés » : la formule
+    dit l'existence, pas l'enregistrement. Un terme de saisie existe-t-il ?
+18. **Les trois langues gardent l'emprunt « identité »** dans l'infobulle,
+    comme l'ancienne valeur (déjà « Identité » nue en `wo`/`bm`/`mos`). C'est
+    assumé faute d'un mot local établi — et c'est le terme que le doute 16 de
+    la relecture devra confirmer.
+
 ## Comment contresigner
 
 Corriger directement les trois dictionnaires, puis remplacer le statut ci-dessus
