@@ -10,9 +10,12 @@ name: Sauvegarde externe vérifiée (quotidien)
 #   1. il REFUSE de conclure (code 2) si une des entrées manque, en la nommant ;
 #   2. il DÉVERSE la base avec `mongodump` (archive unique, compressée) ;
 #   3. il RESTAURE cette archive dans une base de travail, puis délègue la
-#      comparaison à `backend/scripts/exercice_restauration.py` : empreinte
-#      SHA-256 par collection et index, identiques ou échec. Une archive non
-#      restaurée n'est pas une sauvegarde, c'est un fichier ;
+#      comparaison à `backend/scripts/exercice_restauration.py --deja-restauree` :
+#      empreinte SHA-256 par collection et DÉFINITION d'index, identiques ou
+#      échec. Ce mode compte : sans lui, le script aurait détruit la base
+#      restaurée pour la recopier lui-même depuis la source, et le run serait
+#      devenu vert sans avoir jamais jugé l'ARCHIVE. Une archive non restaurée
+#      n'est pas une sauvegarde, c'est un fichier ;
 #   4. il CHIFFRE l'archive (AES-256, phrase secrète) avant de la sortir : un
 #      dump contient des données personnelles, il ne circule pas en clair ;
 #   5. il DÉPOSE l'archive chiffrée sur un stockage S3/R2 privé et publie sa
@@ -25,7 +28,10 @@ name: Sauvegarde externe vérifiée (quotidien)
 # supprimerait la mauvaise chose un jour de fatigue).
 #
 # Secrets requis (Settings → Secrets and variables → Actions) :
-#   MONGO_URL                 chaîne de connexion de LECTURE de la production
+#   MONGO_URL                 chaîne de connexion qui LIT `kojo_db` et ÉCRIT
+#                             `kojo_verif` (l'étape de restauration y range la
+#                             copie : un utilisateur en lecture seule échouerait
+#                             là, pas au dump — donc après avoir cru sauvegarder)
 #   BACKUP_S3_BUCKET          nom du bucket privé (R2/S3)
 #   BACKUP_S3_ENDPOINT        URL S3 du fournisseur (R2 : https://<id>.r2.cloudflarestorage.com)
 #   BACKUP_S3_ACCESS_KEY_ID   identifiant d'accès du bucket
@@ -109,6 +115,26 @@ jobs:
 
       # La restauration est la PREUVE. `--nsFrom/--nsTo` range la copie dans une
       # base de travail : la production n'est jamais écrasée.
+      #
+      # La base de travail est VIDÉE avant : `--drop` ne retire que les
+      # collections de l'archive, donc un reste d'un run précédent (un run qui a
+      # échoué au milieu) apparaîtrait ensuite comme « collection EN TROP » — un
+      # écart qui ne dirait rien de la sauvegarde du jour. pymongo vient avec le
+      # lock, en empreintes vérifiées : pas d'outil de plus.
+      - name: Vider la base de travail (une comparaison sur un reste ment)
+        working-directory: backend
+        env:
+          MONGO_URL: ${{ secrets.MONGO_URL }}
+        run: |
+          python - <<'PY'
+          import os
+          from pymongo import MongoClient
+
+          with MongoClient(os.environ["MONGO_URL"]) as client:
+              client.drop_database("kojo_verif")
+          print("kojo_verif vidée : la comparaison part d'une base vide")
+          PY
+
       - name: Restaurer l'archive dans une base de travail
         env:
           MONGO_URL: ${{ secrets.MONGO_URL }}
@@ -122,7 +148,7 @@ jobs:
           MONGO_URL: ${{ secrets.MONGO_URL }}
         run: |
           python scripts/exercice_restauration.py \
-            --base kojo_db --cible kojo_verif \
+            --base kojo_db --cible kojo_verif --deja-restauree \
             --rapport "/tmp/restauration-$(date +%F).json"
 
       - name: Chiffrer l'archive (les dumps contiennent des données personnelles)

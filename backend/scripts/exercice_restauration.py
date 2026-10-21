@@ -15,14 +15,23 @@ CE QU'IL FAIT, dans cet ordre, et rien d'autre :
   1. lit la base SOURCE (`--base`, défaut `kojo_db`) — aucune écriture ;
   2. calcule l'empreinte de chaque collection : nombre exact de documents,
      SHA-256 du contenu complet (documents encodés BSON, ordonnés par `_id`),
-     et noms d'index ;
+     et DÉFINITION des index (clé ET options : `unique`, `sparse`, TTL,
+     filtre partiel, collation) ;
   3. RESTAURE dans une base de TRAVAIL `--cible`
-     (défaut `<base>_restauration_<AAAA-MM-JJ>`), sur le même serveur, en
-     recréant les index ;
+     (défaut `<base>_restauration_<AAAA-MM-JJ>`), sur le même serveur,     en recréant les index AVEC leurs options — ou, avec `--deja-restauree`,
+     ne restaure RIEN et juge la cible telle qu'un autre outil l'a remplie ;
   4. recalcule la même empreinte dans la cible et COMPARE — un document
-     manquant, un index perdu ou un contenu altéré font échouer l'exercice ;
-  5. détruit la base de travail (`--garder` pour l'inspecter) ;
+     manquant, un index perdu, un index aux options différentes ou un contenu
+     altéré font échouer l'exercice ;
+  5. détruit la base de travail (`--garder` pour l'inspecter) — jamais avec
+     `--deja-restauree`, qui n'a rien créé ;
   6. écrit un rapport daté (`--rapport`) et rend un code de sortie.
+
+`--deja-restauree` existe pour le workflow `backup-db.yml`, et pour une raison
+précise : il RESTAURE l'archive avec `mongorestore`, puis demande à ce script de
+la comparer. Sans ce mode, le script aurait détruit la base restaurée pour la
+recopier lui-même depuis la source — et le run serait devenu vert sans avoir
+jamais jugé l'ARCHIVE, c'est-à-dire le seul objet qui serve le jour d'une perte.
 
 Aucune écriture dans la base de production n'est possible : la cible est une
 base DIFFÉRENTE, et le script refuse `--cible` égale à `--base`. La seule
@@ -57,6 +66,38 @@ SOURCE_DEFAUT = "kojo_db"
 # un exercice qui ne comparerait que ce qu'il trouve passerait après une perte.
 COLLECTIONS_ATTENDUES = ("users", "jobs", "payments", "notifications", "messages")
 
+# Champs de `index_information()` qui ne sont PAS des options de création :
+# `key` est passé à part, `name` aussi, et `v`/`ns`/`background` appartiennent au
+# serveur (les recopier ferait refuser l'index).
+CHAMPS_NON_OPTION = frozenset({"key", "v", "ns", "background", "name"})
+
+
+def options_index(information: dict) -> dict:
+    """Les options d'un index, RECOPIÉES telles quelles.
+
+    Ne garder que `unique` perdait `sparse` — et un index unique non sparse sur
+    `payments.idempotency_key` refuse la restauration dès le deuxième document
+    sans clé (E11000, mesuré le 21/10/2026 par le run 39526117357). Il perdait
+    aussi `expireAfterSeconds` : une restauration qui perd un TTL garde les
+    données, mais les garde POUR TOUJOURS, et rien ne le disait.
+    """
+    return {cle: valeur for cle, valeur in information.items() if cle not in CHAMPS_NON_OPTION}
+
+
+def definition_index(information: dict) -> str:
+    """Définition canonique d'un index — ce qui décide de son comportement.
+
+    Les options sont triées par `sort_keys` et les valeurs non JSON (ObjectId
+    d'un filtre partiel, dates) passées par `default=str` : deux lectures de la
+    même base doivent rendre la même chaîne, sinon la comparaison crierait au
+    loup sur un ordre de dictionnaire.
+    """
+    cles = [
+        [str(champ), direction if isinstance(direction, (int, float, str)) else str(direction)]
+        for champ, direction in (information.get("key") or [])
+    ]
+    return json.dumps({"key": cles, **options_index(information)}, sort_keys=True, default=str)
+
 
 def empreinte_collection(collection) -> dict:
     """Nombre exact, SHA-256 du contenu complet et index d'une collection.
@@ -72,10 +113,15 @@ def empreinte_collection(collection) -> dict:
         condensat.update(BSON.encode(document))
         condensat.update(b"\x00")
         documents += 1
-    index = sorted(
-        nom for nom in collection.index_information() if nom != "_id_"
-    )
-    return {"documents": documents, "sha256": condensat.hexdigest(), "index": index}
+    informations = collection.index_information()
+    index = sorted(nom for nom in informations if nom != "_id_")
+    definitions = {nom: definition_index(informations[nom]) for nom in index}
+    return {
+        "documents": documents,
+        "sha256": condensat.hexdigest(),
+        "index": index,
+        "definitions": definitions,
+    }
 
 
 def empreinte_base(db) -> dict:
@@ -107,6 +153,20 @@ def comparer(avant: dict, apres: dict) -> list:
         perdus = sorted(set(reference["index"]) - set(cible["index"]))
         if perdus:
             ecarts.append("%s : index non restauré(s) : %s" % (nom, ", ".join(perdus)))
+        # Un index présent mais DIFFÉRENT n'est pas restauré : un unique sans
+        # `sparse`, un TTL perdu, un filtre partiel oublié changent le
+        # comportement de la base en silence. Le nom ne le dit pas.
+        reference_defs = reference.get("definitions") or {}
+        cible_defs = cible.get("definitions") or {}
+        for nom_index in sorted(set(reference["index"]) & set(cible["index"])):
+            attendu = reference_defs.get(nom_index)
+            obtenu = cible_defs.get(nom_index)
+            if attendu and obtenu and attendu != obtenu:
+                ecarts.append(
+                    "%s : index « %s » restauré avec une AUTRE définition (%s ≠ %s) "
+                    "— sparse/TTL/partiel changent le comportement"
+                    % (nom, nom_index, attendu, obtenu)
+                )
     for nom in sorted(set(apres) - set(avant)):
         ecarts.append("%s : collection EN TROP dans la restauration" % nom)
     return ecarts
@@ -131,17 +191,38 @@ def restaurer(source, cible, lot: int = 1000) -> dict:
             if nom_index == "_id_":
                 continue
             cles = information.get("key") or []
-            cible[nom].create_index(cles, name=nom_index, unique=bool(information.get("unique")))
+            cible[nom].create_index(cles, name=nom_index, **options_index(information))
     return {"documents": total, "collections": len(source.list_collection_names())}
 
 
+def _sortie_utf8():
+    """Console Windows en cp1252 : le verdict contient « ✅ », et un import du
+    module (test, outil) n'exécute pas le bloc `__main__` qui s'en occupait —
+    l'exercice réussissait alors en levant sur son propre message (mesuré le
+    21/10/2026)."""
+    for flux in (sys.stdout, sys.stderr):
+        try:
+            flux.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):  # flux redirigé (StringIO) ou remplacé
+            pass
+
+
 def main(argv=None) -> int:
+    _sortie_utf8()
     parseur = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parseur.add_argument("--uri", default=os.environ.get("MONGO_URL", ""))
     parseur.add_argument("--base", default=SOURCE_DEFAUT)
     parseur.add_argument("--cible", default="")
     parseur.add_argument("--rapport", default="")
     parseur.add_argument("--garder", action="store_true")
+    parseur.add_argument(
+        "--deja-restauree",
+        action="store_true",
+        help=(
+            "la cible contient DÉJÀ l'archive restaurée (mongorestore) : comparer "
+            "sans recopier ni détruire — c'est l'ARCHIVE qui est jugée"
+        ),
+    )
     args = parseur.parse_args(argv)
 
     aujourd_hui = date.today().isoformat()
@@ -151,6 +232,7 @@ def main(argv=None) -> int:
         "base_source": args.base,
         "base_cible": cible_nom,
         "verdict": "non jugé",
+        "mode": "comparaison d'une archive restaurée" if args.deja_restauree else "recopie depuis la source",
         "ce_qui_n_est_pas_prouve": (
             "la restauration d'un snapshot/PITR côté Atlas (API ou console) : ce script "
             "compare une copie restaurée à la source, il ne restaure pas une sauvegarde Atlas"
@@ -175,6 +257,15 @@ def main(argv=None) -> int:
         )
     if cible_nom == args.base:
         return ecrire(2, "REFUS : la cible est la base source — un exercice ne restaure pas par-dessus.")
+    if args.deja_restauree and not args.cible:
+        # Sans `--cible`, le défaut est une base datée que ce script créerait :
+        # comparer « ce qui est déjà restauré » n'aurait alors aucun sujet, et le
+        # verdict porterait sur une base vide qu'on aurait soi-même nommée.
+        return ecrire(
+            2,
+            "PRÉMISSE : `--deja-restauree` exige `--cible` — il n'y a rien à comparer "
+            "sans nommer la base que l'archive a remplie.",
+        )
 
     try:
         from pymongo import MongoClient
@@ -205,11 +296,23 @@ def main(argv=None) -> int:
         avant = empreinte_base(source)
         duree_empreinte = time.monotonic() - debut
 
-        client.drop_database(cible_nom)
         cible = client[cible_nom]
-        debut = time.monotonic()
-        restaure = restaurer(source, cible)
-        duree_restauration = time.monotonic() - debut
+        if args.deja_restauree:
+            # Rien n'est écrit ici : ni recopie, ni destruction. La cible est le
+            # résultat de `mongorestore`, et c'est LUI qu'on juge.
+            restaure = {"documents": None, "collections": len(cible.list_collection_names())}
+            if not restaure["collections"]:
+                return ecrire(
+                    2,
+                    "PRÉMISSE : la cible « %s » est vide — l'archive n'a rien restauré, "
+                    "donc il n'y a rien à comparer (ni à juger)." % cible_nom,
+                )
+            duree_restauration = None
+        else:
+            client.drop_database(cible_nom)
+            debut = time.monotonic()
+            restaure = restaurer(source, cible)
+            duree_restauration = time.monotonic() - debut
 
         debut = time.monotonic()
         apres = empreinte_base(cible)
@@ -221,20 +324,41 @@ def main(argv=None) -> int:
                 "collections": {nom: value["documents"] for nom, value in avant.items()},
                 "documents": sum(value["documents"] for value in avant.values()),
                 "duree_empreinte_s": round(duree_empreinte, 1),
-                "duree_restauration_s": round(duree_restauration, 1),
                 "duree_verification_s": round(duree_verification, 1),
-                "rto_mesure_s": round(duree_empreinte + duree_restauration + duree_verification, 1),
                 "documents_restaures": restaure["documents"],
                 "ecarts": ecarts,
             }
         )
-        if not args.garder:
-            client.drop_database(cible_nom)
-            rapport["base_travail_detruite"] = True
+        if args.deja_restauree:
+            # Le RTO de la restauration n'est PAS mesuré ici : `mongorestore` a
+            # fait le travail hors de ce script. Le taire vaut mieux que publier
+            # une durée qui ne décrit que des empreintes.
+            rapport["rto_mesure_s"] = None
+            rapport["rto_non_mesure"] = (
+                "mongorestore a restauré l'archive hors de ce script : sa durée est "
+                "celle de l'étape correspondante du workflow, pas celle de la comparaison"
+            )
+            rapport["base_travail_conservee"] = True
+        else:
+            rapport["duree_restauration_s"] = round(duree_restauration, 1)
+            rapport["rto_mesure_s"] = round(
+                duree_empreinte + duree_restauration + duree_verification, 1
+            )
+            if not args.garder:
+                client.drop_database(cible_nom)
+                rapport["base_travail_detruite"] = True
 
         if ecarts:
             return ecrire(1, "ÉCART(S) MESURÉ(S) : " + " ; ".join(ecarts))
         rapport["verdict"] = "identique"
+        if args.deja_restauree:
+            return ecrire(
+                0,
+                "✅ Archive restaurée IDENTIQUE à la source — %d document(s), %d "
+                "collection(s), index ET options d'index compris (base de travail %s, "
+                "jugée telle que mongorestore l'a laissée, contre %s)."
+                % (rapport["documents"], len(avant), cible_nom, args.base),
+            )
         return ecrire(
             0,
             "✅ Restauration IDENTIQUE — %d document(s), %d collection(s), index compris, "
@@ -249,8 +373,4 @@ def main(argv=None) -> int:
 
 
 if __name__ == "__main__":
-    try:
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    except (AttributeError, OSError):
-        pass
     sys.exit(main())

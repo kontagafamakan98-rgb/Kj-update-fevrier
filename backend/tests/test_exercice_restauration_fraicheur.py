@@ -13,7 +13,7 @@ Ce fichier prouve le garde sur trois plans, comme le veut la règle du dépôt :
     MESURÉ (l'âge est publié), un exercice plus vieux que la cadence annoncée
     est refusé en nommant l'âge, le seuil et le remède, et le jour du seuil
     reste vert quand le lendemain refuse ;
-  * les REPÈRES : un titre « non exécuté » (§3bis) n'est PAS une preuve, une
+  * les REPÈRES : un titre « non exécuté » (§3ter) n'est PAS une preuve, une
     date impossible ou absente est refusée, et un titre de prose n'est jamais
     pris pour un exercice — un repère deviné ferait rajeunir la preuve ;
   * le CÂBLAGE : l'étape de `workflow-lint` lance réellement le garde et ne
@@ -71,22 +71,28 @@ class TestLaRegle:
         """Le lecteur trouve le vrai repère du vrai fichier — pas un motif vide."""
         texte = RUNBOOK.read_text(encoding="utf-8")
         exercices, ecartes = garde.repartir(texte)
-        assert [quand for quand, _ in exercices] == [dt.date(2026, 10, 18)], (
-            "le §3 daté du 18/10/2026 n'a pas été lu : %r" % (exercices,)
-        )
+        dates = [quand for quand, _ in exercices]
+        # Le runbook porte PLUSIEURS exercices datés au fil du temps — le
+        # garde juge le plus RÉCENT. Exiger une liste d'un seul élément
+        # interdirait de consigner le suivant, ce qui est le contraire du but.
+        assert dt.date(2026, 10, 18) in dates, "le §3 daté du 18/10/2026 n'a pas été lu : %r" % (exercices,)
+        assert dt.date(2026, 10, 21) in dates, "l'exercice du 21/10/2026 n'a pas été lu : %r" % (exercices,)
+        assert dates == sorted(dates), "les repères datés doivent être chronologiques : %r" % (dates,)
         assert any("non exécuté" in raison for _, raison in ecartes), (
-            "le §3bis (« préparé, non exécuté ») doit être ÉCARTÉ, pas compté : %r"
+            "le §3ter (« préparé, non exécuté ») doit être ÉCARTÉ, pas compté : %r"
             % (ecartes,)
         )
 
     def test_un_exercice_recent_est_un_vert_mesure(self, garde):
+        """Horloge posée au dernier exercice consigné : le garde juge le PLUS
+        RÉCENT des repères, et publie son âge."""
         code, lignes = garde.juger(
-            RUNBOOK.read_text(encoding="utf-8"), dt.date(2026, 10, 19)
+            RUNBOOK.read_text(encoding="utf-8"), dt.date(2026, 10, 21)
         )
         assert code == 0, "\n".join(lignes)
         sortie = "\n".join(lignes)
-        # Un vert muet serait un vert sans mesure : l'âge et le seuil sont dits.
-        assert "18/10/2026" in sortie and "1 jour(s)" in sortie, sortie
+        # Un vert muet serait un vert sans mesure : la date, l'âge et le seuil sont dits.
+        assert "21/10/2026" in sortie and "0 jour(s)" in sortie, sortie
         assert "seuil 100" in sortie, sortie
 
     def test_un_exercice_plus_vieux_que_la_cadence_est_refuse(self, garde):
