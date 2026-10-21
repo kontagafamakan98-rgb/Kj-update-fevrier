@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-21",
-    "motif": "Reference retablie pour le sequestre a deux temps : server.py monte le routeur de fin de mission, la sonde Fly declare OPTIONNELS les deux reglages de liberation (COMPLETION_AUTO_RELEASE_DAYS, COMPLETION_SWEEP_INTERVAL_MINUTES) qui ont un defaut de repli, et le budget du CSS inline est REPORTE sur la mesure du 21/10/2026 (83 329 o, 1 123 regles) car le panneau de fin de mission ajoute 1 041 o et 14 regles a la feuille inlined. Les deux cas de depassement du garde lisent desormais le budget dans la table au lieu de le figer, donc une re-mesure du CSS ne les fait plus rougir pour rien.",
+    "motif": "Reference du 21/10/2026, pour le sequestre a deux temps ET la relecture du depot de sauvegarde. (1) server.py monte le routeur de fin de mission, la sonde Fly declare OPTIONNELS les deux reglages de liberation (COMPLETION_AUTO_RELEASE_DAYS, COMPLETION_SWEEP_INTERVAL_MINUTES) qui ont un defaut de repli, et le budget du CSS inline est REPORTE sur la mesure (83 329 o, 1 123 regles) car le panneau de fin de mission ajoute 1 041 o et 14 regles ; les deux cas de depassement du garde lisent desormais le budget dans la table. (2) backend/scripts/verifier_depot_sauvegarde.py nait avec une mutation declaree (empreinte neutralisee) : son etat de reference est donc enregistre des sa naissance, et non apres une premiere derive.",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -128,7 +128,8 @@
       ".github/scripts/rapport-secrets.py": "231c6e9b180ac25dea480d9d56d2a8fa3cf5ddfe32e79a1b4b6be8780c51965d",
       "backend/server.py": "caf00c2436703dc74c0896359c14e6dbfbd5bce363367b72e479f0be89bf71ef",
       ".github/scripts/check-exercice-restauration.py": "5b630d1aa76144c52795e6c2fad82295736b696457166cfb5b746fe38390e68e",
-      "frontend/scripts/check-css-inline-budget.js": "8fd97dddf10b3bf287713bc1dd5ef3e8e73df884a4e64aba8ba37a7dcb78e87d"
+      "frontend/scripts/check-css-inline-budget.js": "8fd97dddf10b3bf287713bc1dd5ef3e8e73df884a4e64aba8ba37a7dcb78e87d",
+      "backend/scripts/verifier_depot_sauvegarde.py": "165d97d983076e2f03a0ed09950c703935963aef53a917db7b7d70e404f63866"
     }
   },
   "hors_perimetre": [

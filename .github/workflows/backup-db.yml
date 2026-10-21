@@ -21,7 +21,16 @@ name: Sauvegarde externe vérifiée (quotidien)
 #   5. il DÉPOSE l'archive chiffrée sur un stockage S3/R2 privé et publie sa
 #      taille, son empreinte et l'heure — ce que la sonde Atlas juge ensuite
 #      (`.github/scripts`-ci : `backend/scripts/check_atlas_backups.py`, règle
-#      « sauvegarde externe » via l'API Actions).
+#      « sauvegarde externe » via l'API Actions) ;
+#   6. il RELIT l'objet DÉPOSÉ : retéléchargé, empreinté, déchiffré et ouvert
+#      comme un flux gzip (`backend/scripts/verifier_depot_sauvegarde.py`).
+#      Sans cette étape, le run prouvait l'archive LOCALE — donc le disque du
+#      runner, pas ce qu'on récupérerait le jour d'une perte.
+#
+# Le chemin de l'objet est ÉCRIT dans `/tmp/kojo.cle` par l'étape de dépôt et
+# RELU par celle de relecture : recalculer `date -u +%Y/%m/%d` dans la seconde
+# étape traverserait minuit UTC pour un run commencé à 23:59 et relirait une clé
+# qui n'existe pas — un faux rouge de temps en temps, le pire des rouges.
 #
 # Ce qu'il ne fait pas : supprimer les archives (la rétention est une POLITIQUE,
 # bornée dans `backend/SAUVEGARDES_ATLAS.md`, pas une ligne de shell qui
@@ -169,6 +178,7 @@ jobs:
           AWS_DEFAULT_REGION: auto
         run: |
           cle="$(date -u +%Y/%m/%d)-kojo.archive.enc"
+          printf '%s\n' "$cle" > /tmp/kojo.cle
           aws --endpoint-url "$BACKUP_S3_ENDPOINT" s3 cp \
             /tmp/kojo.archive.enc "s3://$BACKUP_S3_BUCKET/$cle" --no-progress
           echo "archive déposée : $cle"
@@ -181,4 +191,35 @@ jobs:
             echo "- empreinte SHA-256 (chiffrée) : \`$(cat /tmp/kojo.archive.sha256)\`"
             echo "- taille : $(stat -c%s /tmp/kojo.archive.enc) octets"
             echo "- restauration comparée à la source : identique (index compris)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # La relecture ferme le dernier trou. Jusqu'ici ce run prouvait l'archive
+      # LOCALE ; il prouve maintenant l'OBJET DÉPOSÉ — donc ce qu'on
+      # récupérerait vraiment. La preuve faite à la main le 21/10/2026
+      # (retélécharger, empreinte, déchiffrement, gzip) devient quotidienne.
+      #
+      # Rien n'est neutralisé ici : un dépôt qui ne se relit pas rend le run
+      # rouge, parce que c'est exactement la panne qu'on ne découvrirait qu'au
+      # moment de restaurer.
+      - name: Relire le dépôt déposé (empreinte, déchiffrement, archive gzip)
+        working-directory: backend
+        env:
+          BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_KEY }}
+          AWS_DEFAULT_REGION: auto
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          cle="$(cat /tmp/kojo.cle)"
+          aws --endpoint-url "$BACKUP_S3_ENDPOINT" s3 cp \
+            "s3://$BACKUP_S3_BUCKET/$cle" /tmp/relecture.enc --no-progress
+          python scripts/verifier_depot_sauvegarde.py \
+            --fichier /tmp/relecture.enc \
+            --envoye /tmp/kojo.archive.enc \
+            --empreinte "$(cat /tmp/kojo.archive.sha256)"
+          {
+            echo ""
+            echo "- relecture du dépôt : objet retéléchargé, empreinte identique,"
+            echo "  déchiffré avec la phrase secrète, flux gzip complet"
           } >> "$GITHUB_STEP_SUMMARY"

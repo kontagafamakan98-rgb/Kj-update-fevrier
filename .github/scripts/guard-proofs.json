@@ -738,6 +738,14 @@
       "runner": "pytest"
     },
     {
+      "chemin": "backend/scripts/verifier_depot_sauvegarde.py",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "backend/tests/test_verifier_depot_sauvegarde.py",
+      "runner": "pytest",
+      "motif": "Etape de backup-db.yml : il relit l'OBJET DEPOSE (retelcharge par aws s3 cp dans une autre copie que celle envoyee), compare son empreinte a celle que le run vient de publier, le dechiffre avec la phrase secrete gardee et verifie que le clair est un flux gzip COMPLET (pas seulement une signature). Sans lui, le run prouvait l'archive du runner : ce qu'on recupererait le jour d'une perte n'etait mesure par personne. Ses refus sont eprouves sur de vrais chiffrements openssl (empreinte fausse, phrase qui n'ouvre pas, clair non gzip, flux tronque, relecture du fichier qu'on vient d'envoyer)."
+    },
+    {
       "chemin": "backend/scripts/preparer_sauvegarde_externe.py",
       "role": "outil",
       "invoque_par": "aucun",
@@ -4376,6 +4384,27 @@
       "cwd": "frontend",
       "attend": [
         "refuse un résidu publié que personne ne sert"
+      ]
+    },
+    {
+      "id": "depot-sauvegarde: empreinte differente neutralisee",
+      "garde": "backend/scripts/verifier_depot_sauvegarde.py",
+      "cible": "backend/scripts/verifier_depot_sauvegarde.py",
+      "trouve": "    if obtenue != attendue:",
+      "remplace": "    if False:",
+      "runner": "python",
+      "preuve": "backend/tests/test_verifier_depot_sauvegarde.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_verifier_depot_sauvegarde.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_verifier_depot_sauvegarde.py::test_une_empreinte_differente_est_un_fait_faux_nomme"
       ]
     },
     {
