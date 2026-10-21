@@ -356,23 +356,33 @@ Trois choses doivent tenir, dans cet ordre :
 
 ## 5. Ce qui reste ouvert (et ce qu'il faut pour fermer)
 
-1. **Les quatre secrets Atlas sont posés** (19/10/2026) : la sonde rend
-   désormais un VERDICT (M0, `backupEnabled=false`, `pitEnabled=false`) au lieu
-   d'une prémisse. Ce qui manque n'est plus la clé mais la sauvegarde :
-   `MONGO_URL` + les accès du bucket, puis un premier run réussi de
-   `backup-db.yml` — sans lui la sonde est rouge en disant exactement cela.
-2. **Passer le cluster en M10+ et activer Continuous Cloud Backup** si la sonde
+1. **La sauvegarde EXTERNE existe et se juge** (21/10/2026) : premier run
+   réussi de `backup-db.yml` (run 39532321510) — archive restaurée puis
+   comparée à la source (404 documents, 20 collections, options d'index
+   comprises), chiffrée en AES-256 et déposée sur le bucket privé. La sonde
+   juge donc une **fraîcheur** au lieu de constater « aucun run réussi ».
+2. **Les quatre clés `ATLAS_*` sont REFUSÉES** (401) depuis le 21/10/2026 :
+   elles rendaient un verdict à 00:10 (M0, `backupEnabled=false`,
+   `pitEnabled=false`) et ne le rendent plus à 02:22. Cause la plus probable :
+   clé supprimée ou roulée pendant la mise en place du compte de sauvegarde,
+   ou **liste d'accès IP** d'Atlas qui exclut les runners GitHub. Tant que
+   c'est le cas, la sonde sort en **2** : elle publie l'âge de la sauvegarde
+   externe (ligne `[MESURÉ]`) mais ne juge PAS le cluster. Remède : Atlas →
+   Access Manager → API Keys, clé « Project Read Only », accès réseau incluant
+   les runners, puis reposer `ATLAS_PUBLIC_KEY`, `ATLAS_PRIVATE_KEY`,
+   `ATLAS_PROJECT_ID`, `ATLAS_CLUSTER`.
+3. **Passer le cluster en M10+ et activer Continuous Cloud Backup** si la sonde
    répond 1 : c'est le seul moyen d'avoir un RPO court.
-3. **Exécuter un vrai exercice PITR daté** et l'écrire ici (même tableau, même
+4. **Exécuter un vrai exercice PITR daté** et l'écrire ici (même tableau, même
    empreinte), au moins une fois avant la mise en service à volume.
-4. **Cadence** : un exercice par trimestre, daté dans ce fichier. Une procédure
+5. **Cadence** : un exercice par trimestre, daté dans ce fichier. Une procédure
    jamais rejouée est une intention, pas une capacité — et cette cadence n'est
    pas une intention non plus : `.github/scripts/check-exercice-restauration.py`
    lit le titre daté du §3 et **refuse** un exercice plus vieux que 100 jours
    (90 de cadence + 10 de marge, étape de `workflow-lint`). Le runbook ne peut
    donc pas rester « prêt à restaurer » sur une preuve périmée. Ce que le garde
    ne fait pas : rejouer l'exercice à ta place — il rougit, il ne restaure pas.
-5. **Le propriétaire doit pouvoir restaurer seul** : la règle des deux personnes
+6. **Le propriétaire doit pouvoir restaurer seul** : la règle des deux personnes
    de `CONTINUITE.md` §1 (écart connu) s'applique aussi ici — une sauvegarde
    dont une seule personne détient les clés reste un point de défaillance.
 
