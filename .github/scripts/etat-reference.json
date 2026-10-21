@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-21",
-    "motif": "Le sequestre a deux temps monte son routeur dans server.py (POST /jobs/{id}/completion, /completion/proof, /completion/confirm) : la reference est retablie sur cet etat, les autres empreintes restent celles du depot.",
+    "motif": "Reference retablie pour le sequestre a deux temps : server.py monte le routeur de fin de mission, et la sonde Fly declare OPTIONNELS les deux reglages de liberation (COMPLETION_AUTO_RELEASE_DAYS, COMPLETION_SWEEP_INTERVAL_MINUTES), qui ont un defaut de repli dans kojo_settings.",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -123,7 +123,7 @@
       "backend/kojo_core.py": "bf699385546b29fd504a7ded798c5ee0f95c53b2395a03d3bed3d3604abda69f",
       "frontend/scripts/check-job-og-contract.js": "839df61489bad8ea3f15b82ef924ac7393bb7e1390bd5c2807e02c9aefa77e67",
       "frontend/scripts/check-spa-routes.js": "397f7d342211ae8db2623e4b36eb37f7059bae134ccc981452f222765ed14114",
-      ".github/scripts/check-fly-env-drift.py": "ff6c31551f971311d776d6fd94ca0276b4b557d3ec7c3b3b3bbbcf4918d30e5a",
+      ".github/scripts/check-fly-env-drift.py": "b289cc663fdf100d42fb482353cba013bea1422e22d03bfa511ed4d7ffb0f580",
       ".github/scripts/install-gitleaks.sh": "4105763e64eaa2b1498c8e8c46913062274e67e5a31c4f108cfdc21bed3a41d1",
       "frontend/scripts/check-worker-og-contract.js": "f1eba48a23f15289eb468c9792847a9bffb83c42f31a5f03dd99142edf2011cc",
       ".github/scripts/rapport-secrets.py": "231c6e9b180ac25dea480d9d56d2a8fa3cf5ddfe32e79a1b4b6be8780c51965d",
