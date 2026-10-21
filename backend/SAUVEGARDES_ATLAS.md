@@ -37,6 +37,13 @@ Un run rouge pour cause de code 2 est une **prémisse** (les clés ne sont pas
 posées), pas une panne de sauvegarde : la distinction est écrite dans le
 message, pour qu'on ne cherche pas une panne qui n'existe pas.
 
+Depuis le 21/10/2026, cette prémisse publie **aussi** une ligne `[MESURÉ]` avec
+l'âge de la dernière sauvegarde EXTERNE. Motif mesuré : les clés `ATLAS_*` ont
+été refusées (401) le jour même où `backup-db.yml` venait d'aboutir, et le run
+ne disait **rien** de cette moitié — on y lisait « on ne sait rien » là où un
+fait était mesurable. Le code reste **2** : un fait rassurant à côté d'un refus
+ne fait pas un vert, et la sonde ne prétend pas avoir jugé Atlas.
+
 À la main, la même vérité se lit dans le tableau de bord : **Atlas → Project →
 Cluster → Backup**. Une case « Cloud Backup » cochée sans « Continuous Cloud
 Backup » est le cas piégeux que la sonde attrape.

@@ -267,6 +267,43 @@ def dernier_succes_externe(depot=None, jeton=None):
     return "ok", runs[0].get("created_at") or runs[0].get("run_started_at")
 
 
+def fraicheur_externe_mesuree(dernier_succes, maintenant, seuil_heures=FRAICHEUR_MAX_HEURES):
+    """UNE LIGNE MESURÉE, jamais un verdict — publiée à côté d'une prémisse Atlas.
+
+    POURQUOI : le 21/10/2026, les clés `ATLAS_*` ont été refusées (401) alors que
+    la sauvegarde externe, elle, venait d'aboutir. La sonde sortait en 2 en
+    n'écrivant RIEN sur cette moitié : le lecteur du run lisait « on ne sait
+    rien » là où un fait était mesurable. Ce n'est pas un vert pour autant — le
+    verdict sur les sauvegardes Atlas reste non rendu, et le code reste 2 —,
+    mais chaque moitié dit ce qu'elle sait.
+
+    PURE : l'horloge est un paramètre, donc un âge se juge sans attendre.
+    """
+    if not dernier_succes:
+        return (
+            "[MESURÉ] Aucune sauvegarde EXTERNE n'a jamais abouti : rien ne serait "
+            "restaurable aujourd'hui. Ce fait ne remplace pas le verdict Atlas."
+        )
+    instant = _instant(dernier_succes)
+    if instant is None:
+        return (
+            f"[MESURÉ] Date de la dernière sauvegarde EXTERNE illisible "
+            f"({dernier_succes!r}) : sa fraîcheur non plus n'est pas jugeable ici."
+        )
+    age = (maintenant - instant) / 3600.0
+    if age < -1:
+        return (
+            f"[MESURÉ] Dernière sauvegarde EXTERNE datée dans le FUTUR "
+            f"({-age:.0f} h d'avance) : une horloge fausse rend l'âge invérifiable."
+        )
+    etat = "fraîche" if age <= seuil_heures else "PÉRIMÉE"
+    return (
+        f"[MESURÉ] Sauvegarde EXTERNE : il y a {age:.0f} h (seuil "
+        f"{seuil_heures:.0f} h) — {etat}. Ce fait ne remplace pas le verdict "
+        "Atlas, qui n'est pas rendu ici."
+    )
+
+
 def sans_sauvegarde_sur_palier_partage(corps):
     """Le cas où la seule restauration possible est EXTERNE."""
     if not isinstance(corps, dict):
@@ -352,6 +389,17 @@ def main():
         args.delai,
     )
     code, lignes = analyser(statut, corps if statut is not None else erreur)
+
+    if code == 2:
+        # Une prémisse Atlas ne dit rien de l'AUTRE moitié : la sauvegarde
+        # externe se mesure sans Atlas, et la taire ferait lire « on ne sait
+        # rien » là où un âge est connu. Le code reste 2 — un refus ne devient
+        # pas un vert parce qu'un fait voisin est rassurant.
+        etat, valeur = dernier_succes_externe()
+        if etat == "illisible":
+            lignes.append(f"[MESURÉ] Sauvegarde EXTERNE non jugeable : {valeur}")
+        else:
+            lignes.append(fraicheur_externe_mesuree(valeur, time.time()))
 
     # Sur un palier PARTAGÉ sans sauvegarde, la seule restauration possible est
     # externe : on juge sa FRAÎCHEUR au lieu d'exiger un Cloud Backup impossible.
