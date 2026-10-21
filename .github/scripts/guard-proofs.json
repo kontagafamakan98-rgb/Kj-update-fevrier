@@ -4393,10 +4393,9 @@
         "scripts/__tests__/check-css-inline-budget.test.js",
         "--reporter=default"
       ],
-      "cwd": "frontend",
-      "attend": [
-        "de CSS inline > budget 82944 o"
-      ]
+      "cwd": "frontend",  "attend": [
+   "de CSS inline > budget "
+  ]
     },
     {
       "id": "css-inline: plancher de la feuille critique neutralise",

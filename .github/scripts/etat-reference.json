@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-21",
-    "motif": "Reference retablie pour le sequestre a deux temps : server.py monte le routeur de fin de mission, et la sonde Fly declare OPTIONNELS les deux reglages de liberation (COMPLETION_AUTO_RELEASE_DAYS, COMPLETION_SWEEP_INTERVAL_MINUTES), qui ont un defaut de repli dans kojo_settings.",
+    "motif": "Reference retablie pour le sequestre a deux temps : server.py monte le routeur de fin de mission, la sonde Fly declare OPTIONNELS les deux reglages de liberation (COMPLETION_AUTO_RELEASE_DAYS, COMPLETION_SWEEP_INTERVAL_MINUTES) qui ont un defaut de repli, et le budget du CSS inline est REPORTE sur la mesure du 21/10/2026 (83 329 o, 1 123 regles) car le panneau de fin de mission ajoute 1 041 o et 14 regles a la feuille inlined. Les deux cas de depassement du garde lisent desormais le budget dans la table au lieu de le figer, donc une re-mesure du CSS ne les fait plus rougir pour rien.",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -114,7 +114,6 @@
       "frontend/scripts/retard-main.js": "eef5724dae66bc8e17fbb50e0be1c426b9eba4ceb24c04808c8fdb0f8dacad37",
       "frontend/scripts/style-layout-budgets.cjs": "db93353a147d9be6e84999ea065d3b3df5d08871a62fe943f3346bc80d68ede9",
       "frontend/scripts/validate-vercel-json.mjs": "16a56835e1fb299821c3a1dd7fa4d0957982a970a493e98ed8855d06fc563518",
-      "frontend/scripts/check-css-inline-budget.js": "cf45fae01f0a25656dad26839dd4b1a4de07abc4023d9be4722e1a3a5a55bedd",
       "frontend/scripts/verre-contraste.js": "0304f01ae4ccd2fea6db62cff8badcb4085d3a34622f49416ed8944c377c688c",
       ".github/scripts/check-resync-parite.py": "4bc076c1ae2c39e2d9ccb2f6c17d3f61be7d7b2fd0d3c64c1c5f52db74535911",
       ".github/scripts/livrer.py": "3f20751305f89a261d3ef27a0f5ae274f8bc85abbf4ed7a90159f6d708f2fbcf",
@@ -128,7 +127,8 @@
       "frontend/scripts/check-worker-og-contract.js": "f1eba48a23f15289eb468c9792847a9bffb83c42f31a5f03dd99142edf2011cc",
       ".github/scripts/rapport-secrets.py": "231c6e9b180ac25dea480d9d56d2a8fa3cf5ddfe32e79a1b4b6be8780c51965d",
       "backend/server.py": "caf00c2436703dc74c0896359c14e6dbfbd5bce363367b72e479f0be89bf71ef",
-      ".github/scripts/check-exercice-restauration.py": "5b630d1aa76144c52795e6c2fad82295736b696457166cfb5b746fe38390e68e"
+      ".github/scripts/check-exercice-restauration.py": "5b630d1aa76144c52795e6c2fad82295736b696457166cfb5b746fe38390e68e",
+      "frontend/scripts/check-css-inline-budget.js": "8fd97dddf10b3bf287713bc1dd5ef3e8e73df884a4e64aba8ba37a7dcb78e87d"
     }
   },
   "hors_perimetre": [

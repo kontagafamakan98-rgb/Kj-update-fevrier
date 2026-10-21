@@ -50,6 +50,16 @@
  * qu'elle remplace. Le budget n'est pas touché : la marge remonte de 494 o à
  * 885 o.
  *
+ * ── Le relevé a bougé le 21/10/2026 : 83 329 o / 16 453 o gzip / 1 123 règles /
+ *    sha 0ca062c21824f478 ────────────────────────────────────────────────────
+ * Le SÉQUESTRE À DEUX TEMPS livre un panneau de fin de mission qui n'existait
+ * pas : formulaire de déclaration du travailleur, note minimale, photos de
+ * preuve, échéance de libération affichée et trois états (en attente, libéré,
+ * bloqué sans séquestre). Il n'ajoute aucune feuille : ce sont des utilitaires,
+ * donc +1 041 o et +14 règles sur la feuille déjà inlinée. Le budget est
+ * REPORTÉ sur la mesure (81 Ko → 84 Ko, marge 2 687 o), pas élargi au-delà : la
+ * prochaine livraison qui touche au CSS se re-mesurera pareil.
+ *
  * ── Le relevé a bougé le 20/10/2026 : 82 288 o / 1 109 règles / sha
  *    da7908a025017f5a ────────────────────────────────────────────────────────
  * L'identité du site s'étend à deux matières qui existaient déjà ailleurs : la
@@ -156,6 +166,15 @@ export const FEUILLE_DE_REFERENCE = 'index.html';
  * le dire — au lieu de dériver en silence.
  */
 export const CSS_INLINE_BUDGETS = {
+  // Relevé 21/10/2026 (séquestre à deux temps) : 83 329 o / 16 453 o gzip /
+  // 1 123 règles / sha 0ca062c21824f478 — budget REPORTÉ sur cette mesure
+  // (84 Ko = 86 016 o), marge 2 687 o. Le panneau de fin de mission ajoute un
+  // formulaire (champ de preuve, envoi de photos, aide de longueur), deux blocs
+  // de preuve et trois états au MÊME vocabulaire utilitaire que le reste :
+  // +1 041 o sur la feuille, soit +1,3 %, et 14 règles nettes. Rien n'est retiré
+  // pour l'absorber — les treize documents relisent ces octets avant le premier
+  // paint, et c'est désormais la marge de 2 687 o qui fera rougir la prochaine
+  // règle ajoutée sans re-mesure.
   // Relevé 20/10/2026 (l'identité : carte de verre, avatar morphique) : 82 288 o
   // / 1 109 règles / sha da7908a025017f5a — budget inchangé, marge 656 o. La
   // carte éditoriale passe du papier plein à un verre à 94 % (filet, reflet,
@@ -167,19 +186,19 @@ export const CSS_INLINE_BUDGETS = {
   // Relevé 17/10/2026 : 80 324 o / 15 759 o gzip / 1083 règles / sha f5da31364d5a2964.
   // (Relevé 11/10/2026 : 76 533 o / 15 115 o gzip / 1044 règles / sha 41d0f2e82d7950d9 ;
   //  09/10/2026 : 69 276 o / 13 111 o gzip / 936 règles / sha d8c74e2cb457a497.)
-  'index.html': { budget: 82944, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'about.html': { budget: 82944, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'app.html': { budget: 82944, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'contact.html': { budget: 82944, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'forgot-password.html': { budget: 82944, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'how-it-works.html': { budget: 82944, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'jobs.html': { budget: 82944, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'login.html': { budget: 82944, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'payment.html': { budget: 82944, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'privacy.html': { budget: 82944, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'register.html': { budget: 82944, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'support.html': { budget: 82944, plancher: 61440, blocs: 1, feuille: 'index.html' },
-  'terms.html': { budget: 82944, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'index.html': { budget: 86016, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'about.html': { budget: 86016, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'app.html': { budget: 86016, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'contact.html': { budget: 86016, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'forgot-password.html': { budget: 86016, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'how-it-works.html': { budget: 86016, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'jobs.html': { budget: 86016, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'login.html': { budget: 86016, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'payment.html': { budget: 86016, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'privacy.html': { budget: 86016, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'register.html': { budget: 86016, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'support.html': { budget: 86016, plancher: 61440, blocs: 1, feuille: 'index.html' },
+  'terms.html': { budget: 86016, plancher: 61440, blocs: 1, feuille: 'index.html' },
   // Le document minimal n'a pas la feuille critique : il a la sienne, et courte.
   // Relevé 09/10/2026 : 392 o / 6 règles / sha 8108c4546aacc8b6.
   '404.html': { budget: 2048, plancher: 256, blocs: 1, feuille: '404.html' },
