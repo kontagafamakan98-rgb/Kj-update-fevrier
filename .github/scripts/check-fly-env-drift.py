@@ -198,6 +198,12 @@ OPTIONAL_KEYS = {
     # absence sur Fly n'est pas une divergence.
     "NEON_AI_GATEWAY_BASE_URL", "NEON_AI_GATEWAY_TOKEN",
     "NEON_AI_GATEWAY_MODEL", "NEON_AI_GATEWAY_TIMEOUT_SECONDS",
+    # Sequestre a deux temps : les deux reglages ont un defaut de repli dans
+    # `kojo_settings` (7 jours, balayage horaire) et le delai REFUSE le demarrage
+    # sous 1 jour. Leur absence sur Fly n'est donc pas une divergence doc-prod :
+    # c'est le defaut qui s'applique, et la valeur est ecrite dans
+    # backend/SAUVEGARDES_ATLAS.md (section sequestre) pour qui veut la changer.
+    "COMPLETION_AUTO_RELEASE_DAYS", "COMPLETION_SWEEP_INTERVAL_MINUTES",
 }
 
 # Keys connues mais NON sensibles (valeur vérifiable côté doc). Leur digest
