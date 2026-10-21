@@ -1,8 +1,9 @@
 # Audit général de Kojo — rédigé le 20/10/2026, révisé le 21/10/2026
 
 Périmètre de la révision : `main` @ `876e810c`, **plus 13 fichiers non commités**
-(le renommage du badge, cf. §0.8). Cet audit lit le **code réel**, les gardes, les
-workflows et les documents d'exploitation du dépôt. Les relevés de production de
+(le renommage du badge, cf. §0.8) — livrés depuis en `25642ef5` (PR #184). Cet audit
+lit le **code réel**, les gardes, les workflows et les documents d'exploitation du
+dépôt. Les relevés de production de
 la révision ont été pris le 21/10/2026 et sont datés ; ce qui n'a pas été mesuré
 est dit comme tel.
 
@@ -150,15 +151,40 @@ elle a un problème d'offre, de preuve et de bouche-à-oreille. Tant que
 Les trois actions qui changent le plus, dans l'ordre : **semer l'offre** (§0.6-1),
 **tracer le litige** (§0.6-2), **réduire la cécité et le facteur Bus** (§0.6-3 et 4).
 
-### 0.8 État de l'arbre de travail (risque de processus, pas de code)
+### 0.8 État de l'arbre de travail, puis livraison (21/10/2026)
 
 Au moment de la rédaction, le renommage du badge (§0.1, §3.4) n'était pas
 commité : 13 fichiers modifiés sur `main` (5 dictionnaires, Dashboard, Profile,
 WorkerProfile, JobDetails, `workerTrustLevel.js`, `AGENTS.md`, la revue native) et
-1 nouveau test non suivi, plus ce document. **Ils partent maintenant dans la même
-PR** (le badge comme premier commit, cet audit comme second) : une modification
-qui reste sur le disque échappe à la CI, donc à ses gardes, et le risque n'était
-pas le code mais la livraison.
+1 nouveau test non suivi, plus ce document. **Ils sont partis dans la même PR**
+(l'audit comme premier commit, le badge comme second) : une modification qui reste
+sur le disque échappe à la CI, donc à ses gardes, et le risque n'était pas le code
+mais la livraison.
+
+**Livré le 21/10/2026 à 15:18 UTC** : PR #184 fusionnée en squash → `25642ef5` sur
+`main`. Tous les checks du périmètre étaient verts sur le commit de tête (tests
+backend et frontend dont le contrat OG, secrets, lint des workflows, audits, build
+mobile, déploiement Fly).
+
+**La production n'a PAS suivi, et ce n'est pas un défaut du code.** Vercel n'a créé
+**aucun déploiement** pour la fusion : le dernier déploiement `Production` est
+`7221114223` (`876e810c`, 08:11 UTC) et le dernier `Preview` est celui de la
+branche à 15:12 UTC — l'événement du push sur `main` n'a pas produit de build. Deux
+rouges en découlent, tous deux sur le run `39624483759` de `main` :
+
+| Rouge | Cause mesurée | Ce qu'il reste à faire |
+|---|---|---|
+| `Frontend tests + build` — étape « Vérifier la révision servie » | 9 tentatives en 4 min : `servi=876e810c`, `attendu=25642ef5`. Le frontend déployé n'est pas celui de `main`. | Rien côté dépôt : **redéclencher un déploiement Vercel de `main`** (dashboard, ou tout nouvel événement de push). `livrer.py` a rendu **2** pour la même raison — PR fusionnée, production non conforme —, ce qui est le comportement voulu. |
+| `Fly env doc-prod` — sonde email authentifié (`check-email-auth.py --require-secrets`, main only) | L'OTP de production a répondu **200**, puis la lecture IMAP a dépassé son délai (`The read operation timed out`). | Indépendant du badge : c'est la **livraison du message** qui a manqué, pas son authentification. À rejouer ; si le délai se répète, c'est la boîte de sonde qu'il faut regarder. |
+
+Ce que ce couple de rouges dit du dispositif, et qui vaut d'être gardé : le gate de
+révision servie a **refusé de conclure à un vert** devant une production en retard
+d'un commit, et l'a nommé en clair. Une livraison qui se croit faite sans être
+servie est exactement le silence que ces sondes existent pour empêcher.
+
+**Ce qui reste ouvert dans ce document** : la production sert toujours `876e810c`
+au moment d'écrire ces lignes ; les relevés de §0.5 restent donc ceux de cette
+révision pour tout ce qui touche au badge (le renommage n'y change aucune mesure).
 
 ---
 
