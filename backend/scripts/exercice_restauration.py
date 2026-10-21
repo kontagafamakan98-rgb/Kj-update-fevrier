@@ -355,8 +355,8 @@ def main(argv=None) -> int:
             return ecrire(
                 0,
                 "✅ Archive restaurée IDENTIQUE à la source — %d document(s), %d "
-                "collection(s), index ET options d'index compris (comparaison de %s, "
-                "recopiée depuis %s)."
+                "collection(s), index ET options d'index compris (base de travail %s, "
+                "jugée telle que mongorestore l'a laissée, contre %s)."
                 % (rapport["documents"], len(avant), cible_nom, args.base),
             )
         return ecrire(
