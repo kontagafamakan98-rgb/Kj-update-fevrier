@@ -31,8 +31,13 @@ if str(REPO_ROOT / "backend" / "scripts") not in sys.path:
 import exercice_restauration as exercice  # noqa: E402  (après le chemin)
 
 
-def _empreinte(documents=10, sha="a" * 64, index=("id",)):
-    return {"documents": documents, "sha256": sha, "index": list(index)}
+def _empreinte(documents=10, sha="a" * 64, index=("id",), definitions=None):
+    return {
+        "documents": documents,
+        "sha256": sha,
+        "index": list(index),
+        "definitions": definitions or {},
+    }
 
 
 def _lancer(argv):
@@ -67,9 +72,60 @@ class TestLaComparaisonNommeCeQuiEstPerdu:
         )
         assert ecarts and "assigned_worker_id" in ecarts[0]
 
+    def test_index_present_mais_sans_sparse_est_un_ecart(self):
+        """Un index du MÊME nom mais d'une autre définition n'est pas restauré :
+        un unique non sparse fait échouer la restauration, un TTL perdu fait
+        garder les données pour toujours. Le nom seul ne le dit pas — mesuré le
+        21/10/2026 (E11000 sur `payments.idempotency_key`)."""
+        ecarts = exercice.comparer(
+            {"payments": _empreinte(
+                index=("idempotency_key_1",),
+                definitions={"idempotency_key_1": '{"key": [["idempotency_key", 1]], "sparse": true, "unique": true}'},
+            )},
+            {"payments": _empreinte(
+                index=("idempotency_key_1",),
+                definitions={"idempotency_key_1": '{"key": [["idempotency_key", 1]], "unique": true}'},
+            )},
+        )
+        assert ecarts and "AUTRE définition" in ecarts[0]
+        assert "sparse/TTL/partiel" in ecarts[0]
+
     def test_collection_en_trop_est_un_ecart(self):
         ecarts = exercice.comparer({"users": _empreinte()}, {"users": _empreinte(), "fantome": _empreinte()})
         assert ecarts and "EN TROP" in ecarts[0]
+
+
+class TestLesIndexSontRecopiesEntiers:
+    def test_sparse_ttl_et_filtre_partiel_survivent(self):
+        """Ne garder que `unique` perdait `sparse` (restauration refusée) et
+        `expireAfterSeconds` (TTL effacé sans le dire)."""
+        information = {
+            "key": [("idempotency_key", 1)],
+            "unique": True,
+            "sparse": True,
+            "name": "idempotency_key_1",
+            "v": 2,
+            "ns": "kojo_db.payments",
+            "background": True,
+        }
+        options = exercice.options_index(information)
+        assert options == {"unique": True, "sparse": True}
+
+        ttl = exercice.options_index({"key": [("recu_le", 1)], "expireAfterSeconds": 2592000, "name": "recu_le_1"})
+        assert ttl == {"expireAfterSeconds": 2592000}
+
+        partiel = exercice.options_index({
+            "key": [("email", 1)],
+            "partialFilterExpression": {"email": {"$exists": True}},
+            "name": "email_1",
+        })
+        assert partiel == {"partialFilterExpression": {"email": {"$exists": True}}}
+
+    def test_la_definition_ne_depend_pas_de_l_ordre_des_cles(self):
+        dit = exercice.definition_index({"key": [("a", 1)], "unique": True, "sparse": True, "name": "a_1"})
+        autre = exercice.definition_index({"sparse": True, "unique": True, "key": [("a", 1)]})
+        assert dit == autre
+        assert exercice.definition_index({"key": [("a", 1)], "unique": True}) != dit
 
 
 class TestLaPremisseNEstPasUnVert:

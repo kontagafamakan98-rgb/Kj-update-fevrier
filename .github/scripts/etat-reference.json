@@ -34,13 +34,12 @@
     "Preuve : backend/tests/test_etat_reference.py"
   ],
   "reference": {
-    "etablie_le": "2026-10-20",
-    "motif": "verdict du scan de secrets (annotations sans valeur, refus de conclure sans mesure, sortie UTF-8 pour qu'un poste Windows ne transforme pas un UnicodeEncodeError en « secret trouve ») : cible de la mutation 'plage non parcourue acceptee'",
+    "etablie_le": "2026-10-21",
+    "motif": "Le garde de fraicheur de l'exercice ecrit ses verdicts en UTF-8 : sur une console Windows en cp1252, une fleche du runbook le faisait tomber en UnicodeEncodeError au lieu de juger.",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
       ".github/scripts/check-exec-bits.py": "92e00bbb66f78f7e06d186ef57a93559d1d3818b446edcdaf006244773690fe6",
-      ".github/scripts/check-exercice-restauration.py": "54de4cd7521a19c5c4bcdd0a78e7ef9ef0fc87d3a62f15facf1b63323f0b5728",
       ".github/scripts/check-gate-perimetre.py": "875db0af3fad7e867eff7115e42d104c30c8f505e6c4c2bc63ac255d8e411e82",
       ".github/scripts/check-guard-mutations.py": "bba1ca83ddd35fc703bee790a3d1057e98af3fe9bd7377155ad1984e0862441a",
       ".github/scripts/check-informative-steps.py": "3ef82281cd546809dd739fd2241a24e2d1f68a3cf17d3cb96fefbe8ac77c9219",
@@ -124,11 +123,12 @@
       "backend/kojo_core.py": "bf699385546b29fd504a7ded798c5ee0f95c53b2395a03d3bed3d3604abda69f",
       "frontend/scripts/check-job-og-contract.js": "839df61489bad8ea3f15b82ef924ac7393bb7e1390bd5c2807e02c9aefa77e67",
       "frontend/scripts/check-spa-routes.js": "397f7d342211ae8db2623e4b36eb37f7059bae134ccc981452f222765ed14114",
-      "backend/server.py": "00a02d8c266a88b24be0fb58b2b38b0f5e449c9e5ac3b97b3d90aa85425fc6cf",
       ".github/scripts/check-fly-env-drift.py": "ff6c31551f971311d776d6fd94ca0276b4b557d3ec7c3b3b3bbbcf4918d30e5a",
       ".github/scripts/install-gitleaks.sh": "4105763e64eaa2b1498c8e8c46913062274e67e5a31c4f108cfdc21bed3a41d1",
       "frontend/scripts/check-worker-og-contract.js": "f1eba48a23f15289eb468c9792847a9bffb83c42f31a5f03dd99142edf2011cc",
-      ".github/scripts/rapport-secrets.py": "231c6e9b180ac25dea480d9d56d2a8fa3cf5ddfe32e79a1b4b6be8780c51965d"
+      ".github/scripts/rapport-secrets.py": "231c6e9b180ac25dea480d9d56d2a8fa3cf5ddfe32e79a1b4b6be8780c51965d",
+      "backend/server.py": "00a02d8c266a88b24be0fb58b2b38b0f5e449c9e5ac3b97b3d90aa85425fc6cf",
+      ".github/scripts/check-exercice-restauration.py": "5b630d1aa76144c52795e6c2fad82295736b696457166cfb5b746fe38390e68e"
     }
   },
   "hors_perimetre": [

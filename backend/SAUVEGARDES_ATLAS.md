@@ -66,6 +66,66 @@ nécessaires : `MONGO_URL`, `BACKUP_S3_BUCKET`, `BACKUP_S3_ENDPOINT`,
 Sans eux le workflow rend **2** en nommant ce qui manque, et la sonde rougit en
 disant qu'aucune sauvegarde externe n'a jamais abouti.
 
+### Mise en service du bucket (une fois, et avec preuve)
+
+Un dépôt qu'on n'a jamais relu n'est pas une sauvegarde. La mise en service se
+fait donc en trois temps, avec un outil qui **juge** avant d'écrire :
+`backend/scripts/preparer_sauvegarde_externe.py`.
+
+1. **Créer le bucket privé** dans le tableau de bord du fournisseur (R2 :
+   *Storage → Create bucket*, « Public access » **désactivé** ; S3 : blocage de
+   tout accès public). L'API S3 de R2 n'implémente pas `CreateBucket` : l'outil
+   ne le fait pas et le dit, au lieu d'échouer sur une erreur de transport.
+2. **Créer un jeton d'objet** (R2 : *Manage R2 API Tokens* → « Object Read &
+   Write »). Il donne `BACKUP_S3_ACCESS_KEY_ID` et `BACKUP_S3_SECRET_KEY` ;
+   `BACKUP_S3_ENDPOINT` vaut `https://<account-id>.r2.cloudflarestorage.com`.
+   L'utilisateur Atlas de la sauvegarde est DÉDIÉ (`kojo-backup`) :
+   `readWrite` sur `kojo_db`, et `readWrite` **+ `dbAdmin`** sur `kojo_verif` —
+   l'exercice repart d'une base de travail vide (`dropDatabase`), action que
+   `readWrite` ne couvre pas (mesuré : `user is not allowed to do action
+   [dropDatabase] on [kojo_verif.]`). L'URI doit porter `authSource=admin` :
+   sans lui le pilote cherche l'utilisateur dans la base du chemin et rend
+   « bad auth » (mesuré aussi).
+3. **Écrire les six valeurs dans un fichier local** `.backup-secrets.env`
+   (ignoré par git : `*.env`). `MONGO_URL` doit pouvoir **lire `kojo_db` et
+   écrire `kojo_verif`** : l'exercice restaure l'archive dans `kojo_verif`, donc
+   un utilisateur en lecture seule échouerait à la restauration, pas au dump —
+   c'est-à-dire après avoir cru sauvegarder. Aucune valeur ne se colle dans un
+   ticket ni dans un journal : l'outil ne les affiche jamais.
+
+```bash
+# 1. juger : bucket privé (lecture anonyme refusée), clés qui écrivent ET
+#    relisent le même objet, phrase secrète qui DÉCHIFFRE ce qu'elle chiffre
+python backend/scripts/preparer_sauvegarde_externe.py --fichier .backup-secrets.env
+# 2. poser les six secrets (la liste est LUE dans le workflow, jamais recopiée)
+python backend/scripts/preparer_sauvegarde_externe.py --fichier .backup-secrets.env \
+    --poser-secrets --depot <owner>/<repo>
+# 3. déclencher la première sauvegarde réelle, puis la sonde qui la juge
+python backend/scripts/preparer_sauvegarde_externe.py --declencher \
+    --depot <owner>/<repo> --ref main
+```
+
+Ce que l'outil refuse, et pourquoi : un bucket qui répond **200 sans
+authentification** est public (l'archive est chiffrée, mais sa présence et sa
+taille fuient — et une erreur de chiffrement un jour la publierait) ; des clés
+qui écrivent mais ne relisent pas ne prouvent rien ; une phrase secrète qui
+chiffre sans déchiffrer rendrait l'archive **irrécupérable**, et c'est la seule
+panne qui ne se découvre qu'au moment de restaurer. Sortie : 0 tout est prouvé,
+1 un fait est faux (nommé), 2 rien n'a pu être jugé.
+
+Le dernier temps ne rend un vert que si **les deux** disent oui : le run de
+sauvegarde a réussi (dump, restauration comparée à la source, chiffrement,
+dépôt) **et** la sonde Atlas juge cette sauvegarde fraîche. Un run vert dont la
+sonde refuse ne prouve pas la restauration, et une sonde verte sans run récent
+ne prouve rien du tout.
+
+Relevé du 21/10/2026, bucket `kojo-sauvegardes` (R2, compte `2d2623e9…`) :
+lecture anonyme **refusée** (HTTP 400, motif `Authorization` — R2 ne répond pas
+403 à un anonyme, et un 400 sans ce motif n'est PAS un refus), cycle
+écriture → relecture identique → effacement **prouvé**, phrase secrète
+**éprouvée**. Ce qui restait à ce moment-là : `MONGO_URL` (lire `kojo_db`,
+écrire `kojo_verif`) et le premier run réel.
+
 ---
 
 ## 2. Procédure de restauration (production)
@@ -180,7 +240,38 @@ qui compte pour un RTO, pas la taille de l'archive.
 
 ---
 
-## 3bis. Exercice Atlas rejouable — préparé le 18/10/2026, **non exécuté**
+## 3bis. Exercice exécuté — 21/10/2026 (production, base restaurée comparée)
+
+Rejoué par `backend/scripts/exercice_restauration.py` sur la VRAIE base de
+production, avec un utilisateur dédié `kojo-backup` (rôles `readWrite` sur
+`kojo_db`, `readWrite` + `dbAdmin` sur `kojo_verif`) :
+
+| Étape | Résultat mesuré |
+| --- | --- |
+| Source | `kojo_db`, **20 collections**, **403 documents** au 21/10/2026 (la production est quasi vide : ce chiffre ne dit rien du volume futur) |
+| Restauration (recopie + recréation des index) | **32,8 s** |
+| Vérification (empreintes SHA-256 des deux côtés) | **9,3 s** |
+| **RTO mesuré** | **51,7 s** |
+| Verdict | **identique** : aucun écart, empreintes et index compris |
+| Base de travail | `kojo_verif` **détruite** après comparaison |
+
+Deux choses que cet exercice a corrigées, mesurées et non supposées :
+
+1. **les options d'index sont recopiées TELLES QUELLES.** Ne garder que
+   `unique` perdait `sparse`, et la reconstruction de
+   `payments.idempotency_key` échouait dès le deuxième document sans clé
+   (`E11000 duplicate key`, run 39526117357) ; elle perdait aussi
+   `expireAfterSeconds`, donc une restauration aurait gardé POUR TOUJOURS les
+   collections à TTL ;
+2. **la comparaison juge la DÉFINITION, pas le nom.** Un index présent mais
+   sans `sparse`, sans TTL ou sans filtre partiel est désormais un ÉCART nommé —
+   le nom seul ne disait rien du comportement.
+
+Ce que cet exercice ne prouve toujours pas : l'archive `mongodump` chiffrée et
+son dépôt sur le bucket (c'est le rôle du workflow `backup-db.yml`), et la
+restauration d'un point PITR côté Atlas.
+
+## 3ter. Exercice Atlas rejouable — préparé le 18/10/2026, **non exécuté**
 
 L'exercice du §3 prouve les commandes du repli sur une base **locale**. Le
 chemin **Atlas** restait non exécuté, et c'était écrit. Le 18/10/2026, la
@@ -251,10 +342,11 @@ Trois choses doivent tenir, dans cet ordre :
 
 ## 5. Ce qui reste ouvert (et ce qu'il faut pour fermer)
 
-1. **Poser les quatre secrets Atlas** dans GitHub (Settings → Secrets →
-   Actions) : `ATLAS_PUBLIC_KEY`, `ATLAS_PRIVATE_KEY`, `ATLAS_PROJECT_ID`,
-   `ATLAS_CLUSTER`. Tant qu'ils manquent, la sonde sort en **2** et le workflow
-   est rouge **pour cette raison nommée** — c'est volontaire, pas une panne.
+1. **Les quatre secrets Atlas sont posés** (19/10/2026) : la sonde rend
+   désormais un VERDICT (M0, `backupEnabled=false`, `pitEnabled=false`) au lieu
+   d'une prémisse. Ce qui manque n'est plus la clé mais la sauvegarde :
+   `MONGO_URL` + les accès du bucket, puis un premier run réussi de
+   `backup-db.yml` — sans lui la sonde est rouge en disant exactement cela.
 2. **Passer le cluster en M10+ et activer Continuous Cloud Backup** si la sonde
    répond 1 : c'est le seul moyen d'avoir un RPO court.
 3. **Exécuter un vrai exercice PITR daté** et l'écrire ici (même tableau, même

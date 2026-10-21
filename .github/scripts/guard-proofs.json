@@ -738,6 +738,15 @@
       "runner": "pytest"
     },
     {
+      "chemin": "backend/scripts/preparer_sauvegarde_externe.py",
+      "role": "outil",
+      "invoque_par": "aucun",
+      "preuve": "backend/tests/test_preparer_sauvegarde_externe.py",
+      "runner": "pytest",
+      "motif": "outil de MISE EN SERVICE, pas un garde de CI : il juge un BUCKET (lecture anonyme refusée, cycle écriture/relecture/effacement), éprouve une phrase secrète par un vrai chiffrement puis déchiffrement, puis pose les secrets GitHub et déclenche les deux workflows. Son verdict porte sur un service EXTERNE et sur l'historique d'Actions, pas sur un fichier du dépôt : le lancer dans la CI demanderait des accès de production, et un gate qu'on ne peut pas rejouer sur une PR ne gate rien. La liste des secrets est LUE dans backup-db.yml (un septième ajouté demain ne serait pas oublié) et aucune valeur n'est jamais imprimée.",
+      "hors_mutation": "muté par sa PROPRE preuve, pas par la table : test_preparer_sauvegarde_externe.py verrouille chaque verdict (bucket public refusé, 401/403/404 acceptés comme privés, lecture anonyme impossible = prémisse, cycle incomplet, objet altéré, phrase qui ne déchiffre pas, aucun secret posé quand il en manque un, pose non relue) et vérifie qu'aucune valeur de secret n'apparaît dans la sortie. La table ne rejoue que les gardes qui portent un verdict sur le DÉPÔT, et ceux-là seuls ont une sortie 1 à neutraliser."
+    },
+    {
       "chemin": "frontend/scripts/published-copy.js",
       "role": "outil",
       "invoque_par": "test",

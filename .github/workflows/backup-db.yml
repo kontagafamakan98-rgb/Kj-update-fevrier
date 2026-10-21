@@ -25,7 +25,10 @@ name: Sauvegarde externe vérifiée (quotidien)
 # supprimerait la mauvaise chose un jour de fatigue).
 #
 # Secrets requis (Settings → Secrets and variables → Actions) :
-#   MONGO_URL                 chaîne de connexion de LECTURE de la production
+#   MONGO_URL                 chaîne de connexion qui LIT `kojo_db` et ÉCRIT
+#                             `kojo_verif` (l'étape de restauration y range la
+#                             copie : un utilisateur en lecture seule échouerait
+#                             là, pas au dump — donc après avoir cru sauvegarder)
 #   BACKUP_S3_BUCKET          nom du bucket privé (R2/S3)
 #   BACKUP_S3_ENDPOINT        URL S3 du fournisseur (R2 : https://<id>.r2.cloudflarestorage.com)
 #   BACKUP_S3_ACCESS_KEY_ID   identifiant d'accès du bucket

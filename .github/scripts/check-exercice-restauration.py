@@ -183,7 +183,21 @@ def juger(texte, aujourdhui, seuil_jours=SEUIL_JOURS):
     return 0, lignes
 
 
+def _sortie_utf8():
+    """Console Windows en cp1252 : le runbook est du TEXTE, et une flèche ou un
+    accent qu'elle ne sait pas écrire faisait tomber le garde en
+    UnicodeEncodeError au lieu de rendre son verdict (mesuré le 21/10/2026).
+    Un garde qui plante sur la prose qu'il juge ne juge rien.
+    """
+    for flux in (sys.stdout, sys.stderr):
+        try:
+            flux.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):  # flux redirigé sans reconfigure
+            pass
+
+
 def main(argv=None):
+    _sortie_utf8()
     analyseur = argparse.ArgumentParser(
         description="Juge la FRAÎCHEUR de l'exercice de restauration daté du runbook."
     )
