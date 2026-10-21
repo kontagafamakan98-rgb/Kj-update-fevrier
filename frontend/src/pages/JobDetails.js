@@ -7,6 +7,9 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
 import ConfirmModal from '../components/ConfirmModal';
 import ProposalModal from '../components/ProposalModal';
+// Fin de mission à DEUX temps : le travailleur déclare, le client valide, et
+// l'échéance libère le séquestre si le client ne répond pas (kojo_job_completion).
+import CompletionPanel from '../components/CompletionPanel';
 import { jobsAPI } from '../services/apiEndpoints';
 import { handleApiError } from '../services/api';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/jobDetails';
@@ -168,6 +171,12 @@ export default function JobDetails() {
   const [sendingMessage, setSendingMessage] = useState(false);
   const [acceptingProposal, setAcceptingProposal] = useState(false);
   const [completingJob, setCompletingJob] = useState(false);
+  // Séquestre à deux temps — états séparés de `completingJob` : la déclaration
+  // du travailleur et la validation du client sont deux gestes différents, et
+  // un seul indicateur pour les deux laisserait les deux boutons actifs.
+  const [markingCompletion, setMarkingCompletion] = useState(false);
+  const [confirmingCompletion, setConfirmingCompletion] = useState(false);
+  const [completionError, setCompletionError] = useState('');
   const [paymentStatus, setPaymentStatus] = useState(null);
   const [paymentStatusLoading, setPaymentStatusLoading] = useState(false);
   const discussionSectionRef = useRef(null);
@@ -546,6 +555,62 @@ export default function JobDetails() {
     }
   };
 
+  const handleMarkJobComplete = async ({ note, files }) => {
+    if (!job?.id) return;
+    setMarkingCompletion(true);
+    setCompletionError('');
+    setMessageSuccess('');
+
+    try {
+      // Les photos partent AVANT la déclaration : la mission n'est jamais
+      // marquée avec des URLs qui n'existent pas encore.
+      const proofs = [];
+      for (const file of files || []) {
+        const formData = new FormData();
+        formData.append('file', file);
+        const upload = await jobsAPI.uploadCompletionProof(job.id, formData);
+        const url = upload?.data?.proof_url;
+        if (url) proofs.push(url);
+      }
+
+      const response = await jobsAPI.markJobComplete(job.id, { note, proofs });
+      const updatedJob = response?.data?.job;
+      if (updatedJob) setJob((previous) => (previous ? { ...previous, ...updatedJob } : updatedJob));
+      setMessageSuccess(pageT('completionDeclared'));
+    } catch (markError) {
+      setCompletionError(handleApiError(markError, pageT('completionError')));
+    } finally {
+      setMarkingCompletion(false);
+    }
+  };
+
+  const handleConfirmJobCompletion = async () => {
+    if (!job?.id) return;
+    setConfirmingCompletion(true);
+    setCompletionError('');
+    setMessageSuccess('');
+
+    try {
+      const response = await jobsAPI.confirmJobCompletion(job.id);
+      const updatedJob = response?.data?.job;
+      const payoutStatus = response?.data?.payout_status;
+      if (updatedJob) setJob((previous) => (previous ? { ...previous, ...updatedJob } : updatedJob));
+
+      if (payoutStatus === 'released') {
+        setMessageSuccess(pageT('missionClosedPaid'));
+      } else if (payoutStatus === 'releasing') {
+        setMessageSuccess(pageT('missionClosedProcessing'));
+      } else {
+        setMessageSuccess(response?.data?.message || pageT('missionClosedManual'));
+      }
+      await refreshPaymentStatus();
+    } catch (confirmError) {
+      setCompletionError(handleApiError(confirmError, pageT('completionError')));
+    } finally {
+      setConfirmingCompletion(false);
+    }
+  };
+
   if (loading) {
     // Skeleton structuré (source unique dans SkeletonLoader) : réplique la
     // hauteur du contenu réel (bouton retour + carte en-tête + carte
@@ -638,7 +703,11 @@ export default function JobDetails() {
                   <button onClick={() => setConfirmDeleteOpen(true)} disabled={deleting} className="rounded-[3px] bg-rose-600 px-4 py-3 font-semibold text-white hover:bg-rose-700 disabled:opacity-60">
                     {deleting ? t('jobUiDeleting') : t('jobUiDeleteJob')}
                   </button>
-                  {job.status === 'in_progress' && assignedWorkerId && paymentStatus?.payment_status === 'completed' && (
+                  {/* Route HISTORIQUE de libération immédiate : elle ne
+                      s'affiche plus quand une déclaration attend la validation
+                      — le bouton « Valider et payer » du panneau de fin de
+                      mission est alors le seul geste, donc un seul chemin. */}
+                  {job.status === 'in_progress' && assignedWorkerId && paymentStatus?.payment_status === 'completed' && !job.completion && (
                     <button onClick={() => setConfirmCompleteOpen(true)} disabled={completingJob} className="rounded-[3px] bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">
                       {completingJob ? pageT('closing') : pageT('workDone')}
                     </button>
@@ -777,6 +846,17 @@ export default function JobDetails() {
               </div>
             </div>
           </div>
+
+          <CompletionPanel
+            job={job}
+            isOwner={isJobOwner}
+            isWorker={assignedToCurrentWorker}
+            onMark={handleMarkJobComplete}
+            onConfirm={handleConfirmJobCompletion}
+            marking={markingCompletion}
+            confirming={confirmingCompletion}
+            error={completionError}
+          />
 
           <div className="carte-editoriale carte-publique">
             <h2 className="titre-carte-app mb-4">{t('jobUiDescription')}</h2>

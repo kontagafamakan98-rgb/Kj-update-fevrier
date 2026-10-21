@@ -229,6 +229,37 @@ class Job(BaseModel):
             raise ValueError('budget_max must be greater than or equal to budget_min')
         return v
 
+    # Déclaration de FIN côté travailleur (séquestre à deux temps). `None` tant
+    # que rien n'a été déclaré. Sinon : {state, note, proofs, marked_at,
+    # marked_by, auto_release_at, confirmed_at, auto_released_at}.
+    # `state` : marked | confirmed | auto_released | auto_release_blocked.
+    # L'état de la MISSION reste `in_progress` tant que l'argent n'est pas
+    # libéré : la validation ne crée pas un faux statut de mission.
+    completion: Optional[dict] = None
+
+
+class JobCompletionMark(BaseModel):
+    """Corps de `POST /jobs/{id}/completion` : ce que le travailleur déclare.
+
+    Une note est EXIGÉE (20 caractères) : c'est la preuve minimale opposable en
+    cas de désaccord, et sans elle le client n'a rien à valider. Les photos sont
+    facultatives mais bornées (3), et doivent venir de NOTRE stockage Cloudinary
+    — une URL arbitraire ferait charger un tiers dans la page du client.
+    """
+    note: str = Field(min_length=20, max_length=1000)
+    proofs: List[str] = Field(default_factory=list, max_length=3)
+
+    @field_validator('proofs')
+    @classmethod
+    def proofs_are_our_cloudinary(cls, valeurs):
+        for url in valeurs or []:
+            if not str(url).startswith('https://res.cloudinary.com/'):
+                raise ValueError(
+                    'Les photos de preuve doivent être téléversées via Kojo '
+                    '(https://res.cloudinary.com/).'
+                )
+        return valeurs
+
 class JobPublic(BaseModel):
     """Vue PUBLIQUE d'un job (découverte sans compte) : ALLOWLIST stricte des
     champs non sensibles, au lieu d'un denylist qui vieillit mal. Tout champ

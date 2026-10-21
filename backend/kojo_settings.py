@@ -266,6 +266,30 @@ EMAIL_OTP_MAX_ATTEMPTS = int(os.environ.get('EMAIL_OTP_MAX_ATTEMPTS', '5'))
 
 PAYMENT_COMMISSION_RATE = float(os.environ.get('PAYMENT_COMMISSION_RATE', '0.14'))
 
+# --- Séquestre à DEUX TEMPS (`kojo_job_completion.py`) ---
+# Le travailleur déclare la mission terminée (note + photos), le client valide,
+# et à défaut de validation le séquestre est libéré AUTOMATIQUEMENT après ce
+# délai. Sans lui, un client injoignable laissait le travailleur impayé
+# indéfiniment : le seul chemin de libération était un clic du client.
+# Le seuil se LIT ici (et se surcharge par variable d'environnement) ; il n'est
+# recopié nulle part ailleurs.
+COMPLETION_AUTO_RELEASE_DAYS = int(os.environ.get('COMPLETION_AUTO_RELEASE_DAYS', '7'))
+COMPLETION_SWEEP_INTERVAL_MINUTES = int(
+    os.environ.get('COMPLETION_SWEEP_INTERVAL_MINUTES', '60')
+)
+
+if COMPLETION_AUTO_RELEASE_DAYS < 1:
+    raise RuntimeError(
+        f"COMPLETION_AUTO_RELEASE_DAYS={COMPLETION_AUTO_RELEASE_DAYS} : un délai "
+        "nul ou négatif libérerait le séquestre avant que le client puisse "
+        "valider. La borne basse est 1 jour."
+    )
+if not 1 <= COMPLETION_SWEEP_INTERVAL_MINUTES <= 1440:
+    raise RuntimeError(
+        f"COMPLETION_SWEEP_INTERVAL_MINUTES={COMPLETION_SWEEP_INTERVAL_MINUTES} : "
+        "le balayage doit tourner au moins une fois par jour (1..1440 minutes)."
+    )
+
 # Récompense de parrainage (FCFA) créditée quand le filleul termine sa
 # PREMIÈRE mission : une part au parrain, une part au filleul.
 REFERRAL_SPONSOR_REWARD = float(os.environ.get('REFERRAL_SPONSOR_REWARD', '500'))

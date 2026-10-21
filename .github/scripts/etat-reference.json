@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-21",
-    "motif": "Le garde de fraicheur de l'exercice ecrit ses verdicts en UTF-8 : sur une console Windows en cp1252, une fleche du runbook le faisait tomber en UnicodeEncodeError au lieu de juger. Et la sonde Atlas publie desormais la moitie qui se MESURE (age de la derniere sauvegarde externe) quand l'API Atlas refuse la cle, au lieu d'un run muet sur cette moitie.",
+    "motif": "Le sequestre a deux temps monte son routeur dans server.py (POST /jobs/{id}/completion, /completion/proof, /completion/confirm) : la reference est retablie sur cet etat, les autres empreintes restent celles du depot.",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -127,9 +127,10 @@
       ".github/scripts/install-gitleaks.sh": "4105763e64eaa2b1498c8e8c46913062274e67e5a31c4f108cfdc21bed3a41d1",
       "frontend/scripts/check-worker-og-contract.js": "f1eba48a23f15289eb468c9792847a9bffb83c42f31a5f03dd99142edf2011cc",
       ".github/scripts/rapport-secrets.py": "231c6e9b180ac25dea480d9d56d2a8fa3cf5ddfe32e79a1b4b6be8780c51965d",
-      "backend/server.py": "00a02d8c266a88b24be0fb58b2b38b0f5e449c9e5ac3b97b3d90aa85425fc6cf",
+      "backend/server.py": "caf00c2436703dc74c0896359c14e6dbfbd5bce363367b72e479f0be89bf71ef",
       ".github/scripts/check-exercice-restauration.py": "5b630d1aa76144c52795e6c2fad82295736b696457166cfb5b746fe38390e68e"
-    }
+    },
+    "establie_le": "2026-10-21"
   },
   "hors_perimetre": [
     {

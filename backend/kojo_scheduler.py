@@ -40,7 +40,9 @@ from kojo_models import NotificationType
 # chaque règle son filtre (kojo_retention), qui porte aussi l'index TTL.
 from kojo_retention import RETENTION_RULES
 from kojo_job_alerts import passage_digest
+from kojo_job_completion import passage_liberations_auto
 from kojo_settings import (
+    COMPLETION_SWEEP_INTERVAL_MINUTES,
     EMAIL_HEALTH_ALERT_INTERVAL_MINUTES,
     JOB_ALERT_DIGEST_INTERVAL_MINUTES,
     OWNER_EMAIL,
@@ -295,6 +297,32 @@ async def executer_si_bail(nom: str, duree: timedelta, travail, *, holder: Optio
         logger.debug(f"⏭️ Tâche '{nom}' sautée : bail tenu par une autre instance")
         return None
     return await travail()
+
+
+async def completion_auto_release_loop():
+    """Tâche de fond : libère le séquestre des fins de mission non validées.
+
+    Le travailleur déclare la mission terminée ; si le client ne valide pas
+    sous `COMPLETION_AUTO_RELEASE_DAYS`, l'argent doit partir quand même —
+    sinon un client injoignable laisse le travailleur impayé indéfiniment.
+
+    Même modèle que les autres boucles : sommeil d'abord (pas de rafale au
+    redémarrage), bail partagé entre instances, erreurs isolées par passage.
+    La logique de libération vit dans `kojo_job_completion` : cette boucle ne
+    fait que décider QUAND elle tourne.
+    """
+    while True:
+        try:
+            await asyncio.sleep(COMPLETION_SWEEP_INTERVAL_MINUTES * 60)
+            await executer_si_bail(
+                "completion_auto_release",
+                timedelta(minutes=COMPLETION_SWEEP_INTERVAL_MINUTES),
+                passage_liberations_auto,
+            )
+        except asyncio.CancelledError:
+            break
+        except Exception as exc:
+            logger.warning(f"⚠️ Erreur balayage des libérations automatiques: {exc}")
 
 
 async def payout_stuck_sweeper_loop():

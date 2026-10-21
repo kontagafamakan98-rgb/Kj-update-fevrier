@@ -1,10 +1,11 @@
 """Événements métier : journal append-only des jalons d'une mission.
 
-Quatre faits, un document chacun : mission créée, proposition acceptée,
-paiement confirmé, mission terminée. Un événement ne porte que son type, sa
-date, le compte concerné (`user_id`, le client de la mission ou le payeur) et
-des identifiants (job, proposition, paiement) : aucune donnée personnelle,
-aucun montant. `user_id` permet à l'export RGPD de rendre le journal du compte.
+Sept faits, un document chacun : mission créée, proposition acceptée,
+paiement confirmé, mission terminée, et les trois jalons du séquestre à deux
+temps (fin déclarée par le travailleur, validation client, libération
+automatique). Un événement ne porte que son type, sa date, le compte concerné
+(`user_id`, le client de la mission ou le payeur) et des identifiants (job,
+proposition, paiement) : aucune donnée personnelle, aucun montant. `user_id` permet à l'export RGPD de rendre le journal du compte.
 
 Idempotence : `cle` (ex. `payment_confirmed:<payment_id>`) est unique. Une
 écriture répétée d'un même jalon — IPN PayDunya en double, fin de mission
@@ -27,7 +28,19 @@ from kojo_db import db
 logger = logging.getLogger(__name__)
 
 TYPES_EVENEMENTS = frozenset(
-    {"mission_created", "proposal_accepted", "payment_confirmed", "mission_completed"}
+    {
+        "mission_created",
+        "proposal_accepted",
+        "payment_confirmed",
+        "mission_completed",
+        # Séquestre à deux temps : la déclaration du travailleur, la validation
+        # du client, et la libération automatique quand le client n'a pas
+        # répondu. Trois faits distincts, donc trois types — les fusionner
+        # rendrait le journal incapable de dire POURQUOI l'argent est parti.
+        "mission_completion_marked",
+        "mission_completion_confirmed",
+        "mission_auto_released",
+    }
 )
 
 

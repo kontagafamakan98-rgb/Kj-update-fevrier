@@ -39,8 +39,18 @@ export const jobsAPI = {
   acceptProposal: (jobId, proposalId, payload = {}) => api.post(`/jobs/${jobId}/proposals/${proposalId}/accept`, payload),
   /** @returns {Promise<object>} {proposals} candidatures du travailleur. */
   getMyProposals: () => api.get('/proposals/mine'),
-  /** @returns {Promise<object>} {job} mission marquée terminée. */
+  /** @returns {Promise<object>} {job} mission marquée terminée (route historique). */
   completeJob: (jobId) => api.post(`/jobs/${jobId}/complete`),
+  /** Séquestre à deux temps — premier temps : le travailleur DÉCLARE la fin
+   *  (note + photos). Le serveur arme l'échéance de libération automatique.
+   *  @returns {Promise<object>} {message, job, completion}. */
+  markJobComplete: (jobId, payload) => api.post(`/jobs/${jobId}/completion`, payload),
+  /** Photo de preuve (Cloudinary) à joindre à la déclaration.
+   *  @returns {Promise<object>} {proof_url}. */
+  uploadCompletionProof: (jobId, formData) => api.uploadFile(`/jobs/${jobId}/completion/proof`, formData),
+  /** Second temps : le client VALIDE et libère le séquestre.
+   *  @returns {Promise<object>} {message, job, payout_status, completion_state}. */
+  confirmJobCompletion: (jobId) => api.post(`/jobs/${jobId}/completion/confirm`),
   /** @returns {Promise<object>} {status, payout_status...} statut du paiement. */
   getPaymentStatus: (jobId) => api.get(`/jobs/${jobId}/payment-status`),
 };
