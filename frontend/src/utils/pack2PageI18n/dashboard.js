@@ -8,7 +8,9 @@ fr: {
   status_open: 'Ouvert',
   status_in_progress: 'En cours',
   status_completed: 'Complété',
-  status_cancelled: 'Annulé'
+  status_cancelled: 'Annulé',
+  addPaymentAccountHint: 'Tu n’as pas encore de compte de paiement. Ce n’est pas urgent : ajoute-le quand tu voudras être payé (ou payer une mission).',
+  addPaymentAccountAction: 'Ajouter un compte de paiement'
 },
 en: {
   loading: 'Loading dashboard...',
@@ -16,7 +18,9 @@ en: {
   status_open: 'Open',
   status_in_progress: 'In progress',
   status_completed: 'Completed',
-  status_cancelled: 'Cancelled'
+  status_cancelled: 'Cancelled',
+  addPaymentAccountHint: 'You have no payment account yet. That is fine for now: add one whenever you want to get paid (or to pay for a mission).',
+  addPaymentAccountAction: 'Add a payment account'
 }
 };
 dict.wo = withBase(dict.fr, {

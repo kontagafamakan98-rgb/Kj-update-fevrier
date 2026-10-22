@@ -279,6 +279,25 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* ── LES COMPTES DE PAIEMENT NE BLOQUENT PLUS L'INSCRIPTION, DONC ILS
+          SE RAPPELLENT ICI (22/10/2026) ─────────────────────────────────
+          Un compte créé sans compte de paiement est VALIDE : ce bandeau n'est
+          pas un avertissement d'erreur (pas de `role="alert"`, pas de rouge),
+          c'est une occasion à saisir quand elle servira. Il disparaît dès le
+          premier compte ajouté (`is_verified`), et la contrainte d'argent
+          reste où elle vit : le backend refuse un décaissement sans compte. */}
+      {user && !user.is_verified && (
+        <div className="carte-editoriale bloc-app flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-stone-700">
+            <CreditCard className="inline h-4 w-4 mr-1 align-[-0.15em] text-orange-700" aria-hidden="true" />
+            {pageT('addPaymentAccountHint')}
+          </p>
+          <Link to="/profile" className="bouton bouton-clair shrink-0">
+            {pageT('addPaymentAccountAction')}
+          </Link>
+        </div>
+      )}
+
       {/* LES MESURES — une tuile dit un chiffre, pas une carte : le
           libellé en petites capitales, le chiffre en serif tabulaire, et rien
           d'autre. Le glyphe du bloc au-dessus rappelle à quoi la mesure se

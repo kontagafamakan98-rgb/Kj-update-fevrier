@@ -316,17 +316,12 @@ export default function Register() {
 
     if (result.success) {
       clearRegistrationFlow();
-      // Onboarding : le compte est créé mais les comptes de paiement doivent
-      // être ajoutés (l'auth Google saute l'OTP mais pas la vérification des
-      // moyens de paiement).
+      // Le compte Google est VÉRIFIÉ (l'email l'est déjà côté Google) : il
+      // entre directement. Les comptes de paiement ne sont plus un passage
+      // obligatoire à l'inscription (22/10/2026) — ils se demandent là où ils
+      // servent, et le tableau de bord le rappelle à qui n'en a pas.
       toast.success(pageT('googleSuccess'));
-      navigate('/payment-verification', {
-        state: {
-          userData: result.user,
-          resumeAfterLogin: true,
-          fromGoogle: true,
-        }
-      });
+      navigate('/dashboard', { replace: true });
       return;
     }
     if (result.cancelled) return;

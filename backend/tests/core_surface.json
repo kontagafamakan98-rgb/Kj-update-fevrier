@@ -145,7 +145,7 @@
   },
   "validate_payment_accounts": {
     "nature": "fonction",
-    "signature": "(payment_accounts: kojo_models.PaymentAccount, user_type: str, country: Optional[str] = None) -> dict"
+    "signature": "(payment_accounts: kojo_models.PaymentAccount, user_type: str, country: Optional[str] = None, exiger_minimum: bool = True) -> dict"
   },
   "validate_wave_number": {
     "nature": "fonction",

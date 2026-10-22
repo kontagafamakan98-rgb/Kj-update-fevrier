@@ -14,8 +14,15 @@ const jobs = [];
 // `/profile` n'avait aucun pays à montrer — ni, par conséquent, aucune carte de
 // localisation à différer (`e2e/helpers/parcours-carte.js` lit ce même pays).
 const users = new Map([
-  ['demo@example.com', { id: 'demo-user', email: 'demo@example.com', password: 'password', user_type: 'worker', country: 'senegal', first_name: 'Demo', last_name: 'Worker', is_verified: true, payment_accounts_count: 2 }],
-  ['client@example.com', { id: 'demo-client', email: 'client@example.com', password: 'password', user_type: 'client', country: 'senegal', first_name: 'Demo', last_name: 'Client', is_verified: true, payment_accounts_count: 2 }],
+  // `email_verified` est le champ que la porte lit (`ProtectedRoute`,
+  // frontend/src/App.js) : il vient du modèle backend, donc du VRAI login. La
+  // fixture ne le portait pas, et depuis que l'inscription aboutit sans compte
+  // de paiement, tout parcours connecté atterrissait sur /payment-verification
+  // au lieu de /dashboard — 40 cas e2e tombés d'un coup, tous par la même
+  // redirection. `is_verified` reste publié (minimum de comptes atteint), mais
+  // ce n'est plus lui qui décide de l'entrée.
+  ['demo@example.com', { id: 'demo-user', email: 'demo@example.com', password: 'password', user_type: 'worker', country: 'senegal', first_name: 'Demo', last_name: 'Worker', email_verified: true, is_verified: true, payment_accounts_count: 2 }],
+  ['client@example.com', { id: 'demo-client', email: 'client@example.com', password: 'password', user_type: 'client', country: 'senegal', first_name: 'Demo', last_name: 'Client', email_verified: true, is_verified: true, payment_accounts_count: 2 }],
 ]);
 const sessions = new Map();
 const proposals = [];
@@ -415,7 +422,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { user, token, access_token: token, token_expires_at: Date.now() + 3600000 }, enTetesDeSession(token));
     }
     if (req.method === 'POST' && path === '/auth/register-verified') {
-      const body = await readBody(req); const user = { id: `user-${users.size + 1}`, email: body.email, password: body.password, user_type: body.user_type || 'client', first_name: body.first_name || 'Demo', last_name: body.last_name || 'User', is_verified: true, payment_accounts_count: 2 };
+      const body = await readBody(req); const user = { id: `user-${users.size + 1}`, email: body.email, password: body.password, user_type: body.user_type || 'client', first_name: body.first_name || 'Demo', last_name: body.last_name || 'User', email_verified: true, is_verified: true, payment_accounts_count: 2 };
       users.set(user.email, user); const token = `fixture-${user.id}`; sessions.set(token, user);
       return send(res, 201, { user, token, access_token: token, token_expires_at: Date.now() + 3600000 }, enTetesDeSession(token));
     }

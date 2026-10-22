@@ -139,7 +139,12 @@ function ProtectedRoute({ children }) {
   // une protection de l'argent : le backend refuse un décaissement sans
   // compte (`get_mobile_money_account` → 400), donc la garantie tient sans
   // cette porte. Ils sont demandés là où ils servent : /payment et le retrait.
-  if (!user.is_verified) {
+  // C'est l'EMAIL qui bloque, jamais les comptes de paiement : depuis le
+  // 22/10/2026 une inscription aboutit SANS compte de paiement, donc
+  // `is_verified` (qui dit « minimum de comptes atteint ») est faux pour un
+  // compte parfaitement valide. Juger sur lui renvoyait ces gens vers un
+  // écran de paiement à chaque route protégée.
+  if (!user.email_verified) {
     return <Navigate to="/payment-verification" replace state={{ resumeAfterLogin: true, userData: user }} />;
   }
   
