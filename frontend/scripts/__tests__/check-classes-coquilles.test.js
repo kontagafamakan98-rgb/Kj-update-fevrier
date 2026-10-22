@@ -92,7 +92,7 @@ function arbreConforme() {
 }
 
 /**
- * Le verdict injecté : `domicile: {}` isole la famille des listes (les 13 champs
+ * Le verdict injecté : `domicile: {}` isole la famille des listes (les 14 champs
  * du vrai domicile n'ont aucun lecteur dans un arbre fabriqué, et c'est normal).
  * `sourcesReact` — et pas `react` : c'est le nom du paramètre, et une faute de
  * frappe y ferait SCANNER le vrai `src/` en gardant les coquilles fabriquées,
@@ -434,9 +434,11 @@ describe('classes-coquilles — le garde en sous-processus, sur l’arbre réel'
     expect(stdout).toMatch(/liste\(s\) de classes publiées par les coquilles/);
   });
 
-  it('nomme les 13 champs du domicile et leurs DEUX lecteurs', () => {
+  it('nomme les 14 champs du domicile et leurs DEUX lecteurs', () => {
     const stdout = lancer();
-    expect(stdout).toMatch(/domicile src\/config\/classes-chrome\.js : 13 champ\(s\), 13 lu\(s\) par les deux canaux/);
+    // 14 depuis le LIEN D'ÉVITEMENT (22/10/2026) : il est peint par les deux
+    // canaux, donc il appartient au domicile comme le reste du chrome.
+    expect(stdout).toMatch(/domicile src\/config\/classes-chrome\.js : 14 champ\(s\), 14 lu\(s\) par les deux canaux/);
   });
 
   it('le domicile par défaut est bien celui de l’arbre (aucun chemin mort)', () => {

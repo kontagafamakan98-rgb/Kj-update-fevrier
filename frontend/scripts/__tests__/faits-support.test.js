@@ -134,9 +134,13 @@ describe('le support répond sept jours sur sept — dans les valeurs publiées'
     const plan = valeursDuPlan();
 
     // Anti-faux-vert : un balayage qui ne lit presque rien ne prouve rien.
+    // 10 = deux champs (fallback + shellText) pour CHACUNE des cinq entrées
+    // de la bande de faits : les deux faits déclarés (pays, support) et les
+    // trois preuves mesurées du 22/10/2026 (travailleurs, missions terminées,
+    // avis), dont la valeur publiée est « — » jusqu'à la réponse de l'API.
     expect(DICTIONNAIRES.length).toBe(5);
     expect(dictionnaires.length).toBeGreaterThan(2000);
-    expect(plan.length).toBe(4);
+    expect(plan.length).toBe(10);
 
     expect(valeursFautives([...dictionnaires, ...plan])).toEqual([]);
   });

@@ -200,6 +200,10 @@ export function CountrySelect({
     }
   };
 
+  // PAS d'`aria-required` sur ce déclencheur : c'est un `button` SANS rôle
+  // ARIA, et l'attribut y est INTERDIT (`aria-allowed-attr`, critique — mesuré
+  // sur /register le 22/10/2026). Le caractère obligatoire reste porté par le
+  // champ caché `required` ci-dessous, que la validation native lit.
   return (
     <div ref={containerRef} className={`relative ${className}`}>
       <button
@@ -210,11 +214,10 @@ export function CountrySelect({
         className={CHAMP_SELECTEUR}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        aria-required={required}
       >
         <span className="flex items-center gap-3 min-w-0">
           {activeCountry ? <FlagIcon country={activeCountry.code} className="w-6 h-4" /> : <span className="text-lg leading-none"><IconePage nom={iconeGlobe} role="paysGlobe" /></span>}
-          <span className={`truncate ${activeCountry ? 'text-gray-900' : 'text-gray-400'}`}>
+          <span className={`truncate ${activeCountry ? 'text-gray-900' : 'text-gray-500'}`}>
             {activeCountry ? getTranslatedCountryName(activeCountry, t) : resolvedPlaceholder}
           </span>
         </span>

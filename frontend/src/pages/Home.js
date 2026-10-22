@@ -5,8 +5,11 @@
 // sans le raccord que le chrome avait déjà. Le composant se comporte comme le
 // `Link` d'origine (mêmes propriétés, même `<a href>` réel pour un crawler et
 // pour « ouvrir dans un nouvel onglet »).
+import { useEffect, useState } from 'react';
 import { IconePage } from '../config/page-icons';
 import Link from '../components/LienVue';
+import { publicAPI } from '../services/apiEndpoints';
+import { valeurDePreuve } from '../utils/preuveSociale';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { getAllCountries } from '../components/CountryDisplay';
@@ -36,9 +39,29 @@ const ICONE_DE_CONTACT = Object.fromEntries(
 );
 
 export default function Home() {
-  const { t } = useLanguage();
+  const { t, currentLanguage } = useLanguage();
   const { user } = useAuth();
   usePageMeta();
+
+  // ── LA PREUVE SOCIALE EST MESURÉE, PAS DÉCORÉE (22/10/2026) ──────────────
+  // La bande de faits du héros porte trois entrées dont la valeur publiée est
+  // « — » : la coquille pré-rendue ne peut pas appeler l'API au build, donc
+  // elle publie « pas mesuré ici » plutôt qu'un chiffre figé. Ce `useEffect`
+  // lit `GET /api/public/stats` après le montage et remplace le tiret DANS LE
+  // MÊME NŒUD (`valeurDePreuve`, `utils/preuveSociale.js`) : aucune entrée
+  // ajoutée ou retirée après peinture, donc aucun décalage de mise en page.
+  //
+  // Un échec n'est pas une erreur d'écran : la bande garde ses tirets (un
+  // chiffre absent reste absent), et rien n'est journalisé comme une panne —
+  // ce n'est qu'un ornement de la landing, la page fonctionne sans lui.
+  const [mesuresPubliques, setMesuresPubliques] = useState(null);
+  useEffect(() => {
+    let monte = true;
+    publicAPI.getStats()
+      .then((r) => monte && setMesuresPubliques(r && typeof r === 'object' ? r : null))
+      .catch(() => monte && setMesuresPubliques(null));
+    return () => { monte = false; };
+  }, []);
 
   // Catégories, promesses, étapes et chiffres : lus dans la déclaration du
   // corps de la page (src/config/page-sections.js) — la MÊME que le build
@@ -560,7 +583,10 @@ export default function Home() {
               <div key={stat.labelKey} className={faitClass}>
                 <span className={faitFigureClass}>
                   <IconePage nom={stat.icone} role="heros" />
-                  {stat.fallback}
+                  {/* La valeur se LIT dans la règle (`utils/preuveSociale.js`) :
+                      mesure formatée quand elle existe, texte déclaré sinon —
+                      et JAMAIS un repli chiffré inventé. */}
+                  {valeurDePreuve(stat, mesuresPubliques, currentLanguage)}
                 </span>
                 <span className={faitLibelleClass}>{t(stat.labelKey)}</span>
               </div>
@@ -641,11 +667,16 @@ export default function Home() {
                 <div className="text-xs text-stone-500 break-all">{CONTACT.email}</div>
               </div>
             </a>
+            {/* PAS d'`aria-label` ICI (mesuré, 22/10/2026) : il valait
+                « Google Maps » alors que le lien MONTRE « Adresse » et
+                l'adresse — WCAG 2.5.3, refusé par la sonde d'accessibilité
+                (`label-content-name-mismatch`) sur CINQ routes publiques. Le
+                nom accessible vient donc du texte visible, et `title` garde la
+                désignation que lit un audit de référencement local. */}
             <a
               href={CONTACT.mapsUrl}
               target="_blank"
               rel="noreferrer"
-              aria-label="Google Maps"
               title="Google Maps"
               className={ligneDeContactClass}
             >

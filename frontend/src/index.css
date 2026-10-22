@@ -62,6 +62,20 @@
    sous les utilitaires, comme en v3. */
 @theme {
   --radius-xs: calc(var(--radius) - 4px);
+
+  /* L'ORANGE 600 NE PORTE PAS DE TEXTE BLANC, ET C'EST MESURÉ (22/10/2026).
+     La gamme v4 place `orange-600` à `#f54900` : blanc dessus = 3,59:1, sous
+     le 4,5:1 du texte courant — la sonde d'accessibilité le mesurait sur le
+     bouton du bandeau de consentement et deux commandes de la barre. Le même
+     jeton sert de COULEUR DE TEXTE sur le papier (83 `text-orange-600`), où
+     `#f54900` sur blanc vaut 3,59:1 aussi.
+     Le remède est le jeton, pas les 150 nœuds : `orange-600` devient
+     `--kojo-orange-fonce` (`#c2410c`, 5,18:1 sur blanc), déjà la teinte que
+     ce système emploie pour de l'orange SUR le papier, et `orange-700`
+     descend d'un cran (`#9a3412`, 7,31:1) pour que `hover:bg-orange-700`
+     assombrisse encore au lieu de ne plus rien changer. */
+  --color-orange-600: #c2410c;
+  --color-orange-700: #9a3412;
 }
 
 @layer base {
@@ -698,13 +712,13 @@ body {
   select:focus-visible,
   textarea:focus-visible,
   summary:focus-visible {
-    outline: 2px solid #c2410c;
+    outline: 2px solid var(--kojo-orange-fonce);
     outline-offset: 2px;
   }
 
   ::selection {
-    background-color: #fed7aa;
-    color: #7c2d12;
+    background-color: var(--kojo-selection);
+    color: var(--kojo-brun);
   }
 
   h1,
@@ -825,27 +839,27 @@ body {
    teinte du texte par `currentColor` — impossible que les deux se contredisent. */
 .pastille-statut {
   border-color: #e7e5e4;
-  background-color: #fafaf9;
-  color: #78716c;
+  background-color: var(--kojo-neutre-fond);
+  color: var(--kojo-neutre);
 }
 
 .pastille-statut[data-statut='open'],
 .pastille-statut[data-statut='pending'] {
   border-color: #fdba74;
-  background-color: #fff7ed;
-  color: #c2410c;
+  background-color: var(--kojo-creme);
+  color: var(--kojo-orange-fonce);
 }
 
 .pastille-statut[data-statut='in_progress'] {
   border-color: #bfdbfe;
-  background-color: #eff6ff;
-  color: #1d4ed8;
+  background-color: var(--kojo-bleu-fond);
+  color: var(--kojo-bleu);
 }
 
 .pastille-statut[data-statut='completed'] {
   border-color: #bbf7d0;
-  background-color: #f0fdf4;
-  color: #15803d;
+  background-color: var(--kojo-succes-fond);
+  color: var(--kojo-succes);
 }
 
 .pastille-statut-point {
@@ -1003,6 +1017,20 @@ body {
      des pays (« #7c2d12 », contraste 10,4:1 avec le blanc). */
   --kojo-creme: #fff7ed;
   --kojo-brun: #7c2d12;
+  /* ── LES JETONS DES ÉTATS ET DE LA SÉLECTION (22/10/2026) ──────────────
+     Une pastille de statut se lit à 12 px : son couple (teinte, fond) est un
+     couple de CONTRASTE, pas un choix décoratif. Il vivait en littéraux dans
+     `.pastille-statut`, donc une retouche d'un seul côté pouvait passer sous
+     4,5:1 sans que rien ne le dise. Les deux moitiés de chaque couple sont
+     désormais des jetons, et la paire est MESURÉE par
+     `scripts/contraste-jetons.js` (test : `scripts/__tests__/contraste-jetons.test.js`). */
+  --kojo-bleu: #1d4ed8;
+  --kojo-bleu-fond: #eff6ff;
+  --kojo-succes: #15803d;
+  --kojo-succes-fond: #f0fdf4;
+  --kojo-neutre: #78716c;
+  --kojo-neutre-fond: #fafaf9;
+  --kojo-selection: #fed7aa;
   /* LE HÉROS garde la face dont la constante est celle de SA phrase (92,1 %, et
      sa boîte est suivie à part : c'est l'élément LCP de « / »). */
   --kojo-serif: 'Cormorant Garamond', 'Cormorant Garamond repli Times',
@@ -1305,6 +1333,50 @@ body {
 
 .fond-sable {
   background-color: var(--kojo-sable);
+}
+
+/* ══ LE LIEN D'ÉVITEMENT ═════════════════════════════════════════════════════
+
+   Le premier élément focalisable de la page (src/App.js, et la coquille
+   pré-rendue via vite-plugins/prerender/app-chrome.js). Sa règle tient en deux
+   états, et c'est le SECOND qui compte :
+
+     • hors focus, il ne peint RIEN et n'occupe aucune place (`clip-path`, 1 px)
+       — donc la géométrie comparée entre la coquille et React ne bouge pas ;
+     • au focus, il apparaît en haut à gauche, au-dessus de la barre (z-index),
+       en encre sur papier, avec un contour visible : un lien d'évitement
+       invisible au clavier ne sert à personne.
+
+   Aucun texte n'est écrit ici : le libellé vient de la clé i18n
+   `skipToContent` (5 langues), et la coquille le lit dans le dictionnaire
+   français au build plutôt que de le recopier. */
+.lien-evitement:not(:focus):not(:focus-visible) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.lien-evitement:focus,
+.lien-evitement:focus-visible {
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 100;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  background-color: var(--kojo-encre);
+  color: var(--kojo-papier);
+  font-weight: 600;
+  text-decoration: none;
+  outline: 2px solid var(--kojo-orange, #ea580c);
+  outline-offset: 2px;
 }
 
 /* ══ LE LANGAGE ÉDITORIAL DE L'ACCUEIL ══════════════════════════════════════
@@ -2404,9 +2476,12 @@ body {
   color: var(--kojo-orange-fonce);
 }
 
+/* La puce ACTIVE porte du texte blanc de 14 px : sur `--kojo-orange`
+   (#ea580c) il vaut 3,55:1, sous le 4,5:1 exigé — mesuré par la sonde
+   d'accessibilité sur /jobs (22/10/2026). La variante foncée mesure 5,18:1. */
 .puce-filtre-active {
-  border-color: var(--kojo-orange);
-  background-color: var(--kojo-orange);
+  border-color: var(--kojo-orange-fonce);
+  background-color: var(--kojo-orange-fonce);
   color: #fff;
 }
 
@@ -2488,7 +2563,10 @@ body {
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.875rem;
-  background-color: var(--kojo-orange);
+  /* `--kojo-orange` (#ea580c) sous du blanc vaut 3,55:1, sous le 4,5:1 que
+     cette étiquette de 11 px exige — mesuré par la sonde d'accessibilité. La
+     variante FONCÉE (5,18:1) est le même orange, un cran plus bas. */
+  background-color: var(--kojo-orange-fonce);
   color: #fff;
   font-size: 0.6875rem;
   font-weight: 700;

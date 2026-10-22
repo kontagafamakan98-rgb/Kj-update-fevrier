@@ -1697,6 +1697,25 @@ jobs:
   #      c'est sur ces deux moteurs qu'un défaut de feuille de style a fait
   #      tomber la carte de /jobs dans l'ErrorBoundary (« Oups »), invisible en
   #      Chromium (voir frontend/e2e/appuis-exterieurs.spec.js).
+  #  10. Accessibilité MESURÉE : axe (WCAG 2.1 A/AA) sur les DIX routes publiques,
+  #      dans un vrai navigateur (le contraste ne se calcule pas en jsdom). Les
+  #      constats `serious`/`critical` sont refusés, les `minor`/`moderate` sont
+  #      PUBLIÉS dans le journal au lieu d'être tus. Le scan n'est pas déclaré
+  #      fiable sur parole : deux cas INJECTENT le défaut (image sans `alt`,
+  #      bouton sans nom accessible) et exigent que le MÊME analyseur le trouve —
+  #      un garde qu'on n'a jamais vu rougir peut être aveugle (voir
+  #      frontend/e2e/accessibilite-routes-publiques.spec.js).
+  #  11. Parcours CLAVIER d'une page publique : le lien d'évitement est le
+  #      PREMIER arrêt de Tab, son activation déplace le focus DANS `main`, la
+  #      tabulation suivante y reste (la barre est sautée) — sur DEUX routes,
+  #      parce que le chrome porte le lien, pas une page ; et sur le document
+  #      SERVI, sans JavaScript, puisque c'est là qu'arrive un visiteur à froid.
+  #      Les preuves d'échec retirent le lien puis l'identifiant de `main` et
+  #      exigent que les MÊMES vérifications disent non (voir
+  #      frontend/e2e/clavier-parcours-public.spec.js).
+  #      Ces deux points n'ajoutent aucun job : ils tournent dans CE job, qui est
+  #      un check REQUIS (`.github/scripts/gate-perimetre.json`) — un défaut
+  #      d'accessibilité bloque donc la fusion comme les autres.
   e2e-playwright:
     # Le NOM de ce job est le nom du check REQUIS (`.github/scripts/gate-perimetre.json`,
     # protection de main, `livrer.py`) : il reste donc celui d'avant le passage à
@@ -1705,7 +1724,15 @@ jobs:
     # attendre un check que personne ne publie.
     name: E2E Playwright tests (Chromium)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 20 → 30 min le 22/10/2026 : le cache des binaires est indexé sur
+    # l'empreinte de `frontend/package-lock.json`, donc l'ajout d'UNE
+    # dépendance de test (`@axe-core/playwright`) l'a invalidé et le job a payé
+    # le téléchargement complet des trois moteurs — deux passes de suite, tuées
+    # à 20 min dans `playwright install --with-deps` avant même de lancer un
+    # test (runs 39827179335 et sa reprise). Une fois le cache réamorcé, la
+    # suite tient largement dans 30 min ; le délai ne change AUCUN critère, il
+    # cesse seulement de confondre « installation lente » et « tests rouges ».
+    timeout-minutes: 30
     needs: frontend-build
     # Le tableau des écarts par moteur est publié en COMMENTAIRE de PR (même
     # mécanique que le rapport de taille du bundle : un seul commentaire,
@@ -1738,7 +1765,20 @@ jobs:
           # Le suffixe `v2` accompagne le passage à trois moteurs : les caches
           # `v1` ne contenaient que Chromium, et un « cache-hit » dessus ferait
           # échouer les projets firefox/webkit sur des binaires absents.
+          #
+          # `restore-keys` est la partie qui compte : le cache EXACT reste lié au
+          # lock, mais une clé qui ne correspond plus (l'ajout d'UNE dépendance
+          # suffit) ne repart plus de zéro — `playwright install` réutilise les
+          # binaires restaurés et ne télécharge que les absents. C'est
+          # exactement ce qui manquait le 22/10/2026, où 493 Mo ont été
+          # retéléchargés avant que le job ne meure à 20 min : `cache-hit`
+          # valant `false` sur une restauration partielle, la branche complète
+          # (`install --with-deps`, qui ne retélécharge rien de présent) est
+          # bien celle qui s'exécute, donc aucune version d'outil n'est jugée
+          # à tort sur des binaires périmés.
           key: playwright-browsers-v2-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            playwright-browsers-v2-${{ runner.os }}-
 
       - name: Install Playwright browser dependencies (and binaries if cache miss)
         working-directory: frontend

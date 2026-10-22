@@ -40,6 +40,8 @@
 //   `border-b` de 1 px autour d'un `h-16` de 64 px. Le placeholder unique
 //   `h-16 … border-b` en faisait 64 (border-box), soit 1 px de moins que la
 //   vraie — de quoi décaler tout le contenu au montage de React.
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { CONTACT, mailtoHref, telHref } from '../../src/config/contact.js'
 // Les CLASSES du chrome n'ont qu'un propriétaire (src/config/classes-chrome.js),
 // lu par React (src/App.js, src/components/Navbar.js) ET par ici : les recopier
@@ -51,7 +53,9 @@ import {
   APP_CLASS,
   COLONNE_CLASS,
   CONTENEUR_CLASS,
+  LIEN_EVITEMENT_CLASS,
   MAIN_CLASS,
+  MAIN_ID,
   NAV_RANGEE_CLASS,
   NAV_CLASS,
   PIED_ADRESSE_CLASS,
@@ -69,6 +73,16 @@ import {
 // CGU) : un crawler n'en lisait rien, et le lien n'était pas un lien interne.
 const ROUTE_CGU = '/terms'
 
+/** Le libellé du lien d'évitement est une DONNÉE : il s'échappe comme toute donnée. */
+const escapeHtml = (texte) =>
+  String(texte).replace(/[&<>"']/g, (caractere) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[caractere]))
+
 export const NAV_PLACEHOLDER =
   `<nav class="${NAV_CLASS}">` +
   // La MÊME structure que src/components/Navbar.js : conteneur, puis rangée de
@@ -81,11 +95,56 @@ export const NAV_PLACEHOLDER =
 // exiger la même enveloppe dans les coquilles construites (elles lisent ces
 // constantes au lieu de recopier une chaîne — même propriétaire, donc pas de
 // dérive silencieuse possible entre la fabrique et son contrôle).
+// ── LE LIEN D'ÉVITEMENT, PUBLIÉ PAR LA COQUILLE AUSSI ─────────────────────
+// Il est le PREMIER arrêt de la touche Tab sur le document servi, avant tout
+// JavaScript : sans lui, le lien n'existerait qu'après le montage de React, et
+// un lecteur d'écran ou un utilisateur clavier qui arrive sur la page — le cas
+// exact que le lien sert — ne l'aurait jamais trouvé. Son libellé se LIT dans
+// le dictionnaire français (celui que la coquille publie partout ailleurs),
+// jamais recopié : une clé renommée casse le build au lieu de publier un lien
+// sans texte.
+// Le libellé est LU dans le dictionnaire français (la coquille publie du
+// français, comme pour le pied de page) : une copie écrite à la main était
+// refusée par `scripts/check-shell-text-provenance.js` — un texte affiché en
+// littéral dans un module de pré-rendu ne bouge pas quand la page change de
+// mot. Ici la copie n'existe plus : renommer ou retoucher la clé se propage au
+// document servi, et le contrat de `check-app-chrome.test.js` continue
+// d'exiger l'égalité avec le dictionnaire.
+// Le chemin se résout depuis le RÉPERTOIRE DE TRAVAIL (frontend/), comme
+// `vite-plugins/prerender-route-meta.js` le fait pour le même fichier : `new
+// URL('…', import.meta.url)` est RÉÉCRIT par Vite au passage du module dans le
+// pipeline de vitest, qui refuse alors une URL qui n'est pas `file:` — la lecture
+// échouait donc dans les tests du garde (`check-app-chrome.test.js`), pas au
+// build. Une seule façon de nommer le dictionnaire, celle qui marche aux deux.
+const DICTIONNAIRE_FR = JSON.parse(
+  readFileSync(path.join(process.cwd(), 'src', 'i18n', 'fr.json'), 'utf8')
+)
+
+export const LIBELLE_EVITEMENT = DICTIONNAIRE_FR.skipToContent
+
+if (!LIBELLE_EVITEMENT) {
+  throw new Error(
+    'prerender-app-chrome : la clé « skipToContent » est absente du dictionnaire français — ' +
+      'le document servi publierait un lien d’évitement sans nom accessible'
+  )
+}
+
+/**
+ * Le lien d'évitement du document pré-rendu — même classe, même cible que
+ * src/App.js (`LIEN_EVITEMENT_CLASS`, `MAIN_ID`), pour que la bascule
+ * coquille → React ne change ni sa place, ni son texte, ni sa cible.
+ */
+export const LIEN_EVITEMENT_HTML =
+  `<a class="${LIEN_EVITEMENT_CLASS}" href="#${MAIN_ID}">${escapeHtml(LIBELLE_EVITEMENT)}</a>`
+
 export const CHROME_OUVERTURE =
   `<div class="${APP_CLASS}">` +
   `<div class="${COLONNE_CLASS}">` +
+  LIEN_EVITEMENT_HTML +
   NAV_PLACEHOLDER +
-  `<main class="${MAIN_CLASS}">`
+  // `tabindex="-1"` : même raison que côté React — la cible doit pouvoir
+  // recevoir le focus, sinon le lien ne fait que défiler.
+  `<main id="${MAIN_ID}" tabindex="-1" class="${MAIN_CLASS}">`
 
 // `main` se ferme ICI ; le pied de page et la fermeture des deux conteneurs
 // viennent après (voir chromeDePage). Séparé pour que les gardes puissent
@@ -137,7 +196,10 @@ export function piedDePage({ esc, T, socialLinks = [] }) {
     `<a href="${esc(telHref)}" class="${PIED_LIEN_CLASS}">${esc(CONTACT.phoneDisplay)}</a>` +
     `<a href="${esc(mailtoHref)}" class="${PIED_LIEN_LONG_CLASS}">${esc(CONTACT.email)}</a>` +
     `<a href="${esc(CONTACT.whatsappUrl)}" target="_blank" rel="noreferrer" class="${PIED_LIEN_CLASS}">${esc(T('contactWhatsapp'))}</a>` +
-    `<a href="${esc(CONTACT.mapsUrl)}" target="_blank" rel="noreferrer" aria-label="Google Maps" title="Google Maps" class="${PIED_LIEN_CLASS}">${esc(T('footerItinerary'))}</a>` +
+    // Sans `aria-label` : le nom accessible doit être le texte VISIBLE
+    // (« Itinéraire »), comme dans src/App.js — WCAG 2.5.3. `title` garde la
+    // désignation cherchée par un audit de référencement local.
+    `<a href="${esc(CONTACT.mapsUrl)}" target="_blank" rel="noreferrer" title="Google Maps" class="${PIED_LIEN_CLASS}">${esc(T('footerItinerary'))}</a>` +
     `</address>` +
     `<div class="${PIED_NAV_CLASS}">` +
     `<a href="/about" class="${PIED_NAV_LIEN_CLASS}">${esc(T('footerAbout'))}</a>` +

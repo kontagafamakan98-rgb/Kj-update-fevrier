@@ -23,9 +23,13 @@
  *      (Lighthouse 12.6.1, pile de la CI, Chrome 152, /contact mobile, 3 runs) :
  *      l'iframe du premier écran, même en `loading="lazy"`, tire ~300 Ko de
  *      tiers et repousse le LCP à 4143-4399 ms simulés (scores 81-85) ;
- *   2. au moins un lien porte `aria-label="Google Maps"` + `title="Google Maps"`
- *      vers l'URL de la fiche (c'est cette désignation qu'un audit lit pour
- *      reconnaître la présence locale) ;
+ *   2. au moins un lien porte `title="Google Maps"` vers l'URL de la fiche
+ *      (c'est cette désignation qu'un audit lit pour reconnaître la présence
+ *      locale) ; il était auparavant nommé par `aria-label="Google Maps"`, et
+ *      ce nom MASQUAIT le texte affiché (« Adresse » + l'adresse) — WCAG 2.5.3,
+ *      refusé par la sonde d'accessibilité sur cinq routes publiques le
+ *      22/10/2026. Le nom accessible est donc le texte visible, et le test le
+ *      vérifie au lieu de le supposer ;
  *   3. les moyens de contact restent cliquables (`tel:`, `mailto:`, `wa.me/`).
  *
  * C'est un test de RENDU : il monte la vraie page, avec le vrai dictionnaire.
@@ -112,17 +116,33 @@ describe('accueil — SEO local (carte intégrée + lien Google Maps)', () => {
     expect(iframe.className).toBe(PAGE_SECTIONS['/contact'].mapFrameClass);
   });
 
-  it('publie un lien Google Maps explicite (désigné par aria-label et title)', () => {
-    rendreLAccueil();
+  it('publie un lien Google Maps explicite (désigné par title, nommé par son texte visible)', () => {
+    const { container } = rendreLAccueil();
 
-    const liens = screen.getAllByRole('link', { name: 'Google Maps' });
-    expect(liens.length).toBeGreaterThan(0);
+    // La désignation lue par un audit de référencement local : un lien qui
+    // MÈNE à la fiche et la NOMME. Elle passe par `title` — un `aria-label` ne
+    // peut pas la porter ici, parce que le nom accessible doit être le texte
+    // visible (WCAG 2.5.3) et que ce lien affiche l'adresse, pas « Google
+    // Maps ».
+    const liens = [...container.querySelectorAll('a[title="Google Maps"]')];
+    expect(liens.length, 'aucun lien Google Maps sur l’accueil').toBeGreaterThan(0);
 
     for (const lien of liens) {
       expect(lien.getAttribute('href')).toBe(CONTACT.mapsUrl);
-      expect(lien.getAttribute('title')).toBe('Google Maps');
       expect(lien.getAttribute('target')).toBe('_blank');
       expect(lien.getAttribute('rel')).toContain('noreferrer');
+
+      // Le nom accessible est le texte visible : une étiquette qui ne le
+      // contient pas est exactement le défaut que la sonde refusait.
+      const etiquette = lien.getAttribute('aria-label');
+      const texteVisible = lien.textContent.replace(/\s+/g, ' ').trim();
+      expect(texteVisible.length, 'le lien n’a AUCUN texte visible').toBeGreaterThan(0);
+      if (etiquette !== null) {
+        expect(
+          etiquette.toLowerCase(),
+          `l’étiquette « ${etiquette} » masque le texte visible « ${texteVisible} » (WCAG 2.5.3)`
+        ).toContain(texteVisible.toLowerCase());
+      }
     }
   });
 

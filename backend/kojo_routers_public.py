@@ -578,14 +578,31 @@ def _site_base() -> str:
 
 
 @router.get("/public/stats")
-async def get_public_stats():
+async def get_public_stats(response: Response):
     """Compteurs réels pour la landing : travailleurs, missions, avis, pays.
+
+    Ces chiffres sont la PREUVE SOCIALE de l'accueil : ils sont MESURÉS, jamais
+    décorés. Trois règles les tiennent :
+
+      • un compte SUPPRIMÉ n'est pas un travailleur (`deleted: True` est posé par
+        la suppression de compte, cf. `kojo_routers_users_account`) — le
+        compter ferait grossir la preuve à mesure qu'on perd des gens ;
+      • une mission SUPPRIMÉE n'est ni ouverte ni terminée (même règle que la
+        liste publique et le sitemap) ;
+      • aucun champ d'identité ne sort : la réponse est une liste FERMÉE de
+        compteurs, pas une projection de documents (garde :
+        `tests/test_public_stats.py`).
+
+    `Cache-Control` : la donnée ne bouge qu'aux inscriptions et publications,
+    donc la landing peut la garder une minute — un visiteur ne martèle pas
+    MongoDB pour un chiffre qui ne change pas sous ses yeux.
 
     Returns:
         dict: {workers, clients, open_jobs, completed_jobs, reviews, countries}.
     """
-    workers = await db.users.count_documents({"user_type": "worker"})
-    clients = await db.users.count_documents({"user_type": "client"})
+    actifs = {"deleted": {"$ne": True}}
+    workers = await db.users.count_documents({"user_type": "worker", **actifs})
+    clients = await db.users.count_documents({"user_type": "client", **actifs})
     open_jobs = await db.jobs.count_documents(
         {"status": "open", "deleted": {"$ne": True}}
     )
@@ -593,6 +610,7 @@ async def get_public_stats():
         {"status": "completed", "deleted": {"$ne": True}}
     )
     reviews = await db.reviews.count_documents({})
+    response.headers["Cache-Control"] = "public, max-age=60, s-maxage=60"
     return {
         "workers": workers,
         "clients": clients,

@@ -361,6 +361,15 @@ const copieModules = (dir) => {
     fs.mkdirSync(path.dirname(cible), { recursive: true });
     fs.copyFileSync(path.join(FRONTEND_DIR, 'vite-plugins', rel), cible);
   }
+  // Le chrome lit le libellé du lien d'évitement dans `src/i18n/fr.json`, résolu
+  // depuis `process.cwd()` (comme `prerender-route-meta.js` : un chemin relatif à
+  // `import.meta.url` est réécrit par Vite et casse la lecture dans vitest). Le
+  // garde tourne donc ICI avec le dictionnaire du dépôt, sans quoi il tomberait
+  // sur un ENOENT au chargement du module — un échec d'outillage qui ne dit rien
+  // de la règle jugée.
+  const dictionnaire = path.join(dir, 'src', 'i18n', 'fr.json');
+  fs.mkdirSync(path.dirname(dictionnaire), { recursive: true });
+  fs.copyFileSync(path.join(FRONTEND_DIR, 'src', 'i18n', 'fr.json'), dictionnaire);
 };
 
 /**

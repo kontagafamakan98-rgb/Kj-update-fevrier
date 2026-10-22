@@ -54,6 +54,46 @@ async def test_public_stats_excludes_deleted_jobs(client):
     assert resp.json()["open_jobs"] == 1
 
 
+async def test_public_stats_excludes_deleted_accounts(client):
+    # La suppression de compte pose `deleted: True` (kojo_routers_users_account) :
+    # un compte supprimé n'est plus un travailleur, sinon la preuve sociale
+    # grossirait à mesure qu'on perd des gens.
+    await db_insert("users", {"id": "w1", "user_type": "worker", "email": "w1@kojo.sn"})
+    await db_insert("users", {"id": "w2", "user_type": "worker", "email": "w2@kojo.sn", "deleted": True})
+    await db_insert("users", {"id": "c1", "user_type": "client", "email": "c1@kojo.sn", "deleted": True})
+
+    resp = await client.get("/api/public/stats")
+    data = resp.json()
+    assert data["workers"] == 1
+    assert data["clients"] == 0
+
+
+async def test_public_stats_est_cachee_une_minute(client):
+    resp = await client.get("/api/public/stats")
+    assert resp.headers.get("Cache-Control") == "public, max-age=60, s-maxage=60", (
+        "la landing ne doit pas marteler la base pour un chiffre qui bouge aux inscriptions"
+    )
+
+
+async def test_public_stats_ne_publie_que_des_compteurs(client):
+    await db_insert("users", {
+        "id": "w1", "user_type": "worker", "email": "prive@kojo.sn",
+        "phone": "+221700000000", "payment_accounts": [{"account_number": "0700"}],
+    })
+
+    resp = await client.get("/api/public/stats")
+    data = resp.json()
+
+    # Liste FERMÉE : ajouter un champ de document à la réponse est une fuite,
+    # pas une amélioration.
+    assert set(data) == {
+        "workers", "clients", "open_jobs", "completed_jobs", "reviews", "countries",
+    }
+    corps = resp.text
+    for interdit in ("prive@kojo.sn", "+221700000000", "0700"):
+        assert interdit not in corps, f"« {interdit} » sort sur une route publique"
+
+
 async def test_radius_search_filters_by_distance(client):
     headers = await auth_headers(client, BASE_USER)
 

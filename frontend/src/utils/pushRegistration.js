@@ -7,7 +7,7 @@
  * ---------------------------------------------------------------
  */
 
-import { notificationAPI } from '../services/api';
+import { isNativeShell, notificationAPI } from '../services/api';
 import { devLog, safeLog } from './env';
 
 const PUSH_SW_PATH = '/push-sw.js';
@@ -32,8 +32,25 @@ function urlBase64ToUint8Array(base64String) {
   }
 }
 
-/** Vérifie si le navigateur supporte les push */
+/**
+ * Le push Web fonctionne-t-il ICI ?
+ *
+ * ── Le défaut que la garde native ferme (22/10/2026) ───────────────────────
+ * La WebView Capacitor expose `serviceWorker`, `PushManager` et `Notification`
+ * (c'est Chromium), donc la détection par PRÉSENCE répondait « oui » dans
+ * l'application Android/iOS — alors qu'un push Web n'y arrive jamais : la
+ * distribution passe par FCM/APNs et un plugin natif, pas par un Service Worker
+ * de WebView. L'inscription partait donc au backend, la permission était
+ * demandée au pire moment, et l'utilisateur n'aurait jamais reçu la première
+ * notification — le pire des deux mondes (une permission consommée pour rien).
+ *
+ * Le bridage est DÉCLARÉ ici, à la seule question que se posent les appelants :
+ * le shell natif est hors périmètre du push Web tant qu'un plugin natif ne
+ * l'implémente pas. Les notifications IN-APP, elles, continuent de fonctionner
+ * (elles passent par l'API, pas par ce module).
+ */
 export function isPushSupported() {
+  if (isNativeShell()) return false;
   return (
     typeof window !== 'undefined' &&
     'serviceWorker' in navigator &&

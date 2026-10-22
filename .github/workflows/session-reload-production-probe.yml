@@ -86,7 +86,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
+          # `restore-keys` : la clé exacte reste liée au lock, mais un changement
+          # de dépendance (même sans rapport avec Playwright) ne fait plus
+          # retélécharger Chromium — `install --with-deps` réutilise le cache
+          # restauré et ne prend que ce qui manque. Même correctif que `ci.yml`,
+          # qui a payé ce téléchargement pour rien le 22/10/2026.
           key: playwright-browsers-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            playwright-browsers-${{ runner.os }}-
 
       - name: Install Playwright Chromium dependencies (and binary if cache miss)
         working-directory: frontend

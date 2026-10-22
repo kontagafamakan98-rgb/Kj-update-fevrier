@@ -492,7 +492,10 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">${glypheDeContact('contactSendEmail')}</span>`,
     `<div><div class="text-sm font-semibold text-stone-900">${esc(T('contactSendEmail'))}</div><div class="text-xs text-stone-500 break-all">${esc(contact.email)}</div></div>`,
     `</a>`,
-    `<a href="${esc(contact.mapsUrl)}" target="_blank" rel="noreferrer" aria-label="Google Maps" title="Google Maps" class="${ligneDeContactClass}">`,
+    // Sans `aria-label`, comme src/pages/Home.js : le nom accessible de ce lien
+    // est son texte VISIBLE (WCAG 2.5.3, mesuré le 22/10/2026) ; `title` garde
+    // la désignation Google Maps.
+    `<a href="${esc(contact.mapsUrl)}" target="_blank" rel="noreferrer" title="Google Maps" class="${ligneDeContactClass}">`,
     `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-stone-600">${glypheDeContact('contactAddress')}</span>`,
     `<div><div class="text-sm font-semibold text-stone-900">${esc(T('contactAddress'))}</div><div class="text-xs text-stone-500">${esc(contact.address)}</div></div>`,
     `</a>`,
