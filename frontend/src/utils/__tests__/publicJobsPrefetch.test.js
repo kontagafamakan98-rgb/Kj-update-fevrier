@@ -206,7 +206,7 @@ describe('publicJobsPrefetch — lecture pendant le rendu (snapshot)', () => {
     // peint tout de suite son texte réel (titre, intro) + son squelette de
     // liste, au lieu d'être suspendue le temps de la réponse (mesuré : 2,1 s
     // sans le plus grand texte de la page sur /jobs desktop).
-    expect(prefetch.snapshot(DEFAULT_PARAMS)).toEqual({ applicable: true, value: null });
+    expect(prefetch.snapshot(DEFAULT_PARAMS)).toEqual({ applicable: true, value: null, total: null });
     await prefetch.pending.promise;
   });
 
@@ -234,6 +234,7 @@ describe('publicJobsPrefetch — lecture pendant le rendu (snapshot)', () => {
     expect(state).toEqual({
       applicable: true,
       value: expect.any(Array),
+      total: null,
     });
     expect(state.value).toHaveLength(2);
     expect(prefetch.pending).not.toBeNull();
@@ -256,6 +257,11 @@ describe('publicJobsPrefetch — lecture pendant le rendu (snapshot)', () => {
       { ...DEFAULT_PARAMS, page: 2 },
       { ...DEFAULT_PARAMS, mine: 'posted' },
       { ...DEFAULT_PARAMS, ids: 'applications' },
+      // Le préchargement ne porte QUE l'ordre chronologique : un tri demandé
+      // doit recharger, sinon la page afficherait la liste seedée (récente)
+      // sous un select qui annonce « budget » ou « distance ».
+      { ...DEFAULT_PARAMS, tri: 'budget' },
+      { ...DEFAULT_PARAMS, tri: 'distance', lat: 14.69, lng: -17.44 },
       { limit: PAGE_SIZE - 1, page: 1, status: 'open' },
     ]) {
       expect(prefetch.snapshot(divergent).applicable, JSON.stringify(divergent)).toBe(false);
@@ -277,6 +283,7 @@ describe('publicJobsPrefetch — lecture pendant le rendu (snapshot)', () => {
     expect(prefetch.snapshot(DEFAULT_PARAMS)).toEqual({
       applicable: true,
       value: null,
+      total: null,
     });
     expect(safeLog.warn).toHaveBeenCalled();
   });
@@ -289,6 +296,44 @@ describe('publicJobsPrefetch — lecture pendant le rendu (snapshot)', () => {
     expect(prefetch.snapshot(DEFAULT_PARAMS)).toEqual({
       applicable: true,
       value: null,
+      total: null,
     });
+  });
+});
+
+describe('publicJobsPrefetch — le COMPTE mesuré voyage avec la liste', () => {
+  it('lit X-Total-Count sur la réponse et le porte jusqu’au seed', async () => {
+    // Le préchargement sert le chemin le PLUS fréquent de la page (découverte
+    // publique, première visite) : sans ce compte, la liste n'aurait dit
+    // « combien » qu'après un filtre — deux écrans pour une même question.
+    const response = {
+      data: jobsOf(2),
+      headers: { get: (nom) => (nom === 'X-Total-Count' ? '37' : null) },
+    };
+    const jobsAPI = { getAll: vi.fn(() => Promise.resolve(response)) };
+    const prefetch = makePublicJobsPrefetch({
+      jobsAPI,
+      normalizeJobList: (liste) => (Array.isArray(liste) ? liste : []),
+      safeLog: { warn: vi.fn() },
+      pageSize: PAGE_SIZE,
+      enabled: true,
+    });
+
+    prefetch.kick();
+    await prefetch.pending.promise;
+
+    expect(prefetch.snapshot(DEFAULT_PARAMS).total).toBe(37);
+    const consumed = await prefetch.consume(DEFAULT_PARAMS);
+    expect(consumed.jobs).toHaveLength(2);
+    expect(consumed.total).toBe(37);
+  });
+
+  it('un compte ABSENT vaut null, jamais la longueur de la page', async () => {
+    const { prefetch } = setup({ items: jobsOf(3) });
+
+    prefetch.kick();
+    const consumed = await prefetch.consume(DEFAULT_PARAMS);
+
+    expect(consumed.total).toBeNull();
   });
 });

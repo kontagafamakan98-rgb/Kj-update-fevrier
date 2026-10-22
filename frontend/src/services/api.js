@@ -452,7 +452,7 @@ const signalerPanneServeur = (method, path, status, requete) => {
   );
 };
 
-const request = async (method, path, { params, data, headers, signal, skipUnauthorizedRedirect = false, skipRecovery = false, sessionProbe = false } = {}) => {
+const request = async (method, path, { params, data, headers, signal, skipUnauthorizedRedirect = false, skipRecovery = false, sessionProbe = false, withHeaders = false } = {}) => {
   const normalizedPath = String(path || '').startsWith('/') ? path : `/${path || ''}`;
   const url = `${buildApiUrl(normalizedPath)}${buildQueryString(params)}`;
   const token = getAuthToken();
@@ -565,7 +565,7 @@ const request = async (method, path, { params, data, headers, signal, skipUnauth
     if (canRecover) {
       const recovered = await recoverSession(
         method, normalizedPath,
-        { params, data, headers, signal, skipUnauthorizedRedirect }
+        { params, data, headers, signal, skipUnauthorizedRedirect, withHeaders }
       );
       if (recovered !== RECOVERY_FAILED) return recovered;
     }
@@ -603,7 +603,11 @@ const request = async (method, path, { params, data, headers, signal, skipUnauth
     throw error;
   }
 
-  return payload;
+  // `withHeaders` : quelques routes publient une MESURE dans un en-tête (le
+  // nombre de missions d'un filtre, `X-Total-Count`). Le corps reste ce que les
+  // appelants lisent déjà — la forme par défaut ne change donc pas — et un
+  // appelant qui demande les en-têtes reçoit les deux.
+  return withHeaders ? { data: payload, headers: response.headers } : payload;
 };
 
 /**

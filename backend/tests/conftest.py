@@ -19,7 +19,13 @@ Ce que la FakeDB applique et ce qu'elle REFUSE (audit du 19/09/2026) :
 
   * requêtes : égalité (sous-document = égalité EXACTE), chemins POINTÉS,
     `$ne`, `$in`, `$nin`, `$exists`, `$gt`/`$gte`/`$lt`/`$lte` (comparaison
-    typée),    `$regex` + `$options`, `$or`, `$and`, `$geoWithin`/`$centerSphere` ;
+    typée),    `$regex` + `$options`, `$or`, `$and`, `$geoWithin`/`$centerSphere`,
+    et `$text` — sur les champs DÉCLARÉS par `kojo_recherche_missions`
+    (`CHAMPS_TEXTE`), avec des jetons pliés casse/accents et un OU entre les
+    termes (la sémantique de Mongo, mesurée : « plomberie urgente » rend aussi
+    une mission qui ne porte que « plomberie »). La langue de l'index est
+    « none » : pas de radicalisation, donc « fuites » ne trouve pas « fuite »,
+    comme sur le vrai index (mesuré) ;
   * écritures : `$set` (chemins pointés compris), `$setOnInsert` (chemin upsert
     uniquement), `$unset`, `$inc` et `$push` (chemins pointés compris, type
     numérique préservé), et le REMPLACEMENT (document sans opérateur) ;
@@ -64,6 +70,18 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
+
+# Les CHAMPS indexés et le pliage des jetons ont UN propriétaire
+# (`kojo_recherche_missions`) : la doublure doit chercher où l'index cherche et
+# plier comme il plie, sinon la suite locale dirait autre chose que la CI
+# (Mongo réel). Module stdlib seulement, donc importable avant les variables
+# d'environnement ci-dessous.
+from kojo_recherche_missions import (
+    CHAMPS_TEXTE,
+    LANGUE_TEXTE,
+    NOM_INDEX_TEXTE,
+    tokens_texte,
+)
 
 # ---------------------------------------------------------------------------
 # Variables d'env AVANT tout import de server.py
@@ -457,13 +475,47 @@ OPERATEURS_D_ECRITURE = frozenset({
 })
 
 
+def _texte_correspond(doc: Dict, spec: Dict) -> bool:
+    """`$text` rendu comme l'index le rend : jetons pliés, OU entre termes.
+
+    Les champs sont ceux de `CHAMPS_TEXTE` — l'index ne cherche nulle part
+    ailleurs — et le pliage est celui de `tokens_texte` : bas de casse, sans
+    accents, découpe sur les non-mots. Une option `$text` non implémentée
+    (`$language`, `$caseSensitive`, `$diacriticSensitive`) LÈVE au lieu d'être
+    ignorée : elle changerait le résultat, et un opérateur ignoré rend la
+    requête plus permissive qu'en production.
+    """
+    inconnues = set(spec) - {"$search"}
+    if inconnues:
+        raise FakeDbUnsupportedOperator(
+            f"option `$text` non implémentée : {sorted(inconnues)!r}"
+        )
+    termes = tokens_texte(spec.get("$search") or "")
+    if not termes:
+        # Mongo refuse un `$search` vide ; une doublure qui le laisserait passer
+        # rendrait « aucune recherche » égal à « tous les documents ».
+        raise FakeDbUnsupportedOperator("`$text` avec `$search` vide")
+    champs = " ".join(
+        str(_get_path(doc, champ) or "") for champ in CHAMPS_TEXTE
+    )
+    jetons = set(tokens_texte(champs))
+    # OU, jamais ET : Mongo rend les documents qui portent AU MOINS UN terme
+    # (mesuré sur 7.0.14 avec « plomberie urgente »). Un `all()` ici ferait de
+    # la doublure une base plus STRICTE que la CI, et les deux suites ne
+    # diraient plus la même chose de la même requête.
+    return any(terme in jetons for terme in termes)
+
+
 class FakeCollection:
     def __init__(self):
         self._docs: List[Dict] = []
 
     def _match(self, query: Dict, doc: Dict) -> bool:
         for key, value in query.items():
-            if key == "$or":
+            if key == "$text":
+                if not _texte_correspond(doc, value):
+                    return False
+            elif key == "$or":
                 if not any(self._match(sub, doc) for sub in value):
                     return False
             elif key == "$and":
@@ -834,6 +886,19 @@ async def reset_state():
         pass
     if USE_REAL_MONGO:
         await _srv.db.client.drop_database(_srv.db.name)
+        # ── L'INDEX TEXTE EST REPOSÉ À CHAQUE CAS (Mongo réel seulement) ──
+        # `$text` ne s'exécute pas sans index texte (Mongo répond alors une
+        # erreur, que le routeur traite comme « index indisponible » et
+        # remplace par le repli `$regex`). Or ce fixture SUPPRIME la base entre
+        # deux cas : sans cette repose, aucun test n'exercerait jamais le
+        # chemin de l'index, et la suite dirait vert sur le repli en croyant
+        # avoir mesuré la recherche par mots. Mêmes constantes que la
+        # production (`kojo_recherche_missions`), pour la même raison.
+        await _srv.db.jobs.create_index(
+            [(champ, "text") for champ in CHAMPS_TEXTE],
+            default_language=LANGUE_TEXTE,
+            name=NOM_INDEX_TEXTE,
+        )
     else:
         fake_db.reset_all()
     yield

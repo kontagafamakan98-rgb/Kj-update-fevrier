@@ -236,7 +236,11 @@ const send = (res, status, body, headers = {}) => {
     // lire un cookie — c'est exactement la dépendance que le modèle doit pouvoir
     // trancher. La production expose le même en-tête (server.py,
     // CORSMiddleware(expose_headers=[... 'X-Kojo-CSRFToken'])).
-    'Access-Control-Expose-Headers': 'X-Kojo-CSRFToken',
+    // `X-Total-Count` est exposé par la production (`server.py`,
+    // CORSMiddleware(expose_headers=[...])) : sans lui, la liste ne peut pas
+    // lire le compte du FILTRE en cross-origin, et le cas mesurerait une
+    // absence d'en-tête au lieu d'une absence de compte.
+    'Access-Control-Expose-Headers': 'X-Kojo-CSRFToken, X-Total-Count',
     ...(csrfAEchoer && !headers['X-Kojo-CSRFToken'] ? { 'X-Kojo-CSRFToken': csrfAEchoer } : {}),
     ...headers
   });
@@ -409,7 +413,17 @@ const server = http.createServer(async (req, res) => {
       const category = url.searchParams.get('category') || '';
       const filtered = jobs.filter((job) => (!query || job.title.toLowerCase().includes(query)) && (!category || job.category === category));
       const data = filtered.slice((page - 1) * limit, page * limit);
-      return send(res, 200, { data, jobs: data, page, limit, has_more: page * limit < filtered.length, total: filtered.length });
+      // La VRAIE route rend une LISTE NUE (`GET /jobs`, response_model=list[JobPublic])
+      // et publie le compte du filtre dans `X-Total-Count`. La fixture répondait
+      // `{data, jobs, page, limit, has_more, total}` : dès que le client a demandé
+      // `withHeaders`, la réponse est devenue `{data: <corps>, headers}` et le
+      // corps ENVELOPPÉ n'a plus été reconnu comme une liste — `/jobs` s'est
+      // affichée vide et deux parcours anonymes (user-flows) sont tombés sur
+      // « aucun élément ». Une fixture qui n'a pas la forme de ce qu'elle
+      // remplace ne mesure rien.
+      return send(res, 200, data, {
+        'X-Total-Count': String(filtered.length),
+      });
     }
     if (req.method === 'GET' && /^\/jobs\/[^/]+$/.test(path)) {
       const job = jobs.find((item) => item.id === path.split('/').pop());

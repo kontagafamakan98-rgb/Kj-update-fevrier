@@ -31,7 +31,17 @@ fr: {
   loadErrorServer: 'Le serveur n’a pas répondu. Réessayez dans un instant.',
   emptyFiltered: 'Aucune mission ne correspond à ces filtres.',
   clearFilters: 'Effacer les filtres',
-  emptyHint: 'Élargissez votre recherche ou revenez plus tard.'
+  emptyHint: 'Élargissez votre recherche ou revenez plus tard.',
+  // Le COMMTE mesuré (X-Total-Count), jamais la longueur de la page : « 12
+  // missions » s'affiche alors que la page en montre 12 sur 300.
+  resultsOne: '1 mission correspond à votre recherche',
+  resultsMany: '{count} missions correspondent à votre recherche',
+  sortLabel: 'Trier par',
+  sortRecent: 'Plus récentes',
+  sortBudget: 'Budget le plus élevé',
+  // L'ordre ne s'applique qu'après la géolocalisation : le libellé le dit
+  // (« au plus proche »), et le refus de position laisse l'ordre précédent.
+  sortDistance: 'Au plus proche'
 },
 en: {
   searchPlaceholder: 'Title or description...',
@@ -52,7 +62,13 @@ en: {
   loadErrorServer: 'The server did not answer. Try again in a moment.',
   emptyFiltered: 'No job matches these filters.',
   clearFilters: 'Clear filters',
-  emptyHint: 'Widen your search or come back later.'
+  emptyHint: 'Widen your search or come back later.',
+  resultsOne: '1 mission matches your search',
+  resultsMany: '{count} missions match your search',
+  sortLabel: 'Sort by',
+  sortRecent: 'Most recent',
+  sortBudget: 'Highest budget',
+  sortDistance: 'Closest first'
 }
 };
 dict.wo = withBase(dict.fr, {  searchPlaceholder: 'Tur walla melokaan...'

@@ -27,12 +27,7 @@ import { MarqueKojo } from '../config/marque-kojo';
 const requiresRegistrationCompletion = (user) => {
   if (!user) return false;
 
-  // `email_verified`, PAS `is_verified` : c'est le champ que lit la même porte
-  // côté route protégée (`ProtectedRoute`, App.js). `is_verified` dit « le
-  // minimum de comptes de paiement est atteint », or une inscription aboutit
-  // SANS compte de paiement depuis le 22/10/2026 : juger sur lui renvoyait à
-  // l'écran de paiement un compte parfaitement valide, à la connexion même.
-  return !user.email_verified;
+  return !user.is_verified;
 };
 
 export default function Login() {

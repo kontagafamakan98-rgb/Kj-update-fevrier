@@ -122,6 +122,9 @@ export default function Jobs() {
     country: searchParams.get('country') || '',
     status: '',
     search: '',
+    // Ordre de la liste : `recent` est celui du serveur sans paramètre (donc
+    // celui du préchargement), `budget` met le mieux payé en tête.
+    sort: 'recent',
   }));
   const [radiusKm, setRadiusKm] = useState('');
   const [userCoords, setUserCoords] = useState(null);
@@ -141,7 +144,7 @@ export default function Jobs() {
   // missions » (ses annonces), sinon découverte publique.
   const effectiveTab = tab || (user?.user_type === 'client' ? JOB_TAB_MISSIONS : JOB_TAB_DISCOVER);
 
-  const { jobs, loading, loadingMore, hasMore, loadError, appliedJobIds, loadJobs, retry } = useJobsData({
+  const { jobs, loading, loadingMore, hasMore, total, loadError, appliedJobIds, loadJobs, retry } = useJobsData({
     effectiveTab,
     filters,
     setFilters,
@@ -157,6 +160,10 @@ export default function Jobs() {
     // fallback Suspense gardait la page sans son plus grand texte (l'intro, qui
     // est l'élément LCP) pendant toute la réponse de l'API (cf. useJobsData.js).
     prefetch: publicJobsPrefetch,
+    // La position de l'utilisateur, quand elle est connue : c'est le POINT
+    // depuis lequel `tri=distance` mesure. Sans elle, la page ne demande pas
+    // cet ordre (voir `changerLOdre`).
+    position: userCoords,
   });
 
   const reessayer = retry;
@@ -190,7 +197,15 @@ export default function Jobs() {
     });
   }, [jobs, radiusKm, userCoords]);
 
-  const locateMe = () => {
+  /**
+   * Demande la position au navigateur, puis la rend au rappel.
+   *
+   * Deux usages, UN seul chemin : le bouton « utiliser ma position » du filtre
+   * de rayon, et l'ordre « Distance » — qui ne peut pas être appliqué sans ce
+   * point. Le second ne doit donc pas recopier la demande (deux timeouts, deux
+   * messages différents, et un jour deux comportements).
+   */
+  const demanderLaPosition = (ensuite) => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
       toast.error(t('geoUnavailable'));
       return;
@@ -198,8 +213,10 @@ export default function Jobs() {
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setUserCoords({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+        const coords = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+        setUserCoords(coords);
         setLocating(false);
+        ensuite?.(coords);
       },
       () => {
         setLocating(false);
@@ -207,6 +224,25 @@ export default function Jobs() {
       },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 120000 }
     );
+  };
+
+  const locateMe = () => demanderLaPosition();
+
+  /**
+   * Le select annonce l'ordre APPLIQUÉ, jamais un ordre souhaité.
+   *
+   * « Distance » demande donc la position D'ABORD : l'appliquer avant de la
+   * connaître ferait envoyer `tri=distance` sans lat/lng — le serveur refuse
+   * (400 nommé), et l'écran aurait déjà annoncé un ordre qui n'existe pas. Un
+   * refus de géolocalisation laisse donc l'ordre précédent en place, et le
+   * message dit pourquoi (aucun tri silencieusement retombé sur « récent »).
+   */
+  const changerLOdre = (valeur) => {
+    if (valeur !== 'distance' || userCoords) {
+      setFilters((prev) => ({ ...prev, sort: valeur }));
+      return;
+    }
+    demanderLaPosition(() => setFilters((prev) => ({ ...prev, sort: 'distance' })));
   };
 
   const categories = [
@@ -420,6 +456,35 @@ export default function Jobs() {
           )}
         </div>
 
+        {/* ── L'ORDRE, DIT ET CHOISI (22/10/2026) ────────────────────────
+            La liste sortait toujours de la plus récente à la plus ancienne,
+            sans que rien ne le dise ni ne permette d'en changer — alors que la
+            première question d'un travailleur est « combien ça paie ». Le
+            select dit l'ordre APPLIQUÉ (pas une intention) et les deux autres
+            ordres que le serveur sait tenir : le budget, et la distance depuis
+            la position de l'utilisateur — demandée au moment où on la choisit,
+            jamais supposée. */}
+        {effectiveTab === JOB_TAB_DISCOVER && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-stone-200 pt-3">
+            {/* `text-stone-600`, pas 500 : sur le sable du panneau (#f7f3ec),
+                ce libellé de 12 px en capitales vaut 4,32:1 — sous le 4,5:1
+                exigé (mesuré par la sonde d'accessibilité le 22/10/2026). */}
+            <label htmlFor="jobs-tri" className="text-xs font-semibold uppercase tracking-wider text-stone-600">
+              {pageT('sortLabel')}
+            </label>
+            <select
+              id="jobs-tri"
+              value={filters.sort || 'recent'}
+              onChange={(e) => changerLOdre(e.target.value)}
+              className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-hidden focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+            >
+              <option value="recent">{pageT('sortRecent')}</option>
+              <option value="budget">{pageT('sortBudget')}</option>
+              <option value="distance">{pageT('sortDistance')}</option>
+            </select>
+          </div>
+        )}
+
         {/* Catégories en puces : la catégorie active reste VISIBLE sans
             déplier un menu natif, et sur mobile un appui suffit. Le menu
             déroulant précédent demandait d'ouvrir, parcourir puis valider. */}
@@ -449,7 +514,7 @@ export default function Jobs() {
             « ce filtre vient d'ailleurs » avant même que le nom soit lu. */}
         {paysFiltre && (
           <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-stone-200 pt-3">
-            <span className="text-xs font-semibold uppercase tracking-wider text-stone-500">
+            <span className="text-xs font-semibold uppercase tracking-wider text-stone-600">
               {t('country')}
             </span>
             <button
@@ -530,6 +595,19 @@ export default function Jobs() {
             {loading ? t('loading') : pageT('retry')}
           </button>
         </div>
+      )}
+
+      {/* ── COMBIEN DE MISSIONS (22/10/2026) ───────────────────────────────
+          Le nombre vient de `X-Total-Count`, donc il compte le FILTRE, pas la
+          page : sans lui, « 12 cartes » faisait croire à 12 missions. Il n'est
+          affiché que MESURÉ (`total !== null`) — un compte absent n'est pas un
+          compte nul, et l'écran n'en invente pas. */}
+      {!loading && total > 0 && (
+        <p className="mb-4 text-sm text-stone-600" aria-live="polite">
+          {total === 1
+            ? pageT('resultsOne')
+            : pageT('resultsMany', { count: total })}
+        </p>
       )}
 
       {loading ? (

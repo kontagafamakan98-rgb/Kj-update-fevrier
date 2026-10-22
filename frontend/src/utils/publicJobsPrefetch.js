@@ -24,6 +24,10 @@
  * Un vrai navigateur est-il disponible ? Évité sous jsdom/tests ainsi que dans
  * tout environnement sans localStorage (SSR, pré-rendu).
  */
+// Le COMPTE mesuré voyage avec la liste (`X-Total-Count`) : il se lit sur la
+// réponse, à côté de la normalisation des enregistrements (jobDisplayBridge).
+import { totalPublie } from './jobDisplayBridge';
+
 export const canUseNetworkPrefetch = () =>
   typeof window !== 'undefined' &&
   typeof window.localStorage !== 'undefined' &&
@@ -66,6 +70,11 @@ export const makePublicJobsPrefetch = ({
   // donc jugé « la même requête », la liste du pays n'était jamais demandée, et
   // la page affichait toutes les offres sous une puce « Mali ». Un filtre ignoré
   // en silence est pire qu'un filtre absent : la puce affirme ce qui n'est pas.
+  // `tri` en fait partie : le préchargement ne porte QUE l'ordre par défaut
+  // (chronologique). Sans cette ligne, choisir « budget » ou « distance » au
+  // premier rendu rendait la liste PRÉCHARGÉE — donc chronologique — sous un
+  // select qui annonçait l'autre ordre. Le préchargement ne portait pas de
+  // `tri`, donc un paramètre ABSENT est le seul cas qui correspond.
   const matches = (requestParams = {}) =>
     requestParams.limit === pageSize &&
     requestParams.page === 1 &&
@@ -74,31 +83,42 @@ export const makePublicJobsPrefetch = ({
     !requestParams.category &&
     !requestParams.country &&
     !requestParams.mine &&
-    !requestParams.ids;
+    !requestParams.ids &&
+    !requestParams.tri;
 
   // Déduplique : un second appel pendant que la requête est en vol renvoie le
   // même cache au lieu de lancer une requête concurrente.
   const kick = () => {
     if (!isEnabled) return null;
     if (pending && pending.promise) return pending;
+    // `withHeaders` : le préchargement sert la liste, et la liste doit dire
+    // COMBIEN de missions correspondent (`X-Total-Count`). Sans cet en-tête,
+    // le chemin le PLUS fréquent de la page — découverte publique, première
+    // visite — aurait affiché une liste sans son compte, alors qu'un filtre
+    // appliqué plus tard l'aurait affiché : deux écrans pour la même question.
     const promise = jobsAPI
-      .getAll(params)
-      .then((response) =>
-        normalizeJobList(Array.isArray(response) ? response : response?.data || [])
-      )
+      .getAll(params, { withHeaders: true })
+      .then((response) => ({
+        jobs: normalizeJobList(Array.isArray(response) ? response : response?.data || []),
+        // Le compte vient de l'en-tête ; absent (serveur plus ancien, proxy qui
+        // le masque), il vaut `null` et l'écran n'affiche alors AUCUN compte —
+        // jamais la longueur de la page, qui n'est pas un compte.
+        total: totalPublie(response),
+      }))
       .catch((error) => {
         // Bénin : laisse le cache null pour que le composant recharge seul.
         safeLog.warn('Public jobs prefetch failed (component will reload)', error);
         return null;
       });
-    pending = { requestParams: params, promise, settled: false, value: null };
-    promise.then((jobs) => {
+    pending = { requestParams: params, promise, settled: false, value: null, total: null };
+    promise.then((resultat) => {
       // Ne renseigne l'état QUE pour la requête encore en cours : `consume`
       // remet `pending` à null, une réponse tardive ne doit pas ressusciter un
       // résultat déjà consommé.
-      if (pending && pending.promise === promise) {
+      if (pending && pending.promise === promise && resultat) {
         pending.settled = true;
-        pending.value = jobs;
+        pending.value = resultat.jobs;
+        pending.total = resultat.total;
       }
     });
     return pending;
@@ -129,8 +149,10 @@ export const makePublicJobsPrefetch = ({
   // croire la page suspendue par un état que plus aucun appelant ne consomme.
   const snapshot = (requestParams = {}) => {
     if (!isEnabled || !matches(requestParams)) return { applicable: false };
-    if (!pending || !pending.promise || !pending.settled) return { applicable: true, value: null };
-    return { applicable: true, value: pending.value };
+    if (!pending || !pending.promise || !pending.settled) {
+      return { applicable: true, value: null, total: null };
+    }
+    return { applicable: true, value: pending.value, total: pending.total };
   };
 
   // Consomme le préchargement depuis le chargement de la liste : si la requête
@@ -139,10 +161,14 @@ export const makePublicJobsPrefetch = ({
   const consume = async (requestParams) => {
     if (!matches(requestParams)) return null;
     if (!pending || !pending.promise) return null;
-    const jobs = await pending.promise;
+    const resultat = await pending.promise;
     pending = null;
-    if (!jobs) return null; // échec → laisser le composant refaire sa requête
-    return { jobs, hasMore: jobs.length === pageSize };
+    if (!resultat) return null; // échec → laisser le composant refaire sa requête
+    return {
+      jobs: resultat.jobs,
+      hasMore: resultat.jobs.length === pageSize,
+      total: resultat.total,
+    };
   };
 
   return {

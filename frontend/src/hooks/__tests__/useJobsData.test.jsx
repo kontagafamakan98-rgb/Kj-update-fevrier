@@ -38,8 +38,8 @@ import { jobsAPI } from '../../services/apiEndpoints';
 
 const jobsOf = (count) => Array.from({ length: count }, (_, i) => ({ id: `job-${i + 1}` }));
 
-const Probe = ({ prefetch, tab = JOB_TAB_DISCOVER, filters = { search: '', category: '', status: '' } }) => {
-  const { jobs, loading } = useJobsData({
+const Probe = ({ prefetch, tab = JOB_TAB_DISCOVER, filters = { search: '', category: '', status: '' }, position }) => {
+  const { jobs, loading, total } = useJobsData({
     effectiveTab: tab,
     filters,
     setFilters: () => {},
@@ -47,11 +47,13 @@ const Probe = ({ prefetch, tab = JOB_TAB_DISCOVER, filters = { search: '', categ
     user: null,
     errorMessages: { network: 'réseau', server: 'serveur' },
     prefetch,
+    position,
   });
   return (
     <div>
       <span data-testid="etat">{loading ? 'squelette' : 'liste'}</span>
       <span data-testid="nombre">{jobs.length}</span>
+      <span data-testid="total">{total === null ? 'aucun' : total}</span>
     </div>
   );
 };
@@ -170,6 +172,63 @@ describe('useJobsData — préchargement lu pendant le rendu', () => {
       q: 'plombier',
       category: 'btp',
     }));
+  });
+
+  it('le tri demandé part au serveur, et le COMPTE mesuré remonte à la page', async () => {
+    // Le tri : la page ne trie pas localement — elle demande l'ordre au
+    // serveur, qui seul peut tenir un ordre exact sur TOUTES les pages.
+    const prefetch = { snapshot: vi.fn(() => ({ applicable: false })), consume: vi.fn() };
+    jobsAPI.getAll.mockResolvedValue({
+      data: jobsOf(2),
+      headers: { get: (nom) => (nom === 'X-Total-Count' ? '42' : null) },
+    });
+
+    render(
+      <Frame>
+        <Probe prefetch={prefetch} filters={{ search: '', category: '', status: '', sort: 'budget' }} />
+      </Frame>
+    );
+
+    await act(async () => {});
+
+    expect(jobsAPI.getAll).toHaveBeenCalledWith(
+      expect.objectContaining({ tri: 'budget', status: 'open' }),
+      { withHeaders: true }
+    );
+    expect(screen.getByTestId('total').textContent).toBe('42');
+  });
+
+  it('tri=distance porte le POINT depuis lequel la distance se mesure', async () => {
+    // Une distance se mesure depuis un point : le serveur refuse
+    // `tri=distance` sans lat/lng (400 nommé), donc les coordonnées partent
+    // DANS la même requête que l'ordre, jamais dans une seconde.
+    jobsAPI.getAll.mockResolvedValue(jobsOf(2));
+
+    render(
+      <Frame>
+        <Probe
+          prefetch={undefined}
+          filters={{ search: '', category: '', status: '', sort: 'distance' }}
+          position={{ latitude: 14.69, longitude: -17.44 }}
+        />
+      </Frame>
+    );
+
+    await act(async () => {});
+
+    expect(jobsAPI.getAll).toHaveBeenCalledWith(
+      expect.objectContaining({ tri: 'distance', lat: 14.69, lng: -17.44 }),
+      { withHeaders: true }
+    );
+  });
+
+  it('sans en-tête, le compte vaut AUCUN : la page n’affiche pas la taille de page', async () => {
+    jobsAPI.getAll.mockResolvedValue(jobsOf(2));
+
+    render(<Frame><Probe prefetch={undefined} /></Frame>);
+    await act(async () => {});
+
+    expect(screen.getByTestId('total').textContent).toBe('aucun');
   });
 
   it('sans préchargement fourni : chemin normal (ni suspension, ni erreur)', async () => {

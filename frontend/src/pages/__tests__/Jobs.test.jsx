@@ -14,12 +14,17 @@
  * est déjà affiché — sinon « Réessayer » ne répare pas la panne qu'il annonce.
  */
 import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 
 // Paramètres d'URL mutables d'un cas à l'autre (hoistés : les fabriques de
 // vi.mock s'exécutent avant le corps du module).
-const { SEARCH_PARAMS } = vi.hoisted(() => ({ SEARCH_PARAMS: { current: new URLSearchParams() } }));
+const { SEARCH_PARAMS, TOASTS } = vi.hoisted(() => ({
+  SEARCH_PARAMS: { current: new URLSearchParams() },
+  // Le refus de géolocalisation n'a que le toast pour le dire : sans un espion
+  // STABLE d'un cas à l'autre, ce refus ne serait vérifiable nulle part.
+  TOASTS: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
+}));
 
 vi.mock('react-router-dom', () => ({
   Link: ({ children }) => <a>{children}</a>,
@@ -38,9 +43,7 @@ vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: null }) }
 vi.mock('../../contexts/CountryContext', () => ({
   useCountry: () => ({ currentCountry: 'mali', changeUserCountry: vi.fn(), isOwner: false }),
 }));
-vi.mock('../../contexts/ToastContext', () => ({
-  useToast: () => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }),
-}));
+vi.mock('../../contexts/ToastContext', () => ({ useToast: () => TOASTS }));
 
 // Le préchargement parallèle est un optim : neutralisé pour que chaque cas
 // exerce le chemin de requête direct, dans un ordre déterministe.
@@ -97,10 +100,104 @@ const VIDE_FILTRE = 'Aucune mission ne correspond à ces filtres.';
 
 beforeEach(() => {
   SEARCH_PARAMS.current = new URLSearchParams();
+  TOASTS.success.mockReset();
+  TOASTS.error.mockReset();
+  TOASTS.info.mockReset();
+
+  // La géolocalisation posée par un cas ne doit pas survivre au suivant :
+  // un ordre « distance » appliqué par héritage ne testerait plus rien.
+  afterEach(() => {
+    delete global.navigator.geolocation;
+  });
   // resetAllMocks (et pas clearAllMocks) : un mockResolvedValueOnce non
   // consommé par un cas fuirait dans le suivant et le ferait mentir.
   vi.resetAllMocks();
   jobsAPI.getMyProposals.mockResolvedValue([]);
+});
+
+describe('Jobs — la liste dit COMBIEN et dans quel ORDRE', () => {
+  it('affiche le compte MESURÉ (X-Total-Count), pas la taille de la page', async () => {
+    // 1 mission affichée, 37 qui correspondent : la page ne doit pas dire 1.
+    jobsAPI.getAll.mockResolvedValue({
+      data: [JOB_A],
+      headers: { get: (nom) => (nom === 'X-Total-Count' ? '37' : null) },
+    });
+
+    render(<Jobs />);
+
+    expect(await screen.findByText(jobsT('resultsMany', { count: 37 }))).toBeTruthy();
+  });
+
+  it('sans en-tête de compte, n’affiche AUCUN compte (jamais la taille de page)', async () => {
+    jobsAPI.getAll.mockResolvedValue([JOB_A]);
+
+    render(<Jobs />);
+
+    expect(await screen.findByText('Réparation de plomberie')).toBeTruthy();
+    expect(screen.queryByText(jobsT('resultsOne'))).toBeNull();
+    expect(screen.queryByText(jobsT('resultsMany', { count: 1 }))).toBeNull();
+  });
+
+  it('choisir « Budget le plus élevé » demande l’ordre au SERVEUR', async () => {
+    jobsAPI.getAll.mockResolvedValue([JOB_A]);
+    render(<Jobs />);
+
+    await screen.findByText('Réparation de plomberie');
+    fireEvent.change(screen.getByLabelText(jobsT('sortLabel')), { target: { value: 'budget' } });
+
+    // Un tri local ne tiendrait pas sur les pages suivantes : la page demande
+    // l'ordre au serveur, qui seul voit toute la collection.
+    await waitFor(() => expect(jobsAPI.getAll).toHaveBeenCalledWith(
+      expect.objectContaining({ tri: 'budget' }),
+      { withHeaders: true }
+    ));
+  });
+
+  it('choisir « Au plus proche » demande la position PUIS l’ordre au serveur', async () => {
+    jobsAPI.getAll.mockResolvedValue([JOB_A]);
+    // jsdom n'a pas de géolocalisation : on pose celle que le navigateur
+    // fournirait, pour vérifier la DEMANDE et les coordonnées transmises.
+    const getCurrentPosition = vi.fn((reussi) =>
+      reussi({ coords: { latitude: 14.69, longitude: -17.44 } })
+    );
+    Object.defineProperty(global.navigator, 'geolocation', {
+      value: { getCurrentPosition },
+      configurable: true,
+    });
+
+    render(<Jobs />);
+    await screen.findByText('Réparation de plomberie');
+    fireEvent.change(screen.getByLabelText(jobsT('sortLabel')), { target: { value: 'distance' } });
+
+    expect(getCurrentPosition).toHaveBeenCalled();
+    // Le point est celui qui vient d'être obtenu : c'est depuis LUI que la
+    // distance se mesure, sinon le tri ne veut rien dire.
+    await waitFor(() => expect(jobsAPI.getAll).toHaveBeenCalledWith(
+      expect.objectContaining({ tri: 'distance', lat: 14.69, lng: -17.44 }),
+      { withHeaders: true }
+    ));
+  });
+
+  it('une position refusée n’annonce PAS un ordre qui n’a pas été appliqué', async () => {
+    jobsAPI.getAll.mockResolvedValue([JOB_A]);
+    const getCurrentPosition = vi.fn((_reussi, echoue) => echoue({ code: 1 }));
+    Object.defineProperty(global.navigator, 'geolocation', {
+      value: { getCurrentPosition },
+      configurable: true,
+    });
+
+    render(<Jobs />);
+    await screen.findByText('Réparation de plomberie');
+    jobsAPI.getAll.mockClear();
+    fireEvent.change(screen.getByLabelText(jobsT('sortLabel')), { target: { value: 'distance' } });
+
+    expect(getCurrentPosition).toHaveBeenCalled();
+    expect(TOASTS.error).toHaveBeenCalledWith(fr.geoPermissionDenied);
+    // Le select reste sur l'ordre RÉELLEMENT appliqué, et aucune requête de
+    // tri par distance n'est partie sans position.
+    expect(screen.getByLabelText(jobsT('sortLabel')).value).toBe('recent');
+    expect(jobsAPI.getAll).not.toHaveBeenCalled();
+  });
 });
 
 describe('Jobs — une panne se répare, une liste vide se dit', () => {
