@@ -58,6 +58,7 @@ from kojo_settings import (
     NOTIFICATION_RETENTION_DAYS,
     PAYMENT_PENDING_EXPIRY_HOURS,
     SUPPORT_TICKET_RETENTION_DAYS,
+    WHATSAPP_MESSAGE_RETENTION_DAYS,
 )
 
 
@@ -213,6 +214,19 @@ RETENTION_RULES: Tuple[RegleDeConservation, ...] = (
         # `_id` est le jour en TEXTE (atomicité de la réservation) : un index TTL
         # sur ce champ n'expirerait jamais, en silence. La date qui fait mourir
         # le document est `jour_debut`, un vrai datetime (kojo_ai_budget).
+        date_portee_par_le_document=False,
+    ),
+    RegleDeConservation(
+        collection="whatsapp_messages",
+        ttl_field="created_at",
+        lifetime=timedelta(days=WHATSAPP_MESSAGE_RETENTION_DAYS),
+        porte_par="WHATSAPP_MESSAGE_RETENTION_DAYS",
+        portee=(
+            "tout message WhatsApp échangé avec le support — numéro, nom de "
+            "profil et texte libre. Il sert de CONTEXTE à l'assistant et de "
+            "trace à l'escalade, puis il n'a plus de raison d'être conservé : "
+            "la demande, elle, survit dans le ticket qu'elle a ouvert"
+        ),
         date_portee_par_le_document=False,
     ),
     RegleDeConservation(

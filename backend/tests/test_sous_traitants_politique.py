@@ -37,6 +37,9 @@ LANGUES = ("fr", "en", "wo", "bm", "mos")
 FOURNISSEURS = (
     # (nom publié, trace dans le code, fichiers qui la portent)
     ("Neon", "NEON_AI_GATEWAY_BASE_URL", ("kojo_ai_gateway.py", "kojo_settings.py")),
+    # Kapso relaie le support WhatsApp : il reçoit le numéro du client, son nom
+    # de profil et le texte échangé, donc la politique doit le nommer.
+    ("Kapso", "api.kapso.ai", ("kojo_whatsapp.py", "kojo_settings.py")),
     ("Resend", "api.resend.com", ("kojo_email.py",)),
     ("Brevo", "api.brevo.com", ("kojo_email.py",)),
     ("Gmail", "gmail.googleapis.com", ("kojo_email.py",)),

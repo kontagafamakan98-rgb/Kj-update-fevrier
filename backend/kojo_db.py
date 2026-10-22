@@ -159,6 +159,14 @@ async def create_database_indexes():
         # (minuscules, sans étiquette `+tag`, cf. kojo_email_suppressions) pour
         # que `prenom+tag@…` et `prenom@…` ne fassent qu'une seule boîte.
         await db.email_suppressions.create_index("email", unique=True)
+
+        # Support WhatsApp (kojo_whatsapp) : `provider_message_id` est UNIQUE —
+        # c'est la contrainte qui absorbe une re-livraison du fournisseur, et
+        # sans elle un même message ferait répondre deux fois, sur un canal où
+        # l'on ne peut pas effacer. L'index de conversation sert le CONTEXTE de
+        # l'assistant (derniers tours) à chaque message.
+        await db.whatsapp_messages.create_index("provider_message_id", unique=True)
+        await db.whatsapp_messages.create_index([("conversation", 1), ("created_at", -1)])
         
         # Messages collection indexes
         # NOTE: les index précédents portaient sur "job_id" et "created_at",

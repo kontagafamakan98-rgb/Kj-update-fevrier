@@ -143,7 +143,7 @@ const SupportAdmin = () => {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="titre-entree">{ticket.full_name}</div>
-                  <div className="mt-1 text-xs text-stone-500">{formatDate(ticket.created_at)} · {ticket.channel === 'direct' ? t('directContact') : t('robotAssistant')}</div>
+                  <div className="mt-1 text-xs text-stone-500">{formatDate(ticket.created_at)} · {ticket.channel === 'direct' ? t('directContact') : ticket.channel === 'whatsapp' ? 'WhatsApp' : t('robotAssistant')}</div>
                 </div>
                 <select
                   value={ticket.status}
@@ -159,9 +159,14 @@ const SupportAdmin = () => {
                 <a href={`tel:${ticket.phone}`} className="flex items-center gap-1.5 transition-colors hover:text-orange-700">
                   <Phone size={14} aria-hidden="true" /> {ticket.phone}
                 </a>
-                <a href={`mailto:${ticket.email}`} className="flex items-center gap-1.5 transition-colors hover:text-orange-700">
-                  <Mail size={14} aria-hidden="true" /> {ticket.email}
-                </a>
+                {/* Un contact WhatsApp n'a pas d'adresse : `ticket.email` est
+                    facultatif depuis l'ouverture du canal. Un lien `mailto:`
+                    vers « undefined » serait un bouton qui ne mène nulle part. */}
+                {ticket.email && (
+                  <a href={`mailto:${ticket.email}`} className="flex items-center gap-1.5 transition-colors hover:text-orange-700">
+                    <Mail size={14} aria-hidden="true" /> {ticket.email}
+                  </a>
+                )}
               </div>
 
               <div className="mt-4">

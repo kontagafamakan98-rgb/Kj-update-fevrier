@@ -24,7 +24,8 @@ n'ont pas cette garantie, et les écarts connus sont nommés en section 7.
 | Avis | note, commentaire, auteur, destinataire | `reviews` |
 | Notification | titre, contenu, état de lecture | `notifications` |
 | Appareil | jeton push (Android / web) | `push_tokens` |
-| Support | nom, téléphone, email, motif, message libre | `support_tickets` |
+| Support | nom, téléphone, email (facultatif), motif, message libre | `support_tickets` |
+| Support WhatsApp | numéro, nom de profil WhatsApp, texte échangé avec l'assistant (les deux sens) | `whatsapp_messages` |
 | Vérification | code OTP (haché), date de péremption ; jeton d'accès révoqué (identifiant seul) | `email_otps`, `revoked_tokens` |
 | Livraison email | adresse email, fait de livraison reçu du fournisseur (rebond, plainte, livraison réussie), identifiant d'événement | `email_delivery_events`, `email_suppressions` |
 | Alerte emploi | adresse email du compte, critères choisis (catégorie, ville, pays), jeton de désinscription | `job_alerts` |
@@ -52,6 +53,7 @@ dans `backend/` et compare à cette liste.
 | Sous-traitant | Ce qu'il fait pour Kojo | Ce qu'il reçoit | Où | Ce qu'il ne reçoit pas |
 | --- | --- | --- | --- | --- |
 | **Neon** (AI Gateway) | répond aux questions de l'assistant de `/support` (`backend/kojo_ai_gateway.py`) | les messages écrits dans le chat, l'historique de la conversation et les instructions du serveur | UE (région de la branche Neon) | ni identifiant de compte, ni email, ni téléphone : le chat ne demande aucune session |
+| **Kapso** (WhatsApp Business) | relaie le support WhatsApp : reçoit le message du client et transmet sa réponse (`backend/kojo_whatsapp.py`) | le numéro WhatsApp du client, son nom de profil et le texte du message — dans les deux sens | hors UE, via l'API WhatsApp Business de Meta | ni identifiant de compte, ni email, ni moyen de paiement ; la conversation conservée par Kojo, elle, périme par sa règle de conservation (`WHATSAPP_MESSAGE_RETENTION_DAYS`, section 4) |
 | **Resend**, **Brevo** ou **Gmail** (selon `EMAIL_PROVIDER`) | remettent les emails du service : vérification d'adresse, codes, alertes, réponse aux tickets (`backend/kojo_email.py`) | l'adresse du destinataire et le contenu du message envoyé | États-Unis (Resend) ou UE (Brevo), Google (Gmail) | ni mot de passe, ni moyen de paiement, ni position |
 | **PayDunya** | encaisse les paiements et verse les travailleurs | montant, identifiant de facture, identifiants internes (`payment_id`, `job_id`, `payer_id`, `worker_id`), et pour la facture de collecte : nom, adresse email et numéro de téléphone du payeur (`backend/kojo_routers_payments.py`) | Sénégal | ni mot de passe, ni photo, ni contenu de message ; le document `payments` de Kojo, lui, ne garde aucune de ces coordonnées |
 | **Cloudinary** | héberge les photos de profil et les preuves photo de fin de mission | les fichiers image envoyés par la personne | États-Unis | ni email, ni téléphone, ni coordonnées bancaires |
@@ -86,7 +88,11 @@ comptable des paiements qui le référencent :
   elle précède la disparition du document ;
 - les **tickets support du compte sont supprimés** (pas anonymisés : leur
   message est du texte libre qui peut nommer ou situer la personne, donc
-  effacer seulement les champs ne serait pas une garantie) ;
+  effacer seulement les champs ne serait pas une garantie), ainsi que les
+  **conversations WhatsApp rattachées au compte** — celles dont le numéro est le
+  téléphone du compte (`kojo_whatsapp.compte_du_numero`) ; un numéro inconnu de
+  Kojo n'a pas de `user_id`, donc il n'appartient à aucun compte supprimable et
+  sa conversation périme par sa règle (section 7, écart 3) ;
 - les **missions postées par le client sont closes** et perdent **toute**
   coordonnée — `shared_location`, `location.latitude`, `location.longitude`,
   `location.coordinates` et le point GeoJSON `geo` — par `$unset`, pour que la
@@ -125,6 +131,7 @@ est donc, par construction, celle que la base applique.
 | `support_tickets` | `created_at` (date de création) | 365 jours | `SUPPORT_TICKET_RETENTION_DAYS` | aucun (toute la collection) | tout ticket support, résolu ou non — nom, téléphone, email et message libre, la donnée la plus identifiante du dépôt |
 | `messages` | `timestamp` (date de création) | 730 jours | `MESSAGE_RETENTION_DAYS` | aucun (toute la collection) | tout message envoyé — il appartient aussi au destinataire, donc il survit à la suppression de compte, mais pas indéfiniment |
 | `ai_usage` | `jour_debut` (date de création) | 90 jours | `AI_USAGE_RETENTION_DAYS` | aucun (toute la collection) | le compteur de dépense de l'assistant IA d'une journée — deux nombres (appels, caractères de prompt) et une date, aucun identifiant de personne ; la journée en cours est recréée à son premier appel |
+| `whatsapp_messages` | `created_at` (date de création) | 90 jours | `WHATSAPP_MESSAGE_RETENTION_DAYS` | aucun (toute la collection) | tout message WhatsApp échangé avec le support — numéro, nom de profil et texte libre. Il sert de CONTEXTE à l'assistant et de trace à l'escalade, puis il n'a plus de raison d'être conservé : la demande, elle, survit dans le ticket qu'elle a ouvert |
 | `email_delivery_events` | `recu_le` (date de création) | 90 jours | `EMAIL_DELIVERY_EVENT_RETENTION_DAYS` | aucun (toute la collection) | tout fait de livraison reçu du fournisseur (rebond, plainte, livraison réussie) — la trace qui explique pourquoi une adresse a été retenue, et qui n'a plus à être conservée ensuite : l'état (`email_suppressions`) lui survit et ne périme pas |
 <!-- CONSERVATION:FIN -->
 
@@ -181,14 +188,22 @@ elle ; `.gitignore` (`*.log.*`) reste le filet contre un `git add -A` distrait.
 
 ## 7. Écarts connus, nommés et vérifiables
 
-Ces deux points sont des manques **actuels**, chacun vérifiable à la ligne
+Ces trois points sont des manques **actuels**, chacun vérifiable à la ligne
 citée. Les taire ferait de ce document une affirmation non contrôlable.
 
 1. **Les compteurs publics comptent les comptes supprimés**
    (`backend/kojo_routers_public.py:384-385` : `count_documents({"user_type":
    "worker"})`, sans filtre sur `deleted`) : le chiffre affiché inclut les
    comptes anonymisés.
-2. **Trois journaux écrivent l'adresse en clair** :
+2. **Une conversation WhatsApp d'un numéro inconnu n'est ni exportable ni
+   effaçable par le compte** : elle n'est rattachée à un compte que lorsque le
+   numéro WhatsApp **est** le téléphone du compte
+   (`backend/kojo_whatsapp.py`, `compte_du_numero`). Une personne qui écrit
+depuis un autre numéro n'a pas de compte à supprimer, donc sa conversation
+   s'efface par sa règle de conservation (section 4) et non sur demande. Le rattachement est volontairement EXACT (chiffres identiques) :
+   deviner un indicatif rattacherait la conversation au hasard, et elle
+   partirait avec le mauvais compte.
+3. **Trois journaux écrivent l'adresse en clair** :
    `backend/kojo_routers_auth.py:675`, `:956`, `backend/kojo_email.py:413`.
    Les corps de réponse des prestataires d'email, journalisés en cas d'échec
    (`kojo_email.py:273`, `:323`), peuvent également contenir l'adresse du

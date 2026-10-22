@@ -189,6 +189,15 @@ OPTIONAL_KEYS = {
     # qui rend la suppression d'adresses effective.
     "RESEND_WEBHOOK_SECRET", "EMAIL_WEBHOOK_TOLERANCE_SECONDS",
     "EMAIL_SOFT_BOUNCE_ALERT_THRESHOLD",
+    # Support WhatsApp (Kapso) : sans `KAPSO_WEBHOOK_SECRET` l'ingestion est
+    # DÉSACTIVÉE (503 nommé), et sans `KAPSO_API_KEY`/`KAPSO_PHONE_NUMBER_ID`
+    # l'envoi est éteint — le message reçu est alors escaladé en ticket. Le
+    # backend démarre dans les trois cas, donc leur absence sur Fly est un
+    # choix d'exploitation et non une config incomplète ; leur PRÉSENCE est ce
+    # qui rend le support WhatsApp effectif (backend/kojo_whatsapp.py).
+    "KAPSO_API_KEY", "KAPSO_PHONE_NUMBER_ID", "KAPSO_WEBHOOK_SECRET",
+    "KAPSO_API_BASE_URL", "KAPSO_API_VERSION", "KAPSO_TIMEOUT_SECONDS",
+    "WHATSAPP_CONTEXT_MESSAGES", "WHATSAPP_MESSAGE_RETENTION_DAYS",
     "FAMAKAN_OWNER_EMAIL", "PASSWORD_RESET_FROM_EMAIL",
     "REFERRAL_FILLEUL_REWARD", "REFERRAL_SPONSOR_REWARD",
     "REFERRAL_WELCOME_FILLEUL_REWARD", "REFERRAL_WELCOME_SPONSOR_REWARD",

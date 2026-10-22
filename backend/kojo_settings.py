@@ -713,3 +713,40 @@ AI_GATEWAY_DAILY_PROMPT_CHARS = int(
 # passée — donc une règle de conservation, appliquée par la base comme les
 # autres (kojo_retention.RETENTION_RULES, publiée par PRIVACY.md).
 AI_USAGE_RETENTION_DAYS = int(os.environ.get('AI_USAGE_RETENTION_DAYS', '90'))
+
+# ── Support WhatsApp (Kapso) ────────────────────────────────────────────────
+# Le support reçoit aussi les messages WhatsApp. Kapso (kapso.ai) relaie l'API
+# WhatsApp Business : le webhook arrive en `POST /api/support/whatsapp/webhook`,
+# signé en HMAC-SHA256 du corps BRUT (`X-Webhook-Signature`, hexadécimal), et la
+# réponse part en `POST {base}/{version}/{phone_number_id}/messages` avec la clé
+# en `X-API-Key` (cf. backend/kojo_whatsapp.py, qui porte tout le contrat).
+#
+# Les variables sont OPTIONNELLES et leur absence ne casse pas le démarrage :
+#   • sans `KAPSO_WEBHOOK_SECRET`, la route répond 503 — l'ingestion est
+#     DÉSACTIVÉE, jamais permissive (même posture que le webhook email) ;
+#   • sans `KAPSO_API_KEY` ou `KAPSO_PHONE_NUMBER_ID`, un message reçu est
+#     enregistré et ESCALADÉ en ticket au lieu d'être acquitté : on ne laisse
+#     pas croire à un client qu'on lui a répondu.
+#
+# `KAPSO_API_BASE_URL` et `KAPSO_API_VERSION` n'existent que pour épingler le
+# dialecte Meta (`v24.0`) et pointer une pile de test locale.
+KAPSO_API_KEY = os.environ.get('KAPSO_API_KEY', '').strip()
+KAPSO_PHONE_NUMBER_ID = os.environ.get('KAPSO_PHONE_NUMBER_ID', '').strip()
+KAPSO_WEBHOOK_SECRET = os.environ.get('KAPSO_WEBHOOK_SECRET', '').strip()
+KAPSO_API_BASE_URL = os.environ.get(
+    'KAPSO_API_BASE_URL', 'https://api.kapso.ai/meta/whatsapp'
+).strip().rstrip('/')
+KAPSO_API_VERSION = os.environ.get('KAPSO_API_VERSION', 'v24.0').strip()
+KAPSO_TIMEOUT_SECONDS = int(os.environ.get('KAPSO_TIMEOUT_SECONDS', '10'))
+
+# Combien de tours précédents de la conversation sont redonnés au modèle. Un
+# message WhatsApp est court, mais sans contexte l'assistant repose la même
+# question à chaque message — et chaque tour est FACTURÉ (kojo_ai_budget), donc
+# la fenêtre est bornée. 0 = aucune mémoire (le modèle ne voit que le message).
+WHATSAPP_CONTEXT_MESSAGES = max(0, int(os.environ.get('WHATSAPP_CONTEXT_MESSAGES', '6')))
+
+# Combien de temps une conversation WhatsApp reste en base : elle sert de
+# contexte à l'assistant et de trace à l'escalade. Publiée par PRIVACY.md.
+WHATSAPP_MESSAGE_RETENTION_DAYS = int(
+    os.environ.get('WHATSAPP_MESSAGE_RETENTION_DAYS', '90')
+)

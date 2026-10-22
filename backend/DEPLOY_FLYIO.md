@@ -107,6 +107,43 @@ fly secrets set \
   absente) si le secret est posé, **503** (ingestion désactivée) sinon — dans
   les deux cas jamais 200 : une requête non signée ne retient aucune adresse.
 
+- 💬 **Support WhatsApp (Kapso)** — `POST /api/support/whatsapp/webhook`.
+  Kapso (kapso.ai) relaie l'API WhatsApp Business : le message d'un client
+  arrive sur cette route, l'assistant de `/support` y répond, et quand un
+  humain doit reprendre, un **ticket support** est ouvert (le propriétaire est
+  prévenu comme pour le formulaire). Le contrat complet vit dans
+  `backend/kojo_whatsapp.py`.
+
+  Trois secrets, dont aucun n'est dans le dépôt :
+  ```bash
+  fly secrets set \
+    KAPSO_API_KEY="…" \
+    KAPSO_PHONE_NUMBER_ID="…" \
+    KAPSO_WEBHOOK_SECRET="…"
+  fly deploy
+  ```
+  - `KAPSO_API_KEY` : clé de l'API Kapso (en-tête `X-API-Key`).
+  - `KAPSO_PHONE_NUMBER_ID` : identifiant du numéro émetteur (Kapso → Phone
+    numbers). **Sans lui, l'envoi est désactivé** : un message reçu est
+    enregistré et escaladé en ticket, mais aucune réponse ne part — et c'est
+    dit (statut `non_envoye`), pas silencieux.
+  - `KAPSO_WEBHOOK_SECRET` : Signing secret du webhook. Sans lui la route
+    répond **503** (ingestion désactivée), avec un mauvais secret **401**.
+    La signature HMAC-SHA256 porte sur le corps brut, donc elle est vérifiée
+    avant tout parsing ; aucune fenêtre temporelle n'est appliquée, le rejeu
+    étant neutralisé par l'identifiant du message (`provider_message_id`,
+    index unique).
+
+  Déclarer l'URL `https://<ton-app>.fly.dev/api/support/whatsapp/webhook` dans
+  le tableau de bord Kapso (Webhooks), puis vérifier :
+  ```bash
+  curl -X POST -H 'content-type: application/json' -d '{}' \
+   https://<ton-app>.fly.dev/api/support/whatsapp/webhook
+  ```
+  → **401** (signature absente) si le secret est posé, **503** (ingestion
+  désactivée) sinon. Jamais 200 : une requête non signée ne fait répondre
+  personne.
+
 - **`REDIS_URL` (recommandé en prod)** : active un rate-limiting PARTAGÉ
   multi-workers. Sans Redis, le rate-limiter reste en mémoire par process
   (limites effectives × N workers, non partagées). Provisionner un Redis sur

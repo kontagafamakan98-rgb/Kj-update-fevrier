@@ -244,11 +244,16 @@ class TestLOTPSuitLeFournisseurActif:
 @pytest.mark.asyncio
 class TestAlertesOwnerSuiventLeFournisseurActif:
     async def test_ticket_support_passe_par_le_point_de_regle(self, client):
-        """Le ticket support envoyait Brevo en dur : il doit suivre le réglage."""
-        with patch("kojo_routers_support.send_email_via_active_provider", new_callable=AsyncMock) as envoi, \
-             patch("kojo_routers_support.OWNER_EMAIL", "owner@example.com"), \
-             patch("kojo_routers_support.notify_user_localized", AsyncMock()), \
-             patch("kojo_routers_support.resolve_owner_id", AsyncMock(return_value="owner-1")):
+        """Le ticket support envoyait Brevo en dur : il doit suivre le réglage.
+
+        L'alerte vit dans `kojo_support_tickets` (propriétaire unique de
+        l'ouverture d'un ticket, partagé avec l'escalade WhatsApp) : c'est donc
+        LUI que le test remplace, et pas le routeur qui l'appelle.
+        """
+        with patch("kojo_support_tickets.send_email_via_active_provider", new_callable=AsyncMock) as envoi, \
+             patch("kojo_support_tickets.OWNER_EMAIL", "owner@example.com"), \
+             patch("kojo_support_tickets.notify_user_localized", AsyncMock()), \
+             patch("kojo_support_tickets.resolve_owner_id", AsyncMock(return_value="owner-1")):
             resp = await client.post(
                 "/api/support/tickets",
                 json={
