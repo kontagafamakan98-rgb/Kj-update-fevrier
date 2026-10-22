@@ -35,13 +35,12 @@
   ],
   "reference": {
     "etablie_le": "2026-10-22",
-    "motif": "Reference etendue le 22/10/2026 : la sonde navigateur du profil travailleur (check-worker-interactive-production.js) entre, cible de trois mutations declarees au registre guard-proofs.json ; son etat est fige des sa naissance. Le reste de la reference du 22/10/2026 (contrat CSP, sonde de production, regle csp-document.js) reste valable pour les fichiers deja figes.",
+    "motif": "Les trois reglages de l'alerte d'arbitrage (seuil, fenetre, intervalle) sont declares OPTIONNELS : kojo_settings porte leurs defauts et refuse le demarrage hors bornes, donc leur absence sur Fly n'est pas une divergence doc-prod.",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
       ".github/scripts/check-exec-bits.py": "92e00bbb66f78f7e06d186ef57a93559d1d3818b446edcdaf006244773690fe6",
       ".github/scripts/check-exercice-restauration.py": "5b630d1aa76144c52795e6c2fad82295736b696457166cfb5b746fe38390e68e",
-      ".github/scripts/check-fly-env-drift.py": "bd1feecd459164725ef29a7dd0c03f29a7fa2cf3f2c82079181c565449948a1f",
       ".github/scripts/check-gate-perimetre.py": "875db0af3fad7e867eff7115e42d104c30c8f505e6c4c2bc63ac255d8e411e82",
       ".github/scripts/check-guard-mutations.py": "4fb457ff74d13487058b4853a95d28861d1f128ecf68b9d194400b1e9466b20a",
       ".github/scripts/check-informative-steps.py": "3ef82281cd546809dd739fd2241a24e2d1f68a3cf17d3cb96fefbe8ac77c9219",
@@ -139,7 +138,8 @@
       "frontend/scripts/check-csp-contract.js": "e58df807a565f614a54d855376e92289059a5a10f65d1b17d48b5c805fef56f1",
       "frontend/scripts/check-csp-documents-production.js": "35344837c96bd19d8a60d3f7d07a4fbdafd4281d3094f1a541c95870687c5ad2",
       "frontend/scripts/csp-document.js": "5b5e21a221dbef12a7e86401db297ec9b7cb16a0d55aaf18f5c6b1ba641fe825",
-      "frontend/scripts/check-worker-interactive-production.js": "98afe75b3d3ff80e0cf150558d73d1ea088a33ca484dfed5d8b9a3a4520b71fa"
+      "frontend/scripts/check-worker-interactive-production.js": "98afe75b3d3ff80e0cf150558d73d1ea088a33ca484dfed5d8b9a3a4520b71fa",
+      ".github/scripts/check-fly-env-drift.py": "a39f47f904e31fee5f636a1b1500b5d5de22f3d2f80fa725e082124416420fb7"
     }
   },
   "hors_perimetre": [

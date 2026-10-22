@@ -174,6 +174,19 @@ describe.skipIf(!hasPrerender)('check-job-og-contract — la fiche DÉMARRE l’
     try {
       const backend = path.join(racine, 'backend');
       fs.mkdirSync(backend);
+      // Les modules du backend sont copiés À PLAT avant la mutation :
+      // `kojo_job_og` importe `kojo_csp` (et `kojo_worker_og` importe celle-ci),
+      // donc un fichier SEUL ne s'importe pas — la copie ne portait que le
+      // module muté, le CLI ne trouvait aucun interpréteur capable de l'importer
+      // et rendait une PRÉMISSE au lieu de juger le bloc, ce qui faisait de ce
+      // cas une preuve de rien. Seul `kojo_job_og.py` est ensuite réécrit.
+      for (const nom of fs.readdirSync(path.join(REPO_ROOT, 'backend'))) {
+        if (!nom.endsWith('.py')) continue;
+        fs.copyFileSync(
+          path.join(REPO_ROOT, 'backend', nom),
+          path.join(backend, nom)
+        );
+      }
       const source = fs.readFileSync(path.join(REPO_ROOT, 'backend/kojo_job_og.py'), 'utf8');
       const mute = source.replace(
         '+ (balise_seed(SEED_ID, vue_publique) if vue_publique is not None else "")',
