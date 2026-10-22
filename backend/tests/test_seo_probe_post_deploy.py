@@ -44,6 +44,11 @@ JOB_CRON = "probe"
 # La garde de `main` : la production ne dit rien d'une PR, et un repli local
 # ferait refuser la sonde (elle ne conclut jamais sur du local).
 GARDE_MAIN = "github.event_name == 'push' && github.ref == 'refs/heads/main'"
+# Ce que la sonde ajoute à la garde de `main` : le déploiement doit avoir été
+# CONSTATÉ (le step de révision publie `sert=oui`). Sans cette condition, une
+# prémisse — déploiement Vercel encore en file — laisserait la sonde juger
+# l'ancien artefact en le présentant comme le nouveau (22/10/2026).
+GARDE_SERT = "steps.revision-servie.outputs.sert == 'oui'"
 COMMANDE = "node scripts/check-seo-production.js --strict"
 EXTRACTION_REVISION = "check-deployed-revision.js"
 EXTRACTION_SONDE = "check-seo-production.js"
@@ -173,16 +178,47 @@ def test_la_sonde_partage_la_garde_main_de_la_verification():
     releve_etapes = releve(CI, JOB)
     revision = releve_etapes[etape_unique(releve_etapes, EXTRACTION_REVISION, "vérifient la révision")]
     sonde = releve_etapes[etape_unique(releve_etapes, EXTRACTION_SONDE, "lancent la sonde SEO")]
-    assert sonde.get("if") == revision.get("if") == GARDE_MAIN, (
-        f"gardes différentes : sonde={sonde.get('if')!r}, révision={revision.get('if')!r}, "
-        f"attendu={GARDE_MAIN!r}. La sonde ne tourne que là où le déploiement a été "
-        "constaté : sur `main`, jamais sur une PR (le repli d'une PR serait local, et "
-        "la sonde ne conclut pas sur du local)."
+    assert revision.get("if") == GARDE_MAIN, (
+        f"garde de la vérification : {revision.get('if')!r}, attendu={GARDE_MAIN!r} — la "
+        "production ne dit rien d'une PR, et un repli local ferait refuser la sonde."
+    )
+    # La sonde hérite de CETTE garde et ajoute la seule condition qui manquait :
+    # la révision servie doit avoir reçu un VERDICT. Une prémisse (déploiement
+    # Vercel encore en file) laisserait sinon la sonde lire l'ancien artefact.
+    assert sonde.get("if") == f"{GARDE_MAIN} && {GARDE_SERT}", (
+        f"garde de la sonde : {sonde.get('if')!r}, attendu={f'{GARDE_MAIN} && {GARDE_SERT}'!r}. "
+        "La sonde ne tourne que sur `main` (jamais sur une PR, dont le repli serait local) "
+        "ET quand la révision servie a été constatée — pas sur une prémisse."
     )
     assert sonde.get("working-directory") == revision.get("working-directory") == "frontend", (
         f"répertoires différents : sonde={sonde.get('working-directory')!r}, "
         f"révision={revision.get('working-directory')!r} — la sonde doit tourner depuis "
         "frontend/, comme la vérification qu'elle suit."
+    )
+
+
+def test_la_verification_de_revision_publie_la_sortie_que_la_sonde_lit():
+    """Un `if:` qui lit `sert` sans que personne ne l'écrive éteindrait la sonde.
+
+    Le step de vérification doit DÉCLARER son identifiant, écrire `sert=oui`
+    quand le déploiement est constaté, et `sert=non` sur les deux autres sorties.
+    Sans ce test, supprimer la ligne d'écriture rendrait la sonde MUETTE sur
+    `main` — un vert sans lecture, exactement ce que F9 a coûté.
+    """
+    releve_etapes = releve(CI, JOB)
+    revision = releve_etapes[etape_unique(releve_etapes, EXTRACTION_REVISION, "vérifient la révision")]
+    assert revision.get("id") == "revision-servie", (
+        f"identifiant du step de révision : {revision.get('id')!r} — la sonde lit "
+        f"`{GARDE_SERT}`, qui n'existe que si le step porte cet identifiant."
+    )
+    run = revision.get("run", "")
+    assert 'echo "sert=oui" >> "$GITHUB_OUTPUT"' in run, (
+        "le step de révision n'écrit PAS `sert=oui` : la sonde ne tournerait plus jamais "
+        "sur `main`, et le silence serait vert."
+    )
+    assert 'echo "sert=non" >> "$GITHUB_OUTPUT"' in run, (
+        "le step n'écrit pas `sert=non` sur la prémisse ou le refus : la sonde pourrait "
+        "s'exécuter sur un déploiement qui n'a pas été constaté."
     )
 
 
