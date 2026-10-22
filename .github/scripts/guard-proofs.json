@@ -335,7 +335,15 @@
       "invoque_par": "ci",
       "preuve": "frontend/scripts/__tests__/check-deployed-revision.test.js",
       "runner": "vitest",
-      "motif": "le frontend SERVI annonce la révision dont il a été construit (meta `kojo-build-revision`, publiée par le build) : c'est ce que `main` n'observait pas, le déploiement de production étant fait par Vercel depuis l'app GitHub. Deux révisions sont acceptées (le commit poussé, et le dernier ayant touché frontend/) pour qu'aucun changement de frontend ne puisse manquer à la production sans rougir, et chaque refus nomme sa cause (cf. CI-COVERAGE.md, F10)"
+      "motif": "le frontend SERVI annonce la revision ET l'arbre `frontend/` dont il a ete construit (metas `kojo-build-revision` et `kojo-build-tree`, publiees par le build). Le verdict porte sur l'ARBRE que l'artefact PUBLIE, compare a `git rev-parse <rev>:frontend` des commits ATTENDUS : une fusion documentaire laisse Vercel sur le build precedent, et comparer des SHA refusait une production pourtant conforme (mesure du 21/10/2026). Deux SHA differents avec le meme arbre sont acceptes et le disent ; deux arbres differents sont refuses en nommant les deux. L'arbre servi venant du HTML, le commit servi n'a plus besoin d'exister dans le clone : le cas « arbre incomparable » (code 2) a donc disparu, et la seule premisse restante est l'arbre d'une revision ATTENDUE illisible dans ce clone — une invocation, jamais un « deploiement echoue ». Chaque refus nomme sa cause (cf. CI-COVERAGE.md, F19)."
+    },
+    {
+      "chemin": "frontend/scripts/check-deployed-assets.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-deployed-assets.test.js",
+      "runner": "vitest",
+      "motif": "les ACTIFS servis (JS, CSS, polices) sont ceux qu'annonce l'artefact : le build ecrit `asset-manifest.json` (une empreinte SHA-256 par fichier) et ancre l'empreinte de CE manifeste dans chaque page (`kojo-build-assets`). La sonde suit la chaine HTML -> manifeste -> octets : un manifeste qui n'est pas celui annonce est refuse (sinon il cautionnerait des actifs d'un autre build), chaque actif doit porter l'empreinte declaree, et un manifeste sous son plancher est un refus — jamais un vert sur du vide. Ce qu'elle ferme : le deploiement « atomique » de Vercel n'etait re-verifie par RIEN, et un HTML neuf avec des actifs restes en arriere servait une page qui ne correspond pas a son bundle (cf. CI-COVERAGE.md, F19). Refus nommes : aucune ancre, manifeste illisible ou hors site, manifeste ≠ artefact, plancher/plafond, actif 404, octets differents ; invocation locale ou base vide = code 2."
     },
     {
       "chemin": "frontend/scripts/check-retard-main.js",
@@ -361,6 +369,22 @@
       "runner": "vitest"
     },
     {
+      "chemin": "frontend/scripts/check-csp-contract.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-csp-contract.test.js",
+      "runner": "vitest",
+      "motif": "la CSP du SITE est déclarée en JavaScript (src/config/csp.js, injecté dans les pages du build par vite-plugins/inject-production-csp.js) et les documents /jobs/:id et /workers/:id sont écrits par le BACKEND Python (kojo_job_og.py, kojo_worker_og.py) : rien, avant ce garde, ne reliait les deux, et un lien partagé — le seul chemin d'arrivée d'un visiteur à froid — ouvrait donc une page qui démarre l'application SANS la politique du site. Recopier la politique en Python aurait fait deux déclarations à garder d'accord ; ce garde est ce qui rend la copie acceptable : il exécute les deux implémentations sur sept cas de référence (aucun réglage, origine seule, origine à normaliser, Plausible seul, GA4 seul, les deux, réglages invalides qui ne doivent RIEN ouvrir) et exige des chaînes IDENTIQUES octet pour octet, sans normalisation — la sonde de production compare ces mêmes octets sur ce qui est SERVI. Trois maillons, tous nécessaires : les deux calculs, les QUATRE documents pré-rendus (fiche, fiche 404, profil, profil 404) qui doivent publier cette politique dans une <meta>, et le plugin du build qui ne peut pas la contourner (sa sortie est comparée à construireCsp, et rien n'est injecté en développement sinon le HMR casserait en silence). Il refuse aussi frame-ancestors dans une <meta>, où les navigateurs l'ignorent. INTERPRÉTEUR : kojo_csp.py est stdlib uniquement, donc n'importe quel python3 convient ; en CI son absence est un ÉCHEC (un garde qui ne s'exécute pas ne garde rien), hors CI un simple avis. Ce qu'il ne juge pas, écrit dans son en-tête : les valeurs DÉPLOYÉES — le build lit VITE_API_URL / VITE_PLAUSIBLE_DOMAIN / VITE_GA_MEASUREMENT_ID, le backend lit BACKEND_PUBLIC_URL / PLAUSIBLE_DOMAIN / GA_MEASUREMENT_ID, et deux environnements peuvent diverger sans qu'aucun contrat hors ligne ne le voie : c'est la sonde de production qui compare le site aux documents."
+    },
+    {
+      "chemin": "frontend/scripts/check-csp-documents-production.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-csp-documents-production.test.js",
+      "runner": "vitest",
+      "motif": "le contrat hors ligne prouve que les deux CALCULS de la politique sont le même calcul ; il ne dit rien des deux ENVIRONNEMENTS, qui sont les seuls à décider de ce qui est réellement servi — Vercel lit des variables VITE_*, Fly lit des secrets sans préfixe, et au premier identifiant d'analytique posé d'un seul côté le document pré-rendu se met à refuser ce que la page du site autorise (ou l'inverse). La production est le seul endroit où les deux sont observables ensemble : la sonde lit la politique SERVIE par une page du build (l'accueil, surchargeable par --reference), puis celle que SERVENT la fiche /jobs/:id et le profil /workers/:id, résolus par le sitemap (ou --job / --worker), et exige l'égalité directive par directive en nommant la directive et les sources en écart — jamais « deux CSP diffèrent ». Une page témoin muette, un document muet, un document qui ne répond pas 200 (réécriture perdue) ou une politique d'un autre ordre sont refusés, chacun avec son remède : le réglage à rapprocher entre les deux déploiements, ou le module de pré-rendu à corriger. Trois sorties, jamais deux : 0 conforme, 1 refus nommé, 2 PRÉMISSE (ni fiche ni profil au sitemap — il n'y a alors aucun document à comparer) et une prémisse n'est jamais un vert ; un seul des deux documents publié suffit à mesurer, l'absence de l'autre est publiée en ::notice au lieu de devenir un verdict. Ce qu'elle ne juge pas, écrit : la politique elle-même (ses directives sont jugées hors ligne), les en-têtes HTTP (frame-ancestors de frontend/vercel.json n'est pas dans le document) et le montage de l'application (check-job-interactive-production.js)."
+    },
+    {
       "chemin": "frontend/scripts/check-session-reload-production.js",
       "role": "garde",
       "invoque_par": "ci",
@@ -375,6 +399,54 @@
       "preuve": "frontend/scripts/__tests__/check-sse-proxy-production.test.js",
       "runner": "vitest",
       "motif": "la SEULE sonde du dépôt qui juge la TRAVERSÉE du flux SSE, c'est-à-dire l'intermédiaire que tout le reste laisse hors de vue : côté serveur, test_live_stream.py, test_live_bus_deux_workers.py (deux uvicorn réels, un Redis réel) et mesure_push.py exigent le même identifiant des deux côtés du bus ; côté client, liveStream.test.js garde la lecture des octets. Entre les deux, la production fait passer /api/:path* par la réécriture Vercel (frontend/vercel.json), et un proxy qui TAMPONNE ne casse aucun test du dépôt : le 200 arrive, les octets arrivent, seulement à la fin — pendant que le client juge le flux muet après SILENCE_TIMEOUT_MS (liveStream.js, 45 s : deux battements du serveur plus une marge, frontend/src/config/flux-temps-reel.js) et bascule sur le repli à 60 s. La sonde ouvre une session (POST /api/auth/login, le flux accepte Authorization: Bearer, donc aucun cookie n'est requis), lit le corps EN FLUX (jamais response.text(), qui mesurerait le tampon), puis refuse sur trois faits mesurés : le premier événement `ready` au-delà d'un budget DÉRIVÉ de l'aller-retour du même proxy (budgetDuPremierEvenement : contrôle x6, plancher 1,5 s, plafond 8 s, toujours sous la fenêtre de silence du client), le premier `: keepalive` livré dans le MÊME vidage que lui (le serveur les écrit pourtant à KOJO_SSE_HEARTBEAT_SECONDS d'intervalle — c'est la signature du tampon), et un content-encoding non identity (un intermédiaire qui recompresse lit tout). Le statut et le content-type sont jugés aussi, une réponse 503 (plafond du compte) ou une page de protection Vercel ne passant pas pour un flux. Sans compte CI ou sans secret de contournement, elle refuse de conclure (code 2, marque « prémisse (aucun verdict rendu ici) ») au lieu de rendre un vert qu'elle n'a pas mesuré. Une tentative ratée seule ne conclut pas : la sonde réessaie, et un relevé SANS proxy (--direct) est publié comme comparaison, jamais comme verdict. Aucune valeur de jeton n'est publiée. Ce qu'elle ne juge pas est écrit : la lecture côté client, la reconnexion et le plafond du compte ont leurs propres preuves."
+    },
+    {
+      "chemin": "frontend/scripts/preview-vercel.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/preview-vercel.test.js",
+      "runner": "vitest",
+      "motif": "résout l'URL du déploiement de PREVIEW d'une RÉVISION par l'API Vercel (`/v7/deployments?projectId=…&sha=…`, filtre sur `meta.githubCommitSha`, déploiement de production exclu) : c'est ce qui donne une origine à `check-deployed-assets.js` sur une PR, au lieu du seul verdict d'après fusion. Il ne décide AUCUN code de sortie — il rend `{ ok, premisse, url, motif }` et l'appelant nomme le sien — donc ce n'est pas un garde : ses refus sont des PRÉMISSES (jeton absent, API illisible, fenêtre d'attente épuisée, `meta.githubCommitSha` absent) sauf un déploiement de cette révision en `ERROR`/`CANCELED`, qui est un fait sur la PR ; la résolution par le COMMENTAIRE de l'app Vercel est écartée parce qu'il peut désigner un commit précédent, et un vert sur un artefact périmé serait un vert sur le mauvais objet. La preuve couvre les issues ci-dessus, l'exclusion de la production et la fenêtre d'attente sans réseau."
+    },
+    {
+      "chemin": "frontend/scripts/csp-document.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/csp-document.test.js",
+      "runner": "vitest",
+      "motif": "définit la SEULE règle de lecture et de comparaison d'une CSP dans un document — chercher la balise <meta http-equiv> quel que soit l'ordre des attributs, décoder l'échappement d'attribut (le backend échappe &, <, > et le guillemet, mais pas l'apostrophe ; comparer les octets BRUTS ferait échouer un garde sur une politique correcte et pousserait à changer l'échappement pour faire passer un test), puis nommer directive par directive ce qui sépare deux politiques. Deux lecteurs s'en servent — le contrat hors ligne et la sonde de production — et ce n'est pas un garde : ces fonctions sont PURES, sans accès disque ni réseau, et ne décident aucun code de sortie ; c'est ce qui permet de prouver qu'elles savent échouer sans toucher au dépôt, et ce qui empêche deux copies de diverger au premier guillemet exotique. La preuve couvre les deux sens de l'absence (balise muette, balise absente), le double décodage (&amp;quot; ne doit pas devenir un guillemet), l'ordre inverse, la directive absente, la source manquante, la source en trop, la directive en trop, le même contenu dans un autre ordre (pas les mêmes octets) et frame-ancestors rendue comme une directive à part entière."
+    },
+    {
+      "chemin": "frontend/scripts/check-worker-interactive-production.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-worker-interactive-production.test.js",
+      "runner": "vitest",
+      "motif": "juge l'EXÉCUTION du profil /workers/:id, le seul fait qu'aucun autre garde ne peut voir : check-worker-page-production.js prouve que le document est bien servi (réécriture, point d'entrée, feuille, bloc accordé, cartes OG) et le contrat hors ligne prouve les noms, mais un document parfait peut charger un module qui ne s'exécute pas — et le crawler lit le HTML, donc il ne le voit jamais. Le seul arrivant d'un lien partagé reçoit alors un profil statique, sans châssis ni geste : c'était la limite DÉCLARÉE de F21. La sonde ouvre le premier /workers/:id du sitemap (ou --worker) dans un Chromium RÉEL, contexte VIERGE, et juge trois faits : #root porte le châssis (#root nav, jamais la coquille statique écrite par backend/kojo_worker_og.py), le <h1> peint est le nom du bloc kojo-worker-data (React a consommé la vue publique, il n'affiche ni squelette ni une autre personne), et un clic RÉEL sur l'action de la page ([data-sonde=\"voir-missions\"], posée par WorkerProfile pour cette sonde) mène à une navigation CLIENTE : un marqueur posé dans window avant le clic survit, l'adresse /jobs est atteinte, #root porte encore le châssis. Le GESTE et le MARQUEUR ne sont pas recopiés : ils appartiennent à check-job-interactive-production.js, qui les a déjà prouvés, et une seconde définition divergerait au premier correctif. Trois sorties : 0 conforme, 1 refus nommé, 2 prémisse (aucun profil au sitemap, ou Chromium absent — outillage), jamais un vert. Aucune écriture : le geste ouvre /jobs. Ce qu'elle ne juge pas, écrit : le document (sa sonde), le rendu visuel (géométrie, contraste, CLS — suite e2e locale), la matrice des moteurs (Chromium seul) et plus d'un profil par passage."
+    },
+    {
+      "chemin": "frontend/scripts/check-worker-page-production.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-worker-page-production.test.js",
+      "runner": "vitest",
+      "motif": "juge le document que la PRODUCTION sert pour /workers/:id, la seule chose qu'aucun garde hors ligne ne pouvait voir : check-worker-og-contract.js exécute le backend, check-spa-routes.js lit la CONFIGURATION des rewrites, et une réécriture Vercel perdue ne casse rien de visible — elle répond 200 avec la coque SPA (document valide, indexable, sans canonical de profil, sans cartes OG de travailleur, sans <h1>). Le PREMIER verdict ne dépend d'aucune donnée : un identifiant SENTINELLE (kojo-sonde-reecriture) doit répondre le 404 du backend (noindex + point d'entrée, AUCUN script de bundle), donc une coque SPA en 200 est refusée en nommant la réécriture perdue — ce jugement tombe chaque jour, corpus ou pas. Le second juge la fiche d'un profil réel (premier /workers/:id du sitemap, ou --worker) : canonical et og:url ÉGAUX à l'adresse demandée, DEUX cartes OG (…png 1200×630 et …-square.png 1200×1200) vérifiées en HTTP réel (200, image/png, signature PNG — le HTML peut annoncer des cartes 404), twitter:*, un <h1> unique accordé au bloc de données, le point d'entrée et la feuille déclarés, et aucun script AUTRE que ce point d'entrée (ni /assets/…js, ni en ligne) : depuis le 21/10/2026 « zéro <script> » n'est plus la propriété, et la règle qui la remplace est plus stricte. Sortie 2 = prémisse (aucun profil publié, marque « prémisse (aucun verdict rendu ici) »), jamais un vert. Ce qu'il ne juge pas, écrit : le TEXTE du titre et de la description (coupe en points de code) reste au contrat hors ligne, sinon deux gardes se contrediraient un jour sur une phrase."
+    },
+    {
+      "chemin": "frontend/scripts/check-job-page-production.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-job-page-production.test.js",
+      "runner": "vitest",
+      "motif": "juge le document que la PRODUCTION sert pour /jobs/:id, et d'abord ce qui le fait DÉMARRER depuis le 21/10/2026 : une réécriture Vercel perdue répond 200 avec la coque SPA (document valide, sans canonical de fiche, sans <h1> de mission, sans bloc de données) et un document qui a perdu son point d'entrée, sa feuille ou son bloc reste lisible par un crawler mais mort pour un visiteur à froid — le seul arrivant d'un lien partagé. Le premier verdict ne dépend d'aucune donnée : un identifiant SENTINELLE doit répondre le 404 du backend (noindex, point d'entrée, aucun script /assets/). Le second juge une mission réelle (première fiche du sitemap, ou --job) : point d'entrée chargé UNE fois, feuille présente AVANT le module, bloc kojo-job-data lisible et ACCORDÉ (même identifiant, même titre que le <h1>, même description que la balise, aucun champ que l'API publique ne publie), plus canonical, og:url et twitter:url. Sortie 2 = prémisse (aucune fiche au sitemap), jamais un vert. Ce qu'il ne juge pas, écrit : la rédaction (contrat hors ligne), les cartes OG (check-og-images.js) et la fraîcheur (cache 1 h)."
+    },
+    {
+      "chemin": "frontend/scripts/check-job-interactive-production.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-job-interactive-production.test.js",
+      "runner": "vitest",
+      "motif": "juge l'EXÉCUTION de /jobs/:id en production, le fait qu'aucune sonde du dépôt ne pouvait voir : check-job-page-production.js juge le DOCUMENT servi (point d'entrée, feuille, bloc), et un document parfait peut charger un module qui ne s'exécute pas — le crawler lit le HTML, le visiteur d'un lien partagé reçoit une fiche morte. Dans un Chromium réel, contexte VIERGE : (1) le montage — #root porte le châssis (#root nav) et non la coquille statique du backend ; (2) la fiche PEINTE — le <h1> de #root est celui du bloc kojo-job-data ; (3) le GESTE — un clic réel sur l'action de la carte (invitation à postuler d'une mission ouverte, sinon le lien de confiance du bandeau) mène à une navigation CLIENTE : un marqueur posé dans window avant le clic survit, le chemin attendu est atteint, #root porte encore le châssis. Un bouton mort, un <a href> sans routeur et une page d'arrivée sans châssis sont refusés nommément. Aucune écriture (le geste ouvre /login ou /how-it-works). Sortie 2 = prémisse (aucune fiche au sitemap, ou Chromium absent — outillage) ; jamais un vert. Ce qu'elle ne rejuge pas, écrit : le document (sonde voisine), le rendu visuel et la matrice des moteurs (suite e2e, pile locale)."
     },
     {
       "chemin": "frontend/scripts/check-spa-routes.js",
@@ -565,6 +637,14 @@
       "preuve": "backend/tests/test_route_surface.py",
       "runner": "pytest",
       "motif": "famille `users` (21 routes, dont la suppression de compte RGPD et l'export des données) : ce qui doit rester vrai est sa SURFACE — chemins, méthodes, dépendances d'authentification, ORDRE de montage — figée dans tests/surface/route_surface_users.json. Le contrôle des modules ORPHELINS, que ni le composeur ni l'application ne peuvent voir (les deux viennent du même montage), est dans le même fichier, dérivé du DOSSIER"
+    },
+    {
+      "chemin": "backend/kojo_scheduler.py",
+      "role": "garde",
+      "invoque_par": "test",
+      "preuve": "backend/tests/test_litige_alerte_sans_reponse.py",
+      "runner": "pytest",
+      "motif": "la boucle qui prévient le propriétaire quand la part des litiges TRANCHÉS sans réponse dépasse le seuil sur une fenêtre glissante : elle porte une PROMESSE d'état (une alerte par dépassement, réarmée par le retour sous le seuil, jamais par une période trop pauvre pour publier un taux) et deux canaux dont l'échec est écrit. Ces règles ne se relisent pas dans une file d'arbitrage — un dépassement qui se répète chaque jour, ou qui se tait après un réarmement, ne casse aucun test du produit ; sa preuve est donc dédiée"
     },
     {
       "chemin": "backend/kojo_core.py",
@@ -2585,6 +2665,307 @@
       "cwd": "frontend",
       "attend": [
         "refuse une production muette"
+      ]
+    },
+    {
+      "id": "frontend-revision: un arbre frontend different est accepte",
+      "garde": "frontend/scripts/check-deployed-revision.js",
+      "cible": "frontend/scripts/check-deployed-revision.js",
+      "trouve": "  return {\n    ok: false,\n    premisse: false,\n    message:\n      `révision servie ≠ attendue et l'arbre ${DOSSIER_FRONTEND}/ DIFFÈRE : ` +",
+      "remplace": "  return {\n    ok: true,\n    parArbre: true,\n    message:\n      `révision servie ≠ attendue et l'arbre ${DOSSIER_FRONTEND}/ DIFFÈRE : ` +",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-deployed-revision.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-deployed-revision.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse quand l’arbre publié diffère, en nommant les deux arbres"
+      ]
+    },
+    {
+      "id": "frontend-revision: le drapeau de premisse disparait",
+      "garde": "frontend/scripts/check-deployed-revision.js",
+      "cible": "frontend/scripts/check-deployed-revision.js",
+      "trouve": "        premisse: true,",
+      "remplace": "        premisse: false,",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-deployed-revision.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-deployed-revision.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "ATTENDU est illisible, et le dit (prémisse)",
+        "propage la prémisse au lieu de faire échouer le déploiement"
+      ]
+    },
+    {
+      "id": "frontend-revision: une premisse passe pour un retard",
+      "garde": "frontend/scripts/check-deployed-revision.js",
+      "cible": "frontend/scripts/check-deployed-revision.js",
+      "trouve": "  if (premisse) {",
+      "remplace": "  if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-deployed-revision.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-deployed-revision.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "arbre attendu est illisible (prémisse tolérée)"
+      ]
+    },
+    {
+      "id": "frontend-revision: un arbre identique est refuse",
+      "garde": "frontend/scripts/check-deployed-revision.js",
+      "cible": "frontend/scripts/check-deployed-revision.js",
+      "trouve": "  if (identique) {",
+      "remplace": "  if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-deployed-revision.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-deployed-revision.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "est identique (fusion documentaire)"
+      ]
+    },
+    {
+      "garde": "frontend/scripts/check-worker-og-contract.js",
+      "cible": "frontend/scripts/check-worker-og-contract.js",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-worker-og-contract.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-worker-og-contract.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "id": "travailleur: un document sans point d'entree est accepte",
+      "trouve": "  if (!module.test(source) && !moduleInverse.test(source)) {",
+      "remplace": "  if (false) {",
+      "attend": [
+        "détecte un point d’entrée ABSENT (page statique, pas d’application)"
+      ]
+    },
+    {
+      "garde": "frontend/scripts/check-worker-og-contract.js",
+      "cible": "frontend/scripts/check-worker-og-contract.js",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-worker-og-contract.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-worker-og-contract.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "id": "travailleur: le bloc de donnees d'un autre profil est accepte",
+      "trouve": "  if (donnees !== null && !egalProfond(donnees, vue)) {",
+      "remplace": "  if (false) {",
+      "attend": [
+        "détecte les données d’un AUTRE profil"
+      ]
+    },
+    {
+      "id": "actifs: une empreinte d'actif differente est acceptee",
+      "garde": "frontend/scripts/check-deployed-assets.js",
+      "cible": "frontend/scripts/check-deployed-assets.js",
+      "trouve": "  if (écarts.length || écartsContenus.length) {",
+      "remplace": "  if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-deployed-assets.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-deployed-assets.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse un actif dont les octets diffèrent, en nommant le chemin et les deux empreintes"
+      ]
+    },
+    {
+      "id": "actifs: un manifeste d'un autre build est accepte",
+      "garde": "frontend/scripts/check-deployed-assets.js",
+      "cible": "frontend/scripts/check-deployed-assets.js",
+      "trouve": "  if (empreinteManifeste !== annoncé) {",
+      "remplace": "  if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-deployed-assets.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-deployed-assets.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse un manifeste qui n’est PAS celui de l’artefact (deux builds mélangés)"
+      ]
+    },
+    {
+      "id": "contenus: un echantillon de tete different est accepte",
+      "garde": "frontend/scripts/check-deployed-assets.js",
+      "cible": "frontend/scripts/check-deployed-assets.js",
+      "trouve": "      if (obtenue !== attendue) {",
+      "remplace": "      if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-deployed-assets.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-deployed-assets.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une image dont la TÊTE diffère, en la nommant"
+      ]
+    },
+    {
+      "id": "contenus: le milieu des images n'est plus exige ni relu",
+      "garde": "frontend/scripts/check-deployed-assets.js",
+      "cible": "frontend/scripts/check-deployed-assets.js",
+      "trouve": "    const plages = plagesContenu(taille, echantillon);",
+      "remplace": "    const plages = plagesContenu(taille, echantillon).filter((p) => p.champ !== 'milieu');",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-deployed-assets.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-deployed-assets.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une image dont seul le MILIEU diffère (tête et queue intactes)"
+      ]
+    },
+    {
+      "id": "actifs: le cout de la sonde n'est plus publie dans le resume du run",
+      "garde": "frontend/scripts/check-deployed-assets.js",
+      "cible": "frontend/scripts/check-deployed-assets.js",
+      "trouve": "  ecrireResume(verdict, resumePath, contexte);",
+      "remplace": "  // mutation : le coût de la sonde n'est plus publié\n",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-deployed-assets.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-deployed-assets.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "publie le coût mesuré (fichiers, octets, durée, budget) dans le résumé du run"
+      ]
+    },
+    {
+      "id": "exposition: une premisse sort en 1 comme un defaut",
+      "garde": "frontend/scripts/check-token-exposure-production.js",
+      "cible": "frontend/scripts/check-token-exposure-production.js",
+      "trouve": "  return result.premisse ? 2 : 1;",
+      "remplace": "  return 1;",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-token-exposure-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-token-exposure-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "sort en 2 pour une prémisse, en la nommant"
+      ]
+    },
+    {
+      "id": "session: une premisse sort en 1 comme une session perdue",
+      "garde": "frontend/scripts/check-session-reload-production.js",
+      "cible": "frontend/scripts/check-session-reload-production.js",
+      "trouve": "  return result.premisse ? 2 : 1;",
+      "remplace": "  return 1;",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-session-reload-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-session-reload-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "sort en 2 pour une prémisse, en la nommant"
+      ]
+    },
+    {
+      "id": "preview: une premisse de resolution rend un vert",
+      "garde": "frontend/scripts/check-deployed-assets.js",
+      "cible": "frontend/scripts/check-deployed-assets.js",
+      "trouve": "    return premisse ? 2 : 1;",
+      "remplace": "    return premisse ? 0 : 1;",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-deployed-assets.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-deployed-assets.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "rend une PRÉMISSE (code 2) quand la preview n’a pas pu être résolue, en la nommant"
+      ]
+    },
+    {
+      "id": "preview: le jeton de contournement Vercel n'est plus envoye",
+      "garde": "frontend/scripts/check-deployed-assets.js",
+      "cible": "frontend/scripts/check-deployed-assets.js",
+      "trouve": "    entetes: bypass ? { [BYPASS_HEADER]: bypass } : {},",
+      "remplace": "    entetes: {},",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-deployed-assets.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-deployed-assets.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "pose le jeton de contournement sur CHAQUE lecture : une preview protégée n’est pas lue à moitié"
       ]
     },
     {
@@ -5774,6 +6155,48 @@
       ]
     },
     {
+      "id": "exercice-restauration: une date impossible recasee en date du jour",
+      "garde": ".github/scripts/check-exercice-restauration.py",
+      "cible": ".github/scripts/check-exercice-restauration.py",
+      "trouve": "        return None, \"date impossible (%s) dans le titre\" % trouvee.group(0)",
+      "remplace": "        return dt.date.today(), None",
+      "runner": "python",
+      "preuve": "backend/tests/test_exercice_restauration_fraicheur.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_exercice_restauration_fraicheur.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_exercice_restauration_fraicheur.py::TestLesReperes::test_une_date_impossible_est_refusee"
+      ]
+    },
+    {
+      "id": "exercice-restauration: un runbook tronque conclut quand meme",
+      "garde": ".github/scripts/check-exercice-restauration.py",
+      "cible": ".github/scripts/check-exercice-restauration.py",
+      "trouve": "    if len(texte) < PLANCHER_CARACTERES:",
+      "remplace": "    if False and len(texte) < PLANCHER_CARACTERES:",
+      "runner": "python",
+      "preuve": "backend/tests/test_exercice_restauration_fraicheur.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_exercice_restauration_fraicheur.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_exercice_restauration_fraicheur.py::TestLesReperes::test_un_runbook_tronque_ne_conclut_pas"
+      ]
+    },
+    {
       "id": "sse-proxy: un premier evenement tardif tolere",
       "garde": "frontend/scripts/check-sse-proxy-production.js",
       "cible": "frontend/scripts/check-sse-proxy-production.js",
@@ -5791,6 +6214,88 @@
       "cwd": "frontend",
       "attend": [
         "au-delà du budget de 4000 ms"
+      ]
+    },
+    {
+      "id": "sse-proxy: une premisse sort en 1 comme un flux tamponne",
+      "garde": "frontend/scripts/check-sse-proxy-production.js",
+      "cible": "frontend/scripts/check-sse-proxy-production.js",
+      "trouve": "      return 2;",
+      "remplace": "      return 1;",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-sse-proxy-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-sse-proxy-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "sort en 2 pour une PRÉMISSE, et dit qu’aucun verdict n’est rendu"
+      ]
+    },
+    {
+      "id": "preview-vercel: le filtre sur la revision neutralise",
+      "garde": "frontend/scripts/preview-vercel.js",
+      "cible": "frontend/scripts/preview-vercel.js",
+      "trouve": "    const candidats = déploiements.filter((d) => d && estPreview(d) && duCommit(d, revision));",
+      "remplace": "    const candidats = déploiements.filter((d) => d && estPreview(d));",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/preview-vercel.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/preview-vercel.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "en filtrant sur le commit"
+      ]
+    },
+    {
+      "id": "arbitrage: le meme depassement realerte a chaque passage",
+      "garde": "backend/kojo_scheduler.py",
+      "cible": "backend/kojo_scheduler.py",
+      "trouve": "    deja_signale = (\n        etat.get(\"sante\") == \"alertee\" and etat.get(\"signature\") == signature\n    )",
+      "remplace": "    deja_signale = False",
+      "runner": "python",
+      "preuve": "backend/tests/test_litige_alerte_sans_reponse.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_litige_alerte_sans_reponse.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_litige_alerte_sans_reponse.py::TestUneAlerteParDepassement::test_depassement_alerte_une_fois_puis_se_tait"
+      ]
+    },
+    {
+      "id": "arbitrage: le seuil franchi a l egalite alerte",
+      "garde": "backend/kojo_scheduler.py",
+      "cible": "backend/kojo_scheduler.py",
+      "trouve": "    if taux <= LITIGE_SANS_REPONSE_SEUIL:",
+      "remplace": "    if False:",
+      "runner": "python",
+      "preuve": "backend/tests/test_litige_alerte_sans_reponse.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_litige_alerte_sans_reponse.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_litige_alerte_sans_reponse.py::TestUneAlerteParDepassement::test_egalite_au_seuil_n_alerte_pas"
       ]
     },
     {
@@ -5877,6 +6382,27 @@
       ]
     },
     {
+      "id": "secrets: un constat accepte comme un rapport vide",
+      "garde": ".github/scripts/rapport-secrets.py",
+      "cible": ".github/scripts/rapport-secrets.py",
+      "trouve": "    if not constats:",
+      "remplace": "    if True or not constats:",
+      "runner": "python",
+      "preuve": "backend/tests/test_secret_scan_workflow.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_secret_scan_workflow.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_secret_scan_workflow.py::TestRapport::test_un_constat_est_bloquant_et_annote"
+      ]
+    },
+    {
       "id": "secrets: empreinte d'installation neutralisee",
       "garde": ".github/scripts/install-gitleaks.sh",
       "cible": ".github/scripts/install-gitleaks.sh",
@@ -5915,6 +6441,307 @@
       "cwd": "frontend",
       "attend": [
         "échoue en CI, avise seulement ailleurs"
+      ]
+    },
+    {
+      "id": "worker-page-production: coque SPA toleree",
+      "garde": "frontend/scripts/check-worker-page-production.js",
+      "cible": "frontend/scripts/check-worker-page-production.js",
+      "trouve": "  if (ressembleACoqueSpa(html)) {",
+      "remplace": "  if (false && ressembleACoqueSpa(html)) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-worker-page-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-worker-page-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse la coque SPA en NOMMANT la réécriture perdue"
+      ]
+    },
+    {
+      "id": "job-page-production: bloc de donnees absent tolere",
+      "garde": "frontend/scripts/check-job-page-production.js",
+      "cible": "frontend/scripts/check-job-page-production.js",
+      "trouve": "  if (!bloc.present) {",
+      "remplace": "  if (false && !bloc.present) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-job-page-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-job-page-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse un bloc de données absent, illisible, ou d’une AUTRE mission"
+      ]
+    },
+    {
+      "id": "job-page-production: point d entree absent tolere",
+      "garde": "frontend/scripts/check-job-page-production.js",
+      "cible": "frontend/scripts/check-job-page-production.js",
+      "trouve": "  if (!pied.length) {\n    erreurs.push(\n      `le document ne charge pas ${POINT_ENTREE_MISSION.script} : un visiteur à froid reçoit une ` +",
+      "remplace": "  if (false && !pied.length) {\n    erreurs.push(\n      `le document ne charge pas ${POINT_ENTREE_MISSION.script} : un visiteur à froid reçoit une ` +",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-job-page-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-job-page-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse un document qui ne charge pas le point d’entrée (plus d’application)"
+      ]
+    },
+    {
+      "id": "worker-page-production: statut de la sentinelle non juge",
+      "garde": "frontend/scripts/check-worker-page-production.js",
+      "cible": "frontend/scripts/check-worker-page-production.js",
+      "trouve": "  if (status !== 404) {",
+      "remplace": "  if (false && status !== 404) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-worker-page-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-worker-page-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "une coque SPA en 200 est refusée en nommant la réécriture"
+      ]
+    },
+    {
+      "id": "job-interactive: montage absent tolere",
+      "garde": "frontend/scripts/check-job-interactive-production.js",
+      "cible": "frontend/scripts/check-job-interactive-production.js",
+      "trouve": "      errors.push(refusDeMontage({ url, etat, timeoutMs: montageTimeoutMs }));",
+      "remplace": "      if (false) errors.push(refusDeMontage({ url, etat, timeoutMs: montageTimeoutMs }));",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-job-interactive-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-job-interactive-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une coquille statique qui n’a jamais monté"
+      ]
+    },
+    {
+      "id": "job-interactive: rechargement du document tolere (navigation non cliente)",
+      "garde": "frontend/scripts/check-job-interactive-production.js",
+      "cible": "frontend/scripts/check-job-interactive-production.js",
+      "trouve": "  if (!apres.marqueur) {",
+      "remplace": "  if (false && !apres.marqueur) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-job-interactive-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-job-interactive-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une navigation qui RECHARGE le document"
+      ]
+    },
+    {
+      "id": "job-interactive: action absente d une mission ouverte toleree",
+      "garde": "frontend/scripts/check-job-interactive-production.js",
+      "cible": "frontend/scripts/check-job-interactive-production.js",
+      "trouve": "    if (ouvert && !etat.ancrePostuler) {",
+      "remplace": "    if (false && ouvert && !etat.ancrePostuler) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-job-interactive-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-job-interactive-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une mission ouverte sans invitation à postuler"
+      ]
+    },
+    {
+      "id": "csp-document: source manquante non nommee",
+      "garde": "frontend/scripts/csp-document.js",
+      "cible": "frontend/scripts/csp-document.js",
+      "trouve": "    const manquantes = sources.filter((source) => !presentes.includes(source));",
+      "remplace": "    const manquantes = [];",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/csp-document.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/csp-document.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "nomme une SOURCE qui manque au document"
+      ]
+    },
+    {
+      "id": "csp-documents-production: politique divergente toleree",
+      "garde": "frontend/scripts/check-csp-documents-production.js",
+      "cible": "frontend/scripts/check-csp-documents-production.js",
+      "trouve": "  const ecarts = ecartsDePolitiques({ attendue, servie });",
+      "remplace": "  const ecarts = [];",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-csp-documents-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-csp-documents-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une politique qui DIVERGE, en nommant la directive en écart"
+      ]
+    },
+    {
+      "id": "csp-contract: document divergent tolere",
+      "garde": "frontend/scripts/check-csp-contract.js",
+      "cible": "frontend/scripts/check-csp-contract.js",
+      "trouve": "    if (politique !== attendu) {",
+      "remplace": "    if (false && politique !== attendu) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-csp-contract.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-csp-contract.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse un document qui publie une politique DIFFÉRENTE"
+      ]
+    },
+    {
+      "id": "exercice-restauration: un titre prepare mais non execute compte comme preuve",
+      "garde": ".github/scripts/check-exercice-restauration.py",
+      "cible": ".github/scripts/check-exercice-restauration.py",
+      "trouve": "        if NON_EXECUTE.search(titre):",
+      "remplace": "        if False and NON_EXECUTE.search(titre):",
+      "runner": "python",
+      "preuve": "backend/tests/test_exercice_restauration_fraicheur.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_exercice_restauration_fraicheur.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_exercice_restauration_fraicheur.py::TestLesReperes::test_un_exercice_prepare_mais_non_execute_ne_compte_pas"
+      ]
+    },
+    {
+      "id": "frontend-servi: un deploiement en file accepte comme retard",
+      "garde": "frontend/scripts/check-deployed-revision.js",
+      "cible": "frontend/scripts/check-deployed-revision.js",
+      "trouve": "  if (ETATS_EN_FILE.has(lu.etat)) {",
+      "remplace": "  if (false && ETATS_EN_FILE.has(lu.etat)) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-deployed-revision.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-deployed-revision.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "rend une PRÉMISSE quand le déploiement est en vol, et le nomme"
+      ]
+    },
+    {
+      "id": "worker-interactive: un nom absent tolere",
+      "garde": "frontend/scripts/check-worker-interactive-production.js",
+      "cible": "frontend/scripts/check-worker-interactive-production.js",
+      "trouve": "    if (!etat.nom) {",
+      "remplace": "    if (false && !etat.nom) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-worker-interactive-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-worker-interactive-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse un profil qui a monté sans peindre de nom"
+      ]
+    },
+    {
+      "id": "worker-interactive: une autre personne toleree",
+      "garde": "frontend/scripts/check-worker-interactive-production.js",
+      "cible": "frontend/scripts/check-worker-interactive-production.js",
+      "trouve": "    } else if (etat.blocLisible && etat.nomBloc && etat.nom !== etat.nomBloc) {",
+      "remplace": "    } else if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-worker-interactive-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-worker-interactive-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse un <h1> qui ne parle pas de la personne du bloc"
+      ]
+    },
+    {
+      "id": "worker-interactive: chemin d arrivee non juge",
+      "garde": "frontend/scripts/check-worker-interactive-production.js",
+      "cible": "frontend/scripts/check-worker-interactive-production.js",
+      "trouve": "export const CHEMIN_MISSIONS = '/jobs';",
+      "remplace": "export const CHEMIN_MISSIONS = '/accueil';",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-worker-interactive-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-worker-interactive-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "juge un profil monté, peint depuis son bloc, et un geste SPA"
       ]
     }
   ]

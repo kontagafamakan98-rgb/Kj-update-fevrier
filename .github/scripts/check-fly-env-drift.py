@@ -198,12 +198,27 @@ OPTIONAL_KEYS = {
     # absence sur Fly n'est pas une divergence.
     "NEON_AI_GATEWAY_BASE_URL", "NEON_AI_GATEWAY_TOKEN",
     "NEON_AI_GATEWAY_MODEL", "NEON_AI_GATEWAY_TIMEOUT_SECONDS",
+    # Budget de l'assistant (plafond de dépense par jour UTC) : les deux
+    # plafonds et la durée de conservation du compteur ont un défaut dans
+    # `kojo_settings` (200 appels, 250 000 caractères, 90 jours), donc leur
+    # absence sur Fly est un réglage laissé au défaut, pas une config
+    # incomplète — et c'est le défaut qui borne la facture.
+    "NEON_AI_GATEWAY_DAILY_CALLS", "NEON_AI_GATEWAY_DAILY_PROMPT_CHARS",
+    "AI_USAGE_RETENTION_DAYS",
     # Sequestre a deux temps : les deux reglages ont un defaut de repli dans
     # `kojo_settings` (7 jours, balayage horaire) et le delai REFUSE le demarrage
     # sous 1 jour. Leur absence sur Fly n'est donc pas une divergence doc-prod :
     # c'est le defaut qui s'applique, et la valeur est ecrite dans
     # backend/SAUVEGARDES_ATLAS.md (section sequestre) pour qui veut la changer.
     "COMPLETION_AUTO_RELEASE_DAYS", "COMPLETION_SWEEP_INTERVAL_MINUTES",
+    # Alerte d'arbitrage (part de decisions prises sans reponse) : le seuil, la
+    # fenetre glissante et la cadence de la boucle ont tous un defaut dans
+    # `kojo_settings` (0,5 ; 90 jours ; 1 440 min) et les deux premiers sont
+    # VALIDES au demarrage (0 < seuil < 1, fenetre entre 1 et 3 650 jours). Leur
+    # absence sur Fly est donc un reglage laisse au defaut — le defaut qui
+    # declenche l'alerte a 50 % sur 90 jours —, pas une config incomplete.
+    "LITIGE_SANS_REPONSE_SEUIL", "LITIGE_SANS_REPONSE_FENETRE_JOURS",
+    "LITIGE_ALERTE_INTERVAL_MINUTES",
 }
 
 # Keys connues mais NON sensibles (valeur vérifiable côté doc). Leur digest

@@ -3,8 +3,10 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from kojo_ai_budget import MOTIF_COMPTEUR, caracteres_de_prompt, reserver
 from kojo_ai_gateway import AiGatewayError, chat_completion, is_configured
 from kojo_core import db
 from kojo_email import send_email_via_active_provider
@@ -87,6 +89,12 @@ async def robot_chat(payload: RobotChatRequest):
     la politique de l'assistant (le rôle `system` est refusé par le modèle
     `RobotChatMessage`).
 
+    Le plafond de DÉPENSE est vérifié AVANT l'appel (`kojo_ai_budget`) : la
+    limite par IP borne le débit, pas la facture. Un plafond atteint répond 429
+    avec `Retry-After` (prochain jour UTC), un compteur injoignable 503 — dans
+    les deux cas le message nomme le formulaire, qui reste le seul chemin
+    garanti.
+
     Returns:
         dict: {reply, ticket_suggested, model} — `reply` est le texte du modèle,
             `ticket_suggested` dit si l'assistant recommande de déposer une
@@ -104,6 +112,36 @@ async def robot_chat(payload: RobotChatRequest):
 
     messages = [{"role": "system", "content": robot_system_prompt(payload.language)}]
     messages += [{"role": m.role, "content": m.content} for m in payload.messages]
+
+    # Le budget se juge sur le prompt RÉEL (instructions du serveur comprises),
+    # et la réservation est prise AVANT l'appel : compter après coup laisserait
+    # passer la dépense qu'on veut borner.
+    budget = await reserver(caracteres_de_prompt(messages))
+    if not budget.autorisee:
+        if budget.motif == MOTIF_COMPTEUR:
+            # Panne du compteur : on ne peut pas affirmer que l'appel est
+            # budgété, et une fonctionnalité facultative ne dépense pas à
+            # l'aveugle. Le formulaire reste à l'écran.
+            raise HTTPException(
+                status_code=503,
+                detail="Assistant momentanément indisponible. Utilisez le formulaire de demande.",
+            )
+        # `bucket` est le champ que le rate-limiter publie déjà sur SES 429 :
+        # le client distingue donc un plafond de dépense (journée entière) d'une
+        # limite de débit (20 / 5 min, qui se relâche seule) sans lire un texte
+        # traduit ni deviner. Confondre les deux fermerait la saisie pour la
+        # journée alors que la limite de débit sera passée dans cinq minutes.
+        return JSONResponse(
+            status_code=429,
+            content={
+                "detail": (
+                    "L'assistant a atteint son plafond de dépense pour aujourd'hui. "
+                    "Déposez une demande de support : une personne vous répondra."
+                ),
+                "bucket": "ai-budget",
+            },
+            headers={"Retry-After": str(budget.retry_after)},
+        )
 
     try:
         # SYNCHRONE (requests) : hors de l'event loop, sinon un gateway lent

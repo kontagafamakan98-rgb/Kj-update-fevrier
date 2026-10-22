@@ -30,8 +30,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { BUILD_REVISION_META } from '../site-meta.js';
-import { revisionDuDepot, revisionFrom } from '../../vite-plugins/inject-build-revision.js';
+import { spawnSync } from 'node:child_process';
+
+import { BUILD_REVISION_META, BUILD_TREE_META } from '../site-meta.js';
+import {
+  arbreDuDepot,
+  revisionDuDepot,
+  revisionFrom,
+} from '../../vite-plugins/inject-build-revision.js';
 
 const FRONTEND_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const INDEX_TEMPLATE = path.join(FRONTEND_DIR, 'index.html');
@@ -78,6 +84,7 @@ async function runRevisionPluginWith(options) {
 }
 
 const metaOf = (tags) => (tags || []).find((tag) => tag.attrs?.name === BUILD_REVISION_META);
+const arbreOf = (tags) => (tags || []).find((tag) => tag.attrs?.name === BUILD_TREE_META);
 
 afterEach(clearRevisionEnv);
 
@@ -130,7 +137,40 @@ describe('inject-build-revision — la révision publiée par le build', () => {
       revisionFrom({ VERCEL_GIT_COMMIT_SHA: '   ' }, { depot: () => '' }),
       'une variable vide ne doit pas devenir une révision'
     ).toBe('');
-    const résultat = await runRevisionPluginWith({ depot: () => '' });
+    const résultat = await runRevisionPluginWith({ depot: () => '', arbre: () => '' });
     expect(typeof résultat === 'string' ? [] : résultat.tags || []).toEqual([]);
+  });
+
+  it('publie l’ARBRE frontend/ à côté de la révision — le verdict ne dépend plus du SHA seul', async () => {
+    setRevisionEnv({ VERCEL_GIT_COMMIT_SHA: SHA });
+    const { tags } = await runRevisionPlugin();
+
+    const arbre = arbreOf(tags);
+    expect(arbre, 'aucune meta d’arbre injectée').toBeDefined();
+    expect(arbre.tag).toBe('meta');
+    // 40 hexadécimaux : un arbre abrégé accepterait deux contenus différents.
+    expect(arbre.attrs.content).toMatch(/^[0-9a-f]{40}$/);
+    expect(arbre.injectTo).toBe('head');
+    // La valeur est bien l’arbre git de `frontend/` à HEAD, pas un autre dossier.
+    expect(arbre.attrs.content).toBe(arbreDuDepot());
+    const attendu = spawnSync('git', ['rev-parse', 'HEAD:frontend'], {
+      cwd: FRONTEND_DIR,
+      encoding: 'utf8',
+    });
+    expect(arbre.attrs.content).toBe(attendu.stdout.trim());
+  });
+
+  it('publie la révision SANS arbre quand le dépôt n’en donne pas, et l’absence est refusée en production', async () => {
+    // Un build fait hors dépôt git avec une variable n’invente pas d’arbre : le
+    // garde refusera en nommant l’absence (code 1, « redéployer ») au lieu de
+    // comparer à une valeur fabriquée.
+    const { tags } = await runRevisionPluginWith({
+      env: { VERCEL_GIT_COMMIT_SHA: SHA },
+      depot: () => '',
+      arbre: () => '',
+    });
+    expect(metaOf(tags)?.attrs?.content).toBe(SHA);
+    expect(arbreOf(tags)).toBeUndefined();
+    expect(arbreDuDepot()).toMatch(/^[0-9a-f]{40}$/);
   });
 });

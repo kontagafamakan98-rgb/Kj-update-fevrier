@@ -1,7 +1,10 @@
 # Audit général de Kojo — rédigé le 20/10/2026, révisé le 21/10/2026
 
 Périmètre de la révision : `main` @ `876e810c`, **plus 13 fichiers non commités**
-(le renommage du badge, cf. §0.8) — livrés puis servis en `25642ef5` (PR #184). Cet
+(le renommage du badge, cf. §0.8) — livrés en `25642ef5` (PR #184), dont le
+frontend est toujours celui qui est servi : la production annonce `0bbff698`
+(PR #186, documentation seule), de **même arbre `frontend/`** (relevé du
+21/10/2026 ; artefact daté de 16:27:41 UTC par `Last-Modified`). Cet
 audit lit le **code réel**, les gardes, les workflows et les documents
 d'exploitation du dépôt. Les relevés de production de
 la révision ont été pris le 21/10/2026 et sont datés ; ce qui n'a pas été mesuré
@@ -17,7 +20,7 @@ est dit comme tel.
 |---|---|---|
 | §3.1 « la restauration est impossible » | **RÉSOLU pour l'essentiel** : l'archive quotidienne est déposée chiffrée sur un bucket privé, **restaurée dans une base de travail et comparée à la source** (405 documents, 20 collections le 21/10), puis **relue depuis le dépôt** (empreinte SHA-256, déchiffrement, flux gzip complet). Sonde de fraîcheur (36 h) verte. Reste : Atlas M0, donc pas de PITR — la granularité est « la dernière sauvegarde », et une règle de rétention/immutabilité du bucket n'est pas exercée. | Runs `39567417671` (sauvegarde), `39568167151` (sonde Atlas) ; étape 13 « Relire le dépôt déposé ». |
 | §3.4 « le badge Vérifié ne vérifie pas une identité » | **RÉSOLU sur le mensonge** : les libellés disent « Moyens de paiement renseignés », l'infobulle dit « l'identité n'est pas vérifiée », et un garde refuse le retour des trois anciennes clés. Reste : aucune vérification d'identité n'existe (pièce + selfie), donc aucun badge de confiance **fort** n'est disponible. | `frontend/src/utils/__tests__/badgePaiementHonnete.test.js` (5 cas, mutation prouvée) ; 5 dictionnaires. |
-| §3.5 « séquestre sans échéance » | **RÉSOLU** : déclaration par le travailleur (note ≥ 20 caractères + 3 photos), validation par le client, **libération automatique à 7 jours** (`COMPLETION_AUTO_RELEASE_DAYS`), un seul propriétaire du versement (`liberer_sequestre`, verrou CAS), trois jalons `business_events`. Reste : **pas de litige tracé** (état, échéance, décision), et la fenêtre de contestation n'existe pas. | `backend/kojo_job_completion.py`, `frontend/src/components/CompletionPanel.js`. |
+| §3.5 « séquestre sans échéance » | **RÉSOLU, les deux moitiés** : déclaration par le travailleur (note ≥ 20 caractères + 3 photos), validation par le client, **libération automatique à 7 jours** (`COMPLETION_AUTO_RELEASE_DAYS`), un seul propriétaire du versement (`liberer_sequestre`, verrou CAS), trois jalons `business_events` ; et **litige tracé** (21/10/2026) : une partie ouvre avec motif, l'ouvreur retire, l'autre partie répond UNE fois (position + note bornée) pour que l'arbitre tranche sur les deux versions, la fenêtre d'arbitrage fait foi, cinq jalons de plus, paiement gelé tant que le désaccord vit. | `backend/kojo_job_completion.py`, `backend/kojo_job_disputes.py`, `frontend/src/components/CompletionPanel.js`, `frontend/src/components/DisputePanel.js`, `frontend/src/components/OwnerDisputes.js`. |
 
 ### 0.2 Ce qui n'a pas changé, vérifié le 21/10/2026
 
@@ -74,6 +77,18 @@ Deux trous :
    Vercel, ni Atlas. Le chat est sans état côté Kojo (aucun stockage), mais ce que
    le visiteur écrit part chez un tiers, et la politique ne le dit pas.
 
+**Les deux trous sont fermés le 21/10/2026.** Le plafond de dépense est
+`backend/kojo_ai_budget.py` : deux compteurs GLOBAUX par jour UTC (appels ET
+caractères de prompt), réservés AVANT l'appel et écrits en base, donc partagés
+par les process et survivants à un redémarrage ; plafond atteint = 429 +
+`Retry-After`, compteur injoignable = 503 nommé (refuser plutôt que dépenser à
+l'aveugle, le repli étant le formulaire). La politique nomme maintenant chaque
+prestataire (PRIVACY.md §2 et la page /privacy, cinq langues), avec ce que
+chacun reçoit et ce qu'il ne reçoit pas — y compris le seul écart qui coûte :
+PayDunya reçoit le nom, l'adresse et le téléphone du payeur pour la facture de
+collecte, alors que le document `payments` n'en garde rien. Gardes :
+`backend/tests/test_ai_budget.py`, `backend/tests/test_sous_traitants_politique.py`.
+
 ### 0.4 Le dépôt en chiffres, mesurés le 21/10/2026
 
 | Mesure | 20/10 | 21/10 |
@@ -85,7 +100,7 @@ Deux trous :
 | Tests frontend unitaires | 132 | **134** : 52 dans `src/` (10 176 lignes) + 82 pour les gardes |
 | Specs e2e | 27 | **27 specs / 39 fichiers / 11 445 lignes** |
 | Gardes et sondes maison | 80 | **85 fichiers / 33 084 lignes** — autant que l'app |
-| Gardes déclarés / mutations rejouées | 80 / — | **129 / 237** (74 en CI, 47 en test, 8 assumés sans exécution) |
+| Gardes déclarés / mutations rejouées | 80 / — | **129 / 238** (74 en CI, 47 en test, 8 assumés sans exécution) |
 | Workflows CI | 11 | **11** |
 | Endpoints HTTP | 109 | **113** |
 | Pages / composants | 25 / 46 | **25 / 46** |
@@ -115,7 +130,7 @@ ordre, par impact réel sur les chiffres de §0.5 :
 | # | Proposition | Pourquoi maintenant |
 |---:|---|---|
 | 1 | **Semer l'offre** : conciergerie des 50 premières missions (ville par ville), publication assistée, relance des 7 clients existants | Avec 0 mission terminée, rien d'autre ne produit d'effet mesurable ; c'est la seule action qui change `open_jobs` |
-| 2 | **Litige tracé** (état, échéance, décision owner, journal) — la moitié non faite du séquestre | La libération automatique paie sans arbitrer ; le désaccord n'a toujours pas de procédure |
+| 2 | ~~**Litige tracé** (état, échéance, décision owner, journal)~~ — **FAIT le 21/10/2026** (`kojo_job_disputes`, `DisputePanel`, `OwnerDisputes`, cinq jalons `business_events` dont la réponse de l'autre partie) | La libération automatique ne paie plus par-dessus une contestation ; la file d'arbitrage remplace le ticket sans état |
 | 3 | **Surveillance minute + astreinte écrite** (moniteur externe **déclaré** dans le dépôt) | La cécité reste de 24 h sur une plateforme qui manipule de l'argent |
 | 4 | **Deuxième personne sur chaque accès** | Inchangé, et c'est le risque le plus difficile à réparer après coup |
 | 5 | **Signaler / bloquer** (message, mission, profil → ticket) | Fonction de sécurité de base, effort S |
@@ -124,7 +139,7 @@ ordre, par impact réel sur les chiffres de §0.5 :
 | 8 | **Push demandé au bon moment** | Canal de retour déjà construit, brûlé au premier écran |
 | 9 | **Recherche utile** (index texte, tri, total, sauvegardes) | Le cœur de l'usage travailleur, et le seul remède durable au `LIKE` |
 | 10 | **Vraie vérification d'identité** (pièce + selfie ou appel vidéo) | Le mensonge est parti ; un badge fort reste à construire |
-| 11 | **Budget et sous-traitance de l'assistant IA** (plafond global, liste des sous-traitants dans la politique) | Nouveau depuis le 20/10, non borné financièrement et non déclaré |
+| 11 | ~~**Budget et sous-traitance de l'assistant IA** (plafond global, liste des sous-traitants dans la politique)~~ — **FAIT le 21/10/2026** (`kojo_ai_budget`, section « Sous-traitants » de PRIVACY.md §2 et de la page /privacy) | La facture est plafonnée par jour et chaque destinataire des données est nommé |
 | 12 | **Pages ville × métier** + sitemap (10 URL aujourd'hui) | Croissance organique sans canal payant |
 | 13 | Accessibilité outillée (axe en CI, lien d'évitement) · 14. préproduction · 15. découpage des quatre gros fichiers · 16. entonnoir produit · 17. second PSP · 18. magasins | Inchangés, après ce qui débloque l'usage |
 
@@ -132,12 +147,12 @@ ordre, par impact réel sur les chiffres de §0.5 :
 
 | Domaine | 20/10 | 21/10 | Ce qui a bougé |
 |---|---:|---:|---|
-| Vérification / qualité | 10 | **10** | 33 484 lignes de tests pour 20 882 de prod, 129 gardes, 237 mutations, 0 vulnérabilité connue |
-| Sécurité | 9 | **9** | Inchangé ; l'assistant IA est borné par IP, pas par budget |
-| Paiement | 8 | **9** | Séquestre à deux temps avec échéance et preuve ; reste un seul PSP et pas de litige |
+| Vérification / qualité | 10 | **10** | 33 484 lignes de tests pour 20 882 de prod, 129 gardes, 238 mutations, 0 vulnérabilité connue |
+| Sécurité | 9 | **9** | Inchangé ; l'assistant IA est borné par IP **et** par un budget journalier (429 nommé, compteur en base) |
+| Paiement | 8 | **9** | Séquestre à deux temps avec échéance et preuve, **litige tracé et arbitré** ; reste un seul PSP |
 | SEO / acquisition technique | 9 | **9** | Révision servie = `main`, OG missions + profils, 10 URL indexables |
 | Expérience / design | 7 | **7** | Inchangé ; accessibilité toujours non outillée |
-| Confiance produit | 5 | **6** | Badge honnête + échéance de libération ; manquent litige, signalement, client noté |
+| Confiance produit | 5 | **6** | Badge honnête + échéance de libération + litige tracé ; manquent signalement et client noté |
 | Liquidité / croissance | 3 | **2** | Mesuré : 0 mission ouverte, 0 terminée, 0 avis, 2 travailleurs, 7 clients |
 | Exploitation / continuité | 4 | **5** | Sauvegarde déposée, restaurée, relue, fraîcheur jugée ; détection toujours quotidienne, un seul détenteur d'accès |
 
@@ -168,13 +183,46 @@ mobile, déploiement Fly).
 
 **La production a suivi — avec 22 minutes de retard, et le gate de révision l'a
 dit avant elle.** Le déploiement Vercel `Production` `7230235937` du commit
-`25642ef5` a été créé à **15:40:33 UTC**, soit 22 min après la fusion de 15:18:49 ;
-le site sert depuis cette révision. Mesuré dans l'artefact servi, pas seulement dans
-la balise : le bundle répond `paymentMethodsOnFile`, `paymentMethodsNone`,
-`paymentMethodsBadgeTitle` et le libellé « Moyens de paiement renseignés », et les
-trois clés menteuses n'y sont plus des **clés** (leur nom ne survit que dans la
-prose d'un commentaire de `workerTrustLevel.js` que la minification a préservée —
-sans effet visible pour un visiteur, mais c'est du poids mort dans l'artefact).
+`25642ef5` a été créé à **15:40:33 UTC**, soit 22 min après la fusion de 15:18:49 :
+c'est ce build qui a mis le contenu de #184 en ligne le premier.
+
+**La révision SERVIE n'est pourtant pas `25642ef5`, et ne l'a jamais été
+durablement** : Vercel ré-estampille à chaque fusion de `main`, donc le site
+annonce aujourd'hui **`0bbff698`** (relevé du 21/10/2026 ; artefact daté de
+**16:27:41 UTC** par `Last-Modified`), une fusion **documentaire** (PR #186).
+C'est le cas d'école du verdict par l'**arbre** :
+`git rev-parse <révision>:frontend` vaut `b0d247249923…` pour `25642ef5` comme
+pour `0bbff698`, donc la production sert bien le contenu de #184 sous un SHA plus
+récent. Nommer `25642ef5` « la révision servie » serait la coquille que ce verdict
+rend inutile : un SHA servi est un fait daté, pas une identité.
+
+Ce qui est mesuré dans l'artefact servi (relevé du 21/10/2026), c'est le
+**bundle** : `index-BklmKz66.js` (190 011 octets) répond `paymentMethodsOnFile`,
+`paymentMethodsNone`, `paymentMethodsBadgeTitle` et le libellé « Moyens de
+paiement renseignés », et les trois clés i18n menteuses n'y sont plus des **clés**
+(`verifiedBadgeTitle`, `verifiedBadge`, `"verified"` : 0 occurrence ; leur nom ne
+survit que dans la prose d'un commentaire de `workerTrustLevel.js` que la
+minification a préservée — sans effet visible pour un visiteur, mais c'est du
+poids mort dans l'artefact).
+
+**Et c'est la seule preuve possible côté HTML.** `GET /workers/:id` est servi par
+le pré-rendu backend (`kojo_worker_og.py`, via le rewrite `/workers/(.*)` de
+`frontend/vercel.json`) : mesuré sur les deux fiches du sitemap le 21/10/2026,
+**2 210 octets, zéro `<script>`, zéro `type="module"`, aucune feuille de style**,
+aucun libellé de moyen de paiement. C'est le module lui-même qui le dit :
+« Aucune balise `<script>` : le document est LISIBLE, pas exécutable »
+(`kojo_worker_og.py`) — le compromis déclaré dans `AGENTS.md`.
+Conséquence concrète : ni le badge de `PaymentMethodsBadge` (peint sur la carte de
+proposition de `JobDetails` et sur son propre `Profile`), ni sa forme textuelle de
+la fiche publique (`WorkerProfile.js` : `· ${t('paymentMethodsOnFile')}`) n'existent
+pour un visiteur à froid ; ils n'apparaissent qu'après une **navigation côté
+client** dans une application déjà chargée. La livraison du renommage se prouve
+donc par le bundle ci-dessus et par `badgePaiementHonnete.test.js` (les cinq
+dictionnaires et le couple de clés), pas par le HTML pré-rendu. Reste ouvert, et
+dit : aucun test n'observe le libellé sur la page rendue — `WorkerProfile.test.jsx`
+et l'E2E `profil-travailleur-public.spec.js` jugent l'identité, les avis et
+l'absence de jeton, pas le paiement ; une régression du libellé ne serait donc vue
+ni par eux ni par la production, où ce chemin ne s'hydrate jamais.
 
 Entre-temps, l'étape « Vérifier la révision servie » de `frontend-build` a échoué
 (run `39624483759`) après 9 tentatives, 15:26:02 → 15:28:59 : `servi=876e810c`,
@@ -186,12 +234,24 @@ sans être servie est exactement le silence que ces sondes existent pour empêch
 **Ce que ce délai apprend, et qui vaut une décision.** La patience du gate est de
 **3 min** (9 × 20 s) ; la file Vercel du jour en a pris **22**. Un build tardif
 laisse donc `main` rouge sur ce run **définitivement** — c'est la livraison
-suivante (PR #185, `4ecf77ae`) qui a rejoué la vérification et l'a rendue verte, la
-révision d'artefact n'ayant pas bougé. Deux remèdes possibles, à trancher si le cas
-se reproduit : allonger la fenêtre au-delà du pire délai observé, ou juger « un
-déploiement est en file côté Vercel » au lieu d'un nombre de tentatives — le second
-distingue *pas encore construit* de *jamais déclenché*, ce que 3 min ne savent pas
-faire.
+suivante (PR #185, `4ecf77ae`) qui a rejoué la vérification et l'a rendue verte.
+**La révision d'artefact avait pourtant bougé** (`4ecf77ae`) : Vercel reconstruit
+chaque push, mais `frontend/` ne change d'**aucun** fichier entre `25642ef5`,
+`4ecf77ae` et `0bbff698` (mesuré : 0 fichier). Sous un verdict de SHA, une fusion
+documentaire se lisait donc comme un retard dès que le CDN servait un build dont
+le SHA n'était ni la tête de `main` ni le dernier commit ayant touché `frontend/`
+— le contenu, lui, était déjà celui de `main`. Le gate juge désormais
+l'**arbre** (`git rev-parse <révision>:frontend`, cf.
+`frontend/scripts/check-deployed-revision.js`, 21/10/2026) : deux SHA différents
+avec le même arbre sont un succès dit, deux arbres différents restent un refus. Et
+l'arbre SERVI n'est plus lu dans le clone — l'artefact le publie (`kojo-build-tree`,
+à côté de `kojo-build-revision`) : le cas « commit servi absent du clone » (prémisse,
+code 2) a donc disparu, et un artefact antérieur qui n'annonce que son SHA est
+refusé en code 1 (redéployer), pas jugé incomparable. Restent deux remèdes de
+DÉLAI, à trancher si le cas se reproduit : allonger la fenêtre au-delà du pire
+délai observé, ou juger « un déploiement est en file côté Vercel » au lieu d'un
+nombre de tentatives — le second distingue *pas encore construit* de *jamais
+déclenché*, ce que 3 min ne savent pas faire.
 
 Un second rouge du même run est **indépendant du badge** :
 
@@ -300,17 +360,32 @@ deux numéros est « vérifié » sans qu'aucune pièce, aucun numéro ni aucun
 entretien n'ait été contrôlé. Sur une place de marché, c'est exactement le badge
 qui ne doit pas mentir.
 
-**3.5 Le séquestre n'a ni échéance ni litige.**
-`POST /jobs/{id}/complete` est **la seule** libération : elle est déclenchée par
-le client. Il n'existe ni « travailleur marque terminé », ni délai de validation,
-ni fenêtre de contestation, ni preuve de réalisation (photo, check-list), ni
-arbitrage tracé. Conséquences symétriques :
+**3.5 Le séquestre n'a ni échéance ni litige.** — **RÉSOLU (20/10/2026 pour
+l'échéance, 21/10/2026 pour le litige).**
+
+Ce qui manquait alors : `POST /jobs/{id}/complete` était **la seule** libération,
+déclenchée par le client ; ni « travailleur marque terminé », ni délai de
+validation, ni fenêtre de contestation, ni preuve de réalisation (photo,
+check-list), ni arbitrage tracé. Conséquences symétriques :
 - client injoignable ou indécis → l'argent reste séquestré **indéfiniment**, le
   travailleur n'a aucun recours automatique (le balayeur existant ne traite que
   les versements **en échec**, pas une libération jamais demandée) ;
 - client mécontent → il ne clique pas, ou supprime la mission (remboursement) ;
   le travailleur a travaillé pour rien, sans procédure.
-Un ticket support est le seul recours, et il n'a pas d'état ni d'échéance.
+Un ticket support était le seul recours, et il n'avait pas d'état ni d'échéance.
+
+Ce qui existe depuis : le séquestre à deux temps (déclaration + preuve +
+échéance) et le **litige tracé** — une partie ouvre (`POST /jobs/{id}/dispute`,
+motif ≥ 20 caractères), l'ouvreur seul retire, le propriétaire tranche
+(`POST /owner/missions/{id}/litige/decision`, verser ou rembourser) par les
+propriétaires UNIQUES de chaque chemin, et la fenêtre d'arbitrage
+(`LITIGE_DECISION_DAYS`) referme un désaccord que personne n'a tranché. Tant
+qu'il est ouvert, le paiement ne part par AUCUN des trois chemins (validation,
+route historique, libération automatique). Le journal métier porte quatre jalons
+de plus ; le motif n'y entre pas (il peut porter un nom) et n'est rendu qu'aux
+parties et au propriétaire. Gardes : `backend/tests/test_litige_trace.py`,
+`frontend/src/components/__tests__/DisputePanel.test.jsx`,
+`frontend/src/components/__tests__/OwnerDisputes.test.jsx`.
 
 **3.6 Aucun signalement, aucun blocage.**
 Une recherche sur `signalement|signaler|report|abuse` ne trouve **rien** côté
@@ -438,10 +513,10 @@ liquidité exécuté (offre semée, missions conciergerie).
 |---|---:|---|
 | Vérification / qualité | **10/10** | 30 621 lignes de tests pour 20 301 de production ; gardes qui prouvent leur propre échec |
 | Sécurité | **9/10** | verrous compte + réseau, CSRF sans cookie lisible, secrets scannés et épinglés ; reste la dépendance à un seul humain |
-| Paiement | **8/10** | séquestre, idempotence, CAS, IPN ; mais un seul PSP et pas d'échéance de libération |
+| Paiement | **8/10** | séquestre, idempotence, CAS, IPN, échéance de libération et litige tracé ; mais un seul PSP |
 | SEO / acquisition technique | **9/10** | pré-rendu, OG dynamiques, sitemap à deux sources, sondes strictes |
 | Expérience / design | **7/10** | rythme et budgets tenus, états vides soignés, 5 langues ; accessibilité non outillée |
-| Confiance produit | **5/10** | badge trompeur, pas de litige, pas de signalement, client non noté |
+| Confiance produit | **5/10** | badge trompeur, signalement absent, client non noté (le litige tracé est arrivé depuis) |
 | Liquidité / croissance | **3/10** | `open_jobs: 0` au 12/10/2026, aucun partage social d'annonce, aucun plan d'amorçage |
 | Exploitation / continuité | **4/10** | aucune restauration possible, détection jusqu'à 24 h, un seul détenteur d'accès |
 

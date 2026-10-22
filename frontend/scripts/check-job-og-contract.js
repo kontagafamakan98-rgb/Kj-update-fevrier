@@ -53,7 +53,11 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { DESCRIPTION_LIMIT, jobSeo } from '../src/utils/jobSeo.js';
-import { canonicalHref, metaContent, metaContents } from './site-meta.js';
+import { POINT_ENTREE_MISSION, canonicalHref, metaContent, metaContents } from './site-meta.js';
+// Le contrôle du point d'entrée et du bloc de données est le MÊME pour les deux
+// documents pré-rendus (même feuille, même module, seul le bloc change) : la
+// fiche mission l'appelle avec SA déclaration au lieu d'en porter une copie.
+import { comparePointEntree } from './check-worker-og-contract.js';
 
 const FRONTEND_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REPO_ROOT = path.resolve(FRONTEND_DIR, '..');
@@ -170,7 +174,11 @@ const PRERENDER_SCRIPT = [
   'import json, sys',
   'sys.path.insert(0, sys.argv[1])',
   'from kojo_job_og import job_og_html',
-  'sys.stdout.write(job_og_html(json.load(sys.stdin), sys.argv[2]))',
+  'job = json.load(sys.stdin)',
+  // La mission de référence EST une vue publique (aucun champ privé) : le garde
+  // la passe comme vue à embarquer, exactement comme le routeur passe la vue de
+  // `JobPublic` — sinon le bloc de données ne serait jamais jugé ici.
+  'sys.stdout.write(job_og_html(job, sys.argv[2], vue_publique=job))',
 ].join('\n');
 
 /**
@@ -288,9 +296,11 @@ export const htmlTitle = (html) => decodeEntities((/<title>([^<]*)<\/title>/i.ex
  * @param {{title: string, description: string, card: string, canonicalPath: string}} options.app Valeur de `jobSeo`.
  * @param {string} options.html HTML pré-rendu de la MÊME mission.
  * @param {string} options.base Origine servant le pré-rendu (`https://…`).
+ * @param {object} [options.vue] Vue publique passée au pré-rendu, pour juger le
+ *   bloc de données (omise = bloc non jugé).
  * @returns {string[]} Problèmes trouvés (vide = contrat tenu).
  */
-export const compareJobOg = ({ app, html, base }) => {
+export const compareJobOg = ({ app, html, base, vue = null }) => {
   const errors = [];
   const title = htmlTitle(html);
   const description = decodeEntities(metaContent(html, 'description'));
@@ -364,6 +374,18 @@ export const compareJobOg = ({ app, html, base }) => {
       errors.push(`og:url : le pré-rendu annonce « ${ogUrl || '(absente)'} », l'application « ${expectedUrl} »`);
     }
   }
+  // Le DOCUMENT DÉMARRE l'application : feuille, point d'entrée, et bloc de
+  // données égal à la vue publique rendue. La tête ci-dessus n'est pas
+  // touchée par cette passe — c'est exactement ce qu'il fallait préserver.
+  if (vue) {
+    for (const problem of comparePointEntree({
+      html,
+      vue,
+      attendu: POINT_ENTREE_MISSION,
+    })) {
+      errors.push(problem);
+    }
+  }
   return errors;
 };
 
@@ -409,13 +431,14 @@ export const runJobOgContractCheck = (opts = {}) => {
       continue;
     }
     const app = jobSeo(job);
-    for (const problem of compareJobOg({ app, html, base })) {
+    for (const problem of compareJobOg({ app, html, base, vue: job })) {
       errors.push(`[${job.label}] ${problem}`);
     }
     checked.push(
       `  ✓ ${job.label} : « ${app.title} » — description ${Array.from(app.description).length} ` +
         `points de code (source ${Array.from(job.description).length}), carte wide + carrée ` +
-        `-square.png, canonical/og:url (${job.covers})`
+        `-square.png, canonical/og:url, point d'entrée + bloc « ${POINT_ENTREE_MISSION.seedId} » ` +
+        `(${job.covers})`
     );
   }
 
@@ -434,7 +457,9 @@ export const runJobOgContractCheck = (opts = {}) => {
   log(
     `✅ Contrat /jobs/:id tenu hors ligne sur ${CONTRACT_JOBS.length} missions de référence : ` +
       'titre, description (coupe en points de code), carte, canonical et og:url identiques entre ' +
-      "l'application et le pré-rendu (aucun serveur, aucune base de données)."
+      "l'application et le pré-rendu, et le document charge la feuille et le point d'entrée " +
+      `« ${POINT_ENTREE_MISSION.script} » en portant la vue publique dans son bloc de données ` +
+      '(aucun serveur, aucune base de données).'
   );
   return { ok: true, errors, notices, checked, python };
 };

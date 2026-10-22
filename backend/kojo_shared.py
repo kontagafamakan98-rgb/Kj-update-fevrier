@@ -244,6 +244,30 @@ def _get_address_msg(lang: str, key: str, **kwargs) -> str:
 # ---------------------------------------------------------------------------
 _NOTIF_MSG: Dict[str, Dict[str, Dict[str, str]]] = {
     "fr": {
+        # LITIGE TRACÉ (`kojo_job_disputes`) : le désaccord a un état, une
+        # échéance et une décision. Les clés du remboursement (`refunding`,
+        # `refund_failed`) ne sont pas dupliquées : la décision de rembourser
+        # ANNULE la mission, et `mission_cancelled_client_refunding` /
+        # `mission_cancelled_client_refund_failed` disent déjà exactement cela.
+        "dispute_opened_client": {"title": "⚖️ Litige ouvert", "body": "Le travailleur a ouvert un litige sur « {job_title} ». Le paiement est gelé : le propriétaire doit trancher avant le {date}."},
+        "dispute_opened_worker": {"title": "⚖️ Litige ouvert", "body": "Le client a ouvert un litige sur « {job_title} ». Le paiement est gelé : le propriétaire doit trancher avant le {date}."},
+        "dispute_withdrawn": {"title": "Litige retiré", "body": "Le litige sur « {job_title} » a été retiré. La mission reprend son cours normal."},
+        "dispute_expired": {"title": "Litige sans décision", "body": "La fenêtre d’arbitrage du litige sur « {job_title} » est passée sans décision : le paiement suit à nouveau la règle ordinaire (un silence prolongé favorise le travailleur)."},
+        "dispute_paid_client": {"title": "Litige tranché", "body": "Le propriétaire a tranché le litige sur « {job_title} » : le paiement a été versé au travailleur."},
+        "dispute_refunded_client": {"title": "Litige tranché en votre faveur", "body": "Le propriétaire a tranché le litige sur « {job_title} » : le remboursement de {amount} FCFA a été lancé vers votre compte mobile money."},
+        "dispute_refunded_worker": {"title": "Litige tranché", "body": "Le propriétaire a tranché le litige sur « {job_title} » : la mission est annulée et le client est remboursé."},
+        # Alerte d'EXPLOITATION, fr et en seulement, même raison que
+        # `owner_email_provider_down` : elle s'adresse au propriétaire et nomme
+        # une route (`/owner/litiges`) ; `_get_notif_msgs` sert déjà le repli
+        # français pour une langue qui ne la porte pas. Une traduction
+        # approximative en wolof/bambara/mooré vaudrait moins que ce repli.
+        "dispute_opened_owner": {"title": "⚖️ Litige à trancher", "body": "Mission « {job_title} » : un litige est ouvert, fenêtre d’arbitrage jusqu’au {date}. File d’arbitrage : GET /owner/litiges."},
+        # L'autre partie a répondu : c'est le moment où l'arbitre a les DEUX
+        # versions, donc où la file d'arbitrage devient actionnable. La position
+        # demandée n'est pas interpolée ici (c'est une valeur technique) : elle
+        # se lit dans la file, en clair.
+        "dispute_answered_owner": {"title": "⚖️ Litige : l’autre partie a répondu", "body": "Mission « {job_title} » : l’autre partie a répondu au litige. Les deux versions sont lisibles dans la file d’arbitrage : GET /owner/litiges."},
+        "dispute_expired_owner": {"title": "⚖️ Litige échu sans décision", "body": "Mission « {job_title} » : la fenêtre d’arbitrage est passée sans décision. Le paiement suit à nouveau la règle ordinaire ; la trace reste dans le journal de la mission (GET /owner/missions/{job_id}/evenements)."},
         "bonus_filleul_first_mission": {"title": "🎁 Bonus de parrainage débloqué", "body": "Votre première mission « {job_title} » est terminée : +{amount} FCFA de bonus vous ont été crédités."},
         "bonus_sponsor_first_mission": {"title": "🎁 Votre filleul a terminé sa première mission", "body": "« {job_title} » est terminée : +{amount} FCFA de récompense de parrainage crédités."},
         "new_job_matching": {"title": "🔔 Nouveau job dans votre domaine", "body": "{job_title}"},
@@ -294,8 +318,24 @@ _NOTIF_MSG: Dict[str, Dict[str, Dict[str, str]]] = {
         # français pour une langue qui ne la porte pas. Une traduction
         # approximative en wolof/bambara/mooré dirait moins que ce repli.
         "owner_rate_limit_repli_memoire": {"title": "🚨 Rate-limit en repli mémoire", "body": "Redis est injoignable : les limites sont comptées PAR PROCESS depuis {replis} bascule(s). Elles restent appliquées, mais multiples par le nombre de workers tant que la panne dure. Vérifier REDIS_URL et l'état du service Redis."},
+        # Alerte d'EXPLOITATION, fr et en seulement, même raison que les deux
+        # précédentes : elle nomme des routes du propriétaire et un réglage
+        # (`LITIGE_SANS_REPONSE_SEUIL`) ; `_get_notif_msgs` sert déjà le repli
+        # français. Une décision prise sans lire l'autre partie est un fait
+        # d'arbitrage, pas un message à traduire approximativement.
+        "owner_litiges_sans_reponse": {"title": "⚖️ Litiges tranchés sans réponse", "body": "{sans_reponse} des {tranches} litiges tranchés des {jours} derniers jours l'ont été SANS réponse de l'autre partie ({part} %, au-delà du seuil de {seuil} %). L'arbitre a tranché sur une seule version. File d'arbitrage : GET /owner/litiges, mesures : GET /owner/litiges/mesures."},
     },
     "en": {
+        "dispute_opened_client": {"title": "⚖️ Dispute opened", "body": "The worker opened a dispute on « {job_title} ». The payment is frozen: the owner must decide before {date}."},
+        "dispute_opened_worker": {"title": "⚖️ Dispute opened", "body": "The client opened a dispute on « {job_title} ». The payment is frozen: the owner must decide before {date}."},
+        "dispute_withdrawn": {"title": "Dispute withdrawn", "body": "The dispute on « {job_title} » was withdrawn. The job is back to its normal course."},
+        "dispute_expired": {"title": "Dispute closed without a decision", "body": "The arbitration window for the dispute on « {job_title} » passed without a decision: the payment follows the ordinary rule again (prolonged silence favours the worker)."},
+        "dispute_paid_client": {"title": "Dispute decided", "body": "The owner decided the dispute on « {job_title} »: the payment was released to the worker."},
+        "dispute_refunded_client": {"title": "Dispute decided in your favour", "body": "The owner decided the dispute on « {job_title} »: the refund of {amount} FCFA has been sent to your mobile money account."},
+        "dispute_refunded_worker": {"title": "Dispute decided", "body": "The owner decided the dispute on « {job_title} »: the job is cancelled and the client is refunded."},
+        "dispute_opened_owner": {"title": "⚖️ Dispute to arbitrate", "body": "Job « {job_title} »: a dispute is open, arbitration window until {date}. Arbitration queue: GET /owner/litiges."},
+        "dispute_answered_owner": {"title": "⚖️ Dispute: the other party answered", "body": "Job « {job_title} »: the other party answered the dispute. Both versions are readable in the arbitration queue: GET /owner/litiges."},
+        "dispute_expired_owner": {"title": "⚖️ Dispute expired undecided", "body": "Job « {job_title} »: the arbitration window closed without a decision. The payment follows the ordinary rule again; the trace stays in the job journal (GET /owner/missions/{job_id}/evenements)."},
         "bonus_filleul_first_mission": {"title": "🎁 Referral bonus unlocked", "body": "Your first job « {job_title} » is complete: +{amount} FCFA bonus credited to you."},
         "bonus_sponsor_first_mission": {"title": "🎁 Your referral completed their first job", "body": "« {job_title} » is complete: +{amount} FCFA referral reward credited."},
         "new_job_matching": {"title": "🔔 New job in your field", "body": "{job_title}"},
@@ -329,8 +369,16 @@ _NOTIF_MSG: Dict[str, Dict[str, Dict[str, str]]] = {
         "owner_payout_stuck_alert": {"title": "🚨 Stuck payout", "body": "Payment {payment_id}: {amount} FCFA still in « {status} » for over {hours} h. Manual check required."},
         "owner_email_provider_down": {"title": "🚨 Email provider silent", "body": "The active email provider « {provider} » can no longer send ({motif}): {detail}. No Kojo email is going out (login codes, resets). Check EMAIL_PROVIDER, its keys and sender, then /monitor/email."},
         "owner_rate_limit_repli_memoire": {"title": "🚨 Rate limiter fell back to memory", "body": "Redis is unreachable: limits are counted PER PROCESS since {replis} failover(s). They still apply, but multiplied by the number of workers while the outage lasts. Check REDIS_URL and the Redis service."},
+        "owner_litiges_sans_reponse": {"title": "⚖️ Disputes decided without a reply", "body": "{sans_reponse} of the {tranches} disputes decided in the last {jours} days were decided WITHOUT any reply from the other party ({part} %, above the {seuil} % threshold). The arbitrator decided on a single version. Arbitration queue: GET /owner/litiges, measures: GET /owner/litiges/mesures."},
     },
     "wo": {
+        "dispute_opened_client": {"title": "⚖️ Litige ubbeeku na", "body": "Liggéeykat bi ubbeeku na litige ci « {job_title} ». Fey bi ñu ko taxawal : propriétaire bi wara ko tëg ba {date}."},
+        "dispute_opened_worker": {"title": "⚖️ Litige ubbeeku na", "body": "Kliyan bi ubbeeku na litige ci « {job_title} ». Fey bi ñu ko taxawal : propriétaire bi wara ko tëg ba {date}."},
+        "dispute_withdrawn": {"title": "Litige bi dindi nañu ko", "body": "Litige bi ci « {job_title} » dindi nañu ko. Mission bi dellu na ci yoonam bu biasa."},
+        "dispute_expired": {"title": "Litige bi jeex na te tëguñu ko", "body": "Waxtu tëg bi jeex na te kenn tëgul litige bi ci « {job_title} » : fey bi dellu na ci yoon bi biasa (su kenn waxul, liggéeykat bi moo féey)."},
+        "dispute_paid_client": {"title": "Litige bi tëg nañu ko", "body": "Propriétaire bi tëg na litige bi ci « {job_title} » : fey bi jëm na ci liggéeykat bi."},
+        "dispute_refunded_client": {"title": "Litige bi tëg nañu ko ci sa wàll", "body": "Propriétaire bi tëg na litige bi ci « {job_title} » : dëbbal bu {amount} FCFA tàmbaliw na ci sa konte mobile money."},
+        "dispute_refunded_worker": {"title": "Litige bi tëg nañu ko", "body": "Propriétaire bi tëg na litige bi ci « {job_title} » : mission bi dindi nañu ko te kliyan bi ñu ko dëbbal."},
         "bonus_filleul_first_mission": {"title": "🎁 Bonus bu parrainage bi", "body": "Sa njëkk liggéey « {job_title} » mujj na: +{amount} FCFA bonus ñu la jox."},
         "bonus_sponsor_first_mission": {"title": "🎁 Sa filleul mujj na ci sa njëkk liggéey", "body": "« {job_title} » mujj na: +{amount} FCFA récompense ñu la jox."},
         "new_job_matching": {"title": "🔔 Liggéey bu bees ci sa yoon", "body": "{job_title}"},
@@ -364,6 +412,13 @@ _NOTIF_MSG: Dict[str, Dict[str, Dict[str, str]]] = {
         "owner_payout_stuck_alert": {"title": "🚨 Paay bi moo xëy", "body": "Paay {payment_id}: {amount} FCFA moo ngi ci « {status} » ci lu gën {hours} waxtu. Xamal ci loxo."},
     },
     "bm": {
+        "dispute_opened_client": {"title": "⚖️ Farati dɔnna", "body": "Baarakɛla ye farati dɔn « {job_title} » kan. Sara bɛ dan : owner ka a fɔ ba {date}."},
+        "dispute_opened_worker": {"title": "⚖️ Farati dɔnna", "body": "Client ye farati dɔn « {job_title} » kan. Sara bɛ dan : owner ka a fɔ ba {date}."},
+        "dispute_withdrawn": {"title": "Farati bɔra", "body": "Farati min tun bɛ « {job_title} » kan, a bɔra. Baara bɛ taa a ka ɲɔgɔn kɔ."},
+        "dispute_expired": {"title": "Farati banna kojugu", "body": "Waati banna farati « {job_title} » kan, nga mɔgɔ ma a fɔ : sara bɛ taa a ka ɲɔgɔn kɔ (ni mɔgɔ ma kuma, baarakɛla bɛ sara)."},
+        "dispute_paid_client": {"title": "Farati fɔra", "body": "Owner ye farati « {job_title} » kan fɔ : sara taa ra baarakɛla ma."},
+        "dispute_refunded_client": {"title": "Farati fɔra i ye", "body": "Owner ye farati « {job_title} » kan fɔ : sɛgɛnli {amount} FCFA bɛ taa i ka mobile money konti la."},
+        "dispute_refunded_worker": {"title": "Farati fɔra", "body": "Owner ye farati « {job_title} » kan fɔ : baara banna ka client sɛgɛn."},
         "bonus_filleul_first_mission": {"title": "🎁 Bonus parrainage bɔlen", "body": "I ka baara fɔlɔ « {job_title} » dafara: +{amount} FCFA bonus bɛ i ka konti la."},
         "bonus_sponsor_first_mission": {"title": "🎁 I ka filleul dafara a ka baara fɔlɔ", "body": "« {job_title} » dafara: +{amount} FCFA récompense bɛ i ka konti la."},
         "new_job_matching": {"title": "🔔 Baara kura i ka yɔrɔ la", "body": "{job_title}"},
@@ -397,6 +452,13 @@ _NOTIF_MSG: Dict[str, Dict[str, Dict[str, str]]] = {
         "owner_payout_stuck_alert": {"title": "🚨 Wari bɛ sɛgɛn", "body": "Wari {payment_id}: {amount} FCFA bɛ « {status} » kɔnɔ kabini {hours} wati. Lajɛ ni lɔgɔkɛla bolo ye."},
     },
     "mos": {
+        "dispute_opened_client": {"title": "⚖️ Yẽesg pukame", "body": "Tʋʋmdã n kõo yẽesg « {job_title} » zugu. Ligdã kɩtame : ownerã n na n gese n tɩ {date}."},
+        "dispute_opened_worker": {"title": "⚖️ Yẽesg pukame", "body": "Clientã n kõo yẽesg « {job_title} » zugu. Ligdã kɩtame : ownerã n na n gese n tɩ {date}."},
+        "dispute_withdrawn": {"title": "Yẽesgã yiime", "body": "Yẽesg sẽn da be « {job_title} » zugu yiime. Tʋʋmã leba a sorã zugu."},
+        "dispute_expired": {"title": "Yẽesgã sɑɑme ne gese", "body": "Wakatã sɑɑme la b ka yẽesg « {job_title} » zugu gese : ligdã leba sẽn zemsã zugu (sã n ned ka gom, tʋʋmdã n na n paam a ligdi)."},
+        "dispute_paid_client": {"title": "B gesa yẽesgã", "body": "Ownerã gesa yẽesgã « {job_title} » zugu : ligdã kẽnga tʋʋmdã nengẽ."},
+        "dispute_refunded_client": {"title": "B gesa yẽesgã f yĩnga", "body": "Ownerã gesa yẽesgã « {job_title} » zugu : b sɩnga f lebsg {amount} FCFA f mobile money kont pʋgẽ."},
+        "dispute_refunded_worker": {"title": "B gesa yẽesgã", "body": "Ownerã gesa yẽesgã « {job_title} » zugu : tʋʋmã yãagame la b lebsa clientã ligdi."},
         "bonus_filleul_first_mission": {"title": "🎁 Parrainage bonus", "body": "F tʋʋm rẽgenga « {job_title} » sɑɑme: +{amount} FCFA bonus b tʋm ne fo."},
         "bonus_sponsor_first_mission": {"title": "🎁 F filleul sɑɑm a rẽgeng tʋʋm", "body": "« {job_title} » sɑɑme: +{amount} FCFA sɩd n kõo fo."},
         "new_job_matching": {"title": "🔔 Tʋʋm paalle f yĩngre", "body": "{job_title}"},

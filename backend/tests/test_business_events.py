@@ -19,6 +19,10 @@ from kojo_business_events import TYPES_EVENEMENTS, enregistrer_evenement
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
+# Forme d'un événement SANS détail. `details` n'est posé que s'il y a quelque
+# chose à dire (depuis le litige tracé, et uniquement des clés ÉNUMÉRÉES :
+# `DETAILS_AUTORISES`) : un événement ordinaire ne gagne pas une clé vide à
+# relire, et le test qui suit juge justement cette absence.
 CHAMPS_ATTENDUS = {"id", "type", "cle", "user_id", "job_id", "proposal_id", "payment_id", "created_at"}
 
 
@@ -93,11 +97,17 @@ async def test_type_inconnu_est_une_erreur_de_programmation(journal):
     assert journal.documents == []
 
 
-def test_les_sept_jalons_sont_declares():
-    """Sept faits, pas quatre : le séquestre à deux temps a trois jalons à lui.
+def test_les_jalons_sont_declares():
+    """Treize faits : le séquestre à deux temps en a trois, le litige tracé SIX.
+
+    Le sixième est la décision dont le PAIEMENT a échoué : la tentative est un
+    fait (elle explique pourquoi la mission est restée bloquée), et son code
+    d'échec est énuméré comme les autres détails.
 
     Les fusionner rendrait le journal incapable de dire POURQUOI l'argent est
-    parti (validation du client ou échéance). Ce test est la liste des types
+    parti (validation du client, échéance, ou décision du propriétaire après
+    contestation), ni quelle POSITION l'autre partie a opposée au motif — les
+    deux versions que l'arbitre doit lire. Ce test est la liste des types
     admis : un type ajouté sans être déclaré ici est refusé par
     `enregistrer_evenement`, et ce test le dit avant l'exécution.
     """
@@ -109,7 +119,46 @@ def test_les_sept_jalons_sont_declares():
         "mission_completion_marked",
         "mission_completion_confirmed",
         "mission_auto_released",
+        "mission_dispute_opened",
+        "mission_dispute_answered",
+        "mission_dispute_withdrawn",
+        "mission_dispute_decided",
+        "mission_dispute_expired",
+        "mission_dispute_decision_failed",
     }
+
+
+@pytest.mark.asyncio
+async def test_un_detail_non_declare_est_une_erreur_de_programmation(journal):
+    """`details` n'est pas un sac : une clé libre (le motif d'un litige, qui
+    peut porter un nom) lève, au lieu d'entrer dans le journal."""
+    import pytest as _pytest
+
+    with _pytest.raises(ValueError):
+        await enregistrer_evenement(
+            "mission_dispute_decided",
+            "mission_dispute_decided:j1",
+            user_id="u1",
+            job_id="j1",
+            details={"motif": "le client m'a insulté, joignable au 77 000 00 00"},
+        )
+    assert journal.documents == []
+
+
+@pytest.mark.asyncio
+async def test_un_detail_declare_est_borne_et_rendu(journal):
+    nouveau = await enregistrer_evenement(
+        "mission_dispute_decided",
+        "mission_dispute_decided:j2",
+        user_id="owner-1",
+        job_id="j2",
+        details={"decision": "release_worker" * 20, "paiement": "released"},
+    )
+    assert nouveau is True
+    document = journal.documents[0]
+    # Tronqué à `LONGUEUR_MAX_DETAIL` : un détail n'est pas un champ libre.
+    assert len(document["details"]["decision"]) == kojo_business_events.LONGUEUR_MAX_DETAIL
+    assert document["details"]["paiement"] == "released"
 
 
 def _source(nom):

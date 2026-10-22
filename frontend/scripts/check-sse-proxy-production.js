@@ -703,33 +703,50 @@ function lireOptions(argv) {
   return options;
 }
 
-async function main() {
-  const options = lireOptions(process.argv.slice(2));
+/**
+ * La ligne de commande — couture INJECTABLE, pour que le CODE DE SORTIE soit
+ * jugé sans réseau, sans compte et sans flux.
+ *
+ * Les trois issues étaient déjà distinctes ICI (0/1/2), mais aucune preuve ne
+ * les nommait : `main` lisait `process.argv` et sortait par `process.exit`, donc
+ * le seul moyen de le juger était de lancer un processus. Un code de sortie
+ * n'est une promesse que s'il est MESURÉ.
+ *
+ * @param {string[]} argv Arguments après `node script`.
+ * @param {object} deps `run` (la sonde), `error`.
+ * @returns {Promise<number>} 0 vert, 1 refus du flux, 2 prémisse (aucun verdict).
+ */
+export async function main(argv = process.argv.slice(2), { run = runSseProxyProbe, error = console.error } = {}) {
+  const options = lireOptions(argv);
   const base = (options.base || SITE_ORIGIN).replace(/\/$/, '');
-  const resultat = await runSseProxyProbe({ ...options, base });
+  const resultat = await run({ ...options, base });
 
   if (!resultat.ok) {
     // Un seul titre d'annotation, et chaque message porte sa FAMILLE : le
     // refus se lit hors de son workflow.
-    console.error(`::error title=${TITRE_ERREUR}::${resultat.errors.join(' | ')}`);
-    for (const message of resultat.errors) console.error(`❌ ${message}`);
+    error(`::error title=${TITRE_ERREUR}::${resultat.errors.join(' | ')}`);
+    for (const message of resultat.errors) error(`❌ ${message}`);
     if (resultat.premisse) {
-      console.error(
+      error(
         `\nAucun verdict rendu : cette prémisse n'est pas un rouge du flux. ` +
           `Ce qu'elle constate (compte CI absent, Protection Vercel, connexion refusée) ` +
           `ne dit rien du tampon d'un proxy.`
       );
-      process.exit(2);
+      return 2;
     }
-    process.exit(1);
+    return 1;
   }
-  process.exit(0);
+  return 0;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch((err) => {
-    console.error(`::error title=${TITRE_ERREUR}::sonde interrompue : ${err?.message || err}`);
-    process.exit(1);
-  });
+  main()
+    .then((code) => {
+      process.exitCode = code;
+    })
+    .catch((err) => {
+      console.error(`::error title=${TITRE_ERREUR}::sonde interrompue : ${err?.message || err}`);
+      process.exitCode = 1;
+    });
 }
 

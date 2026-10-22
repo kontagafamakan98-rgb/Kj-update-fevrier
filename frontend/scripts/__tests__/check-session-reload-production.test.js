@@ -29,7 +29,9 @@ import {
   MARQUE_PREMISSE,
   RENVOI_EXPOSITION,
   contextOptions,
+  estPremisse,
   libelleSonde,
+  main,
   origineDuCookie,
   runSessionReloadProbe,
   parseArgs,
@@ -551,5 +553,79 @@ describe('check-session-reload-production — préproduction cross-site', () => 
     expect(parseArgs(['--base', BASE, '--cross-site', API])).toEqual({
       base: BASE, api: API, directApi: true,
     });
+  });
+});
+
+describe('la ligne de commande — 1 et 2 ne se ressemblent plus', () => {
+  /**
+   * Le faux-vert que cette section empêche : une PRÉMISSE comptée comme une
+   * SESSION PERDUE. Les deux sortaient en 1 ; le texte les distinguait, le
+   * code non — donc un run rouge ne disait pas s'il fallait poser un secret ou
+   * corriger les attributs du cookie. La sonde est INJECTÉE : aucun navigateur.
+   */
+  it('sort en 2 pour une prémisse, en la nommant', async () => {
+    const erreurs = [];
+    const code = await main(['--base', BASE], {
+      run: async () => ({
+        ok: false,
+        premisse: true,
+        attempts: 0,
+        errors: [`${libelleSonde(BASE, BASE)} : ${MARQUE_PREMISSE} · compte CI absent`],
+        notices: [],
+        checked: [],
+        verdicts: null,
+      }),
+      log: () => {},
+      error: (message) => erreurs.push(String(message)),
+    });
+    expect(code).toBe(2);
+    expect(erreurs.join('\n')).toContain(MARQUE_PREMISSE);
+  });
+
+  it('sort en 1 pour une SESSION perdue — le code dit que la sonde a jugé', async () => {
+    const erreurs = [];
+    const code = await main(['--base', BASE], {
+      run: async () => ({
+        ok: false,
+        premisse: false,
+        attempts: 2,
+        errors: [`${libelleSonde(BASE, BASE)} : session absente après rechargement`],
+        notices: [],
+        checked: [],
+        verdicts: null,
+      }),
+      log: () => {},
+      error: (message) => erreurs.push(String(message)),
+    });
+    expect(code).toBe(1);
+    expect(erreurs.join('\n')).not.toContain(MARQUE_PREMISSE);
+  });
+
+  it('sort en 0 quand la session est restaurée', async () => {
+    const code = await main(['--base', BASE], {
+      run: async () => ({
+        ok: true,
+        premisse: false,
+        attempts: 1,
+        errors: [],
+        notices: ['session restaurée'],
+        checked: ['cookie HttpOnly, Secure, SameSite=None'],
+        verdicts: {},
+      }),
+      log: () => {},
+      error: () => {},
+    });
+    expect(code).toBe(0);
+  });
+
+  it('marque une prémisse dans le RÉSULTAT, et seulement quand AUCUN défaut n’est mesuré', async () => {
+    const sansCompte = await runSessionReloadProbe({ base: BASE, api: API, email: '', password: '', quiet: true });
+    expect(sansCompte.ok).toBe(false);
+    expect(sansCompte.premisse).toBe(true);
+    expect(sansCompte.errors[0]).toContain(MARQUE_PREMISSE);
+
+    expect(estPremisse([`${MARQUE_PREMISSE} · compte CI absent`])).toBe(true);
+    expect(estPremisse([`${MARQUE_PREMISSE} · compte CI absent`, 'session absente après rechargement'])).toBe(false);
+    expect(estPremisse([])).toBe(false);
   });
 });

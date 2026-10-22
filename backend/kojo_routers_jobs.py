@@ -13,6 +13,7 @@ chacun se lit seul.
   - `kojo_routers_jobs_listing`    : `GET /jobs`, `GET|DELETE /jobs/{id}`
   - `kojo_routers_jobs_proposals`  : candidater, accepter une candidature
   - `kojo_routers_jobs_completion` : clôturer et verser, bonus de 1ʳᵉ mission
+  - `kojo_routers_jobs_disputes`   : ouvrir et retirer un litige (2 routes)
   - `kojo_routers_jobs_tracking`   : candidatures et état du paiement (lecture)
 
 Trois faits partagés ont leur propre propriétaire, pour la même raison :
@@ -34,6 +35,7 @@ from fastapi import APIRouter
 
 from kojo_routers_jobs_completion import router as _completion
 from kojo_routers_jobs_creation import router as _creation
+from kojo_routers_jobs_disputes import router as _disputes
 from kojo_routers_jobs_listing import router as _listing
 from kojo_routers_jobs_proposals import router as _proposals
 from kojo_routers_jobs_tracking import router as _tracking
@@ -47,6 +49,10 @@ router.include_router(_creation)
 router.include_router(_listing)
 router.include_router(_proposals)
 router.include_router(_completion)
+# Après la clôture : `/jobs/{id}/dispute` ne recouvre aucune route existante,
+# et l'ordre historique des routes déjà servies ne bouge pas (le contrat de
+# surface est figé route par route, dans l'ordre).
+router.include_router(_disputes)
 router.include_router(_tracking)
 
 # ─── Ré-exports : la surface d'import existante, conservée ──────────────────

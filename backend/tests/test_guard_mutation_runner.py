@@ -502,8 +502,11 @@ class TestRejeuDesEtapes:
         monkeypatch.setenv("GITHUB_OUTPUT", str(sortie))
         executees = []
         monkeypatch.setattr(
-            harnais, "executer",
-            lambda mutation, racine: (executees.append(mutation["id"]), (True, "rouge nommé"))[1],
+            harnais, "executer_en_detail",
+            lambda mutation, racine: (
+                executees.append(mutation["id"]),
+                (True, "rouge nommé", ["tests/preuve.py::test_cas"]),
+            )[1],
         )
         return executees, sortie
 
@@ -540,6 +543,137 @@ class TestRejeuDesEtapes:
         monkeypatch.setattr(harnais, "charger_spec", lambda chemin=None: spec)
         monkeypatch.setattr(harnais, "fichiers_changes", lambda base, racine=None: {"garde.txt"})
         assert harnais.main(["--etape", "og", "--rejouer", "--changed-from", "une-ref"]) == 1
+
+
+class TestResumeDeCI:
+    """Le RÉSUMÉ du run dit ce qui a été rejoué et quel cas a rougi.
+
+    Un journal de run qui n'affiche qu'un code de sortie oblige à ouvrir la
+    sortie de chaque preuve pour savoir ce qui s'est passé. Ces cas mesurent le
+    résumé lui-même : les trois nombres (déclarées, dues, rejouées), la table
+    mutation → cas rougi, et le cas où RIEN n'était dû (0 rejouée, avec le motif).
+    """
+
+    def _resultat(self, harnais, cible, commande, attend=("BOOM",)):
+        cible.write_text("if INTERDIT:\n    pass\n", encoding="utf-8")
+        mutation = _mutation(commande=commande, attend=list(attend))
+        return harnais.executer_en_detail(mutation, cible.parent)
+
+    def test_les_cas_rougis_se_lisent_dans_les_deux_runners(self, harnais):
+        pytest_sortie = (
+            "tests/test_a.py::test_ok PASSED\n"
+            "FAILED tests/test_a.py::TestB::test_refus - AssertionError: rouge\n"
+        )
+        vitest_sortie = "\n × le refus est nommé 12ms\n\n × un second cas 3.5s\n"
+
+        assert harnais.cas_rougis(pytest_sortie) == ["tests/test_a.py::TestB::test_refus"]
+        # La durée de Vitest ne fait pas partie du nom du cas.
+        assert harnais.cas_rougis(vitest_sortie) == ["le refus est nommé", "un second cas"]
+
+    def test_les_cas_sont_dedupliques_et_bornes(self, harnais):
+        sortie = "\n".join("× cas %d\n" % i for i in range(20)) + "× cas 0\n"
+        cas = harnais.cas_rougis(sortie)
+        assert len(cas) == harnais.MAX_CAS_CITES
+        assert len(set(cas)) == len(cas)
+
+    def test_le_resume_compte_ce_qui_a_ete_rejoue_et_nomme_les_cas(self, harnais, tmp_path, monkeypatch):
+        resume = tmp_path / "resume.md"
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(resume))
+        mutation_ok = _mutation(id="prouvee", preuve="preuve-a.py")
+        mutation_ko = _mutation(id="morte", preuve="preuve-b.py")
+
+        harnais._ecrire_resume(
+            [
+                (mutation_ok, True, "rouge nommé (BOOM)", ["tests/preuve-a.py::test_x"]),
+                (mutation_ko, False, "la preuve est restée VERTE", []),
+            ],
+            etape="runner-python",
+            declarees=244,
+            dues_total=11,
+        )
+
+        contenu = resume.read_text(encoding="utf-8")
+        # Les trois nombres sont distincts et publiés ensemble : un « 2 rejouées »
+        # ne doit pas se lire comme « 2 prouvées sur le dépôt ».
+        assert "**2 mutation(s) rejouée(s)**" in contenu, contenu
+        assert "1 prouvée(s), 1 en échec" in contenu, contenu
+        assert "244 déclarée(s)" in contenu, contenu
+        assert "11 due(s) pour cette étape" in contenu, contenu
+        assert "runner-python" in contenu, contenu
+        # La question posée : quelle mutation a rougi quel cas.
+        assert "`tests/preuve-a.py::test_x`" in contenu, contenu
+        assert "`morte`" in contenu and "VERTE" in contenu, contenu
+
+    def test_un_rejeu_non_du_publie_zero_avec_son_motif(self, harnais, tmp_path, monkeypatch):
+        resume = tmp_path / "resume.md"
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(resume))
+        harnais._ecrire_resume(
+            [], etape="runner-node", declarees=244, dues_total=55,
+            motif_non_du="aucun de ses 15 fichiers n'a bougé",
+        )
+        contenu = resume.read_text(encoding="utf-8")
+        assert "**0 mutation rejouée**" in contenu, contenu
+        assert "rejeu non dû" in contenu and "bougé" in contenu, contenu
+        # Aucune ligne de tableau pour un rejeu vide : pas de preuve inventée.
+        assert "| Mutation |" not in contenu, contenu
+
+    def test_sans_fichier_de_resume_la_fonction_est_inerte(self, harnais, monkeypatch, capsys):
+        monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+        harnais._ecrire_resume([], etape="runner-python", declarees=1, dues_total=1)
+        assert capsys.readouterr().out == ""
+
+    def test_un_pipe_dans_un_nom_ne_casse_pas_le_tableau(self, harnais, tmp_path, monkeypatch):
+        resume = tmp_path / "resume.md"
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(resume))
+        harnais._ecrire_resume(
+            [(_mutation(id="cas|pipe"), True, "rouge | nommé", [])],
+            etape="runner-python", declarees=1, dues_total=1,
+        )
+        contenu = resume.read_text(encoding="utf-8")
+        ligne = next(ligne for ligne in contenu.splitlines() if "cas" in ligne and "pipe" in ligne)
+        # Un `|` non échappé créerait une cellule de plus, et le tableau mentirait
+        # sur ses colonnes.
+        assert "\\|" in ligne, ligne
+
+    def test_un_accent_grave_dans_un_nom_de_cas_ne_casse_pas_le_tableau(
+        self, harnais, tmp_path, monkeypatch
+    ):
+        resume = tmp_path / "resume.md"
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(resume))
+        harnais._ecrire_resume(
+            [(_mutation(id="flag"), True, "rouge nommé (BOOM)",
+              ["sort 1 en nommant un champ `flag` revenu"])],
+            etape="runner-node", declarees=1, dues_total=1,
+        )
+        contenu = resume.read_text(encoding="utf-8")
+        ligne = next(l for l in contenu.splitlines() if "revenu" in l)
+        # Un accent grave laissé dans le nom ouvrirait un code span que la cellule
+        # ne referme pas : le reste de la ligne (et la fin du tableau) sortirait
+        # de son bloc de code. Le compte des accents graves doit donc rester PAIR.
+        assert ligne.count("`") % 2 == 0, ligne
+
+    def test_le_verdict_non_du_ecrit_le_resume_du_run(self, harnais, monkeypatch, tmp_path):
+        resume = tmp_path / "resume.md"
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(resume))
+        monkeypatch.setattr(harnais, "fichiers_changes", lambda base, racine=None: set())
+        assert harnais.verdict_d_etape(_spec(), "runner-python", "une-ref") == 0
+        contenu = resume.read_text(encoding="utf-8")
+        assert "**0 mutation rejouée**" in contenu, contenu
+        assert "aucun de ses" in contenu, contenu
+
+    def test_un_rejeu_ecrit_le_resume_avec_ce_qu_il_a_execute(self, harnais, monkeypatch, tmp_path):
+        resume = tmp_path / "resume.md"
+        monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(resume))
+        monkeypatch.setattr(
+            harnais, "executer_en_detail",
+            lambda mutation, racine: (
+                True, "rouge nommé (BOOM)", ["tests/preuve.py::test_%s" % mutation["id"]]
+            ),
+        )
+        assert harnais.rejouer([_mutation(id="a"), _mutation(id="b")], declarees=7, dues_total=2) == 0
+        contenu = resume.read_text(encoding="utf-8")
+        assert "**2 mutation(s) rejouée(s)**" in contenu, contenu
+        assert "`tests/preuve.py::test_a`" in contenu and "`tests/preuve.py::test_b`" in contenu, contenu
 
 
 class TestRegistreReel:

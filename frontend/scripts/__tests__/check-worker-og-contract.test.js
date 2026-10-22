@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -8,12 +8,18 @@ import {
   CONTRACT_WORKERS,
   FIXTURE_WORKER,
   PRERENDER_SCRIPT,
+  comparePointEntree,
   compareWorkerOg,
+  egalProfond,
+  extraireSeed,
   findPython,
   hasLoneSurrogate,
   renderPrerenderedPage,
   runWorkerOgContractCheck,
+  verifierArtefacts,
 } from '../check-worker-og-contract';
+import { POINT_ENTREE_TRAVAILLEUR } from '../site-meta';
+import { SELECTEUR_TEMOIN } from '../../vite-plugins/worker-boot.js';
 import { DESCRIPTION_LIMIT } from '../../src/utils/jobSeo';
 import { workerSeo } from '../../src/utils/workerSeo';
 
@@ -202,6 +208,160 @@ describe.skipIf(!hasPrerender)('check-worker-og-contract — le jeu de référen
         expect(errors.join('\n'), label).toMatch(/DEMI-CARACTÈRE/);
       }
     }
+  });
+});
+
+describe.skipIf(!hasPrerender)('check-worker-og-contract — le document DÉMARRE l’application', () => {
+  it('cas nominal : point d’entrée, feuille et données déjà rendues', () => {
+    for (const { label, worker, html } of referenceCases) {
+      expect(comparePointEntree({ html, vue: worker }), label).toEqual([]);
+    }
+    // Et la lecture du bloc est celle du module de production, pas une fixture.
+    const { worker, html } = referenceCases[0];
+    expect(egalProfond(JSON.parse(extraireSeed(html)), worker)).toBe(true);
+  });
+
+  it('détecte un point d’entrée ABSENT (page statique, pas d’application)', () => {
+    const { worker, html } = referenceCases[0];
+    const amputé = html.replace(/<script type="module"[^>]*><\/script>\r?\n/, '');
+    expect(amputé).not.toBe(html);
+
+    expect(comparePointEntree({ html: amputé, vue: worker }).join('\n')).toMatch(/point d’entrée/);
+  });
+
+  it('détecte une feuille ABSENTE (application peinte sans style)', () => {
+    const { worker, html } = referenceCases[0];
+    const amputé = html.replace(/<link rel="stylesheet"[^>]*\/?>\r?\n/, '');
+    expect(amputé).not.toBe(html);
+
+    expect(comparePointEntree({ html: amputé, vue: worker }).join('\n')).toMatch(/feuille/);
+  });
+
+  it('détecte un bloc de données ABSENT (retour au squelette)', () => {
+    const { worker, html } = referenceCases[0];
+    const amputé = html.replace(/<script type="application\/json"[\s\S]*?<\/script>/, '');
+
+    expect(comparePointEntree({ html: amputé, vue: worker }).join('\n')).toMatch(/bloc .* absent/);
+  });
+
+  it('détecte les données d’un AUTRE profil', () => {
+    const { html } = referenceCases[0];
+    const autre = referenceCases[1].worker;
+
+    expect(comparePointEntree({ html, vue: autre }).join('\n')).toMatch(
+      /ne porte pas la vue publique rendue/
+    );
+  });
+
+  it('détecte un bloc qui REFERME sa balise (balisage injecté)', () => {
+    const { worker, html } = referenceCases[0];
+    // Une valeur NON échappée ouvre une balise dans le bloc (ici `<script>`, ce
+    // qu'un échappement correct aurait rendu `\u003cscript\u003e`).
+    const injecté = html.replace(
+      /(<script type="application\/json"[^>]*>)[\s\S]*?(<\/script>)/,
+      '$1{"id":"x","bio":"<script>alert(1)"}$2'
+    );
+
+    expect(comparePointEntree({ html: injecté, vue: worker }).join('\n')).toMatch(/NON échappée/);
+  });
+
+  it('détecte un bloc illisible', () => {
+    const { worker, html } = referenceCases[0];
+    const tronqué = html.replace(
+      /(<script type="application\/json"[^>]*>)[\s\S]*?(<\/script>)/,
+      '$1{"id":$2'
+    );
+
+    expect(comparePointEntree({ html: tronqué, vue: worker }).join('\n')).toMatch(/pas du JSON lisible/);
+  });
+
+  it('suit les chemins DÉCLARÉS : un renommage d’un côté rougit', () => {
+    const { worker, html } = referenceCases[0];
+
+    const errors = comparePointEntree({
+      html,
+      vue: worker,
+      attendu: {
+        ...POINT_ENTREE_TRAVAILLEUR,
+        script: '/boot/autre-nom.js',
+        style: '/boot/autre-feuille.css',
+      },
+    });
+    const texte = errors.join('\n');
+    expect(texte).toMatch(/point d’entrée/);
+    expect(texte).toMatch(/feuille/);
+  });
+});
+
+describe('check-worker-og-contract — les cibles du document existent dans l’artefact', () => {
+  let racine;
+
+  const ecrire = (relatif, contenu) => {
+    const abs = path.join(racine, relatif);
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    fs.writeFileSync(abs, contenu, 'utf8');
+  };
+
+  const artefactValide = () => {
+    ecrire(POINT_ENTREE_TRAVAILLEUR.script.replace(/^\//, ''), 'import"/assets/index-Ab12Cd.js";\n');
+    ecrire('assets/index-Ab12Cd.js', 'console.log("app")');
+    ecrire(POINT_ENTREE_TRAVAILLEUR.style.replace(/^\//, ''), `${SELECTEUR_TEMOIN}{color:red}`);
+    ecrire(
+      'asset-manifest.json',
+      JSON.stringify({
+        fichiers: {
+          [POINT_ENTREE_TRAVAILLEUR.script]: 'a'.repeat(64),
+          [POINT_ENTREE_TRAVAILLEUR.style]: 'b'.repeat(64),
+        },
+      })
+    );
+  };
+
+  beforeEach(() => {
+    racine = fs.mkdtempSync(path.join(os.tmpdir(), 'worker-og-artefact-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(racine, { recursive: true, force: true });
+  });
+
+  it('accepte un artefact complet', () => {
+    artefactValide();
+
+    expect(verifierArtefacts(racine)).toEqual([]);
+  });
+
+  it('refuse un boot absent, ou pointant vers un fichier absent', () => {
+    artefactValide();
+    fs.rmSync(path.join(racine, POINT_ENTREE_TRAVAILLEUR.script.replace(/^\//, '')));
+    expect(verifierArtefacts(racine).join('\n')).toMatch(/absent du build/);
+
+    ecrire(POINT_ENTREE_TRAVAILLEUR.script.replace(/^\//, ''), 'import"/assets/inconnu.js";\n');
+    expect(verifierArtefacts(racine).join('\n')).toMatch(/ABSENT du build/);
+  });
+
+  it('refuse un boot qui importerait une entrée hors de /assets/', () => {
+    artefactValide();
+    ecrire(POINT_ENTREE_TRAVAILLEUR.script.replace(/^\//, ''), 'import"/boot/autre.js";\n');
+
+    expect(verifierArtefacts(racine).join('\n')).toMatch(/hors de \/assets\//);
+  });
+
+  it('refuse une feuille absente ou étrangère à l’application', () => {
+    artefactValide();
+    ecrire(POINT_ENTREE_TRAVAILLEUR.style.replace(/^\//, ''), 'body{margin:0}');
+    expect(verifierArtefacts(racine).join('\n')).toMatch(/feuille de l’application/);
+
+    fs.rmSync(path.join(racine, POINT_ENTREE_TRAVAILLEUR.style.replace(/^\//, '')));
+    expect(verifierArtefacts(racine).join('\n')).toMatch(/SANS style/);
+  });
+
+  it('refuse un manifeste qui n’ancre pas les deux fichiers', () => {
+    artefactValide();
+    ecrire('asset-manifest.json', JSON.stringify({ fichiers: {} }));
+
+    const texte = verifierArtefacts(racine).join('\n');
+    expect(texte).toMatch(/n’est pas dans asset-manifest\.json/);
   });
 });
 

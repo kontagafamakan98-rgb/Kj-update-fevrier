@@ -171,6 +171,21 @@ export const libelleSonde = (base) => `${FAMILLE} sur ${base}`;
 export const premisse = (fait) => `${MARQUE_PREMISSE} · ${fait} ${RENVOI_RECHARGEMENT}`;
 
 /**
+ * Le résultat ne porte-t-il QUE des prémisses ?
+ *
+ * C'est ce qui sépare, au CODE DE SORTIE, « la sonde n'a pas pu juger » (2) de
+ * « un défaut a été mesuré » (1). Les deux sortaient en 1 : le texte les
+ * distinguait, le code non — donc un run rouge ne disait pas, à lui seul, s'il
+ * fallait poser un secret ou corriger le code. Un mélange (au moins un défaut
+ * mesuré) reste un refus, jamais une prémisse.
+ *
+ * @param {string[]} errors Messages du résultat.
+ * @returns {boolean} Vrai si tous les échecs sont des prémisses.
+ */
+export const estPremisse = (errors) =>
+  Array.isArray(errors) && errors.length > 0 && errors.every((error) => String(error).includes(MARQUE_PREMISSE));
+
+/**
  * Relevé pris DANS la page — et seule la page peut le prendre : `document.cookie`,
  * les deux réservoirs et l'URL ne sont lisibles que là où le script attaquant
  * s'exécuterait. Les VALEURS ne quittent pas cette fonction : ce qui remonte est
@@ -935,6 +950,7 @@ export async function runTokenExposureProbe({
       "sans session ouverte, il n'y a aucun jeton à exposer, donc rien à mesurer.";
     return {
       ok: false,
+      premisse: true,
       errors: [`${libelleSonde(cleanBase)} : ${premisse(fait)}`],
       checked: [],
       attempts: 0,
@@ -972,7 +988,7 @@ export async function runTokenExposureProbe({
   const label = libelleSonde(cleanBase);
   if (!last.ok) last.errors = last.errors.map((error) => `${label} : ${error}`);
 
-  return { ...last, attempts: used };
+  return { ...last, premisse: !last.ok && estPremisse(last.errors), attempts: used };
 }
 
 /**
@@ -994,16 +1010,35 @@ export function parseArgs(argv = []) {
   return options;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  const result = await runTokenExposureProbe(parseArgs(process.argv.slice(2)));
-  console.log(
-    `Sonde d'exposition du jeton — ${result.ok ? 'aucun jeton exposé' : 'DÉFAUT'} ` +
-      `(${result.attempts} tentative(s))`
-  );
-  for (const ligne of result.checked) console.log(`  ✓ ${ligne}`);
+/**
+ * La ligne de commande — couture INJECTABLE, pour que le CODE DE SORTIE soit
+ * jugé sans réseau ni navigateur.
+ *
+ * Les trois issues sont nommées, et deux d'entre elles se ressemblaient : une
+ * prémisse (aucun verdict) sortait en **1**, comme un défaut mesuré. Un run
+ * rouge ne disait donc pas s'il fallait poser un secret ou corriger le code.
+ *
+ * @param {string[]} argv Arguments après `node script`.
+ * @param {object} deps `run` (la sonde), `log`, `error`.
+ * @returns {Promise<number>} 0 vert, 1 défaut mesuré, 2 prémisse (aucun verdict).
+ */
+export async function main(
+  argv = process.argv.slice(2),
+  { run = runTokenExposureProbe, log = console.log, error = console.error } = {}
+) {
+  const result = await run(parseArgs(argv));
+  // Une prémisse n'est pas un DÉFAUT : la ligne de tête le dit, comme le code.
+  const état = result.ok ? 'aucun jeton exposé' : result.premisse ? MARQUE_PREMISSE : 'DÉFAUT';
+  log(`Sonde d'exposition du jeton — ${état} (${result.attempts} tentative(s))`);
+  for (const ligne of result.checked) log(`  ✓ ${ligne}`);
   // Aucun ::notice : cette sonde ne sait pas mesurer à moitié. Sans session
   // ouverte ou avec un stockage illisible, elle ROUGIT au lieu de publier une
   // note — un vert qui n'a rien pu lire est le silence qu'un corpus vide a coûté.
-  for (const error of result.errors) console.error(`::error title=Exposition jeton production::${error}`);
-  if (!result.ok) process.exit(1);
+  for (const message of result.errors) error(`::error title=Exposition jeton production::${message}`);
+  if (result.ok) return 0;
+  return result.premisse ? 2 : 1;
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  process.exitCode = await main();
 }

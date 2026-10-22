@@ -32,6 +32,7 @@
  *
  * Usage : cd frontend && node scripts/check-worker-og-contract.js
  */
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -46,7 +47,17 @@ import {
 } from './check-job-og-contract.js';
 import { DESCRIPTION_LIMIT } from '../src/utils/jobSeo.js';
 import { workerSeo } from '../src/utils/workerSeo.js';
-import { canonicalHref, metaContent, metaContents } from './site-meta.js';
+// La règle témoin de la feuille de l'application : elle est DÉCLARÉE par le
+// plugin qui la copie (`SELECTEUR_TEMOIN`), et non recopiée ici — deux
+// littéraux divergeraient, et le contrôle porterait sur un sélecteur qui
+// n'existe plus (donc sur rien).
+import { SELECTEUR_TEMOIN } from '../vite-plugins/worker-boot.js';
+import {
+  POINT_ENTREE_TRAVAILLEUR,
+  canonicalHref,
+  metaContent,
+  metaContents,
+} from './site-meta.js';
 
 const FRONTEND_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REPO_ROOT = path.resolve(FRONTEND_DIR, '..');
@@ -230,7 +241,226 @@ export const compareWorkerOg = ({ app, html, base }) => {
 };
 
 /**
- * @param {{root?: string, base?: string, quiet?: boolean}} [opts]
+ * Égalité PROFONDE de deux valeurs JSON — l'ordre des clés ne décide rien.
+ *
+ * Un `JSON.stringify` des deux côtés aurait fait rougir un bloc identique dont
+ * les clés auraient été rendues dans un autre ordre (un `sort_keys` ajouté au
+ * backend, par exemple) : ce serait un faux refus, et on apprendrait à passer
+ * outre.
+ */
+export const egalProfond = (a, b) => {
+  if (a === b) return true;
+  if (typeof a !== typeof b || a === null || b === null) return false;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    return a.every((valeur, rang) => egalProfond(valeur, b[rang]));
+  }
+  if (typeof a !== 'object') return false;
+  const clesA = Object.keys(a).sort();
+  const clesB = Object.keys(b).sort();
+  if (clesA.length !== clesB.length || clesA.some((cle, rang) => cle !== clesB[rang])) {
+    return false;
+  }
+  return clesA.every((cle) => egalProfond(a[cle], b[cle]));
+};
+
+/**
+ * Le bloc de données du profil, tel que le document le porte — ou null.
+ *
+ * @param {string} html HTML pré-rendu.
+ * @param {string} [seedId] Identifiant de la balise (défaut : site-meta).
+ * @returns {string|null} Contenu brut du bloc.
+ */
+export const extraireSeed = (html, seedId = POINT_ENTREE_TRAVAILLEUR.seedId) => {
+  const motif = new RegExp(
+    `<script\\b[^>]*\\bid="${seedId}"[^>]*>([\\s\\S]*?)<\\/script>`,
+    'i'
+  );
+  const trouve = motif.exec(String(html));
+  return trouve ? trouve[1] : null;
+};
+
+/**
+ * Le document DÉMARRE-T-IL l'application, et avec QUELLES données ?
+ *
+ * Trois faits, dont chacun a son propre refus (le nom du fichier fautif est
+ * cité) :
+ *   1. la feuille de l'application est liée au chemin STABLE déclaré — sans
+ *      elle, le profil et l'application qu'il démarre sont peints sans style ;
+ *   2. le point d'entrée est déclaré en `type="module"` au chemin STABLE — sans
+ *      lui, le visiteur à froid n'a que le document statique (le compromis que
+ *      cette passe retire) ;
+ *   3. le bloc de données porte EXACTEMENT la vue publique rendue — un bloc
+ *      absent ramènerait le squelette, un bloc d'un AUTRE profil afficherait la
+ *      mauvaise personne, et un bloc qui refermerait sa balise serait du
+ *      balisage injecté (la vue est écrite par des utilisateurs).
+ *
+ * GÉNÉRIQUE aux deux documents pré-rendus (profil ET fiche mission) : les deux
+ * citent le MÊME point d'entrée et la MÊME feuille, seul le bloc de données
+ * change. La fiche mission l'appelle avec `POINT_ENTREE_MISSION` — une seconde
+ * copie de ces trois refus divergerait au premier renommage.
+ *
+ * @param {object} options
+ * @param {string} options.html HTML pré-rendu (profil ou fiche).
+ * @param {object} options.vue Vue publique passée au pré-rendu.
+ * @param {{script: string, style: string, seedId: string}} [options.attendu]
+ * @returns {string[]} Problèmes trouvés (vide = document conforme).
+ */
+export const comparePointEntree = ({
+  html,
+  vue,
+  attendu = POINT_ENTREE_TRAVAILLEUR,
+}) => {
+  const errors = [];
+  const source = String(html);
+
+  const feuille = new RegExp(
+    `<link\\b[^>]*\\brel="stylesheet"[^>]*\\bhref="${attendu.style.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`,
+    'i'
+  );
+  const feuilleInversee = new RegExp(
+    `<link\\b[^>]*\\bhref="${attendu.style.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*\\brel="stylesheet"`,
+    'i'
+  );
+  if (!feuille.test(source) && !feuilleInversee.test(source)) {
+    errors.push(
+      `feuille : le document ne lie pas « ${attendu.style} » — l’application démarrerait ` +
+        'SANS style (une page nue se lit comme une page cassée)'
+    );
+  }
+
+  const module = new RegExp(
+    `<script\\b[^>]*\\btype="module"[^>]*\\bsrc="${attendu.script.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`,
+    'i'
+  );
+  const moduleInverse = new RegExp(
+    `<script\\b[^>]*\\bsrc="${attendu.script.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*\\btype="module"`,
+    'i'
+  );
+  if (!module.test(source) && !moduleInverse.test(source)) {
+    errors.push(
+      `point d’entrée : le document ne charge pas « ${attendu.script} » en module — ` +
+        'un visiteur à froid n’aurait que le document statique (ni châssis, ni avis, ni navigation)'
+    );
+  }
+
+  // L'identifiant du bloc vient de la déclaration JUGÉE, jamais du défaut : le
+  // document de la fiche mission porte `kojo-job-data`, et chercher celui du
+  // profil ferait dire « bloc absent » à un document pourtant complet.
+  const brut = extraireSeed(source, attendu.seedId);
+  if (brut === null) {
+    errors.push(
+      `données : le bloc « ${attendu.seedId} » est absent — la page repasserait par un ` +
+        'squelette alors que le serveur vient de rendre la vue'
+    );
+  } else {
+    if (/<\/(script|style)|<script/i.test(brut)) {
+      errors.push(
+        'données : le bloc contient une balise (`<script`/`</script`) NON échappée — ' +
+          'une bio, une description ou un commentaire refermerait la balise et le reste ' +
+          'du document deviendrait du balisage'
+      );
+    }
+    let donnees = null;
+    try {
+      donnees = JSON.parse(brut);
+    } catch (_erreur) {
+      errors.push('données : le bloc n’est pas du JSON lisible');
+    }
+    if (donnees !== null && !egalProfond(donnees, vue)) {
+      errors.push(
+        'données : le bloc ne porte pas la vue publique rendue — un bloc d’une autre ' +
+          'page, ou amputé, afficherait autre chose que ce que le document annonce'
+      );
+    }
+  }
+  return errors;
+};
+
+/**
+ * Les DEUX fichiers que le document cite existent-ils vraiment dans l'artefact ?
+ *
+ * Le contrat ci-dessus juge le DOCUMENT ; ceci juge ce qu'il pointe. Les deux
+ * doivent tenir ensemble : un document conforme qui pointerait vers un 404
+ * rendrait la page statique et muette — exactement le défaut que cette passe
+ * corrige — et rien dans le HTML ne le dirait.
+ *
+ * Trois faits, chacun refusé en le nommant :
+ *   1. le fichier de boot existe et importe une entrée sous `/assets/` qui
+ *      existe elle aussi (c'est le lien vers l'application réelle) ;
+ *   2. la feuille copiée existe et contient `.titre-page` — le CSS du site, pas
+ *      un bloc vide ;
+ *   3. les deux sont dans `asset-manifest.json`, donc leurs octets sont
+ *      vérifiés en production par `check-deployed-assets.js`.
+ *
+ * @param {string} dossierArtefact Dossier `build/` du frontend.
+ * @returns {string[]} Problèmes trouvés (vide = les cibles du document existent).
+ */
+export const verifierArtefacts = (dossierArtefact) => {
+  const errors = [];
+  const relatif = (chemin) => chemin.replace(/^\/+/, '');
+  const bootAbs = path.join(dossierArtefact, relatif(POINT_ENTREE_TRAVAILLEUR.script));
+  const cssAbs = path.join(dossierArtefact, relatif(POINT_ENTREE_TRAVAILLEUR.style));
+
+  if (!fs.existsSync(bootAbs)) {
+    errors.push(
+      `artefact : « ${POINT_ENTREE_TRAVAILLEUR.script} » est absent du build — le ` +
+        'document /workers/:id pointerait vers un 404 et l’application ne démarrerait jamais'
+    );
+  } else {
+    const contenu = fs.readFileSync(bootAbs, 'utf8');
+    const entree = /import\s*["'](\/[^"']+\.js)["']/.exec(contenu);
+    if (!entree) {
+      errors.push(
+        `artefact : « ${POINT_ENTREE_TRAVAILLEUR.script} » n’importe aucune entrée — ` +
+          'il ne démarrerait rien'
+      );
+    } else if (!entree[1].startsWith('/assets/')) {
+      errors.push(
+        `artefact : le boot importe « ${entree[1]} », hors de /assets/ — une entrée ` +
+          'stable sous un autre chemin échapperait au cache immuable du build'
+      );
+    } else if (!fs.existsSync(path.join(dossierArtefact, relatif(entree[1])))) {
+      errors.push(
+        `artefact : le boot importe « ${entree[1]} », ABSENT du build — le document ` +
+          'chargerait un module en 404'
+      );
+    }
+  }
+
+  if (!fs.existsSync(cssAbs)) {
+    errors.push(
+      `artefact : « ${POINT_ENTREE_TRAVAILLEUR.style} » est absent du build — ` +
+        'l’application du profil démarrerait SANS style'
+    );
+  } else if (!fs.readFileSync(cssAbs, 'utf8').includes(SELECTEUR_TEMOIN)) {
+    errors.push(
+      `artefact : « ${POINT_ENTREE_TRAVAILLEUR.style} » ne contient pas ` +
+        `« ${SELECTEUR_TEMOIN} » — ce n’est pas la feuille de l’application`
+    );
+  }
+
+  const manifesteAbs = path.join(dossierArtefact, 'asset-manifest.json');
+  if (!fs.existsSync(manifesteAbs)) {
+    errors.push('artefact : asset-manifest.json absent — les deux fichiers ci-dessus ne sont pas ancrés');
+  } else {
+    let fichiers = {};
+    try {
+      fichiers = JSON.parse(fs.readFileSync(manifesteAbs, 'utf8')).fichiers || {};
+    } catch (_erreur) {
+      errors.push('artefact : asset-manifest.json illisible');
+    }
+    for (const chemin of [POINT_ENTREE_TRAVAILLEUR.script, POINT_ENTREE_TRAVAILLEUR.style]) {
+      if (!fichiers[chemin]) {
+        errors.push(`artefact : « ${chemin} » n’est pas dans asset-manifest.json — ses octets ne seraient vérifiés nulle part`);
+      }
+    }
+  }
+  return errors;
+};
+
+/**
+ * @param {{root?: string, base?: string, quiet?: boolean, artefact?: string}} [opts]
  * @returns {{ok: boolean, errors: string[], notices: string[], checked: string[], python: string}}
  */
 export const runWorkerOgContractCheck = (opts = {}) => {
@@ -284,10 +514,35 @@ export const runWorkerOgContractCheck = (opts = {}) => {
     for (const problem of compareWorkerOg({ app, html, base })) {
       errors.push(`[${label}] ${problem}`);
     }
+    for (const problem of comparePointEntree({ html, vue: worker })) {
+      errors.push(`[${label}] ${problem}`);
+    }
     checked.push(
       `  ✓ ${label} : « ${app.title} » — description ${Array.from(app.description).length} ` +
-        'points de code, carte wide + carrée, canonical/og:url'
+        'points de code, carte wide + carrée, canonical/og:url, point d’entrée + feuille + données'
     );
+  }
+
+  // Les cibles du document, dans l'artefact QUE la CI vient de bâtir. Un poste
+  // sans build garde un avis (le contrat ci-dessus, lui, ne demande rien) ; en
+  // CI, l'étape tourne après `npm run build`, donc l'absence est une panne.
+  const artefact = opts.artefact || path.join(FRONTEND_DIR, 'build');
+  if (fs.existsSync(path.join(artefact, 'index.html'))) {
+    for (const problem of verifierArtefacts(artefact)) errors.push(problem);
+    checked.push(
+      `  ✓ artefact    ${POINT_ENTREE_TRAVAILLEUR.script} → entrée hachée, ` +
+        `${POINT_ENTREE_TRAVAILLEUR.style}, les deux ancrés dans asset-manifest.json`
+    );
+  } else {
+    const message =
+      `aucun build dans ${artefact} — les fichiers que le document cite ne sont ` +
+      'donc PAS vérifiés (lancer npm run build ; en CI cette absence est une panne)';
+    if (process.env.CI) {
+      errors.push(message);
+    } else {
+      notices.push(message);
+      logError(`::notice title=Artefacts /workers/:id non vérifiés::${message}`);
+    }
   }
 
   if (errors.length > 0) {
@@ -305,7 +560,8 @@ export const runWorkerOgContractCheck = (opts = {}) => {
   log(
     `✅ Contrat /workers/:id tenu hors ligne sur ${CONTRACT_WORKERS.length} profils de référence : ` +
       'titre, description (coupe en points de code), cartes wide + carrée, canonical et og:url ' +
-      "identiques entre l'application et le pré-rendu (aucun serveur, aucune base de données)."
+      "identiques entre l'application et le pré-rendu, et le document DÉMARRE l'application " +
+      '(point d’entrée, feuille, données déjà rendues) — aucun serveur, aucune base de données.'
   );
   return { ok: true, errors, notices, checked, python };
 };

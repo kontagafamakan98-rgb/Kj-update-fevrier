@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict
+from typing import Any, Dict, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -13,9 +13,11 @@ from kojo_email_suppressions import (
 )
 from kojo_settings import (
     JWT_ALGORITHM,
+    LITIGE_DECISION_DAYS,
     PAYOUT_ALERT_THRESHOLD_HOURS,
     logger,
 )
+import kojo_job_disputes as litiges
 from kojo_core import (
     is_database_available, verify_owner_access,
 )
@@ -419,16 +421,82 @@ async def get_stuck_payouts(owner_user = Depends(verify_owner_access)):
 
 
 # Champs du journal métier rendus au propriétaire : allowlist, jamais le document brut.
-_CHAMPS_EVENEMENT_METIER = ("id", "type", "cle", "user_id", "job_id", "proposal_id", "payment_id", "created_at")
+# `details` n'y est que depuis le litige tracé, et n'y porte que des clés
+# ÉNUMÉRÉES par `kojo_business_events.DETAILS_AUTORISES` (decision, paiement,
+# echeance, position) : ni le motif ni la note de réponse, écrits par une
+# partie, n'entrent dans le journal.
+_CHAMPS_EVENEMENT_METIER = (
+    "id", "type", "cle", "user_id", "job_id", "proposal_id", "payment_id", "details", "created_at",
+)
+
+# Champs du litige rendus au propriétaire : allowlist, comme partout ailleurs.
+_CHAMPS_LITIGE = (
+    "state", "reason", "opened_by", "opened_by_role", "opened_at",
+    "decision_deadline_at", "expired_at", "resolved_at", "decision",
+    "decision_note", "decided_by", "payment_outcome", "withdrawn_at",
+    # Décision TENTÉE dont le paiement a échoué : le CODE d'échec et l'instant
+    # de l'essai, sans quoi la décision serait relue comme jamais tentée.
+    "decision_failure", "decision_attempted_at",
+    # La version de l'AUTRE partie : l'arbitre tranche sur deux versions, donc
+    # il doit pouvoir les lire toutes les deux ici, sans ouvrir la fiche.
+    "response",
+)
+
+
+class OwnerDisputeDecision(BaseModel):
+    """Corps de `POST /owner/missions/{job_id}/litige/decision`.
+
+    Deux décisions, pas trois : verser le travailleur ou rembourser le client.
+    Un partage exigerait de couper un décaissement, ce que PayDunya ne fait pas
+    — l'inventer produirait une décision inapplicable. La note est EXIGÉE
+    (10 caractères) : c'est ce que les deux parties liront pour comprendre,
+    et une décision muette relancerait le désaccord qu'elle prétend clore.
+    """
+    decision: Literal["release_worker", "refund_client"]
+    note: str = Field(min_length=10, max_length=1000)
+
+
+def _evenement_public(evenement: dict) -> dict:
+    """Un jalon du journal, réduit à l'allowlist — `details` SEULEMENT s'il existe.
+
+    L'écriture ne pose `details` que lorsqu'il y a quelque chose à dire (les
+    jalons d'avant le litige gardent exactement leur forme) ; la lecture doit
+    dire la même chose, sinon une clé `null` apparaîtrait sur des événements
+    qui n'ont jamais eu de détail, et l'écran devrait distinguer « pas de
+    détail » de « détail vide ».
+    """
+    entree = {champ: evenement.get(champ) for champ in _CHAMPS_EVENEMENT_METIER}
+    if entree.get("details") is None:
+        entree.pop("details", None)
+    return entree
+
+
+def _litige_public(job: dict) -> dict:
+    dispute = job.get("dispute") or {}
+    return {
+        "job_id": job.get("id") or job.get("job_id"),
+        "title": job.get("title"),
+        "status": job.get("status"),
+        "client_id": job.get("client_id"),
+        "worker_id": job.get("assigned_worker_id"),
+        "litige": {champ: dispute.get(champ) for champ in _CHAMPS_LITIGE},
+    }
 
 
 @router.get("/owner/missions/{job_id}/evenements")
 async def get_mission_business_events(job_id: str, owner_user = Depends(verify_owner_access)):
     """Journal des événements métier d'une mission, par ordre chronologique.
 
-    PROPRIÉTAIRE UNIQUEMENT, lecture seule. Ce sont les quatre jalons de
-    `kojo_business_events` : mission créée, proposition acceptée, paiement
-    confirmé, mission terminée. Une mission sans événement renvoie une liste vide.
+    PROPRIÉTAIRE UNIQUEMENT, lecture seule. Tous les jalons de
+    `kojo_business_events` y passent : les quatre d'avant le séquestre (mission
+    créée, proposition acceptée, paiement confirmé, mission terminée), les trois
+    du séquestre à deux temps et les cinq du litige tracé. `details` ne porte
+    que des clés ÉNUMÉRÉES (decision, paiement, echeance, position) : ni le motif
+    ni la note de réponse n'y sont — un journal append-only relu et exporté ne
+    doit pas exposer une prose écrite par une partie. La note se lit à sa source
+    (`GET /owner/missions/{job_id}/litige`), que l'écran du propriétaire pose
+    sous le jalon `mission_dispute_answered`. Une mission sans événement renvoie
+    une liste vide.
 
     Returns:
         Dict à trois clés : `job_id` (mission demandée), `count` (nombre de jalons
@@ -443,11 +511,109 @@ async def get_mission_business_events(job_id: str, owner_user = Depends(verify_o
     return {
         "job_id": job_id,
         "count": len(evenements),
-        "evenements": [
-            {champ: evenement.get(champ) for champ in _CHAMPS_EVENEMENT_METIER}
-            for evenement in evenements
-        ],
+        "evenements": [_evenement_public(evenement) for evenement in evenements],
     }
+
+
+@router.get("/owner/litiges")
+async def list_disputes(
+    etat: Optional[str] = Query(None, pattern="^(open|expired|decision_failed|resolved|withdrawn)$"),
+    limite: int = Query(100, ge=1, le=500),
+    owner_user = Depends(verify_owner_access),
+):
+    """File d'arbitrage : les litiges à trancher, échéance la plus proche d'abord.
+
+    C'est le remède à la cécité de l'échéance : un litige dont la fenêtre se
+    referme demain doit se lire AVANT un litige déjà refermé, et le propriétaire
+    ne peut pas dépendre d'un identifiant de mission qu'il n'a pas sous les yeux.
+    Une décision DONT LE PAIEMENT A ÉCHOUÉ (`decision_failed`) y figure aussi,
+    en tête : elle a un remède nommé (`decision_failure`) et l'argent reste
+    gelé tant qu'elle n'est pas relancée.
+
+    Returns:
+        dict: {count, etats, fidelite (jours de la fenêtre), litiges} — chaque
+        entrée réduite à l'allowlist des champs du désaccord, jamais le document
+        brut de la mission.
+    """
+    etats = [etat] if etat else [litiges.ECHEC, litiges.OUVERT, litiges.EXPIRE]
+    jobs = await litiges.file_arbitrage(etats=etats, limite=limite)
+    return {
+        "count": len(jobs),
+        "etats": etats,
+        "fenetre_jours": LITIGE_DECISION_DAYS,
+        "litiges": [_litige_public(job) for job in jobs],
+    }
+
+
+@router.get("/owner/litiges/mesures")
+async def get_dispute_measures(owner_user = Depends(verify_owner_access)):
+    """Mesures de l'ARBITRAGE, sur l'historique des litiges.
+
+    PROPRIÉTAIRE UNIQUEMENT. La file dit ce qui reste à trancher ; ces chiffres
+    disent comment l'arbitrage se passe : réponses reçues AVANT l'échéance,
+    décisions prises SANS réponse (l'arbitre a tranché sur une seule version),
+    et délai entre la réponse et la décision.
+
+    Les taux valent `null` sous le plancher : un pourcentage sur trois litiges
+    n'est pas une mesure. `fenetres` rejoue les mêmes chiffres sur 30 et 90
+    jours, pour distinguer l'état actuel de l'historique.
+
+    Returns:
+        dict: {mesure_le, plancher, depuis, litiges: {total, lus, tronque},
+        etats, reponse: {avec_reponse, avant_echeance, apres_echeance,
+        echeance_illisible, taux_avant_echeance}, tranches: {total,
+        sans_reponse, avec_reponse, taux_sans_reponse},
+        delai_reponse_decision: {n, mediane_heures, moyenne_heures,
+        max_heures, incoherents}, fenetres: [{fenetre_jours, depuis,
+        decisions: {...}, reponses: {...}, delai_reponse_decision: {...}}]}.
+    """
+    return await litiges.mesures_arbitrage()
+
+
+@router.get("/owner/missions/{job_id}/litige")
+async def get_mission_dispute(job_id: str, owner_user = Depends(verify_owner_access)):
+    """Litige courant d'une mission (lecture), ou `litige: null` s'il n'y en a pas.
+
+    Returns:
+        dict: {job_id, title, status, client_id, worker_id, litige}.
+    """
+    job = await litiges.litiges_du_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Mission introuvable")
+    return _litige_public(job)
+
+
+@router.post("/owner/missions/{job_id}/litige/decision")
+async def decide_mission_dispute(
+    job_id: str,
+    payload: OwnerDisputeDecision,
+    owner_user = Depends(verify_owner_access),
+):
+    """TRANCHER un litige : verser le travailleur, ou rembourser le client.
+
+    L'argent ne bouge que par les propriétaires uniques de chaque chemin
+    (`liberer_sequestre` pour le versement, `execute_paydunya_refund` pour le
+    remboursement) : cette route décide, elle ne paie pas elle-même.
+
+    Quand le paiement échoue, `dispute_state` vaut `decision_failed`, `echec`
+    nomme le code, `relance` vaut True et le message dit l'action à faire : le
+    litige n'est PAS refermé.
+
+    Returns:
+        dict: {message, decision, payment_outcome, dispute_state, echec,
+        relance} — les deux derniers ne sont rendus que sur un échec.
+    """
+    job = await litiges.litiges_du_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Mission introuvable")
+    return await litiges.decider_litige(
+        job,
+        # `verify_owner_access` rend le DOCUMENT du compte (dict), pas un
+        # modèle : l'identifiant se lit comme partout ailleurs dans ce routeur.
+        owner_id=owner_user["id"],
+        decision=payload.decision,
+        note=payload.note,
+    )
 
 
 # ── Adresses email retenues (rebonds définitifs, plaintes) ───────────────────

@@ -12,6 +12,8 @@ import { preloadHomeChunkPlugin } from './vite-plugins/preload-home-chunk.js'
 import { injectSeoExtrasPlugin } from './vite-plugins/inject-seo-extras.js'
 import { injectProductionCspPlugin } from './vite-plugins/inject-production-csp.js'
 import { injectBuildRevisionPlugin } from './vite-plugins/inject-build-revision.js'
+import { injectAssetManifestPlugin } from './vite-plugins/inject-asset-manifest.js'
+import { workerBootPlugin } from './vite-plugins/worker-boot.js'
 import { writeRobotsTxtPlugin } from './vite-plugins/write-robots-txt.js'
 
 // Correspondance route → carte OG : SOURCE UNIQUE dans scripts/check-og-images.js,
@@ -116,10 +118,24 @@ export default defineConfig(({ mode }) => {
       writeRobotsTxtPlugin({ privateRoutes: PRIVATE_ROUTES, siteOrigin: SITE_ORIGIN }),
       preloadHomeChunkPlugin(),
       injectSeoExtrasPlugin({ env }),
-      // Ce que le déploiement de production ANNONCE de lui-même (meta
-      // `kojo-build-revision`) : c'est ce que lit `scripts/check-deployed-revision.js`
-      // pour refuser un frontend servi qui n'est pas celui de `main`.
+      // Ce que le déploiement de production ANNONCE de lui-même (metas
+      // `kojo-build-revision` et `kojo-build-tree`) : c'est ce que lit
+      // `scripts/check-deployed-revision.js` pour refuser un frontend servi qui
+      // n'est pas celui de `main`, sans avoir à résoudre localement le commit
+      // servi (l'arbre publié porte le verdict).
       injectBuildRevisionPlugin({ env }),
+      // LA FEUILLE ET LE POINT D'ENTRÉE DE L'APPLICATION À DES CHEMINS STABLES
+      // (`/boot/worker-app.css`, `/boot/worker-boot.js`) : le document pré-rendu
+      // /workers/:id est écrit par le BACKEND, donc il ne peut pas citer les noms
+      // hachés du build. Le fichier de boot ne fait qu'importer l'entrée que les
+      // pages chargent déjà — aucune copie de l'application, donc aucun chunk
+      // stable qui échapperait au cache immuable.
+      workerBootPlugin(),
+      // L'EMPREINTE de chaque actif servi (JS, CSS, polices) : le manifeste est
+      // écrit APRÈS le bundle (`enforce: 'post'`), et son empreinte est ancrée
+      // dans les pages. C'est ce que suit `scripts/check-deployed-assets.js`
+      // pour refuser un déploiement mixte (HTML neuf, actifs restés derrière).
+      injectAssetManifestPlugin(),
       injectProductionCspPlugin({ env, mode, apiOrigin }),
       // PLUS D'ÉTAPE D'ÉLAGAGE, et c'est un choix, pas un oubli : les familles de
       // sélecteurs qu'aucun composant ne pose ont été RETIRÉES de leurs feuilles

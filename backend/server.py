@@ -65,6 +65,8 @@ from kojo_scheduler import (
     completion_auto_release_loop,
     email_provider_alert_loop,
     job_alert_digest_loop,
+    litige_arbitrage_alert_loop,
+    litige_expiry_loop,
     payout_stuck_sweeper_loop,
     retention_purge_loop,
 )
@@ -709,6 +711,15 @@ async def lifespan(application: FastAPI):
     # client n'a pas validées à l'échéance (kojo_job_completion). Sans cette
     # boucle, un client injoignable laissait le travailleur impayé pour toujours.
     completion_task = asyncio.create_task(completion_auto_release_loop())
+    # LITIGE TRACÉ : referme les fenêtres d'arbitrage échues (kojo_job_disputes).
+    # Sans cette boucle, un désaccord resterait `open` pour toujours et gèlerait
+    # le paiement au-delà de la fenêtre annoncée aux parties.
+    litige_task = asyncio.create_task(litige_expiry_loop())
+    # ARBITRAGE SANS RÉPONSE : prévient le propriétaire quand la part de litiges
+    # TRANCHÉS sans réponse de l'autre partie dépasse le seuil sur la fenêtre
+    # glissante (kojo_scheduler). La file dit ce qui reste à faire ; cette
+    # boucle dit si l'arbitre tranche sans avoir lu les deux versions.
+    litige_alerte_task = asyncio.create_task(litige_arbitrage_alert_loop())
     # BUS TEMPS RÉEL (Redis pub/sub) : le fan-out reste en mémoire, le bus le
     # PROLONGE aux autres workers et machines. Sans REDIS_URL, rien ne change
     # (le process publie et sert ses propres flux) — et `start_bus` DIT la perte
@@ -728,6 +739,8 @@ async def lifespan(application: FastAPI):
     email_alert_task.cancel()
     job_alert_task.cancel()
     completion_task.cancel()
+    litige_task.cancel()
+    litige_alerte_task.cancel()
     try:
         await asyncio.gather(
             rate_limit_task,
@@ -736,6 +749,8 @@ async def lifespan(application: FastAPI):
             email_alert_task,
             job_alert_task,
             completion_task,
+            litige_task,
+            litige_alerte_task,
         )
     except asyncio.CancelledError:
         pass

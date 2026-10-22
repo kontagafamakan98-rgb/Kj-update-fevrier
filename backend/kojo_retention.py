@@ -49,6 +49,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Optional, Tuple
 
 from kojo_settings import (
+    AI_USAGE_RETENTION_DAYS,
     DELETED_ACCOUNT_RETENTION_DAYS,
     EMAIL_DELIVERY_EVENT_RETENTION_DAYS,
     EMAIL_OTP_EXPIRY_MINUTES,
@@ -196,6 +197,22 @@ RETENTION_RULES: Tuple[RegleDeConservation, ...] = (
             "tout message envoyé — il appartient aussi au destinataire, donc "
             "il survit à la suppression de compte, mais pas indéfiniment"
         ),
+        date_portee_par_le_document=False,
+    ),
+    RegleDeConservation(
+        collection="ai_usage",
+        ttl_field="jour_debut",
+        lifetime=timedelta(days=AI_USAGE_RETENTION_DAYS),
+        porte_par="AI_USAGE_RETENTION_DAYS",
+        portee=(
+            "le compteur de dépense de l'assistant IA d'une journée — deux "
+            "nombres (appels, caractères de prompt) et une date, aucun "
+            "identifiant de personne ; la journée en cours est recréée à son "
+            "premier appel"
+        ),
+        # `_id` est le jour en TEXTE (atomicité de la réservation) : un index TTL
+        # sur ce champ n'expirerait jamais, en silence. La date qui fait mourir
+        # le document est `jour_debut`, un vrai datetime (kojo_ai_budget).
         date_portee_par_le_document=False,
     ),
     RegleDeConservation(

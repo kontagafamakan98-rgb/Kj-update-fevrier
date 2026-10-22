@@ -5,10 +5,10 @@ quelles données le service conserve, pendant combien de temps, et par quel
 mécanisme — en citant à chaque fois le fichier et le symbole qui portent
 l'affirmation, pour qu'elle soit vérifiable plutôt que crue.
 
-**Le tableau de la section 3 n'est pas écrit ici.** Il est engendré depuis le
+**Le tableau de la section 4 n'est pas écrit ici.** Il est engendré depuis le
 code par `.github/scripts/check-privacy-policy.py`, et la CI refuse une
 divergence entre les deux. Les autres sections sont du texte humain : elles
-n'ont pas cette garantie, et les écarts connus sont nommés en section 6.
+n'ont pas cette garantie, et les écarts connus sont nommés en section 7.
 
 ---
 
@@ -28,6 +28,7 @@ n'ont pas cette garantie, et les écarts connus sont nommés en section 6.
 | Vérification | code OTP (haché), date de péremption ; jeton d'accès révoqué (identifiant seul) | `email_otps`, `revoked_tokens` |
 | Livraison email | adresse email, fait de livraison reçu du fournisseur (rebond, plainte, livraison réussie), identifiant d'événement | `email_delivery_events`, `email_suppressions` |
 | Alerte emploi | adresse email du compte, critères choisis (catégorie, ville, pays), jeton de désinscription | `job_alerts` |
+| Assistant IA | compteur de dépense du jour : nombre d'appels et nombre de caractères de prompt, agrégés pour tout le service — aucun lien vers un compte, le chat n'est pas conservé | `ai_usage` |
 
 La liste fait autorité dans le code : `USER_DATA_SOURCES`, `USER_DATA_BY_EMAIL`
 et `NO_USER_DATA_COLLECTIONS` (`backend/kojo_routers_users.py`) classent
@@ -39,7 +40,37 @@ Les identifiants sont des UUID internes. Un paiement ne porte **aucune** PII :
 ni nom, ni téléphone, ni email (`payer_id` et `receiver_id` sont des
 identifiants de compte).
 
-## 2. Ce qui est effacé, et quand
+## 2. Sous-traitants
+
+Kojo ne traite pas seul ces données : des prestataires font tourner le service.
+Cette section est la liste de ceux que le code appelle, avec ce que chacun
+reçoit et ce qu'il ne reçoit pas. Elle n'est pas une clause de style : un
+prestataire appelé par le code et absent d'ici est refusé par
+`backend/tests/test_sous_traitants_politique.py`, qui lit les domaines sortants
+dans `backend/` et compare à cette liste.
+
+| Sous-traitant | Ce qu'il fait pour Kojo | Ce qu'il reçoit | Où | Ce qu'il ne reçoit pas |
+| --- | --- | --- | --- | --- |
+| **Neon** (AI Gateway) | répond aux questions de l'assistant de `/support` (`backend/kojo_ai_gateway.py`) | les messages écrits dans le chat, l'historique de la conversation et les instructions du serveur | UE (région de la branche Neon) | ni identifiant de compte, ni email, ni téléphone : le chat ne demande aucune session |
+| **Resend**, **Brevo** ou **Gmail** (selon `EMAIL_PROVIDER`) | remettent les emails du service : vérification d'adresse, codes, alertes, réponse aux tickets (`backend/kojo_email.py`) | l'adresse du destinataire et le contenu du message envoyé | États-Unis (Resend) ou UE (Brevo), Google (Gmail) | ni mot de passe, ni moyen de paiement, ni position |
+| **PayDunya** | encaisse les paiements et verse les travailleurs | montant, identifiant de facture, identifiants internes (`payment_id`, `job_id`, `payer_id`, `worker_id`), et pour la facture de collecte : nom, adresse email et numéro de téléphone du payeur (`backend/kojo_routers_payments.py`) | Sénégal | ni mot de passe, ni photo, ni contenu de message ; le document `payments` de Kojo, lui, ne garde aucune de ces coordonnées |
+| **Cloudinary** | héberge les photos de profil et les preuves photo de fin de mission | les fichiers image envoyés par la personne | États-Unis | ni email, ni téléphone, ni coordonnées bancaires |
+| **MongoDB Atlas** | héberge la base décrite en section 1 | tout ce que la section 1 liste | UE (région du cluster) | rien d'autre que la base : ce n'est pas un prestataire d'envoi |
+| **Fly.io** | héberge le backend (`backend/fly.toml`, région `fra`) et ses journaux | les requêtes HTTP (adresse IP, en-têtes, identifiant de requête) et les journaux applicatifs | Francfort | le contenu du chat : la route et le client du gateway ne journalisent que la CAUSE d'une panne (`kojo_routers_support`, `kojo_ai_gateway`), et la conservation côté gateway est celle de Neon, hors de portée de ce dépôt |
+| **Vercel** | sert le site et relaie `/api` vers le backend | les requêtes HTTP (adresse IP, agent), les journaux d'accès | réseau mondial, journaux aux États-Unis | aucune donnée applicative : le relais transmet la requête et la réponse sans les stocker |
+| **Sentry** (optionnel, `SENTRY_DSN`) | reçoit les erreurs du backend quand il est configuré (`backend/server.py`) | la trace technique de l'erreur, sans PII par défaut (`send_default_pii=False`) | projet Sentry configuré | ni email, ni téléphone, ni corps de message — le drapeau est explicite dans le code |
+| **Google** | connexion Google (SSO), quand `GOOGLE_CLIENT_ID` est configuré | le jeton d'identité Google (adresse, nom, identifiant Google), que le backend vérifie | Google | ni mot de passe Kojo, ni données de mission |
+
+Trois conséquences, dites plutôt que déduites : un compte supprimé reste
+référencé par les paiements chez PayDunya, qui garde la trace de la transaction
+pour ses propres obligations, et la facture de collecte y a porté le nom et
+l'adresse du payeur ; ce qui est écrit dans le chat de `/support` part chez le
+gateway IA sans être conservé par Kojo, donc une demande de suppression ne peut
+pas l'effacer après coup — la consommation y est COMPTÉE (section 1), pas
+relue ; et la dépense de ce gateway est plafonnée par jour, pour que la facture
+ne suive pas le trafic (`backend/kojo_ai_budget.py`).
+
+## 3. Ce qui est effacé, et quand
 
 ### Suppression de compte — `DELETE /api/users/account`
 
@@ -65,7 +96,7 @@ comptable des paiements qui le référencent :
   (adresse et critères : elles n'ont plus de destinataire) et profil
   travailleur sont supprimés ; les sessions en cours ne peuvent plus se
   réauthentifier ;
-- les **messages restent** au-delà de la suppression du compte — ils appartiennent aussi à l'autre partie — puis suivent l'échéance de la règle `messages` (section 3). Un message garde ce que son auteur a écrit ; rien ne peut en être retiré sans le réécrire ;
+- les **messages restent** au-delà de la suppression du compte — ils appartiennent aussi à l'autre partie — puis suivent l'échéance de la règle `messages` (section 4). Un message garde ce que son auteur a écrit ; rien ne peut en être retiré sans le réécrire ;
 - le **nom du compte est retiré des notifications de l'autre partie** : les gabarits de proposition et d'acceptation l'interpolent à l'écriture (`backend/kojo_shared.py`), donc la copie vit dans la boîte du destinataire et survivrait à l'anonymisation. Elle est réécrite avec un libellé neutre (`NOM_COMPTE_SUPPRIME`) au moment de la suppression, la notification elle-même étant CONSERVÉE (le tiers garde l'information « une proposition a été reçue ») — `backend/tests/test_notifications_nom_compte_supprime.py` mesure les deux sens sur le flux mission réel.
 
 ### Droit d'accès — `GET /api/users/account/export`
@@ -77,7 +108,7 @@ reçu), parce que c'est une donnée personnelle de la personne qui le demande.
 réponse (`withheld`), et le plafond de `EXPORT_LIMIT_PER_COLLECTION`
 documents par collection est signalé par `truncated` plutôt que silencieux.
 
-## 3. Durées de conservation
+## 4. Durées de conservation
 
 Chaque ligne est engendrée depuis `backend/kojo_retention.py`, qui est aussi ce
 dont `kojo_core.create_database_indexes` crée les index TTL. La durée publiée
@@ -93,6 +124,7 @@ est donc, par construction, celle que la base applique.
 | `users` | `purge_at` | 90 jours | `DELETED_ACCOUNT_RETENTION_DAYS` | `deleted` = `True` et `purge_at` présent | le document d'un compte SUPPRIMÉ (anonymisé : plus aucune PII, mais l'identifiant interne qui référence les paiements) — un compte actif ne porte pas `purge_at` et n'est jamais purgé |
 | `support_tickets` | `created_at` (date de création) | 365 jours | `SUPPORT_TICKET_RETENTION_DAYS` | aucun (toute la collection) | tout ticket support, résolu ou non — nom, téléphone, email et message libre, la donnée la plus identifiante du dépôt |
 | `messages` | `timestamp` (date de création) | 730 jours | `MESSAGE_RETENTION_DAYS` | aucun (toute la collection) | tout message envoyé — il appartient aussi au destinataire, donc il survit à la suppression de compte, mais pas indéfiniment |
+| `ai_usage` | `jour_debut` (date de création) | 90 jours | `AI_USAGE_RETENTION_DAYS` | aucun (toute la collection) | le compteur de dépense de l'assistant IA d'une journée — deux nombres (appels, caractères de prompt) et une date, aucun identifiant de personne ; la journée en cours est recréée à son premier appel |
 | `email_delivery_events` | `recu_le` (date de création) | 90 jours | `EMAIL_DELIVERY_EVENT_RETENTION_DAYS` | aucun (toute la collection) | tout fait de livraison reçu du fournisseur (rebond, plainte, livraison réussie) — la trace qui explique pourquoi une adresse a été retenue, et qui n'a plus à être conservée ensuite : l'état (`email_suppressions`) lui survit et ne périme pas |
 <!-- CONSERVATION:FIN -->
 
@@ -118,9 +150,9 @@ Quatre précisions que le tableau ne dit pas :
   TTL seul ne s'exécuterait dans aucune suite de tests.
 - **Les collections absentes de ce tableau ne sont purgées par aucun
   mécanisme** : `jobs`, `job_proposals`, `reviews`, `worker_profiles` et
-  `push_tokens` ne disparaissent qu'avec le compte qui les porte (section 2), et
+  `push_tokens` ne disparaissent qu'avec le compte qui les porte (section 3), et
   un avis REÇU survit même à la suppression du compte qui l'a reçu — c'est le
-  prix du choix de la section 2 : la note d'un travailleur doit rester vraie.
+  prix du choix de la section 3 : la note d'un travailleur doit rester vraie.
   `email_suppressions` en fait partie, et c'est DÉLIBÉRÉ : c'est la liste des
   adresses auxquelles le service a cessé d'écrire (rebond définitif, ou
   signalement comme indésirable). Elle ne périme pas parce qu'une adresse
@@ -129,7 +161,7 @@ Quatre précisions que le tableau ne dit pas :
   le service à écrire dans le vide, ce qui est exactement ce qu'elle existe
   pour empêcher.
 
-## 4. Journalisation
+## 5. Journalisation
 
 Le backend écrit sur la sortie standard et, hors suite de tests, dans un fichier
 rotatif (`kojo_backend.log`, 10 Mo × 6) — `backend/kojo_settings.py`. Ce fichier
@@ -139,15 +171,15 @@ temporaire du système, déplaçable ou désactivable par `KOJO_LOG_FILE`
 fichier est désactivée, donc une exécution de la suite ne laisse rien derrière
 elle ; `.gitignore` (`*.log.*`) reste le filet contre un `git add -A` distrait.
 
-## 5. Ce que cette politique ne couvre pas
+## 6. Ce que cette politique ne couvre pas
 
 - Elle décrit le **dépôt**, pas la configuration déployée : les variables
-  d'environnement de production peuvent déplacer une durée (voir section 3) et
+  d'environnement de production peuvent déplacer une durée (voir section 4) et
   les secrets ne sont pas dans ce document.
 - Elle n'est pas un avis juridique. Elle décrit ce que le code fait, ce qui est
   la matière première d'une conformité, pas la conformité elle-même.
 
-## 6. Écarts connus, nommés et vérifiables
+## 7. Écarts connus, nommés et vérifiables
 
 Ces deux points sont des manques **actuels**, chacun vérifiable à la ligne
 citée. Les taire ferait de ce document une affirmation non contrôlable.
@@ -162,7 +194,7 @@ citée. Les taire ferait de ce document une affirmation non contrôlable.
    (`kojo_email.py:273`, `:323`), peuvent également contenir l'adresse du
    destinataire.
 
-## 7. Vérifier ce document
+## 8. Vérifier ce document
 
 ```bash
 python3 .github/scripts/check-privacy-policy.py          # le tableau == le code ?
@@ -174,7 +206,7 @@ une durée modifiée dans le code, une ligne retirée du document, une cellule
 éditée à la main et une collection ajoutée sans ligne sont chacune refusées, en
 nommant la collection et la colonne fautives.
 
-L'effacement de la section 2 est lui aussi tenu par un invariant, et non par une
+L'effacement de la section 3 est lui aussi tenu par un invariant, et non par une
 liste recopiée : `backend/kojo_routers_users.py` déclare `ANONYMISATION_CHAMPS`
 (cet effacé, et par quelle valeur) et `CHAMPS_CONSERVES` (ce qui reste, et
 pourquoi), et

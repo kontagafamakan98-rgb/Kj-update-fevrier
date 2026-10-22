@@ -35,11 +35,13 @@ et `/og/jobs/{id}-square.png` sont déclarées AVANT `/og/jobs/{id}`. Si cet ord
 casse, la route HTML capture « …-square.png » comme identifiant et renvoie du
 text/html : le test le voit tout de suite (type MIME + dimensions).
 """
+import json
 import re
 
 import pytest
 from httpx import AsyncClient
 
+from kojo_job_og import BOOT_SCRIPT, BOOT_STYLE, SEED_ID
 from tests.conftest import BASE_JOB, BASE_USER, auth_headers, db_find_one
 
 SITE_BASE = "https://kojoforafrica.cc.cd"
@@ -162,3 +164,98 @@ class TestJobFicheLifecycle:
         # être absent, c'est la DIRECTIVE noindex, quel que soit le canal.
         for tag in re.findall(r'<meta[^>]+name="robots"[^>]*>', fiche.text):
             assert "noindex" not in tag.lower(), tag
+
+
+async def _fiche_de_mission(client: AsyncClient, **champs) -> tuple:
+    """Crée une mission (compte client CI) et rend (identifiant, corps de la fiche).
+
+    Le corps est lu sur la route PRÉ-RENDUE (`/api/og/jobs/{id}`), donc sur le
+    document qu'un crawler reçoit réellement — pas sur le rendu appelé à la main.
+    """
+    headers = await auth_headers(client, BASE_USER)
+    created = await client.post(
+        "/api/jobs",
+        headers=headers,
+        json={**BASE_JOB, "category": "general", **champs},
+    )
+    assert created.status_code in (200, 201), created.text
+    job_id = created.json()["id"]
+    fiche = await client.get(f"/api/og/jobs/{job_id}")
+    assert fiche.status_code == 200, fiche.text
+    return job_id, fiche.text
+
+
+def _bloc_donnees(corps: str) -> dict:
+    """Le JSON du bloc `kojo-job-data`, tel que la page le lit."""
+    debut = corps.index(f'id="{SEED_ID}"') + len(f'id="{SEED_ID}">')
+    fin = corps.index("</script>", debut)
+    return json.loads(corps[debut:fin])
+
+
+@pytest.mark.asyncio
+class TestPointDEntree:
+    """La fiche pré-rendue DÉMARRE l'application — sans perdre ce qu'un crawler lit.
+
+    Le document était lisible et inerte : un lien partagé — le SEUL chemin
+    d'arrivée d'un visiteur à froid — ouvrait une page sans châssis, sans
+    navigation et sans propositions. Ces cas jugent les trois pièces qui le
+    rendent exécutable, et la contrepartie qui rend la passe acceptable : la
+    tête du document garde EXACTEMENT son titre, sa description et ses deux
+    cartes de partage.
+    """
+
+    async def test_le_document_charge_le_point_d_entree_et_la_feuille(
+        self, client: AsyncClient
+    ):
+        job_id, corps = await _fiche_de_mission(client, title="Mission avec application")
+
+        # La feuille BLOQUANTE en premier : sans elle, l'application démarrée
+        # serait peinte sans style. Le module vient ensuite (différé par nature).
+        assert f'<link rel="stylesheet" href="{BOOT_STYLE}" />' in corps
+        assert f'<script type="module" src="{BOOT_SCRIPT}"></script>' in corps
+        assert corps.index(BOOT_STYLE) < corps.index(BOOT_SCRIPT)
+        # Et la tête garde tout ce que lit un crawler (la passe n'a rien retiré).
+        assert "<title>Mission avec application — Kojo</title>" in corps
+        assert 'name="description"' in corps
+        assert corps.count('property="og:image"') == 2, "carte wide + carrée attendues"
+        assert f"https://kojoforafrica.cc.cd/api/og/jobs/{job_id}.png" in corps
+
+    async def test_le_bloc_de_donnees_porte_la_vue_publique_rendue(
+        self, client: AsyncClient
+    ):
+        job_id, corps = await _fiche_de_mission(client, title="Mission reprise sans squelette")
+
+        # Le bloc vient APRÈS la fermeture de `#root` : React efface ce
+        # conteneur au montage, donc un bloc placé dedans disparaîtrait avant
+        # d'être lu et la fiche repasserait par son squelette.
+        assert '</div>\n<script type="application/json"' in corps
+        donnees = _bloc_donnees(corps)
+        assert donnees["id"] == job_id
+        assert donnees["title"] == "Mission reprise sans squelette"
+        assert donnees["description"] == BASE_JOB["description"]
+        # La vue est celle de `GET /jobs/:id` anonyme : ni identité, ni position.
+        assert "client_id" not in donnees
+        assert "geo" not in donnees
+        assert "lat" not in donnees["location"] and "lng" not in donnees["location"]
+        assert donnees["location"]["address"] == BASE_JOB["location"]["address"]
+
+    async def test_une_donnee_hostile_ne_referme_pas_le_bloc(self, client: AsyncClient):
+        """Un titre qui contient la fermeture d'un script resterait du TEXTE."""
+        titre = "Travaux </script><script>alert(1)</script> & co"
+        _job_id, corps = await _fiche_de_mission(client, title=titre)
+
+        assert "</script><script>" not in corps
+        assert "\\u003c/script\\u003e" in corps
+        # Le bloc reste du JSON lisible malgré l'échappement.
+        assert _bloc_donnees(corps)["title"] == titre
+
+    async def test_une_fiche_inconnue_ouvre_aussi_l_application(
+        self, client: AsyncClient
+    ):
+        """Un lien partagé devenu mort garde une issue : la page 404 de l'app."""
+        reponse = await client.get("/api/og/jobs/inconnu-og")
+
+        assert reponse.status_code == 404
+        assert f'src="{BOOT_SCRIPT}"' in reponse.text
+        assert BOOT_STYLE in reponse.text
+        assert "noindex" in reponse.text

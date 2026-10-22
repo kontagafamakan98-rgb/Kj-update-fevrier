@@ -199,9 +199,6 @@ async def liberer_sequestre(job: dict, *, acteur_id: str) -> dict:
     if not worker_id:
         raise HTTPException(status_code=400, detail="Aucun travailleur attribué à cette mission")
 
-    if job.get("status") == JobStatus.COMPLETED.value:
-        raise HTTPException(status_code=409, detail="Cette mission est déjà marquée comme terminée")
-
     # Trouver le paiement collecte et sequestre pour ce job (le plus recent)
     payment_record = await db.payments.find_one(
         {"job_id": job_id, "status": "completed"},
@@ -215,6 +212,15 @@ async def liberer_sequestre(job: dict, *, acteur_id: str) -> dict:
 
     # Idempotence : si deja libere ou en cours de liberation, ne pas relancer
     current_payout_status = payment_record.get("payout_status") or "held"
+
+    # Un versement REFUSÉ a clôturé la mission SANS payer (`_mark_release_failed`
+    # plus bas) : l'argent du travailleur est toujours séquestré. Refuser ici
+    # rendrait tout échec du fournisseur définitif — la relance (décision du
+    # propriétaire sur un litige, correction du compte de décaissement) ne
+    # pourrait plus jamais reprendre le versement. Seul `release_failed` ouvre
+    # cette porte : PayDunya n'a rien exécuté, relancer ne paie pas deux fois.
+    if job.get("status") == JobStatus.COMPLETED.value and current_payout_status != "release_failed":
+        raise HTTPException(status_code=409, detail="Cette mission est déjà marquée comme terminée")
     if current_payout_status == "released":
         # Deja verse : on se contente de cloturer le job si ce n'est pas fait
         await _marquer_terminee(job_id, job.get("client_id"))
@@ -492,11 +498,37 @@ async def marquer_termine(job: dict, *, worker_id: str, note: str, proofs: list)
     }
 
 
+def _litige_bloquant(job: dict) -> bool:
+    """Le désaccord gèle-t-il l'argent ?
+
+    La règle a UN propriétaire (`kojo_job_disputes.litige_bloquant`) et une
+    seule définition. L'import est LOCAL parce que les deux modules se
+    regardent : le litige gèle le versement, et le versement a un propriétaire
+    que le litige appelle. Le déplacer en tête de fichier créerait un cycle
+    d'import, pas une meilleure abstraction.
+    """
+    from kojo_job_disputes import litige_bloquant
+
+    return litige_bloquant(job)
+
+
 async def confirmer_validation(job: dict, *, client_id: str) -> dict:
     """Second temps : le client valide la déclaration et libère le séquestre.
 
-    Lève HTTPException 409 si aucune déclaration n'attend d'être validée.
+    Lève HTTPException 409 si aucune déclaration n'attend d'être validée, ou si
+    un LITIGE est ouvert : on ne valide pas par-dessus une contestation, sinon
+    le litige ne protégerait rien. La décision appartient alors au propriétaire
+    (`POST /owner/missions/{id}/litige/decision`).
     """
+    if _litige_bloquant(job):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Un litige est ouvert sur cette mission : la décision appartient "
+                "au propriétaire, le paiement reste gelé jusque-là."
+            ),
+        )
+
     completion = job.get("completion") or {}
     if completion.get("state") != MARKED:
         raise HTTPException(
@@ -546,6 +578,11 @@ async def liberer_automatiquement(job: dict) -> dict:
         lieu de réessayer toutes les heures en silence.
     """
     job_id = job.get("id")
+    if _litige_bloquant(job):
+        # Rien n'est écrit, rien n'est journalisé : le litige n'est pas un
+        # échec de libération, c'est une interdiction de payer. Le passage
+        # suivant le sautera de la même façon, sans bruit.
+        return {"payout_status": "blocked_by_dispute"}
     try:
         resultat = await liberer_sequestre(job, acteur_id=job.get("client_id"))
     except HTTPException as exc:
@@ -622,14 +659,21 @@ async def passage_liberations_auto(now: Optional[datetime] = None) -> dict:
     deux formats différents ne se comparent pas, et un balayage qui ne trouve
     jamais rien aurait l'air d'un balayage au repos.
     """
+    from kojo_job_disputes import ETATS_BLOQUANTS  # local : voir `_litige_bloquant`
+
     instant = (now or _maintenant()).astimezone(timezone.utc).isoformat()
+    # Le litige OUVERT est exclu de la REQUÊTE, pas seulement au moment de
+    # payer : une mission contestée ne doit pas occuper les places bornées du
+    # passage (`MAX_LIBERATIONS_PAR_PASSAGE`) au détriment de celles qui
+    # attendent vraiment. `ETATS_BLOQUANTS` est lu, pas recopié.
     en_attente = await db.jobs.find({
         "completion.state": MARKED,
         "completion.auto_release_at": {"$lte": instant},
+        "dispute.state": {"$nin": list(ETATS_BLOQUANTS)},
         "deleted": {"$ne": True},
     }).to_list(MAX_LIBERATIONS_PAR_PASSAGE)
 
-    resume = {"due": len(en_attente), "released": 0, "blocked": 0, "skipped": 0}
+    resume = {"due": len(en_attente), "released": 0, "blocked": 0, "skipped": 0, "frozen": 0}
     for job in en_attente:
         try:
             issue = await liberer_automatiquement(job)
@@ -640,6 +684,10 @@ async def passage_liberations_auto(now: Optional[datetime] = None) -> dict:
 
         if issue.get("payout_status") == "blocked":
             resume["blocked"] += 1
+        elif issue.get("payout_status") == "blocked_by_dispute":
+            # Compté, pas confondu avec un échec : un litige gelé n'est pas une
+            # libération ratée, et le journal doit pouvoir les distinguer.
+            resume["frozen"] += 1
         elif issue.get("payout_status") in ("already_in_progress", "already_completed"):
             resume["skipped"] += 1
         else:

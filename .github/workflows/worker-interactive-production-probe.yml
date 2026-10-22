@@ -1,0 +1,100 @@
+name: Worker page interactive probe (daily)
+
+# ─── Pourquoi cette sonde existe ────────────────────────────────────────────
+# `check-worker-page-production.js` (cron 07:04) juge le DOCUMENT servi de
+# `/workers/:id` : réécriture Vercel (sentinelle), point d'entrée chargé une
+# fois, feuille avant le module, bloc `kojo-worker-data` accordé au `<h1>`,
+# cartes OG. C'est nécessaire et ce n'est pas suffisant : un document parfait
+# peut charger un module qui ne s'exécute pas (entrée 404, erreur au premier
+# rendu), et un crawler n'en voit rien — il lit le HTML. Le seul arrivant d'un
+# lien partagé reçoit alors un profil statique, sans châssis ni geste : une page
+# morte qui passe tous les autres verts. C'était la limite DÉCLARÉE de F21.
+#
+# Cette sonde ouvre donc le profil dans un vrai Chromium, contexte VIERGE, et
+# juge l'EXÉCUTION :
+#   1. le montage — `#root` porte le châssis de l'application (`#root nav`), et
+#      plus la coquille statique écrite par le backend ;
+#   2. le profil peint — le `<h1>` de `#root` est le nom du bloc
+#      `kojo-worker-data` (React a consommé la vue publique) ;
+#   3. le geste — un clic RÉEL sur l'action de la page
+#      (`[data-sonde="voir-missions"]`) mène à une navigation CLIENTE : un
+#      marqueur posé dans `window` avant le clic survit, l'adresse `/jobs` est
+#      atteinte, `#root` porte encore le châssis. Un lien mort ou un `<a href>`
+#      sans routeur sont refusés, nommément.
+#
+# Aucune ÉCRITURE : le geste ouvre la liste des missions. Il ne soumet rien, ne
+# propose rien — une proposition se fait depuis la mission (`/jobs/:id`), jugée
+# par sa propre sonde.
+#
+# Trois sorties, jamais deux :
+#   0 — profil monté, peint et interactif ; 1 — refus nommé ;
+#   2 — prémisse : aucun profil au sitemap, ou Chromium indisponible (outillage).
+#       Une prémisse n'est jamais un vert.
+#
+# Le coût assumé : Chromium est installé à chaque run (~1 min), et la sonde ne
+# juge qu'un moteur (Chromium) et un profil par passage. La matrice des moteurs
+# et le rendu visuel restent la suite e2e, sur pile locale.
+on:
+  schedule:
+    # 07:26 UTC : après les sondes de document (07:04 profil, 07:10 fiche,
+    # 07:16 montage de la fiche), hors des heures pleines.
+    - cron: '26 7 * * *'
+  workflow_dispatch:
+    inputs:
+      site:
+        description: "Origine frontend à juger (défaut : vide = production)"
+        required: false
+        default: ""
+      worker:
+        description: "Profil à juger : identifiant ou URL /workers/:id (défaut : vide = sitemap)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Profil travailleur interactif (production)
+    runs-on: ubuntu-latest
+    # Plafond : une production qui ne monte plus doit rougir, pas patienter
+    # jusqu'à l'abandon du runner (installation du navigateur comprise).
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # Playwright vient du lockfile : l'installer au lock (et non un `npx`
+      # flottant) garde le même binaire que la suite e2e, et le cache npm suit
+      # `frontend/package-lock.json`.
+      - name: Installer les dépendances du frontend
+        working-directory: frontend
+        run: npm ci
+
+      # Sans binaire, la sonde rendrait une prémisse — jamais un vert, mais
+      # aucune mesure. Le job DOIT échouer ici si l'installation casse.
+      - name: Installer Chromium (sonde navigateur)
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Juger le démarrage réel de /workers/:id
+        working-directory: frontend
+        env:
+          SITE_A_JUGER: ${{ inputs.site }}
+          PROFIL_A_JUGER: ${{ inputs.worker }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          arguments=()
+          if [ -n "$SITE_A_JUGER" ]; then
+            arguments+=(--base "$SITE_A_JUGER")
+          fi
+          if [ -n "$PROFIL_A_JUGER" ]; then
+            arguments+=(--worker "$PROFIL_A_JUGER")
+          fi
+          node scripts/check-worker-interactive-production.js ${arguments[@]+"${arguments[@]}"}

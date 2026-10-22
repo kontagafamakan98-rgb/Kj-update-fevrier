@@ -89,6 +89,10 @@ export default function RobotChat({ onBack }) {
   const [asking, setAsking] = useState(false);
   const [chatError, setChatError] = useState('');
   const [ticketSuggested, setTicketSuggested] = useState(false);
+  // Le plafond de dépense de l'assistant est GLOBAL et journalier (backend :
+  // kojo_ai_budget) : renvoyer le même message ne ferait que re-facturer un
+  // 429, donc le champ se ferme et le questionnaire reste la voie.
+  const [budgetEpuise, setBudgetEpuise] = useState(false);
 
   const bottomRef = useRef(null);
 
@@ -123,7 +127,19 @@ export default function RobotChat({ onBack }) {
     } catch (err) {
       // L'assistant indisponible n'est pas une impasse : le message d'erreur
       // nomme le repli, et le bouton de dépôt reste à l'écran.
-      setChatError(handleApiError(err, t('supportGenericError')));
+      // 429 « ai-budget » = plafond de dépense du jour atteint (et non une
+      // panne) : le dire dans la langue du visiteur, et fermer la saisie —
+      // insister coûterait un second refus pour rien.
+      // Le rate-limiter répond 429 lui aussi, mais avec SON `bucket` : une
+      // limite de débit se relâche en cinq minutes, donc elle ne ferme rien.
+      const statut = err?.response?.status ?? err?.status;
+      const corps = err?.response?.data || {};
+      if (statut === 429 && corps.bucket === 'ai-budget') {
+        setBudgetEpuise(true);
+        setChatError(t('robotChatBudgetReached'));
+      } else {
+        setChatError(handleApiError(err, t('supportGenericError')));
+      }
     } finally {
       setAsking(false);
     }
@@ -262,11 +278,12 @@ export default function RobotChat({ onBack }) {
             }}
             placeholder={t('robotChatPlaceholder')}
             rows={2}
-            className="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm focus:outline-hidden focus:ring-2 focus:ring-orange-500"
+            disabled={budgetEpuise}
+            className="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm focus:outline-hidden focus:ring-2 focus:ring-orange-500 disabled:bg-gray-50"
           />
           <button
             onClick={envoyerQuestion}
-            disabled={asking || !draft.trim()}
+            disabled={asking || budgetEpuise || !draft.trim()}
             className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-xl bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-60"
             aria-label={t('robotChatSend')}
           >

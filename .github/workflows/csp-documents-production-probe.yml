@@ -1,0 +1,95 @@
+name: CSP documents production probe (daily)
+
+# ─── Pourquoi cette sonde existe ────────────────────────────────────────────
+# La CSP du site est déclarée une fois (`frontend/src/config/csp.js`) et
+# recopiée en Python (`backend/kojo_csp.py`) pour être publiée par les documents
+# pré-rendus `/jobs/:id` et `/workers/:id`, que le BACKEND écrit.
+#
+# Le contrat hors ligne (`check-csp-contract.js`, étape `frontend-build`) prouve
+# que les deux calculs rendent la MÊME politique pour les mêmes entrées. Il ne
+# peut pas prouver que les DÉPLOIEMENTS portent les mêmes valeurs : le build
+# Vercel lit `VITE_API_URL` / `VITE_PLAUSIBLE_DOMAIN` / `VITE_GA_MEASUREMENT_ID`,
+# le backend Fly lit `BACKEND_PUBLIC_URL` / `PLAUSIBLE_DOMAIN` / `GA_MEASUREMENT_ID`.
+# Deux identifiants d'analytique ajoutés d'un seul côté, et la politique des
+# documents refuse ce que celle du site autorise (ou l'inverse) — sans qu'aucun
+# test ne le voie.
+#
+# Cette sonde lit donc les deux en PRODUCTION : la politique que le SITE sert
+# sur une page du build, puis celle que les documents pré-rendus servent, et
+# exige l'égalité en nommant la directive en écart. Un refus nomme le réglage à
+# rapprocher.
+#
+# Trois sorties, jamais deux :
+#   0 — le site et les documents servent la même politique ;
+#   1 — refus nommé (page du site muette, document muet, politique divergente) ;
+#   2 — prémisse : ni fiche ni profil au sitemap, donc aucun document à comparer.
+#       Une prémisse n'est jamais un vert.
+on:
+  schedule:
+    # 07:22 UTC : après les sondes de document (07:04 profil, 07:10 fiche,
+    # 07:16 montage), hors des heures pleines.
+    - cron: '22 7 * * *'
+  workflow_dispatch:
+    inputs:
+      site:
+        description: "Origine frontend à juger (défaut : vide = production)"
+        required: false
+        default: ""
+      job:
+        description: "Fiche à comparer (identifiant ou URL, défaut : vide = sitemap)"
+        required: false
+        default: ""
+      worker:
+        description: "Profil à comparer (identifiant ou URL, défaut : vide = sitemap)"
+        required: false
+        default: ""
+      reference:
+        description: "Page du build servant de témoin (défaut : vide = /)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: CSP documents pré-rendus (production)
+    runs-on: ubuntu-latest
+    # Plafond : une sonde qui ne conclut pas doit rougir, pas patienter jusqu'à
+    # l'abandon du runner (elle ne télécharge aucun navigateur).
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # La sonde n'importe que des modules du dépôt (`site-meta.js`,
+      # `csp-document.js`, les deux résolveurs de sitemap) : aucune dépendance
+      # n'est installée, et le passage reste à quelques requêtes HTTP.
+      - name: Comparer la CSP du site et celle des documents pré-rendus
+        working-directory: frontend
+        env:
+          SITE_A_JUGER: ${{ inputs.site }}
+          FICHE_A_JUGER: ${{ inputs.job }}
+          PROFIL_A_JUGER: ${{ inputs.worker }}
+          PAGE_TEMOIN: ${{ inputs.reference }}
+        run: |
+          arguments=()
+          if [ -n "$SITE_A_JUGER" ]; then
+            arguments+=(--base "$SITE_A_JUGER")
+          fi
+          if [ -n "$FICHE_A_JUGER" ]; then
+            arguments+=(--job "$FICHE_A_JUGER")
+          fi
+          if [ -n "$PROFIL_A_JUGER" ]; then
+            arguments+=(--worker "$PROFIL_A_JUGER")
+          fi
+          if [ -n "$PAGE_TEMOIN" ]; then
+            arguments+=(--reference "$PAGE_TEMOIN")
+          fi
+          node scripts/check-csp-documents-production.js ${arguments[@]+"${arguments[@]}"}

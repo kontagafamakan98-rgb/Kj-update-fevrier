@@ -79,6 +79,63 @@ class OwnerService {
     }
   }
 
+  /** Litige COURANT d'une mission, ou `litige.response` absent s'il n'y en a pas.
+   *  Lu par le journal de mission : la réponse de l'autre partie n'est pas dans
+   *  le journal (aucune prose n'y entre), donc l'écran la demande à sa source.
+   *  @returns {Promise<object>} {job_id, title, status, client_id, worker_id, litige}. */
+  async getMissionDispute(jobId) {
+    try {
+      const data = await api.get(`/owner/missions/${encodeURIComponent(jobId)}/litige`);
+      return data;
+    } catch (error) {
+      safeLog.error('❌ Erreur litige de mission:', error);
+      throw this._translateOwnerError(error, `Erreur serveur: ${error?.response?.status || 'inconnu'}`);
+    }
+  }
+
+  /** MESURES de l'arbitrage (propriétaire uniquement) : réponses avant échéance,
+   *  décisions sans réponse, délai réponse → décision. Calculées à la demande
+   *  sur l'historique des litiges, jamais recopiées.
+   *  @returns {Promise<object>} {litiges, etats, reponse, tranches,
+   *  delai_reponse_decision, plancher, fenetres (30 et 90 jours : decisions,
+   *  reponses, delai)}. */
+  async getDisputeMesures() {
+    try {
+      const data = await api.get('/owner/litiges/mesures');
+      return data;
+    } catch (error) {
+      safeLog.error('❌ Erreur mesures d’arbitrage:', error);
+      throw this._translateOwnerError(error, `Erreur serveur: ${error?.response?.status || 'inconnu'}`);
+    }
+  }
+
+  /** File d'arbitrage des LITIGES (propriétaire uniquement).
+   *  @returns {Promise<object>} {count, etats, fenetre_jours, litiges}. */
+  async getDisputes() {
+    try {
+      const data = await api.get('/owner/litiges');
+      return data;
+    } catch (error) {
+      safeLog.error('❌ Erreur file d’arbitrage:', error);
+      throw this._translateOwnerError(error, `Erreur serveur: ${error?.response?.status || 'inconnu'}`);
+    }
+  }
+
+  /** TRANCHER un litige — verser le travailleur ou rembourser le client.
+   *  @returns {Promise<object>} {message, decision, payment_outcome}. */
+  async decideDispute(jobId, { decision, note }) {
+    try {
+      const data = await api.post(
+        `/owner/missions/${encodeURIComponent(jobId)}/litige/decision`,
+        { decision, note },
+      );
+      return data;
+    } catch (error) {
+      safeLog.error('❌ Erreur décision de litige:', error);
+      throw this._translateOwnerError(error, `Erreur serveur: ${error?.response?.status || 'inconnu'}`);
+    }
+  }
+
   /** @returns {Promise<object>} Infos de debug (propriétaire uniquement). */
   async getDebugInfo() {
     try {

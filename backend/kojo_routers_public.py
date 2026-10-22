@@ -13,9 +13,16 @@ from urllib.parse import urlparse
 
 from fastapi import APIRouter, HTTPException, Response
 
+from pydantic import ValidationError
+
 from kojo_core import db
 from kojo_balises import DesequilibreHtml, exiger_balises_equilibrees
 from kojo_job_og import escape_xml, job_og_html, job_og_html_404
+# La vue PUBLIQUE d'une mission (allowlist `JobPublic`) a UN propriétaire :
+# `_job_view` dans son routeur. Le pré-rendu la LIT au lieu d'en construire une
+# seconde — deux constructions divergeraient au premier champ ajouté, et c'est
+# exactement ce que l'allowlist existe pour empêcher.
+from kojo_routers_jobs_listing import _job_view
 # La vue PUBLIQUE d'un travailleur vit dans son routeur (allowlist) : le
 # pré-rendu et la carte OG la LISENT au lieu d'en construire une seconde. Deux
 # constructions divergeraient au premier champ ajouté, et c'est exactement ce
@@ -417,8 +424,30 @@ async def get_job_og_html(job_id: str):
                 status_code=404,
                 headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex"},
             )
+        # Le bloc de données est la vue que `GET /jobs/:id` rend déjà à un
+        # visiteur anonyme : coordonnées GPS, identités et champs internes
+        # restent donc ABSENTS du document, par construction. Un document legacy
+        # qui ne valide pas l'allowlist garde sa tête et son application, mais
+        # pas de bloc (la page démarre par un chargement) — refuser la fiche
+        # entière priverait la mission de sa carte de partage pour un défaut de
+        # données qu'elle ne peut pas corriger.
+        try:
+            apercu = _job_view(job, None)
+            vue_publique = (
+                apercu.model_dump(mode="json") if hasattr(apercu, "model_dump") else apercu
+            )
+        except ValidationError as exc:
+            logger.warning(
+                "Pré-rendu de la fiche %s : vue publique indisponible (%s) — document "
+                "servi SANS bloc de données, la fiche démarrera par un chargement.",
+                job_id,
+                exc,
+            )
+            vue_publique = None
         corps = exiger_balises_equilibrees(
-            f"la fiche mission {job_id}", job_og_html(job, base), origine="kojo_job_og"
+            f"la fiche mission {job_id}",
+            job_og_html(job, base, vue_publique=vue_publique),
+            origine="kojo_job_og",
         )
     except DesequilibreHtml as exc:
         logger.error("Pré-rendu HTML de la fiche %s refusé : %s", job_id, exc)

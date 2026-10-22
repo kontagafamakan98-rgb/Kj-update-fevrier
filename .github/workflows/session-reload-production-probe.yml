@@ -21,7 +21,9 @@ name: Session reload production probe (daily)
 # d'un compte réel et d'un réseau public, donc elle ne bloque aucune PR. Mais
 # elle ÉCHOUE (code 1) au lieu de publier une note, parce que ce qu'elle
 # vérifie est un invariant : si la session ne survit pas au rechargement, le
-# site est cassé pour ses utilisateurs connectés.
+# site est cassé pour ses utilisateurs connectés. Code 2 = prémisse (aucun
+# verdict rendu) : compte CI absent, session impossible à ouvrir — le code de
+# sortie ne se confond pas avec une session perdue.
 #
 # Aucune écriture : la sonde LIT une session existante (aucune inscription,
 # aucun compte créé), et chaque tentative est jetée avec son contexte.

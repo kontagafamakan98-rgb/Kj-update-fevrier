@@ -1,0 +1,83 @@
+name: Worker page production probe (daily)
+
+# ─── Pourquoi cette sonde est PUBLIÉE, et pas seulement écrite ──────────────
+# `/workers/:id` n'est PAS une route du build : Vercel la réécrit vers le
+# backend (`frontend/vercel.json`, `/workers/(.*)` → `/api/og/workers/$1`), qui
+# écrit le document pré-rendu. Si cette réécriture est perdue — entrée retirée,
+# ordre des rewrites changé, `vercel.json` d'avant redéployé —, le site ne tombe
+# PAS : il répond 200 avec la COQUE SPA, un document valide, indexable, sans
+# canonical de profil, sans cartes OG de travailleur et sans `<h1>`.
+# Aucun test du dépôt ne le voit : `check-worker-og-contract.js` exécute le
+# backend hors ligne, `check-spa-routes.js` lit la CONFIGURATION des rewrites,
+# et ni l'un ni l'autre ne lit ce qui est réellement SERVI.
+#
+# La sonde juge donc la production, en deux temps :
+#   1. la RÉÉCRITURE, sans dépendre d'aucune donnée : un identifiant sentinelle
+#      doit répondre le 404 du backend (noindex + point d'entrée, aucun script de
+#      bundle) — une coque SPA répondrait 200 + `/assets/*.js` ;
+#   2. la FICHE d'un profil réel (le premier `/workers/:id` du sitemap, ou celui
+#      passé à la main) : canonical, og:url, deux cartes OG (wide 1200×630 +
+#      carrée 1200×1200) vérifiées en HTTP réel, `twitter:*`, `<h1>`, point
+#      d'entrée, feuille, et le bloc de données déjà rendu.
+#
+# Trois sorties, jamais deux :
+#   0 — document conforme ; 1 — refus nommé (le défaut et sa correction) ;
+#   2 — prémisse : aucun profil publié, donc la FORME d'une fiche n'a pas pu être
+#       jugée. Une prémisse ne vaut jamais un vert (la réécriture, elle, a été
+#       mesurée sur la sentinelle).
+#
+# Aucune écriture, aucun secret : la sonde lit des documents publics. Le
+# `workflow_dispatch` sert à juger une PREVIEW (protection Vercel à contourner
+# hors de ce workflow) ou un profil précis, jamais à changer la conduite du cron.
+on:
+  schedule:
+    # 07:04 UTC : après les autres sondes du matin (SEO 06:17, santé 06:30,
+    # Atlas 06:45, session 06:47, exposition 06:52, flux SSE 06:58), hors des
+    # heures pleines pour ne pas concurrencer les crons d'autres dépôts.
+    - cron: '04 7 * * *'
+  workflow_dispatch:
+    inputs:
+      site:
+        description: "Origine frontend à juger (défaut : vide = production)"
+        required: false
+        default: ""
+      worker:
+        description: "Profil à juger : identifiant ou URL /workers/:id (défaut : vide = sitemap)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Profil travailleur pré-rendu (production)
+    runs-on: ubuntu-latest
+    # Plafond : une production qui ne répond plus doit rougir, pas patienter
+    # jusqu'à l'abandon du runner.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pas de `npm ci` : la sonde n'importe que des modules du dépôt et la
+      # stdlib de Node. Installer la suite complète ajouterait un mode d'échec
+      # (registre npm indisponible) qui masquerait le verdict cherché.
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Juger le document servi de /workers/:id
+        working-directory: frontend
+        env:
+          SITE_A_JUGER: ${{ inputs.site }}
+          PROFIL_A_JUGER: ${{ inputs.worker }}
+        run: |
+          arguments=()
+          if [ -n "$SITE_A_JUGER" ]; then
+            arguments+=(--base "$SITE_A_JUGER")
+          fi
+          if [ -n "$PROFIL_A_JUGER" ]; then
+            arguments+=(--worker "$PROFIL_A_JUGER")
+          fi
+          node scripts/check-worker-page-production.js ${arguments[@]+"${arguments[@]}"}
