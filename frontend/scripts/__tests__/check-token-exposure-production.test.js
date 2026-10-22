@@ -30,9 +30,11 @@ import {
   MARQUE_PREMISSE,
   RENVOI_RECHARGEMENT,
   TOKEN_KEY_PATTERN,
+  estPremisse,
   jugerExposition,
   jugerSessionNative,
   libelleSonde,
+  main,
   parseArgs,
   runTokenExposureProbe,
   sourceMarqueurNatif,
@@ -954,5 +956,72 @@ describe('check-token-exposure — options de ligne de commande', () => {
     // Le drapeau d'un AUTRE geste (celui de la sonde de session) n'a pas d'effet
     // ici : cette sonde ne juge qu'une chose, la surface servie.
     expect(parseArgs(['--cross-site', 'https://api.test'])).toEqual({});
+  });
+});
+
+describe('la ligne de commande — 1 et 2 ne se ressemblent plus', () => {
+  /**
+   * Le faux-vert que cette section empêche : une PRÉMISSE comptée comme un
+   * DÉFAUT. Les deux sortaient en 1 ; le texte les distinguait, le code non —
+   * donc un run rouge ne disait pas s'il fallait poser un secret ou corriger
+   * le code. La sonde est INJECTÉE : aucun navigateur, aucun réseau.
+   */
+  it('sort en 2 pour une prémisse, en la nommant', async () => {
+    const erreurs = [];
+    const code = await main(['--base', BASE], {
+      run: async () => ({
+        ok: false,
+        premisse: true,
+        attempts: 0,
+        errors: [`${libelleSonde(BASE)} : ${MARQUE_PREMISSE} · compte CI absent`],
+        checked: [],
+        verdicts: null,
+      }),
+      log: () => {},
+      error: (message) => erreurs.push(String(message)),
+    });
+    expect(code).toBe(2);
+    expect(erreurs.join('\n')).toContain(MARQUE_PREMISSE);
+  });
+
+  it('sort en 1 pour un DÉFAUT mesuré — le code dit que la sonde a jugé', async () => {
+    const erreurs = [];
+    const code = await main(['--base', BASE], {
+      run: async () => ({
+        ok: false,
+        premisse: false,
+        attempts: 1,
+        errors: [`${libelleSonde(BASE)} : jeton lisible en localStorage`],
+        checked: [],
+        verdicts: null,
+      }),
+      log: () => {},
+      error: (message) => erreurs.push(String(message)),
+    });
+    expect(code).toBe(1);
+    expect(erreurs.join('\n')).not.toContain(MARQUE_PREMISSE);
+  });
+
+  it('sort en 0 quand aucun jeton n’est exposé', async () => {
+    const code = await main(['--base', BASE], {
+      run: async () => ({ ok: true, premisse: false, attempts: 2, errors: [], checked: ['localStorage : vide'], verdicts: {} }),
+      log: () => {},
+      error: () => {},
+    });
+    expect(code).toBe(0);
+  });
+
+  it('marque une prémisse dans le RÉSULTAT, et seulement quand AUCUN défaut n’est mesuré', async () => {
+    // Les deux cas réels, sans navigateur : les identifiants manquent (prémisse),
+    // puis un mélange — un mélange est un refus, jamais une prémisse.
+    const sansCompte = await runTokenExposureProbe({ base: BASE, email: '', password: '', quiet: true });
+    expect(sansCompte.ok).toBe(false);
+    expect(sansCompte.premisse).toBe(true);
+    expect(sansCompte.errors[0]).toContain(MARQUE_PREMISSE);
+
+    expect(estPremisse([`${MARQUE_PREMISSE} · compte CI absent`])).toBe(true);
+    expect(estPremisse([`${MARQUE_PREMISSE} · compte CI absent`, 'jeton lisible en sessionStorage'])).toBe(false);
+    expect(estPremisse([])).toBe(false);
+    expect(estPremisse(['jeton lisible en localStorage'])).toBe(false);
   });
 });

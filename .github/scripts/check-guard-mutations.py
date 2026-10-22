@@ -542,13 +542,116 @@ def commande_de(mutation):
     return commande
 
 
-def executer(mutation, racine):
+# Les deux runners écrivent le nom du cas qui a rougi, chacun à sa façon :
+# `FAILED tests/x.py::TestA::test_b` côté pytest, `× le nom du cas 12ms` côté
+# Vitest. On lit CES lignes plutôt que de redemander le détail : c'est ce que
+# l'humain aurait ouvert, et le résumé doit le lui épargner.
+CAS_ROUGIS_PYTEST = re.compile(r"^\s*(?:FAILED|ERROR)\s+(\S+)", re.MULTILINE)
+CAS_ROUGIS_VITEST = re.compile(r"^\s*(?:×|✗)\s+(.+?)\s*$", re.MULTILINE)
+# Durée ajoutée par Vitest en fin de ligne (« … 123ms », « … 1.2s »).
+DUREE_EN_FIN = re.compile(r"\s+\d+(?:[.,]\d+)?\s*(?:ms|s)$")
+ANSI = re.compile(r"\x1b\[[0-9;]*m")
+MAX_CAS_CITES = 6
+
+
+def cas_rougis(sortie):
+    """Les cas que la preuve a réellement fait rougir, lus dans sa sortie.
+
+    Sert au RÉSUMÉ de CI : « quelle mutation a rougi quel cas ». Un cas est un
+    identifiant de test (fichier + chemin de test), jamais une ligne de log — le
+    résumé doit se relire sans ouvrir la sortie de chaque preuve.
+    """
+    texte = ANSI.sub("", sortie or "")
+    trouves = []
+    for motif in (CAS_ROUGIS_PYTEST, CAS_ROUGIS_VITEST):
+        for brut in motif.findall(texte):
+            cas = DUREE_EN_FIN.sub("", brut).strip().strip("`")
+            if cas and cas not in trouves:
+                trouves.append(cas)
+            if len(trouves) >= MAX_CAS_CITES:
+                return trouves
+    return trouves
+
+
+def _cellule(valeur, limite=120):
+    """Une cellule de tableau Markdown : un `|` non échappé casserait la ligne."""
+    texte = str(valeur or "").replace("|", "\\|").replace("\n", " ").strip()
+    return texte if len(texte) <= limite else texte[: limite - 1] + "…"
+
+
+def _code(valeur, limite=120):
+    """Une valeur citée en code dans un tableau Markdown.
+
+    Le nom d'un cas de test peut citer un identifiant entre accents graves
+    (« un champ `flag` revenu ») : laissé tel quel, il ouvrirait un code span que
+    la cellule ne refermerait pas, et le reste de la ligne en sortirait. On
+    retire donc les accents graves du NOM, et on échappe `|` comme ailleurs.
+    """
+    return "`%s`" % _cellule(valeur, limite).replace("`", "'")
+
+
+def _ecrire_resume(resultats, *, etape=None, declarees=None, dues_total=None, motif_non_du=None):
+    """Publie le RÉSUMÉ du rejeu dans le journal du run (GITHUB_STEP_SUMMARY).
+
+    Demande du propriétaire du harnais : un run doit se relire dans son résumé
+    sans ouvrir la sortie de chaque preuve. On y trouve donc ce qui a été
+    RÉELLEMENT rejoué (pas ce que le registre déclare), et pour chaque mutation
+    le(s) cas qu'elle a fait rougir.
+
+    Hors GitHub (`GITHUB_STEP_SUMMARY` absent), la fonction ne fait rien : le
+    harnais reste utilisable à la main.
+    """
+    chemin = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not chemin:
+        return
+
+    rejouees = len(resultats)
+    prouvees = sum(1 for _, ok, _, _ in resultats if ok)
+    declarees = declarees if declarees is not None else rejouees
+    titre = "### Harnais de mutation des gardes"
+    if etape:
+        titre += " — étape « %s »" % etape
+
+    lignes = [titre, ""]
+    if motif_non_du:
+        lignes.append("**0 mutation rejouée** — rejeu non dû : %s" % _cellule(motif_non_du, 300))
+    else:
+        portee = "%d déclarée(s) au registre" % declarees
+        if dues_total is not None:
+            portee += " · %d due(s) pour cette étape" % dues_total
+        lignes.append(
+            "**%d mutation(s) rejouée(s)** (%d prouvée(s), %d en échec) sur %s."
+            % (rejouees, prouvees, rejouees - prouvees, portee)
+        )
+
+    if resultats:
+        lignes += ["", "| Mutation | Preuve | Cas rougi | Verdict |", "| --- | --- | --- | --- |"]
+        for mutation, ok, detail, cas in resultats:
+            nom_cas = " · ".join(_code(c, 160) for c in cas[:3]) if cas else "—"
+            if len(cas) > 3:
+                nom_cas += " (+%d)" % (len(cas) - 3)
+            lignes.append(
+                "| %s | %s | %s | %s |"
+                % (
+                    _code(mutation["id"], 60),
+                    _code(mutation.get("preuve"), 80),
+                    nom_cas,
+                    ("✅ %s" if ok else "❌ %s") % _cellule(detail, 160),
+                )
+            )
+
+    lignes.append("")
+    with io.open(chemin, "a", encoding="utf-8", newline="\n") as flux:
+        flux.write("\n".join(lignes) + "\n")
+
+
+def executer_en_detail(mutation, racine):
     """Applique la mutation, exécute la preuve, restaure. Retourne
-    (ok, detail). L'état de l'arbre est TOUJOURS restauré, y compris si la
-    preuve explose."""
+    (ok, detail, cas_rougis). L'état de l'arbre est TOUJOURS restauré, y compris
+    si la preuve explose."""
     cible = racine / mutation["cible"]
     if not cible.exists():
-        return False, "cible introuvable : %s" % mutation["cible"]
+        return False, "cible introuvable : %s" % mutation["cible"], []
 
     original = lire(cible)
     initiale = empreinte(original)
@@ -558,7 +661,7 @@ def executer(mutation, racine):
         return False, (
             "littéral à neutraliser trouvé %d fois dans %s (attendu 1) — la mutation "
             "ne vise plus rien : %r" % (occurrences, mutation["cible"], mutation["trouve"][:70])
-        )
+        ), []
 
     env = dict(os.environ)
     env["PYTHONDONTWRITEBYTECODE"] = "1"
@@ -573,7 +676,7 @@ def executer(mutation, racine):
         except OSError as exc:
             # Une preuve qui ne peut PAS tourner n'est pas une preuve : c'est un
             # échec nommé, jamais une exception qui laisserait la mutation en place.
-            return False, "preuve non exécutable (%s) : %s" % (mutation["commande"][0], exc)
+            return False, "preuve non exécutable (%s) : %s" % (mutation["commande"][0], exc), []
         sortie = (proc.stdout + proc.stderr).decode("utf-8", "replace")
     finally:
         ecrire(cible, original)
@@ -582,12 +685,15 @@ def executer(mutation, racine):
     if restauree != initiale:
         return False, "RESTAURATION IMPOSSIBLE : %s (SHA-1 %s ≠ %s)" % (
             mutation["cible"], restauree, initiale,
-        )
+        ), []
+    # Les cas lus dans la sortie servent au RÉSUMÉ du run (« quelle mutation a
+    # rougi quel cas »), pas au verdict : celui-ci reste le motif déclaré.
+    cas = cas_rougis(sortie)
     if proc.returncode == 0:
         return False, (
             "la preuve %s est restée VERTE : neutraliser ce refus ne fait rougir personne "
             "(code 0)" % mutation["preuve"]
-        )
+        ), cas
     manquants = [motif for motif in mutation["attend"] if motif not in sortie]
     if manquants:
         # Montrer CE QUE la preuve a réellement imprimé : un motif devenu faux
@@ -599,27 +705,50 @@ def executer(mutation, racine):
         return False, (
             "la preuve a rougi mais n'a pas nommé %s — le rouge ne vient pas de ce refus"
             "\n         sortie : %s" % (manquants, extrait or sortie[-400:])
-        )
-    return True, "rouge nommé (%s)" % ", ".join(mutation["attend"])
+        ), cas
+    return True, "rouge nommé (%s)" % ", ".join(mutation["attend"]), cas
 
 
-def rejouer(mutations):
-    """Exécute les mutations données et rend le code de sortie : 1 si une seule
-    est restée verte sans motif, 0 sinon.
+def executer(mutation, racine):
+    """Verdict d'une mutation, sans les cas rougis : (ok, detail).
+
+    Contrat historique du harnais (ses preuves l'appellent telle quelle) ; le
+    résumé de CI passe par `executer_en_detail`, qui rend en plus les cas.
+    """
+    ok, detail, _cas = executer_en_detail(mutation, racine)
+    return ok, detail
+
+
+def rejouer(mutations, *, etape=None, declarees=None, dues_total=None):
+    """Exécute les mutations données, publie le RÉSUMÉ, et rend le code de
+    sortie : 1 si une seule est restée verte sans motif, 0 sinon.
 
     Un rejeu VIDE n'est pas un échec ici : c'est le cas d'une étape à qui le
-    verdict ne devait rien, et c'est `rejouer_l_etape` qui le dit. Ce qui reste
-    un échec, c'est une mutation qui ne mord pas.
+    verdict ne devait rien, et c'est `rejouer_l_etape` qui le dit — mais le
+    résumé l'écrit quand même, sinon un run n'aurait aucun chiffre à montrer.
+    Ce qui reste un échec, c'est une mutation qui ne mord pas.
+
+    `declarees`/`dues_total` viennent de l'appelant : le registre dit combien de
+    mutations existent, l'étape combien lui en sont dues, et ce rejeu combien il
+    en a RÉELLEMENT exécutées. Trois nombres distincts, publiés ensemble :
+    « 3 rejouées » ne se lit pas comme « 3 prouvées sur le dépôt ».
     """
     print("Harnais de mutation des gardes — %d mutation(s) à rejouer" % len(mutations))
-    echecs = []
+    resultats = []
     for mutation in mutations:
-        ok, detail = executer(mutation, REPO_ROOT)
+        ok, detail, cas = executer_en_detail(mutation, REPO_ROOT)
+        resultats.append((mutation, ok, detail, cas))
         print("  %s %s" % ("[OK]   " if ok else "[ECHEC]", mutation["id"]))
         print("         %s" % detail)
+        if cas:
+            print("         cas rougi(s) : %s" % ", ".join(cas))
         if not ok:
-            echecs.append(mutation["id"])
-            print("::error title=Mutation sans preuve::%s — %s" % (mutation["id"], detail))
+            print("::error title=Mutation sans preuve::%s — %s" % (mutation["id"], detail.replace("\n", " ")))
+
+    echecs = [mutation["id"] for mutation, ok, _detail, _cas in resultats if not ok]
+    _ecrire_resume(
+        resultats, etape=etape, declarees=declarees, dues_total=dues_total
+    )
 
     print()
     if echecs:
@@ -705,8 +834,21 @@ def verdict_d_etape(spec, nom, demande=None, racine=REPO_ROOT):
     """Le verdict de portée d'une étape déclarée : `oui` (à rejouer) ou `non`,
     avec son motif. N'exécute aucune mutation, et ne rend que le verdict — c'est
     la question qu'un workflow pose pour ne même pas démarrer une étape qui
-    n'est pas due."""
-    _dire_l_etape(*etat_d_etape(spec, nom, demande, racine))
+    n'est pas due.
+
+    Quand le verdict est `non`, le rejeu ne tournera PAS (le workflow garde son
+    pas derrière ce verdict) : c'est donc ICI que le résumé du run doit dire
+    « 0 mutation rejouée » et pourquoi. Sans cela, un run où l'étape n'était pas
+    due n'afficherait aucun chiffre, et un run sans chiffre se lit comme un run
+    sans preuve — alors qu'il en dit une : rien n'était dû.
+    """
+    etape, verdict, motif, dues, total = etat_d_etape(spec, nom, demande, racine)
+    _dire_l_etape(etape, verdict, motif, dues, total)
+    if verdict == "non":
+        _ecrire_resume(
+            [], etape=nom, declarees=len(spec["mutations"]),
+            dues_total=total, motif_non_du=motif,
+        )
     return 0
 
 
@@ -730,10 +872,16 @@ def rejouer_l_etape(spec, nom, demande=None, racine=REPO_ROOT):
     _, verdict, motif, dues, total = etat_d_etape(spec, nom, demande, racine)
     _dire_l_etape(etape, verdict, motif, dues, total)
     if verdict == "oui" and dues:
-        return rejouer(dues)
+        return rejouer(
+            dues, etape=nom, declarees=len(spec["mutations"]), dues_total=total
+        )
     print(
         "[OK] aucun rejeu dû pour cette étape : rien n'a été exécuté "
         "(la preuve ENTIÈRE est due sur main)"
+    )
+    _ecrire_resume(
+        [], etape=nom, declarees=len(spec["mutations"]),
+        dues_total=total, motif_non_du=motif,
     )
     return 0
 
@@ -806,7 +954,7 @@ def main(argv=None):
             print("  [%s] %s → %s" % (mutation["runner"], mutation["id"], mutation["preuve"]))
         return 0
 
-    return rejouer(mutations)
+    return rejouer(mutations, declarees=len(spec["mutations"]))
 
 
 if __name__ == "__main__":

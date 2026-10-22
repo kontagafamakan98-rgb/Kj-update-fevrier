@@ -1,0 +1,92 @@
+name: Job page production probe (daily)
+
+# ─── Pourquoi cette sonde est PUBLIÉE, et pas seulement écrite ──────────────
+# `/jobs/:id` n'est PAS une route du build : Vercel la réécrit vers le backend
+# (`frontend/vercel.json`, `/jobs/(.*)` → `/api/og/jobs/$1`), qui écrit le
+# document pré-rendu. Depuis le 21/10/2026 ce document DÉMARRE l'application —
+# il publie `/boot/worker-boot.js`, `/boot/worker-app.css` et le bloc de données
+# `kojo-job-data`.
+#
+# Aucun garde ne le voyait en production :
+#   • `check-job-og-contract.js` exécute le backend HORS LIGNE ;
+#   • `check-seo-production.js` juge canonical/titre/description, jamais le
+#     point d'entrée ;
+#   • `check-deployed-assets.js` vérifie les octets des actifs, pas le document
+#     qui les charge ;
+#   • `check-spa-routes.js` lit la CONFIGURATION des rewrites.
+# Et les deux pannes réelles ne cassent rien de visible : une réécriture perdue
+# répond 200 avec la coque SPA, et un document sans point d'entrée (ou sans
+# feuille, ou sans bloc) reste une fiche lisible par un crawler mais morte pour
+# un visiteur à froid — le seul arrivant d'un lien partagé.
+#
+# La sonde juge donc la production, en deux temps :
+#   1. la RÉÉCRITURE, sans dépendre d'aucune donnée : un identifiant sentinelle
+#      doit répondre le 404 du backend (noindex + point d'entrée, aucun script de
+#      bundle) — une coque SPA répondrait 200 + `/assets/*.js` ;
+#   2. la FICHE d'une mission réelle (la première `/jobs/:id` du sitemap, ou
+#      celle passée à la main) : point d'entrée chargé UNE fois, feuille présente
+#      et AVANT le module, bloc `kojo-job-data` lisible et accordé au `<h1>` et à
+#      la description, sans champ que l'API publique ne publie, plus canonical,
+#      `og:url` et `twitter:url`.
+#
+# Trois sorties, jamais deux :
+#   0 — document conforme ; 1 — refus nommé (le défaut et sa correction) ;
+#   2 — prémisse : aucune fiche au sitemap, donc le démarrage d'une fiche n'a pas
+#       pu être jugé. Une prémisse ne vaut jamais un vert (la réécriture, elle, a
+#       été mesurée sur la sentinelle).
+#
+# Aucune écriture, aucun secret : la sonde lit des documents publics. Le
+# `workflow_dispatch` sert à juger une PREVIEW ou une fiche précise, jamais à
+# changer la conduite du cron.
+on:
+  schedule:
+    # 07:10 UTC : après les autres sondes du matin (SEO 06:17, santé 06:30,
+    # Atlas 06:45, session 06:47, exposition 06:52, flux SSE 06:58, profil
+    # travailleur 07:04), hors des heures pleines.
+    - cron: '10 7 * * *'
+  workflow_dispatch:
+    inputs:
+      site:
+        description: "Origine frontend à juger (défaut : vide = production)"
+        required: false
+        default: ""
+      job:
+        description: "Fiche à juger : identifiant ou URL /jobs/:id (défaut : vide = sitemap)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Fiche mission pré-rendue (production)
+    runs-on: ubuntu-latest
+    # Plafond : une production qui ne répond plus doit rougir, pas patienter
+    # jusqu'à l'abandon du runner.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pas de `npm ci` : la sonde n'importe que des modules du dépôt et la
+      # stdlib de Node. Installer la suite complète ajouterait un mode d'échec
+      # (registre npm indisponible) qui masquerait le verdict cherché.
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Juger le document servi de /jobs/:id
+        working-directory: frontend
+        env:
+          SITE_A_JUGER: ${{ inputs.site }}
+          FICHE_A_JUGER: ${{ inputs.job }}
+        run: |
+          arguments=()
+          if [ -n "$SITE_A_JUGER" ]; then
+            arguments+=(--base "$SITE_A_JUGER")
+          fi
+          if [ -n "$FICHE_A_JUGER" ]; then
+            arguments+=(--job "$FICHE_A_JUGER")
+          fi
+          node scripts/check-job-page-production.js ${arguments[@]+"${arguments[@]}"}

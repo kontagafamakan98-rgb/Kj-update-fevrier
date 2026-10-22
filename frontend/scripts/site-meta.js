@@ -20,6 +20,9 @@
  * recopiée — voir sa définition.
  */
 
+import { APERCU_TRAVAILLEUR } from '../src/config/apercu-travailleur.js';
+import { APERCU_MISSION } from '../src/config/apercu-mission.js';
+
 /** Origine publique canonique du site (l'alias Vercel y redirige en 308). */
 export const SITE_ORIGIN = 'https://kojoforafrica.cc.cd';
 
@@ -34,6 +37,143 @@ export const SITE_ORIGIN = 'https://kojoforafrica.cc.cd';
  * n'existe plus — un vert sur du vide.
  */
 export const BUILD_REVISION_META = 'kojo-build-revision';
+
+/**
+ * Nom de la balise qui publie l'ARBRE `frontend/` dont le build est fait.
+ *
+ * Le SHA ne suffisait pas : une fusion documentaire laisse Vercel sur le build
+ * précédent, donc le commit servi n'est ni la tête de `main` ni le dernier
+ * commit ayant touché `frontend/`, alors que le CONTENU servi est celui de
+ * `main`. Faire lire au garde l'arbre du commit servi (`git rev-parse
+ * <sha>:frontend`) exigeait ce commit dans le clone — d'où un « arbre
+ * incomparable » en prémisse dès qu'il manquait. L'artefact publie donc son
+ * arbre lui-même : la comparaison ne demande plus rien au clone du côté SERVI.
+ *
+ * Deux lecteurs, un seul nom : le build l'écrit
+ * (`vite-plugins/inject-build-revision.js`), `scripts/check-deployed-revision.js`
+ * le lit. Même raison que `BUILD_REVISION_META`.
+ */
+export const BUILD_TREE_META = 'kojo-build-tree';
+
+/**
+ * Le dossier dont l'ARBRE décide du verdict de révision du frontend.
+ *
+ * Un seul propriétaire : le build l'utilise pour publier `HEAD:<dossier>`
+ * (`vite-plugins/inject-build-revision.js`) et le garde pour lire l'arbre des
+ * commits ATTENDUS (`scripts/check-deployed-revision.js`). Deux littéraux « frontend »
+ * divergeraient au premier déplacement, et le garde comparerait deux arbres de
+ * dossiers différents — un refus permanent, ou pire un vert sur du vide.
+ */
+export const BUILD_TREE_DIR = 'frontend';
+
+/**
+ * Nom de la balise qui ANCRE le manifeste d'empreintes des actifs servis.
+ *
+ * Le build écrit `asset-manifest.json` (une empreinte SHA-256 par fichier JS,
+ * CSS et police) et publie dans chaque HTML l'empreinte de CE manifeste. La
+ * vérification de production suit la chaîne : HTML servi → manifeste annoncé
+ * → octets de chaque actif. Sans cette ancre, un manifeste resté d'un build
+ * précédent pourrait contredire l'artefact servi sans que personne ne le voie.
+ */
+export const BUILD_ASSETS_META = 'kojo-build-assets';
+
+/**
+ * Chemin (absolu, sur le site) du manifeste d'empreintes des actifs.
+ *
+ * Propriétaire unique : le build l'écrit à cet endroit
+ * (`vite-plugins/inject-asset-manifest.js`) et `scripts/check-deployed-assets.js`
+ * l'y lit. Deux littéraux divergeraient au premier renommage, et la sonde
+ * demanderait un fichier que le build n'écrit plus — un refus permanent.
+ */
+export const MANIFESTE_ACTIFS = '/asset-manifest.json';
+
+/**
+ * Taille d'un BLOC d'échantillon par contenu (image, carte OG, icône) : nombre
+ * d'octets de TÊTE, de MILIEU et de QUEUE dont le manifeste publie l'empreinte.
+ *
+ * Pourquoi pas l'empreinte du fichier entier : une image de héros pèse
+ * plusieurs centaines de kilo-octets, et `scripts/check-deployed-assets.js`
+ * téléchargerait des mégaoctets à chaque passage pour un fait que la sonde n'a
+ * pas besoin de payer. Tête et queue attrapent un déploiement mixte (début du
+ * fichier, métadonnées de fin de l'encodeur) ; le MILIEU a été ajouté le
+ * 22/10/2026 parce qu'une retouche au centre du fichier laissait les deux bords
+ * intacts — la sonde rendait alors un vert sur une image qui n'était plus celle
+ * du build. Trois blocs bornent le prix à 12 Kio par contenu.
+ *
+ * Valeur LUE des deux côtés : le plugin qui écrit le manifeste et la sonde qui
+ * le vérifie. Une seconde constante dans la sonde autoriserait un manifeste
+ * d'un échantillon plus grand que ce que la sonde s'autorise à lire.
+ */
+export const ECHANTILLON_CONTENU = 4096;
+
+/**
+ * Les PLAGES d'octets dont un CONTENU publie l'empreinte — et qu'il faut relire.
+ *
+ * Tête et queue toujours ; le MILIEU seulement quand ces deux blocs laissent une
+ * brèche (`taille > 2 × bloc`). En deçà, tête et queue couvrent déjà tout le
+ * fichier, et une troisième lecture serait payée pour un fait déjà connu ; un
+ * fichier plus petit que le bloc n'a qu'une tête, qui EST le fichier (la queue
+ * est publiée elle aussi, avec la même empreinte — le schéma du manifeste ne
+ * dépend pas de la taille).
+ *
+ * Fonction PARTAGÉE par le build (qui publie les empreintes) et la sonde (qui
+ * les rejoue) : deux calculs de plages divergeraient à la première taille
+ * limite, et la sonde comparerait des octets que le build n'a jamais hachés.
+ *
+ * @param {number} taille Taille du fichier en octets.
+ * @param {number} [echantillon] Taille d'un bloc (`ECHANTILLON_CONTENU`).
+ * @returns {Array<{champ: string, debut: number, fin: number}>} Plages, dernier
+ *   octet INCLUS ; `debut` et `fin` sont les clés du manifeste.
+ */
+export function plagesContenu(taille, echantillon = ECHANTILLON_CONTENU) {
+  const nombre = Math.floor(Number(taille));
+  if (!Number.isFinite(nombre) || nombre <= 0) return [];
+  const bloc = Math.min(Math.floor(Number(echantillon)) || 0, nombre);
+  if (bloc <= 0) return [];
+  const plages = [
+    { champ: 'debut', debut: 0, fin: bloc - 1 },
+    { champ: 'fin', debut: nombre - bloc, fin: nombre - 1 },
+  ];
+  if (nombre > 2 * bloc) {
+    const debut = Math.floor((nombre - bloc) / 2);
+    plages.push({ champ: 'milieu', debut, fin: debut + bloc - 1 });
+  }
+  return plages;
+}
+
+/**
+ * Le POINT D'ENTRÉE du document pré-rendu `/workers/:id`, réexposé pour les
+ * gardes et le build.
+ *
+ * Les noms eux-mêmes vivent dans `src/config/apercu-travailleur.js`, parce que
+ * l'APPLICATION les consomme aussi (`WorkerProfile` lit `SEED_ID`) : c'est le
+ * seul domicile possible pour un fait que les deux côtés doivent partager sans
+ * recopiage. `check-worker-og-contract.js` confronte cette déclaration au
+ * document que le backend rend réellement (`backend/kojo_worker_og.py`), et
+ * `vite-plugins/worker-boot.js` publie les deux chemins stables.
+ */
+export const POINT_ENTREE_TRAVAILLEUR = {
+  script: APERCU_TRAVAILLEUR.BOOT_SCRIPT,
+  style: APERCU_TRAVAILLEUR.BOOT_STYLE,
+  seedId: APERCU_TRAVAILLEUR.SEED_ID,
+};
+
+/**
+ * Le même point d'entrée pour le document pré-rendu `/jobs/:id`.
+ *
+ * Les deux chemins sont IDENTIQUES à ceux du profil (c'est l'application, pas
+ * une page : `src/config/apercu-mission.js` les lit dans `APERCU_TRAVAILLEUR`),
+ * et seul `seedId` distingue les deux documents — chaque bloc porte SA vue.
+ * `check-job-og-contract.js` confronte cette déclaration au HTML que le backend
+ * rend réellement (`backend/kojo_job_og.py`), comme son jumeau le fait pour le
+ * profil.
+ */
+export const POINT_ENTREE_MISSION = {
+  script: APERCU_MISSION.BOOT_SCRIPT,
+  style: APERCU_MISSION.BOOT_STYLE,
+  seedId: APERCU_MISSION.SEED_ID,
+};
+
 
 /**
  * Origine de l'API que ce site appelle en direct depuis le navigateur.

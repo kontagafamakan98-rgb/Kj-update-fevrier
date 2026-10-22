@@ -31,6 +31,26 @@ router = APIRouter()
 # ajouté au document (identité, GPS, interne) reste privé par défaut.
 
 
+def _litige_visible(job: dict, current_user: Optional[User]) -> bool:
+    """Le litige d'une mission est réservé à ses PARTIES et au propriétaire.
+
+    Le motif peut porter un nom ou un numéro (il est écrit par une partie) :
+    aucune autre identité n'a de raison de le lire, et la mission elle-même
+    reste consultable sans lui — c'est le désaccord qui se cache, pas la fiche.
+    """
+    if current_user is None:
+        return False
+    identifiant = str(getattr(current_user, "id", "") or "")
+    if identifiant and identifiant in (
+        str(job.get("client_id") or ""),
+        str(job.get("assigned_worker_id") or ""),
+    ):
+        return True
+    if getattr(current_user, "user_type", None) == "owner":
+        return True
+    return bool(OWNER_EMAIL) and getattr(current_user, "email", None) == OWNER_EMAIL
+
+
 def _job_view(job: dict, current_user: Optional[User]):
     """Vue d'un job selon l'identité de l'appelant.
 
@@ -45,6 +65,13 @@ def _job_view(job: dict, current_user: Optional[User]):
         return JobPublic.model_validate(job)
     view = dict(job)
     view.pop("_id", None)
+    # Un LITIGE ne se lit que par les PARTIES et le propriétaire. Le motif est
+    # écrit par une partie (donc potentiellement un nom, une adresse) : c'est
+    # exactement pour cela qu'il n'entre pas dans le journal métier, et le
+    # laisser sortir sur `GET /jobs/{id}` — que tout compte connecté peut
+    # appeler — rouvrirait par la fenêtre ce que le journal ferme par la porte.
+    if view.get("dispute") and not _litige_visible(job, current_user):
+        view.pop("dispute", None)
     return view
 
 @router.get("/jobs")

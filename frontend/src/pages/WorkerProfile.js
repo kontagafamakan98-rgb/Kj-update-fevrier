@@ -23,12 +23,25 @@
  * (titre, description, canonical, cartes Open Graph, `<h1>`), et
  * `X-Robots-Tag: noindex` a été retiré de `vercel.json`.
  *
- * Le COMPROMIS est celui de la fiche mission, et il est assumé : le HTML servi
- * ne charge aucun script, donc un visiteur qui ouvre l'URL à FROID voit la page
- * statique (nom, réputation, ville) et pas l'application interactive ; dans
- * l'application, la navigation par `LienVue` monte ce composant normalement.
- * C'est le prix d'un contenu lisible sans JavaScript, et il se paie de la même
- * façon pour /jobs/:id.
+ * ── Et depuis le 21/10/2026, l'application DÉMARRE aussi sur ce document ──
+ * Le compromis d'origine — « le HTML servi ne charge aucun script » — coûtait
+ * trop cher : un lien partagé était le SEUL chemin d'arrivée d'un visiteur à
+ * froid, et il recevait un texte sans châssis ni navigation. Le document porte
+ * donc le point d'entrée stable du build (`/boot/worker-boot.js`) et la feuille
+ * de l'application, plus un bloc de données (`kojo-worker-data`) qui est la VUE
+ * PUBLIQUE déjà rendue. Cette page le lit comme état initial : le profil
+ * s'affiche tout de suite, sans squelette, puis se rafraîchit par l'API.
+ *
+ * Le nom du bloc et les deux chemins sont déclarés une fois dans
+ * `src/config/apercu-travailleur.js` — jamais recopiés ici —, et le contrat
+ * hors ligne (`scripts/check-worker-og-contract.js`) exige que le document
+ * serve exactement ces valeurs.
+ *
+ * ── Ce qui n'a pas changé ────────────────────────────────────────────────
+ * Le HTML reste lisible SANS JavaScript (c'est ce qu'un crawler lit) ; le
+ * titre, la description et les cartes sont toujours celles de `workerSeo`, et un
+ * identifiant inconnu dit « page introuvable » — que la page soit venue du
+ * pré-rendu ou d'une navigation par `LienVue`.
  *
  * ── Ce qu'elle n'invente pas ───────────────────────────────────────────────
  * Pas d'avis : `stats.rating_average` vaut `null` et la page écrit « aucun avis
@@ -50,10 +63,47 @@ import { Star } from 'lucide-react';
 import Link from '../components/LienVue';
 import { useLanguage } from '../contexts/LanguageContext';
 import { buildApiUrl } from '../utils/backendUrl';
+import { APERCU_TRAVAILLEUR } from '../config/apercu-travailleur';
 import { absoluteUrl, usePageOpenGraph, usePageTitle } from '../utils/seo';
 import { workerSeo } from '../utils/workerSeo';
 
 const MAX_AVIS_AFFICHES = 10;
+
+/**
+ * Le profil DÉJÀ rendu par le backend, s'il correspond bien à la route.
+ *
+ * Le bloc vient du document que le backend a écrit (`kojo_worker_og.py`) : c'est
+ * la vue publique qu'il a lui-même publiée en HTML, donc la relire ne révèle
+ * rien de nouveau. Trois refus, tous silencieux, parce que le repli est le
+ * comportement d'avant et qu'il est correct :
+ *
+ *   • pas de bloc (navigation interne, ou `/workers/:id` servi par l'app) ;
+ *   • bloc illisible (JSON tronqué par un proxy, document d'une autre version) ;
+ *   • bloc d'un AUTRE identifiant (le document est en cache pour un profil, la
+ *     route en demande un autre) — s'en servir afficherait la mauvaise personne.
+ *
+ * Ce qui n'est PAS jugé ici : la forme des champs. Le bloc vient du même backend
+ * que l'API, et la page tolère déjà l'absence de chacun (`stats` par défaut,
+ * avis facultatifs) ; re-valider chaque clé ajouterait un second schéma à
+ * maintenir pour un document que nous écrivons nous-mêmes.
+ *
+ * @param {string} id Identifiant attendu (celui de la route).
+ * @param {Document} [racine] Document à lire (injecté par les tests).
+ * @returns {object|null} La vue publique, ou null.
+ */
+export const lireApercuPrerendu = (id, racine = typeof document === 'undefined' ? null : document) => {
+  if (!racine || !id) return null;
+  const noeud = racine.getElementById(APERCU_TRAVAILLEUR.SEED_ID);
+  if (!noeud) return null;
+  try {
+    const donnees = JSON.parse(noeud.textContent || 'null');
+    if (!donnees || typeof donnees !== 'object' || Array.isArray(donnees)) return null;
+    if (String(donnees.id ?? '') !== String(id)) return null;
+    return donnees;
+  } catch (_erreur) {
+    return null;
+  }
+};
 
 /** L'initiale d'un prénom, jamais un carré vide. */
 const initiale = (prenom) => (prenom ? String(prenom).trim().charAt(0).toUpperCase() : '·');
@@ -62,8 +112,19 @@ const WorkerProfile = () => {
   const { id } = useParams();
   const { t } = useLanguage();
 
-  const [profil, setProfil] = useState(null);
-  const [etat, setEtat] = useState('chargement'); // chargement | pret | absent | erreur
+  // L'aperçu pré-rendu (s'il y en a un pour CETTE route) est l'état INITIAL :
+  // le premier rendu est le profil complet, pas un squelette. Une seule lecture
+  // du bloc, donc pas deux `JSON.parse` pour deux `useState`.
+  const [apercu] = useState(() => lireApercuPrerendu(id));
+  const [profil, setProfil] = useState(apercu);
+  const [etat, setEtat] = useState(apercu ? 'pret' : 'chargement'); // chargement | pret | absent | erreur
+
+  // Ce qui est AFFICHÉ à cet instant (profil et état), pour que la lecture
+  // asynchrone sache si elle peut remplacer une page déjà lisible. Un ref, et
+  // pas une dépendance de `charger` : en faire une dépendance relancerait
+  // l'effet à chaque réponse, donc une boucle de requêtes.
+  const affiche = useRef({ id: apercu ? String(apercu.id ?? '') : null, etat: apercu ? 'pret' : 'chargement' });
+  affiche.current = { id: profil ? String(profil.id ?? '') : null, etat };
 
   // ── Une réponse TARDIVE n'écrit rien ─────────────────────────────────────
   // La lecture est asynchrone, et rien ne garantit qu'elle se termine pendant
@@ -85,7 +146,13 @@ const WorkerProfile = () => {
     const mienne = requete.current + 1;
     requete.current = mienne;
     const encoreValide = () => mienne === requete.current;
-    setEtat('chargement');
+    // Une page DÉJÀ lisible (aperçu pré-rendu, ou profil précédent du même
+    // identifiant) reste à l'écran pendant la relecture : la remplacer par le
+    // squelette ferait disparaître le contenu que le backend vient de servir,
+    // et le visiteur verrait un clignotement au lieu du profil.
+    const garderAffiche = () =>
+      affiche.current.etat === 'pret' && affiche.current.id === String(id);
+    if (!garderAffiche()) setEtat('chargement');
     try {
       // Route PUBLIQUE : aucun jeton, aucun en-tête d'authentification. Un
       // visiteur qui arrive par un lien partagé doit voir la page.
@@ -105,6 +172,11 @@ const WorkerProfile = () => {
       setEtat('pret');
     } catch (_error) {
       if (!encoreValide()) return;
+      // Avec un profil déjà affiché, une lecture ratée ne l'efface pas : ce
+      // contenu vient du serveur, il y a quelques secondes, et une page de
+      // profil valable vaut mieux qu'un message d'erreur — la navigation
+      // reste disponible, et la relecture se refera au prochain montage.
+      if (garderAffiche()) return;
       setEtat('erreur');
     }
   }, [id]);
@@ -275,7 +347,17 @@ const WorkerProfile = () => {
       </section>
 
       <p className="mt-8">
-        <Link to="/jobs" className="font-semibold text-orange-600 hover:text-orange-700">
+        {/* L'ancre stable de la sonde navigateur
+            (scripts/check-worker-interactive-production.js) : le libellé est
+            traduit en cinq langues et la classe est une peinture, aucun des
+            deux ne peut servir de repère. C'est l'action que la page OFFRE au
+            visiteur — le profil est public et en lecture seule, une
+            proposition se fait depuis la mission (`/jobs/:id`). */}
+        <Link
+          to="/jobs"
+          data-sonde="voir-missions"
+          className="font-semibold text-orange-600 hover:text-orange-700"
+        >
           {t('viewJobs')}
         </Link>
       </p>

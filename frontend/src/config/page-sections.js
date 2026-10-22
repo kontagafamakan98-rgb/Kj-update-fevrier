@@ -1392,6 +1392,11 @@ export const PAGE_SECTIONS = {
     lcpChamp: 'sectionBodyClass',
     sections: [
       { titleKey: 'privacyDataTitle', bodyKey: 'privacyDataBody' },
+      // Les sous-traitants viennent APRÈS « données conservées » : la page dit
+      // d'abord ce qu'elle garde, puis chez qui. La liste fait autorité dans
+      // PRIVACY.md §2, et un test refuse un prestataire appelé par le code sans
+      // y être nommé (backend/tests/test_sous_traitants_politique.py).
+      { titleKey: 'privacyProcessorsTitle', bodyKey: 'privacyProcessorsBody' },
       { titleKey: 'privacyRetentionTitle', bodyKey: 'privacyRetentionBody' },
       { titleKey: 'privacyRightsTitle', bodyKey: 'privacyRightsBody' },
       { titleKey: 'privacyContactSectionTitle', bodyKey: 'privacyContactBody' },

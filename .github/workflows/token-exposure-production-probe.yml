@@ -27,7 +27,9 @@ name: Token exposure production probe (daily)
 # Elle tourne une fois par jour au lieu de chaque push, à dessein : elle dépend
 # d'un compte réel et d'un réseau public, donc elle ne bloque aucune PR. Mais
 # elle ÉCHOUE (code 1) au lieu de publier une note : l'exposition d'un jeton est
-# un invariant, pas une métrique.
+# un invariant, pas une métrique. Code 2 = prémisse (aucun verdict rendu) :
+# compte CI absent, session impossible à ouvrir — le code de sortie ne se
+# confond pas avec un jeton exposé, même si les deux rendent le job rouge.
 #
 # Aucune écriture : la sonde LIT une session existante (aucune inscription,
 # aucun compte créé), ne modifie rien, et jette son contexte à chaque tentative.

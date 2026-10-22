@@ -16,6 +16,7 @@ import {
   runJobOgContractCheck,
 } from '../check-job-og-contract';
 import { DESCRIPTION_LIMIT, jobSeo } from '../../src/utils/jobSeo';
+import { POINT_ENTREE_MISSION } from '../site-meta';
 
 // Tests du garde « contrat app ↔ pré-rendu de /jobs/:id » (hors ligne) :
 //   - le HTML comparé est celui du MODULE DE PRODUCTION (backend/kojo_job_og.py),
@@ -140,11 +141,76 @@ describe.skipIf(!hasPrerender)('check-job-og-contract — ce qui doit échouer',
   });
 });
 
+describe.skipIf(!hasPrerender)('check-job-og-contract — la fiche DÉMARRE l’application', () => {
+  it('le document de production porte la feuille, le point d’entrée et la vue rendue', () => {
+    // Le document rendu par le module de production est confronté AUX chemins
+    // déclarés : renommer l'un des deux côtés rougit ici, sans serveur.
+    expect(compareJobOg({ app, html: realHtml, base: BASE, vue: FIXTURE_JOB })).toEqual([]);
+    // Et le CLI FOURNIT la vue : sans elle, le bloc ne serait jamais jugé dans
+    // l'étape de CI — un contrôle qui ne s'exécute pas ne garde rien.
+    const run = runJobOgContractCheck({ root: REPO_ROOT, base: BASE, quiet: true });
+    expect(run.ok).toBe(true);
+    expect(run.checked.join('\n')).toContain(`bloc « ${POINT_ENTREE_MISSION.seedId} »`);
+  });
+
+  it('détecte un document qui NE démarre PAS l’application', () => {
+    const sansBoot = realHtml.replace(/<script type="module"[^>]*><\/script>\r?\n?/, '');
+    expect(sansBoot).not.toBe(realHtml);
+
+    const errors = compareJobOg({ app, html: sansBoot, base: BASE, vue: FIXTURE_JOB });
+    expect(errors.join('\n')).toContain('point d’entrée');
+
+    // Sans vue à juger, ce même document passerait : c'est bien le CLI qui
+    // décide que le bloc et le démarrage font partie du contrat.
+    expect(compareJobOg({ app, html: sansBoot, base: BASE })).toEqual([]);
+  });
+
+  it('le CLI REFUSE un pré-rendu qui ne porte plus le bloc (il fournit donc la vue)', () => {
+    // La preuve que l'étape de CI juge vraiment le bloc : on retire la balise du
+    // module de production, sur une COPIE du dépôt (le dépôt n'est jamais écrit),
+    // et la même invocation doit rougir. Si le CLI oubliait de passer la vue, ce
+    // document passerait au vert — le contrôle serait décoratif.
+    const racine = fs.mkdtempSync(path.join(os.tmpdir(), 'job-og-boot-'));
+    try {
+      const backend = path.join(racine, 'backend');
+      fs.mkdirSync(backend);
+      const source = fs.readFileSync(path.join(REPO_ROOT, 'backend/kojo_job_og.py'), 'utf8');
+      const mute = source.replace(
+        '+ (balise_seed(SEED_ID, vue_publique) if vue_publique is not None else "")',
+        '+ ""'
+      );
+      expect(mute).not.toBe(source);
+      fs.writeFileSync(path.join(backend, 'kojo_job_og.py'), mute);
+
+      const run = runJobOgContractCheck({ root: racine, base: BASE, quiet: true });
+
+      expect(run.ok).toBe(false);
+      expect(run.errors.join('\n')).toContain('bloc');
+    } finally {
+      fs.rmSync(racine, { recursive: true, force: true });
+    }
+  });
+
+  it('détecte un bloc de données d’une AUTRE mission', () => {
+    // La page afficherait la mauvaise mission, avec son budget et son adresse :
+    // le bloc doit porter la vue RENDUE, pas une vue voisine.
+    const errors = compareJobOg({
+      app,
+      html: realHtml,
+      base: BASE,
+      vue: { ...FIXTURE_JOB, id: 'autre-mission' },
+    });
+    expect(errors.join('\n')).toContain('ne porte pas la vue publique rendue');
+  });
+});
+
 describe.skipIf(!hasPrerender)('check-job-og-contract — le jeu de référence (frontière des 150)', () => {
   it('chaque mission du jeu tient le contrat des DEUX côtés', () => {
     expect(referenceCases).toHaveLength(CONTRACT_JOBS.length);
     for (const { job, app: announce, html } of referenceCases) {
-      expect(compareJobOg({ app: announce, html, base: BASE }), job.label).toEqual([]);
+      // `vue: job` : chaque mission du jeu est aussi jugée sur son bloc de
+      // données, pas seulement sur sa tête.
+      expect(compareJobOg({ app: announce, html, base: BASE, vue: job }), job.label).toEqual([]);
     }
   });
 

@@ -16,34 +16,61 @@
  * (`vite-plugins/inject-build-revision.js` → meta `kojo-build-revision`), et ce
  * garde compare cette réponse à ce que `main` aurait dû déployer.
  *
- * ── Quelle révision est ATTENDUE ───────────────────────────────────────────
+ * ── Quelle révision est ATTENDUE, et ce qu'on compare VRAIMENT ────────────
  * La propriété visée est : aucun changement de `frontend/**` n'est absent de la
- * production. Elle s'écrit avec deux valeurs acceptées, et non une seule, parce
- * que la politique du déployeur n'est pas la nôtre :
+ * production. C'est une propriété d'ARBRE, pas de SHA — et le SHA n'en était
+ * qu'un raccourci, faux dès qu'une fusion ne touche pas le frontend.
+ *
+ * Mesuré le 21/10/2026 : une fusion DOCUMENTAIRE laisse Vercel sur le build
+ * précédent (le déployeur ne reconstruit pas pour un changement qui ne le
+ * concerne pas), donc la révision servie n'est ni la tête de `main` ni, dans un
+ * clone superficiel ou sur un commit de fusion, ce que `git rev-list -1 HEAD --
+ * frontend/` désigne. Le garde refusait alors une production CONFORME : un rouge
+ * sur un fait vrai, c'est-à-dire un garde qu'on apprend à ignorer.
+ *
+ * Le verdict porte donc sur l'arbre de `frontend/`. Deux SHA différents avec le
+ * MÊME arbre sont acceptés (et le disent) ; deux SHA différents avec des arbres
+ * différents sont refusés. L'égalité de SHA reste le chemin rapide, qui
+ * n'appelle même pas git.
+ *
+ * L'arbre SERVI n'est plus lu dans le clone : le build le PUBLIE dans le HTML
+ * qu'il produit (`vite-plugins/inject-build-revision.js` → meta
+ * `kojo-build-tree`), et ce garde le lit là. C'était la dernière raison pour
+ * laquelle le commit servi devait exister localement : un clone superficiel
+ * rendait l'arbre « incomparable » et la vérification sortait en prémisse
+ * (code 2) pour un fait qui ne disait rien de la production. Le clone n'est
+ * plus interrogé que pour les commits ATTENDUS — ceux que l'appelant nomme, et
+ * qui viennent de `main`.
+ *
  *   • `--attendu` : le commit poussé (Vercel redéploie chaque push de `main`,
  *     mesuré sur 12 commits consécutifs) ;
- *   • `--sinon`   : le dernier commit qui a touché `frontend/**` — l'état que la
- *     production laisse en place si un jour Vercel ignore un push sans
- *     changement de frontend. L'accepter ne relâche rien : dans les deux cas, le
- *     contenu frontend servi est celui de `main`.
- * Accepter une valeur PLUS ANCIENNE ne relâcherait rien non plus, mais serait un
- * refus silencieux de la question posée : un déploiement en retard doit rougir.
+ *   • `--sinon`   : le dernier commit qui a touché `frontend/**` — conservé pour
+ *     que les deux valeurs restent nommées, même si l'arbre les départage.
+ * Accepter une révision PLUS ANCIENNE dont l'arbre diffère ne relâcherait rien
+ * non plus, mais serait un refus silencieux de la question posée : un
+ * déploiement en retard doit rougir.
  *
  * ── Ce que ce garde refuse, et pourquoi il le NOMME ────────────────────────
- * Trois refus, trois corrections différentes — un seul « échec » les confondrait :
+ * Quatre refus, quatre corrections différentes — un seul « échec » les confondrait :
  *   1. le HTML servi n'annonce AUCUNE révision : l'artefact est antérieur à ce
  *      mécanisme, ou construit sans qu'aucune source n'en donne (ni `KOJO_GIT_SHA`,
  *      ni variable système, ni dépôt git — cf. `vite-plugins/inject-build-revision.js`).
  *      Correction : redéployer le frontend sur Vercel.
- *   2. la révision servie n'est ni l'attendue ni la dernière ayant touché le
- *      frontend : la production est en retard (build échoué, en file d'attente
- *      depuis plus longtemps que la fenêtre d'attente, ou déploiement annulé).
- *   3. aucune réponse exploitable : le site ne répond pas, ou le CDN refuse
+ *   2. le HTML servi annonce une révision mais AUCUN arbre : artefact antérieur
+ *      au verdict par arbre, ou build fait hors dépôt git. Correction :
+ *      redéployer. C'est un fait de PRODUCTION (code 1), jamais une prémisse :
+ *      comparer deux arbres ne demande plus le commit servi dans ce clone.
+ *   3. l'arbre servi n'est celui d'aucune révision attendue : la production est
+ *      en retard (build échoué, en file d'attente depuis plus longtemps que la
+ *      fenêtre d'attente, ou déploiement annulé).
+ *   4. aucune réponse exploitable : le site ne répond pas, ou le CDN refuse
  *      (défi de sécurité de l'edge Vercel, mesuré le 20/09/2026 et nommé ici :
  *      `X-Vercel-Mitigated`). Rien ne peut alors être affirmé sur le déploiement.
  *
- * Une invocation qui ne dit pas quoi comparer ÉCHOUE (code 2) au lieu de passer :
- * `--attendu` vide ou trop court n'est pas un identifiant de commit.
+ * La seule prémisse qui reste (code 2) ne parle PAS de la production : c'est
+ * l'arbre d'une révision ATTENDUE qui est illisible dans ce clone — donc
+ * l'invocation, pas le déploiement. Son remède est le clone, jamais un
+ * redéploiement.
  *
  * ── Coût, et le risque de faux rouge ───────────────────────────────────────
  * Un appel HTTP par tentative, séquentiels, bornés par `--tentatives` (défaut 9
@@ -59,12 +86,31 @@
  *   --base https://kojoforafrica.cc.cd   (défaut : SITE_ORIGIN, scripts/site-meta.js)
  *   --tentatives 9 --delai 20
  */
+import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { BUILD_REVISION_META, SITE_ORIGIN, isLoopbackUrl, metaContent } from './site-meta.js';
+import {
+  BUILD_REVISION_META,
+  BUILD_TREE_DIR,
+  BUILD_TREE_META,
+  SITE_ORIGIN,
+  isLoopbackUrl,
+  metaContent,
+} from './site-meta.js';
+
+// Le dossier dont l'ARBRE décide du verdict. Un seul propriétaire : le jour où
+// le déployeur sert autre chose que `frontend/`, c'est ici que ça se dit — et
+// le build lit la MÊME constante (`BUILD_TREE_DIR`), donc les deux côtés ne
+// peuvent pas comparer deux dossiers différents.
+export const DOSSIER_FRONTEND = BUILD_TREE_DIR;
 
 // Longueur minimale d'un SHA de commit : en dessous, ce n'est pas un identifiant
 // de commit mais une chaîne quelconque — comparer là-dessus serait un faux vert.
 export const LONGUEUR_SHA_MIN = 7;
+
+// Un arbre git, c'est 40 caractères hexadécimaux — et rien d'autre. Une valeur
+// d'une autre forme (arbre abrégé, message d'erreur) n'est pas un arbre, et
+// comparer là-dessus accepterait deux contenus différents sur douze caractères.
+export const ARBRE_GIT = /^[0-9a-f]{40}$/i;
 
 // Valeurs qui ne sont PAS une révision : le champ vide, et ce qu'un artefact
 // fabriqué sans révision pourrait annoncer.
@@ -145,6 +191,23 @@ export function revisionServie(html) {
 }
 
 /**
+ * L'ARBRE `frontend/` publié par le HTML servi, ou '' si la page n'en annonce
+ * aucun (ou en annonce un qui n'a pas la forme d'un arbre git).
+ *
+ * C'est la grandeur du verdict, et elle voyage dans l'artefact : le garde n'a
+ * donc plus à résoudre le commit SERVI localement. Une valeur abrégée est
+ * refusée comme absente — deux arbres différents partagent leurs douze premiers
+ * caractères assez souvent pour qu'un préfixe soit un faux vert.
+ *
+ * @param {string} html Corps de la réponse de la page d'accueil.
+ * @returns {string} L'arbre publié, en minuscules, ou ''.
+ */
+export function arbreServi(html) {
+  const valeur = String(metaContent(String(html ?? ''), BUILD_TREE_META) ?? '').trim();
+  return ARBRE_GIT.test(valeur) ? valeur.toLowerCase() : '';
+}
+
+/**
  * Le verdict, avec le coupable nommé dans chaque cas.
  *
  * @param {string} servie Révision annoncée par la production.
@@ -174,6 +237,187 @@ export function comparer(servie, attendues = []) {
     ok: false,
     message:
       `révision servie ≠ attendue : servi=${révision.slice(0, 12)} attendu=${attendu} — ` +
+      "le frontend déployé n'est pas celui de main (build Vercel échoué, en file d'attente, " +
+      'ou déploiement jamais déclenché).',
+  };
+}
+
+/**
+ * Lance git et rend son verdict, sans jamais lever.
+ *
+ * `spawnSync` (et un délai BORNÉ) plutôt qu'`execSync` : un `git fetch` qui
+ * pendrait sur un réseau lent ne doit pas figer le garde plus longtemps que la
+ * fenêtre d'attente qu'il s'est donnée.
+ *
+ * @param {string[]} args Arguments git.
+ * @param {object} [options] `cwd`, `timeout` (ms).
+ * @returns {{ok: boolean, sortie: string, erreur: string}}
+ */
+export function gitTexte(args, { cwd = process.cwd(), timeout = 20000 } = {}) {
+  const résultat = spawnSync('git', args, { cwd, encoding: 'utf8', timeout });
+  const sortie = typeof résultat.stdout === 'string' ? résultat.stdout.trim() : '';
+  const erreur = typeof résultat.stderr === 'string' ? résultat.stderr.trim() : '';
+  return {
+    ok: résultat.status === 0,
+    sortie,
+    erreur: erreur || (résultat.error?.message ?? ''),
+  };
+}
+
+// Révisions pour lesquelles une récupération a DÉJÀ été tentée. Sans cette
+// borne, une révision absente du clone relancerait un `git fetch` à CHAQUE
+// tentative du garde (neuf fois, ~25 s chacune au pire) : la fenêtre d'attente
+// annoncée deviendrait fausse. Une révision ne se récupère qu'une fois.
+const RECUPERATIONS_TENTEES = new Set();
+
+/**
+ * L'arbre `frontend/` d'une révision, ou la raison de son absence.
+ *
+ * La grandeur comparée à l'arbre PUBLIÉ par l'artefact (cf. `arbreServi`). Une
+ * fusion documentaire laisse la production sur le build précédent : son SHA
+ * n'est alors ni la tête de `main` ni ce que `rev-list -1 HEAD -- frontend/`
+ * désigne, alors que le contenu servi est pourtant celui de `main`. L'arbre dit
+ * cette égalité-là.
+ *
+ * Cette fonction ne sert donc plus qu'aux révisions ATTENDUES (celles de
+ * `main`, nommées par l'appelant) : le commit SERVI n'est plus résolu ici, ce
+ * qui est exactement ce qui a supprimé le cas « arbre incomparable ». Si même
+ * un commit attendu manque au clone, une récupération BORNÉE est tentée, puis
+ * la lecture est refaite ; si elle échoue encore, l'erreur le dit — on ne rend
+ * jamais un arbre vide qu'un appelant confondrait avec « identique ».
+ *
+ * @param {string} révision SHA (ou référence) du commit.
+ * @param {object} [options] `cwd`, `git` (injectable), `récupérer` (false = pas de réseau).
+ * @returns {{arbre: string, erreur: string|null}}
+ */
+export function arbreFrontend(révision, {
+  cwd = process.cwd(),
+  git = gitTexte,
+  récupérer = true,
+} = {}) {
+  const rev = normaliser(révision);
+  if (rev.length < LONGUEUR_SHA_MIN) {
+    return { arbre: '', erreur: `révision inutilisable (${JSON.stringify(révision)})` };
+  }
+
+  const lire = () => git(['rev-parse', '--verify', '--quiet', `${rev}:${DOSSIER_FRONTEND}`], { cwd });
+  let lecture = lire();
+  if (!lecture.ok && récupérer && !RECUPERATIONS_TENTEES.has(rev)) {
+    RECUPERATIONS_TENTEES.add(rev);
+    git(['fetch', '--no-tags', 'origin', rev], { cwd, timeout: 25000 });
+    lecture = lire();
+  }
+  if (!lecture.ok) {
+    return {
+      arbre: '',
+      erreur:
+        `commit ${rev.slice(0, 12)} absent de ce clone (${lecture.erreur || 'git rev-parse a échoué'}) : ` +
+        `impossible de lire l'arbre ${DOSSIER_FRONTEND}/ de la révision ATTENDUE. ` +
+        `Correction : passer un commit présent dans ce clone, ou ` +
+        `\`git fetch origin ${rev.slice(0, 12)}\` — le commit SERVI, lui, n'est plus ` +
+        'lu ici depuis que le build publie son arbre.',
+    };
+  }
+
+  const arbre = lecture.sortie.split(/\s+/).pop();
+  if (!ARBRE_GIT.test(arbre)) {
+    return {
+      arbre: '',
+      erreur:
+        `git n'a pas rendu d'arbre pour ${rev.slice(0, 12)}:${DOSSIER_FRONTEND} ` +
+        `(${JSON.stringify(lecture.sortie)})`,
+    };
+  }
+  return { arbre, erreur: null };
+}
+
+/**
+ * Le verdict : le SHA d'abord (chemin rapide, aucun appel à git), puis l'ARBRE
+ * PUBLIÉ par l'artefact comparé à celui des révisions attendues.
+ *
+ * Ce qui est accepté, et pourquoi ce n'est pas un relâchement :
+ *   • même SHA → même code, évidemment ;
+ *   • SHA différent, arbre `frontend/` IDENTIQUE → aucun changement de frontend
+ *     n'est absent de la production, ce qui est exactement la propriété visée.
+ *     C'est le cas d'une fusion documentaire (mesuré le 21/10/2026) ;
+ *   • SHA différent, arbre DIFFÉRENT → refus, en nommant les deux arbres ;
+ *   • révision servie SANS arbre publié → refus (code 1) : c'est un fait de
+ *     production, l'artefact précède le verdict par arbre ou a été construit
+ *     hors dépôt git. Plus de prémisse ici : l'arbre servi vient du HTML, donc
+ *     rien du clone n'est nécessaire pour le lire.
+ *
+ * La seule prémisse restante (code 2) porte sur une révision ATTENDUE dont
+ * l'arbre est illisible dans ce clone — une invocation qui ne peut pas conclure,
+ * pas un déploiement en retard.
+ *
+ * @param {string} servie Révision annoncée par la production.
+ * @param {string[]} attendues Révisions acceptées.
+ * @param {object} [options] `arbrePublié` (lu dans le HTML), `arbreDe` (injectable), `cwd`.
+ * @returns {{ok: boolean, message: string, premisse?: boolean, parArbre?: boolean}}
+ */
+export function verdictDeRevision(servie, attendues = [], {
+  arbrePublié = '',
+  arbreDe = arbreFrontend,
+  cwd = process.cwd(),
+} = {}) {
+  const simple = comparer(servie, attendues);
+  if (simple.ok) return { ...simple, parArbre: false };
+
+  const révision = normaliser(servie);
+  // Une production MUETTE n'est pas une prémisse : c'est le refus « aucune
+  // révision annoncée » (artefact antérieur, ou build sans source), et il doit
+  // garder son code 1 et son message. L'arbre n'a rien à y voir.
+  if (!révision) return { ...simple, parArbre: false };
+
+  const publié = String(arbrePublié ?? '').trim().toLowerCase();
+  if (!ARBRE_GIT.test(publié)) {
+    return {
+      ok: false,
+      message:
+        `le frontend servi annonce une révision (${révision.slice(0, 12)}) mais AUCUN arbre ` +
+        `${DOSSIER_FRONTEND}/ (meta « ${BUILD_TREE_META} » absente ou mal formée) : ` +
+        "l'artefact déployé est antérieur au verdict par arbre, ou il a été construit hors " +
+        "dépôt git. Redéployer le frontend sur Vercel — comparer le SHA seul refuserait une " +
+        'fusion documentaire (rouge sur un fait vrai), et ne rien comparer passerait sur du vide.',
+    };
+  }
+
+  const arbres = [];
+  for (const cible of attendues.map(normaliser).filter(Boolean)) {
+    const lu = arbreDe(cible, { cwd });
+    if (!lu?.arbre) {
+      return {
+        ok: false,
+        premisse: true,
+        message:
+          `arbre ${DOSSIER_FRONTEND}/ ATTENDU illisible — prémisse (aucun verdict rendu ici) : ` +
+          `${lu?.erreur || `aucun arbre pour ${cible.slice(0, 12)}`}. ` +
+          "Ce n'est pas un retard de production : c'est le clone qui ne contient pas la " +
+          'révision attendue (celle que `--attendu`/`--sinon` nomment).',
+      };
+    }
+    arbres.push({ cible, arbre: lu.arbre });
+  }
+
+  const identique = arbres.find(({ arbre }) => arbre === publié);
+  if (identique) {
+    return {
+      ok: true,
+      parArbre: true,
+      message:
+        `révision servie ≠ attendue (servi=${révision.slice(0, 12)} attendu=${identique.cible.slice(0, 12)}) ` +
+        `mais l'arbre ${DOSSIER_FRONTEND}/ publié par l'artefact est IDENTIQUE (${publié.slice(0, 12)}) : ` +
+        `aucun changement de ${DOSSIER_FRONTEND}/ n'est absent de la production.`,
+    };
+  }
+
+  return {
+    ok: false,
+    premisse: false,
+    message:
+      `révision servie ≠ attendue et l'arbre ${DOSSIER_FRONTEND}/ DIFFÈRE : ` +
+      `servi=${révision.slice(0, 12)} (arbre ${publié.slice(0, 12)}) ` +
+      `attendu=${arbres.map(({ cible, arbre }) => `${cible.slice(0, 12)} (arbre ${arbre.slice(0, 12)})`).join(' ou ')} — ` +
       "le frontend déployé n'est pas celui de main (build Vercel échoué, en file d'attente, " +
       'ou déploiement jamais déclenché).',
   };
@@ -226,6 +470,10 @@ export async function interroger(base, { fetchImpl = fetch, timeout = 15000 } = 
  * Les tentatives absorbent le déploiement en cours ; elles ne transforment pas un
  * refus en succès, elles attendent que la réponse change.
  *
+ * L'arbre est lu dans CHAQUE réponse (il est publié par l'artefact, cf.
+ * `arbreServi`) : un build en cours peut servir d'abord l'ancien arbre, puis le
+ * bon, sans que le commit servi ait à exister dans ce clone.
+ *
  * @param {object} options `base`, `attendues`, `fetchImpl`, `tentatives`, `delai`.
  * @returns {Promise<{ok: boolean, journal: string[]}>} Le verdict et chaque essai.
  */
@@ -238,8 +486,11 @@ export async function verifierServie({
   dormir = (ms) => new Promise((r) => setTimeout(r, ms * 1000)),
   log = console.log,
   interrogerImpl = interroger,
+  arbreDe = arbreFrontend,
+  cwd = process.cwd(),
 } = {}) {
   const journal = [];
+  let dernier = null;
   const total = Math.max(1, Number(tentatives) || 1);
   for (let tentative = 1; tentative <= total; tentative += 1) {
     const { html, erreur } = await interrogerImpl(base, { fetchImpl });
@@ -248,13 +499,18 @@ export async function verifierServie({
         ok: false,
         message: `aucune réponse exploitable de ${base} : ${erreur} — rien ne peut être affirmé sur le déploiement.`,
       }
-      : comparer(revisionServie(html), attendues);
+      : verdictDeRevision(revisionServie(html), attendues, {
+        arbrePublié: arbreServi(html),
+        arbreDe,
+        cwd,
+      });
+    dernier = verdict;
     journal.push(`tentative ${tentative}/${total} : ${verdict.message}`);
     log(`  ${journal[journal.length - 1]}`);
-    if (verdict.ok) return { ok: true, journal };
+    if (verdict.ok) return { ok: true, journal, premisse: false, parArbre: Boolean(verdict.parArbre) };
     if (tentative < total) await dormir(delai);
   }
-  return { ok: false, journal };
+  return { ok: false, journal, premisse: Boolean(dernier?.premisse) };
 }
 
 /**
@@ -296,8 +552,8 @@ export function lireOptions(argv = []) {
     throw new Error(
       `--attendu/--sinon ne sont pas des identifiants de commit (${invalides
         .map((v) => JSON.stringify(v))
-        .join(', ')}) : ce garde compare la révision servie à un commit, il ne peut pas ` +
-        'conclure sans lui.'
+        .join(', ')}) : ce garde compare la révision et l\'arbre SERVIS à des commits ` +
+        'attendus, il ne peut pas conclure sans eux.'
     );
   }
   if (valides.length === 0) {
@@ -314,7 +570,7 @@ export function lireOptions(argv = []) {
   };
 }
 
-export async function main(argv = process.argv.slice(2)) {
+export async function main(argv = process.argv.slice(2), { verifier = verifierServie } = {}) {
   let options;
   try {
     options = lireOptions(argv);
@@ -331,7 +587,13 @@ export async function main(argv = process.argv.slice(2)) {
 
   console.log(`Révisions acceptées : ${options.attendues.map((r) => r.slice(0, 12)).join(' ou ')}`);
   console.log(`Interrogation de ${options.base}/…`);
-  const { ok, journal } = await verifierServie(options);
+  // Le VÉRIFICATEUR est injectable comme `arbreDe`/`fetchImpl` le sont plus bas :
+  // le verdict de prémisse ne se fabrique pas depuis la production réelle (il
+  // faut une révision servie ET un commit attendu ABSENT de ce clone), donc sans
+  // cette couture le CODE 2 — la prémisse TOLÉRÉE, qui ne doit pas accuser le
+  // déploiement — ne serait nommé par aucun cas, et un `return 1` posé là
+  // passerait la suite entière sans qu'un test bronche.
+  const { ok, journal, premisse } = await verifier(options);
   if (ok) {
     console.log(
       `::notice title=Frontend servi::${journal[journal.length - 1]} — le site sert bien un ` +
@@ -341,8 +603,17 @@ export async function main(argv = process.argv.slice(2)) {
   }
 
   const dernier = journal[journal.length - 1] || 'aucune tentative';
+  if (premisse) {
+    // La seule prémisse restante : l'arbre d'une révision ATTENDUE est illisible
+    // dans ce clone. Ce n'est pas un frontend en retard — le code 2 le dit à la
+    // CI et à `livrer.py`, qui ne doivent pas accuser le déploiement.
+    console.log(`::error title=Arbre attendu illisible::${dernier}`);
+    return 2;
+  }
   if (dernier.includes('AUCUNE révision')) {
     console.log(`::error title=Révision du frontend non annoncée::${dernier}`);
+  } else if (dernier.includes('AUCUN arbre')) {
+    console.log(`::error title=Arbre du frontend non annoncé::${dernier}`);
   } else if (dernier.includes('aucune réponse exploitable')) {
     console.log(`::error title=Frontend injoignable::${dernier}`);
   } else {

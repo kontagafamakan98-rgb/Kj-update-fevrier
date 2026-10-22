@@ -5,7 +5,7 @@ import re
 import uuid
 from datetime import datetime, timezone
 from enum import Enum
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
@@ -237,6 +237,20 @@ class Job(BaseModel):
     # libéré : la validation ne crée pas un faux statut de mission.
     completion: Optional[dict] = None
 
+    # LITIGE TRACÉ (`kojo_job_disputes`). `None` tant que personne ne conteste.
+    # Sinon : {state, reason, opened_by, opened_by_role, opened_at,
+    # decision_deadline_at, expired_at, resolved_at, decision, decision_note,
+    # decided_by, payment_outcome, withdrawn_at, decision_failure,
+    # decision_attempted_at, response}.
+    # `state` : open | withdrawn | resolved | expired | decision_failed.
+    # `open` et `decision_failed` gèlent l'argent (une décision de rembourser
+    # qui n'a pas abouti ne doit pas être défaite par la libération
+    # automatique) ; `expired` est une fenêtre d'arbitrage refermée sans
+    # décision, après laquelle la règle ordinaire reprend.
+    # Il voyage avec la mission (même route, même réponse) : l'écran qui montre
+    # la mission montre le désaccord, sans seconde source à croire.
+    dispute: Optional[dict] = None
+
 
 class JobCompletionMark(BaseModel):
     """Corps de `POST /jobs/{id}/completion` : ce que le travailleur déclare.
@@ -259,6 +273,43 @@ class JobCompletionMark(BaseModel):
                     '(https://res.cloudinary.com/).'
                 )
         return valeurs
+
+class JobDisputeOpen(BaseModel):
+    """Corps de `POST /jobs/{id}/dispute` : ce que la partie conteste.
+
+    Le motif est EXIGÉ (20 caractères, 1000 au plus) : c'est ce que le
+    propriétaire lira pour trancher, et un litige sans motif serait une
+    contestation muette — donc intraitable. Il n'entre JAMAIS dans le journal
+    métier (voir `kojo_business_events.DETAILS_AUTORISES`) : le journal garde
+    des faits énumérés, pas une prose écrite par une partie.
+    """
+    reason: str = Field(min_length=20, max_length=1000)
+
+
+class JobDisputeWithdraw(BaseModel):
+    """Corps FACULTATIF de `POST /jobs/{id}/dispute/withdraw`.
+
+    Retirer un litige n'a pas besoin d'être motivé : exiger un texte pour
+    débloquer un accord retrouvé pousserait à écrire n'importe quoi.
+    """
+    reason: Optional[str] = Field(None, max_length=500)
+
+
+class JobDisputeResponse(BaseModel):
+    """Corps de `POST /jobs/{id}/dispute/response` : la version de l'autre partie.
+
+    `position` emploie le vocabulaire de la DÉCISION du propriétaire
+    (`release_worker`, `refund_client`) : l'arbitre lit ainsi ce que chaque côté
+    DEMANDE dans les termes exacts de ce qu'il devra choisir, sans une troisième
+    nomenclature à traduire. La note est bornée comme le motif (20 à 1000
+    caractères) : les deux versions se lisent côte à côte.
+
+    La note n'entre jamais dans le journal métier (elle peut porter un nom ou un
+    numéro, comme le motif) : seule la `position`, énumérée, y entre.
+    """
+    position: Literal["release_worker", "refund_client"]
+    note: str = Field(min_length=20, max_length=1000)
+
 
 class JobPublic(BaseModel):
     """Vue PUBLIQUE d'un job (découverte sans compte) : ALLOWLIST stricte des

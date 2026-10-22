@@ -26,9 +26,13 @@ composition se regarde, et `check-worker-og-contract.js` vérifie la paire
 titre/description avec l'application) ni l'indexation réelle par un moteur, qui
 n'appartient à personne dans ce dépôt.
 """
+import json
+from datetime import datetime, timezone
+
 import pytest
 from httpx import AsyncClient
 
+from kojo_worker_og import BOOT_SCRIPT, BOOT_STYLE, SEED_ID, seed_json
 from tests.conftest import db_insert
 
 IDENTIFIANT = "worker-og-1"
@@ -199,12 +203,105 @@ class TestAucuneFuite:
         self, client: AsyncClient
     ):
         """`country` stocke une clé (« senegal »), pas un libellé : la description
-        publique dit la VILLE, jamais le code brut."""
+        publique dit la VILLE, jamais le code brut.
+
+        Le contrôle porte sur le document VISIBLE (tête et coquille), pas sur le
+        bloc de données ajouté le 21/10/2026 : celui-ci porte la vue publique
+        TELLE QUELLE, et cette vue publie déjà `country` par l'API
+        (`GET /api/workers/:id`). Ce n'est donc pas le pré-rendu qui l'invente,
+        et le faire disparaître ici créerait deux vues divergentes.
+        """
+        await _travailleur()
+
+        corps = (await client.get(f"/api/og/workers/{IDENTIFIANT}")).text
+        visible = corps.split('<script type="application/json"')[0]
+
+        assert "senegal" not in visible
+        assert "Dakar" in visible
+
+
+class TestPointDEntree:
+    """Un visiteur à froid obtient AUSSI l'application, et avec les bonnes données.
+
+    Le document était lisible et inerte : le compromis d'origine (« aucun script,
+    donc un crawler le lit ») laissait un lien partagé sans châssis, sans
+    navigation et sans avis. Ces cas jugent les trois pièces qui le rendent
+    exécutable, et surtout les DEUX façons de le faire mal : pointer vers un
+    fichier qui n'existe pas, ou publier un bloc de données d'un autre profil.
+    """
+
+    async def test_le_document_charge_le_point_d_entree_et_la_feuille(
+        self, client: AsyncClient
+    ):
         await _travailleur()
 
         corps = (await client.get(f"/api/og/workers/{IDENTIFIANT}")).text
 
-        assert "senegal" not in corps
+        # La feuille BLOQUANTE en premier : sans elle, l'application démarrée
+        # serait peinte sans style. Le module vient ensuite (différé par nature).
+        assert f'<link rel="stylesheet" href="{BOOT_STYLE}" />' in corps
+        assert f'<script type="module" src="{BOOT_SCRIPT}"></script>' in corps
+        assert corps.index(BOOT_STYLE) < corps.index(BOOT_SCRIPT)
+        # Et la tête garde tout ce que lit un crawler.
+        assert "<title>Awa Diop — plomberie — Kojo</title>" in corps
+        assert corps.count('property="og:image"') == 2
+
+    async def test_le_bloc_de_donnees_porte_la_vue_publique_rendue(
+        self, client: AsyncClient
+    ):
+        await _travailleur()
+
+        corps = (await client.get(f"/api/og/workers/{IDENTIFIANT}")).text
+
+        # Le bloc vient APRÈS la fermeture de `#root` : React efface ce
+        # conteneur au montage, donc un bloc placé dedans disparaîtrait avant
+        # d'être lu.
+        assert '</div>\n<script type="application/json"' in corps
+        debut = corps.index(f'id="{SEED_ID}"') + len(f'id="{SEED_ID}">')
+        fin = corps.index("</script>", debut)
+        donnees = json.loads(corps[debut:fin])
+        assert donnees["id"] == IDENTIFIANT
+        assert donnees["first_name"] == "Awa"
+        assert donnees["city"] == "Dakar"
+        assert donnees["stats"]["missions_completed"] == 0
+        # La vue est celle de l'API publique : mêmes clés, rien de plus.
+        assert set(donnees) >= {"id", "first_name", "last_name", "city", "country",
+                                "skills", "bio", "verified", "member_since", "stats",
+                                "reviews"}
+
+    async def test_une_donnee_hostile_ne_referme_pas_le_bloc(self, client: AsyncClient):
+        """Une bio qui contient la fermeture d'un script resterait du TEXTE."""
+        await _travailleur(
+            bio="Fin </script><script>alert(1)</script> et & co",
+            first_name="Awa",
+        )
+
+        corps = (await client.get(f"/api/og/workers/{IDENTIFIANT}")).text
+
+        assert "</script><script>" not in corps
+        assert "\\u003c/script\\u003e" in corps
+        # Le bloc reste du JSON lisible malgré l'échappement.
+        debut = corps.index(f'id="{SEED_ID}"') + len(f'id="{SEED_ID}">')
+        fin = corps.index("</script>", debut)
+        assert "</script>" in json.loads(corps[debut:fin])["bio"]
+
+    async def test_un_profil_absent_ouvre_aussi_l_application(
+        self, client: AsyncClient
+    ):
+        """Un lien partagé devenu mort garde une issue : la page 404 de l'app."""
+        reponse = await client.get("/api/og/workers/inconnu-og")
+
+        assert reponse.status_code == 404
+        assert f'src="{BOOT_SCRIPT}"' in reponse.text
+        assert BOOT_STYLE in reponse.text
+        assert "noindex" in reponse.text
+
+    def test_une_date_du_document_devient_de_l_iso_8601(self):
+        """`created_at` peut être un datetime : sans conversion, le bloc lèverait
+        et le profil tomberait dans le squelette — ce que le bloc évite."""
+        texte = seed_json({"id": "w", "created_at": datetime(2024, 5, 17, 10, 0, tzinfo=timezone.utc)})
+
+        assert json.loads(texte)["created_at"] == "2024-05-17T10:00:00+00:00"
 
 
 class TestCartesOpenGraph:

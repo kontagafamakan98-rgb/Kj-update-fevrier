@@ -17,6 +17,8 @@
 | `pull_request` vers `main` | **oui**, 11 jobs (dont `deploy-fly` *skipped*) |
 | `workflow_dispatch` (manuel) | **oui** ; `deploy-fly` déploie même sans changement backend |
 | `schedule` de `.github/workflows/atlas-backups-probe.yml` | **oui**, 1 job, cron 06:45 — `backupEnabled` ET `pitEnabled` lus dans l'API Atlas. Rouge sur sauvegarde absente (cause nommée) comme sur prémisse (clés/API illisibles) : une surface aveugle se déclare. Aucun budget : ce n'est pas une mesure de performance mais un fait de configuration. |
+| `schedule` de `.github/workflows/worker-page-production-probe.yml` | **oui**, 1 job, cron 07:04 — le document SERVI de `/workers/:id` est jugé en deux temps : la réécriture Vercel (sentinelle `kojo-sonde-reecriture` → 404 du backend, noindex + point d'entrée, aucun script `/assets/`), puis la fiche d'un profil réel (canonical, `og:url`, deux cartes OG vérifiées en HTTP, `twitter:*`, `<h1>`, point d'entrée, feuille, données). Une réécriture perdue répond 200 avec la coque SPA : sans cette sonde, elle ne cassait aucun test. Aucun secret, aucune écriture ; sortie 2 si aucun profil n'est publié (prémisse, jamais un vert). |
+| `schedule` de `.github/workflows/job-page-production-probe.yml` | **oui**, 1 job, cron 07:10 — le document SERVI de `/jobs/:id` est jugé en deux temps : la réécriture Vercel (sentinelle `kojo-sonde-reecriture-fiche` → 404 du backend, noindex + point d'entrée, aucun script `/assets/`), puis le DÉMARRAGE de la fiche d'une mission réelle (point d'entrée chargé une fois, feuille présente AVANT le module, bloc `kojo-job-data` lisible et accordé au `<h1>` et à la description, aucun champ que l'API publique ne publie), plus `canonical`, `og:url` et `twitter:url`. Une réécriture perdue répond 200 avec la coque SPA, et un document sans point d'entrée reste lisible par un crawler mais mort pour un visiteur à froid : sans cette sonde, ni l'un ni l'autre ne cassait un test. Aucun secret, aucune écriture ; sortie 2 si aucune fiche n'est au sitemap (prémisse, jamais un vert). |
 | `workflow_dispatch` de `.github/workflows/lighthouse-mesure-locale.yml` | **oui**, 1 job — et **sans aucun budget** : la mesure Lighthouse locale sur les trois routes (`/,/jobs,/contact`), ses LHR run par run publiés en artifact. Rien n'y échoue sur une performance ; ce qui bloque reste `lighthouse-ci` (`lighthouserc*.cjs`) |
 | `push` sur une branche de travail | **non** — aucun run n'est déclenché |
 
@@ -1772,10 +1774,10 @@ lisait le code réellement servi** — les sondes de production qui existaient y
 cartes OG et le CORS, jamais de quel commit l'artefact est fait. Un build Vercel échoué, annulé, ou
 en retard laissait donc `main` vert pendant que le site servait l'ancien bundle.
 
-**Ce qui est vérifié désormais** : le build publie sa révision dans le HTML statique
-(`vite-plugins/inject-build-revision.js` → meta `kojo-build-revision`), et l'étape de
-`frontend-build` sur `main` compare cette réponse à ce que `main` aurait dû déployer
-(`frontend/scripts/check-deployed-revision.js`).
+**Ce qui est vérifié désormais** : le build publie sa révision **et l'arbre `frontend/`** dans le HTML
+statique (`vite-plugins/inject-build-revision.js` → metas `kojo-build-revision` et
+`kojo-build-tree`), et l'étape de `frontend-build` sur `main` compare cette réponse à ce que `main`
+aurait dû déployer (`frontend/scripts/check-deployed-revision.js`).
 
 - Les sources de la révision sont, dans l'ordre : `KOJO_GIT_SHA` (l'écrasement explicite, le
   même nom de fait que côté backend), puis `VERCEL_GIT_COMMIT_SHA` / `GITHUB_SHA` (variables
@@ -1788,41 +1790,363 @@ en retard laissait donc `main` vert pendant que le site servait l'ancien bundle.
   `VERCEL_GIT_COMMIT_SHA`, c'est cette valeur qui est publiée. Rien n'est inventé : hors
   dépôt git ET sans variable, le build ne publie rien (`revisionFrom({}, { depot: () => '' })`).
 
-- Ce qui doit être VRAI : aucun changement de `frontend/**` n'est absent de la production. Deux
-  révisions sont donc acceptées — le commit poussé, et le dernier commit ayant touché `frontend/`
-  (l'état que la production laisse en place si le déployeur ignorait un push sans changement de
-  frontend). Dans `ci.yml`, ce calcul est fait depuis le job `frontend-build` (working-directory
-  `frontend`) en demandant à Git la surface `.` du répertoire courant ; demander `frontend/` à cet
-  endroit chercherait par erreur `frontend/frontend/` et produirait une attente vide. Accepter une
-  révision PLUS ANCIENNE ne serait pas un relâchement du même genre : ce
-  serait un refus silencieux de la question posée.
+- Ce qui doit être VRAI : aucun changement de `frontend/**` n'est absent de la production. C'est une
+  propriété d'**ARBRE**, pas de SHA — et le SHA n'en était qu'un raccourci, faux dès qu'une fusion
+  ne touche pas le frontend. **Mesuré le 21/10/2026** : une fusion DOCUMENTAIRE laisse Vercel sur le
+  build précédent (le déployeur ne reconstruit pas pour un changement qui ne le concerne pas), donc
+  la révision servie n'est ni la tête de `main` ni, dans un clone superficiel ou sur un commit de
+  fusion, ce que `git rev-list -1 HEAD -- frontend/` désigne : le garde refusait une production
+  **conforme**, c'est-à-dire un rouge sur un fait vrai.
+
+  Le verdict porte donc sur l'arbre de `frontend/`. Même SHA → même code (chemin rapide, aucun
+  appel à git) ; SHA différents avec le **même arbre** → accepté, en le disant (aucun changement de
+  `frontend/` ne manque à la production) ; arbres différents → refusé en nommant les deux arbres.
+  `--attendu` (commit poussé) et `--sinon` (dernier commit ayant touché `frontend/`) restent nommés,
+  mais c'est l'arbre qui départage.
+- **L'arbre SERVI est publié par l'artefact, plus lu dans le clone** (21/10/2026). Le build écrit
+  `kojo-build-tree` (`git rev-parse HEAD:frontend` — le dossier vient de `BUILD_TREE_DIR`, un seul
+  propriétaire partagé par le build et le garde) à côté de `kojo-build-revision`. Le garde ne
+  résout donc plus le commit servi localement : il compare l'arbre **publié** à celui des commits
+  **attendus**, seuls lus dans le clone — ceux de `main`, toujours présents. C'est ce qui supprime
+  le cas « arbre incomparable » : un clone superficiel ne peut plus rendre l'instrument aveugle, et
+  `frontend-build` n'a plus besoin de `fetch-depth: 0` **pour cette raison**.
+- Un artefact antérieur qui annonce sa révision **sans arbre** (ou un build fait hors dépôt git) est
+  REFUSÉ en **code 1**, en nommant `kojo-build-tree` et le remède (redéployer). Ce n'est pas une
+  prémisse : l'absence est un fait de production, et comparer les SHA seuls refuserait à nouveau une
+  fusion documentaire.
+- **Les ACTIFS servis sont jugés un par un** (21/10/2026), et c'est l'angle mort que le garde de
+  révision laissait ouvert : il prouve que le HTML vient de `main`, jamais que le JS, le CSS ou les
+  polices que ce HTML charge sont ceux du même build. Le build écrit `asset-manifest.json` (une
+  empreinte SHA-256 par fichier JS, CSS, police) en `closeBundle` — le premier instant où les polices
+  recopiées depuis `public/` sont sur le disque — et **ancre l'empreinte de ce manifeste** dans chaque
+  page (`kojo-build-assets`). `frontend/scripts/check-deployed-assets.js` suit la chaîne dans cet
+  ordre : HTML servi → manifeste (son empreinte doit être celle ANNONCÉE, sinon il vient d'un autre
+  build et ne garantit rien) → octets de chaque actif. **Mesuré sur le build local du 21/10/2026** :
+  **69 actifs** listés (JS, CSS, polices), manifeste de **7,4 Ko**, même empreinte ancrée dans les
+  **14** pages ; servi par un HTTP local, la sonde accepte les 69, puis refuse en nommant le chemin
+  et les deux empreintes dès qu'un fichier est réécrit. Plancher `MIN_ACTIFS` = **5** (sous lui, un
+  manifeste ne décrit pas un build) et plafond **400** (au-delà, ce n'est plus son empreinte et la
+  sonde ne télécharge pas un inventaire). Un chemin hors site (`../`, `//hôte`, schéma) est refusé :
+  une sonde de production ne va pas juger un fichier d'un autre domaine.
+- **Les CONTENUS (images, cartes OG, icônes) sont échantillonnés sous budget** (22/10/2026), et
+  c'est l'autre moitié de l'angle mort : les actifs de code étaient jugés un par un, mais aucune
+  image, aucune carte de partage n'était listée par un manifeste — une image remplacée par un
+  déploiement mixte restait invisible. Le manifeste porte donc une deuxième section (`contenus`) :
+  pour chaque fichier, sa TAILLE et l'empreinte de ses **4 Kio de tête, de MILIEU et de queue**
+  (constante `ECHANTILLON_CONTENU` et plages `plagesContenu`, lues par le build ET par la sonde) :
+  le milieu a été ajouté le 22/10/2026 parce qu'une retouche au centre du fichier laissait les deux
+  bords intacts, donc deux blocs rendaient un vert sur une image qui n'était plus celle du build.
+  Il n'est demandé qu'au-delà de deux blocs (tête et queue couvrent alors tout le fichier).
+  La sonde lit ces plages en HTTP réel
+  (`Range` → `206` + `Content-Range`), refuse un serveur qui répond `200` (l'échantillon coûterait le
+  fichier entier), compare aussi la taille annoncée par la plage, et s'arrête à `BUDGET_CONTENUS`
+  (**768 Kio** depuis l'ajout du milieu : à 512 Kio, un troisième bloc par image aurait RETIRÉ des
+  contenus de la vérification ; 768 Kio gardent la couverture mesurée sous 512 Kio pour deux blocs) : au-delà, les contenus restants sont DÉCLARÉS non échantillonnés (`N sur M`) et un
+  `::warning` est publié — zéro contenu lu est un REFUS, pas un vert. La section `contenus` est
+  exigée : un manifeste muet sur les images ne les fait pas passer pour vérifiées, et un échantillon
+  plus grand que la constante est refusé (un manifeste est une donnée SERVIE, il ne décide pas de ce
+  que la sonde télécharge). **Mesuré sur le build local du 22/10/2026** : **71 actifs** et **53
+  contenus**, manifeste de **21,1 Ko**, échantillon total de **433 046 o** pour un budget de 524 288
+  (la couverture était donc complète ; elle se tronque en le DISANT si les images grossissent). Ce
+  relevé précède l'échantillonnage du MILIEU : chaque contenu plus grand que deux blocs coûte
+  désormais un troisième bloc (4 Kio), ce qui a fait passer le budget à **786 432 o** pour ne pas
+  perdre de contenus au passage.
+- **Le coût de la sonde est PUBLIÉ, verdict vert compris** (22/10/2026). Les actifs de code sont lus
+  en entier, les contenus par plages : la dépense réelle (octets), le nombre de requêtes, la durée et
+  la part de `BUDGET_CONTENUS` consommée partent dans le résumé du run (`$GITHUB_STEP_SUMMARY`) et sur
+  la sortie standard — la même phrase (`lignesCout`) sert les deux, donc aucun format ne peut dériver.
+  C'est écrit AUSSI quand la sonde refuse : un arrêt en cours de route a déjà dépensé des requêtes, et
+  les taire ferait lire « passe gratuite ». Le chiffre publié est l'octet **réellement reçu**, pas le
+  budget qui l'a réservé — mesuré par un `fetch` qui compte les corps et les ressert depuis le même
+  tampon. Un budget qui ne s'affiche que le jour où il déborde ne permet aucun arbitrage : le manifeste
+  gagne une image à chaque ajout, et le refus tomberait sur la livraison qui n'a rien changé.
+- **La même chaîne joue sur la PREVIEW d'une PR, avant fusion** (22/10/2026). La sonde ne jugeait
+  que `main`, et c'était structurel — mais l'artefact d'une PR n'était alors vérifié par PERSONNE
+  avant d'être fusionné : l'écart se découvrait en production, sur la livraison qu'il fallait
+  corriger. `check-deployed-assets.js --preview --sha <tête de PR>` résout le déploiement de CETTE
+  révision et lui applique la chaîne (HTML → manifeste ancré → octets, contenus échantillonnés sous
+  budget). L'origine se résout par l'API Vercel (`preview-vercel.js`, `/v7/deployments` filtré sur
+  `sha`, retenu seulement si `meta.githubCommitSha` correspond et si ce n'est pas la production),
+  **jamais par le commentaire de l'app Vercel** : il peut désigner un commit précédent, et une
+  chaîne cohérente sur un artefact périmé rendrait un vert sur le mauvais objet —
+  `resolve-vercel-url.sh` garde le commentaire pour Lighthouse, dont le besoin est inverse (une
+  origine lisible SANS jeton). La preview est protégée par défaut : le jeton
+  `VERCEL_AUTOMATION_BYPASS_SECRET` part en `x-vercel-protection-bypass` sur chaque requête et n'est
+  jamais imprimé. Trois issues distinctes, et une seule tolerance, DECLAREE :
+  **prémisse** (code 2) pour un jeton absent, une API illisible, aucun déploiement dans la fenêtre,
+  `meta.githubCommitSha` absent ou un MUR de protection — publiée en `::warning` + résumé, et
+  tolérée par le step (une PR de fork ne reçoit pas les secrets) ; **refus** (code 1) pour un actif
+  réécrit, un manifeste d'un autre build ou un déploiement de la PR en `ERROR` — le job requis
+  `frontend-build` échoue donc avant la fusion ; **vert** seulement si la chaîne entière concorde.
+  Limite déclarée : une PR dont la preview n'est pas résolvable n'est pas vérifiée avant fusion, et
+  rien ne remplace le verdict de `main` après fusion.
 - Ce qui rend cette politique mesurable : chaque commit de `main` a reçu une **production
   déployée** (12 commits consécutifs, statut `Vercel` `success`), et le déploiement se termine
   **0,4 à 0,6 min** après le commit (mesuré sur les 6 derniers). La fenêtre d'attente du garde
   (9 tentatives espacées de 20 s, un appel HTTP séquentiel chacune) absorbe un déploiement en
   cours sans jamais transformer un refus en succès.
-- Chaque refus NOMME sa cause, et elles demandent trois corrections différentes : aucune révision
+- Chaque refus NOMME sa cause, et elles demandent quatre corrections différentes : aucune révision
   annoncée (artefact antérieur à ce mécanisme, ou construit sans `VERCEL_GIT_COMMIT_SHA` →
-  redéployer), révision différente (production en retard → regarder le build Vercel), réponse
-  inexploitable (site injoignable — **défi de l'edge Vercel** compris, nommé par
-  `X-Vercel-Mitigated`, pour qu'il ne se lise pas comme un frontend en retard). Une invocation qui
-  ne dit pas quoi comparer sort en **code 2**, jamais en vert.
+  redéployer), **aucun arbre annoncé** (artefact antérieur au verdict par arbre, ou build hors dépôt
+  git → redéployer), arbre `frontend/` **différent** (production en retard ou build d'une autre
+  branche → regarder le build Vercel), réponse inexploitable (site injoignable — **défi de l'edge
+  Vercel** compris, nommé par `X-Vercel-Mitigated`, pour qu'il ne se lise pas comme un frontend en
+  retard). Une invocation qui ne dit pas quoi comparer sort en **code 2**, jamais en vert. La seule
+  prémisse restante (code 2) porte sur le CLONE et non sur la production : l'arbre d'une révision
+  **attendue** est illisible localement, et le message le dit.
+- Le **CODE 2 est nommé à la sortie du CLI**, pas seulement dans la fonction de verdict (21/10/2026) :
+  `main(argv, { verifier })` accepte un vérificateur injecté — la même couture que `arbreDe` et
+  `fetchImpl` plus bas, parce qu'une prémisse ne se fabrique pas depuis la production réelle (il faut
+  une révision servie ET un commit attendu absent de ce clone). Deux cas la nomment : le même verdict
+  avec `premisse: true` sort en **2** avec le titre `Arbre attendu illisible`, et **sans** le titre du
+  vrai retard ; avec `premisse: false`, le même verdict sort en **1** en portant ce titre-là. Sans le
+  second, le code 2 pourrait n'être qu'un hasard.
 - Preuve d'échec rejouable : `frontend/scripts/__tests__/check-deployed-revision.test.js`
-  (18 cas, `fetch` injecté, aucun réseau) pour les refus et l'attente, et
-  `frontend/scripts/__tests__/build-revision-injection.test.js` (5 cas, pilotant le VRAI
-  `vite.config.js`) pour la publication de la balise — sans quoi le garde refuserait TOUTE
-  production, y compris une production correcte. **Deux** mutations du registre font chacune rougir
-  le test propriétaire, nommé : `frontend-revision: la comparaison accepte une autre revision` et
-  `frontend-revision: le refus d'une production muette disparait`.
+  (30 cas, `fetch`, `arbreDe` et `verifier` injectés, aucun réseau) pour les refus, l'attente, le code
+  du CLI et l'**arbre** :
+  même arbre **publié** accepté sur deux SHA différents (la fusion documentaire), arbres différents
+  refusés en les nommant, artefact sans arbre refusé en code 1, arbre ATTENDU illisible rendu en
+  prémisse, chemin rapide qui n'appelle pas git, arbre abrégé refusé comme absent, plus la lecture
+  du VRAI arbre de `HEAD` dans le dépôt ; et
+  `frontend/scripts/__tests__/build-revision-injection.test.js` (7 cas, pilotant le VRAI
+  `vite.config.js`) pour la publication des balises — dont l'arbre, comparé à `git rev-parse
+  HEAD:frontend` et absent quand le dépôt n'en donne pas — sans quoi le garde refuserait TOUTE
+  production, y compris une production correcte. **Six** mutations du registre font chacune rougir
+  le test propriétaire, nommé : `frontend-revision: la comparaison accepte une autre revision`,
+  `frontend-revision: le refus d'une production muette disparait`, `frontend-revision: un arbre
+  frontend different est accepte` — cette dernière neutralise le refus des arbres DIFFÉRENTS, donc
+  un vrai retard (ou un build d'une autre branche) repasserait au vert ; elle rougit `refuse quand
+  l’arbre publié diffère, en nommant les deux arbres` —, puis les deux de la PRÉMISSE TOLÉRÉE :
+  `frontend-revision: le drapeau de premisse disparait` (le verdict ne se déclare plus prémisse ;
+  rougissent `ne conclut pas quand l’arbre ATTENDU est illisible` et `propage la prémisse`) et
+  `frontend-revision: une premisse passe pour un retard` (`if (premisse)` neutralisé : le CLI sort en
+  **1** avec le titre du retard au lieu de **2**, et rougit `sort en code 2 quand l’arbre attendu est
+  illisible (prémisse tolérée), sans accuser le déploiement`). La sixième prend la TOLÉRANCE à la
+  fusion documentaire par l'autre bout : `frontend-revision: un arbre identique est refuse` neutralise
+  `if (identique)` — un arbre IDENTIQUE à celui d'un commit attendu est alors rendu refusé, donc une
+  fusion qui ne touche pas `frontend/` redeviendrait un rouge sur un fait vrai ; elle rougit `accepte
+  une révision différente dont l’arbre publié est identique (fusion documentaire)`.
+- Preuve des ACTIFS, des CONTENUS et du COÛT :
+  `frontend/scripts/__tests__/check-deployed-assets.test.js`
+  (**39 cas**, `fetch` fabriqué, aucun réseau, **plus un serveur HTTP local réel qui répond aux
+  plages** — le seul chemin que la sonde emprunte pour une image —, le coût compté sur les corps
+  réellement reçus, le résumé du run écrit pour un vert COMME pour un refus, et le mode **preview**
+  : jeton sur chaque lecture, prémisse de résolution, build en `ERROR`, origine de production
+  refusée, mur de protection nommé) et
+  `frontend/scripts/__tests__/asset-manifest-injection.test.js` (**6 cas**, écrivant un vrai dossier
+  de build : séparation code/contenus, échantillon borné de tête, milieu et queue, déterminisme,
+  ancre idempotente, plugin branché en `post`). Les mutations font rougir leur cas nommé :
+  `actifs: une empreinte d'actif differente est acceptee` (le refus des octets différents disparaît),
+  `actifs: un manifeste d'un autre build est accepte` (un manifeste périmé cautionnerait des actifs
+  périmés), `contenus: un echantillon de tete different est accepte` (la comparaison des blocs
+  disparaît : tête, queue ET milieu rougissent), `contenus: le milieu des images n'est plus exige
+  ni relu` (une retouche au centre du fichier, bords intacts, repasserait pour celle du build) et
+  `actifs: le cout de la sonde n'est plus
+  publie dans le resume du run` (le budget redevient invisible ; rougissent le résumé d'un vert et
+  celui d'un refus), `preview: une premisse de resolution rend un vert` (une PR non résoluble passe
+  pour vérifiée) et `preview: le jeton de contournement Vercel n'est plus envoye` (une preview
+  protégée serait lue à travers son mur, sur certaines lectures seulement). Preuve de la
+  résolution : `frontend/scripts/__tests__/preview-vercel.test.js` (10 cas, transport fabriqué —
+  révision filtrée, production et déploiement sans commit exclus, `BUILDING` puis `READY`, `ERROR`
+  refusé, prémisses sans réseau). Registre : **131 gardes / 251 mutations**.
 
-Mesures de la passe : sur un build local, les **12** HTML produits portent la balise ; la production
-d'avant cette passe n'en annonçait **aucune**, et le garde l'a refusée en la nommant (« antérieur à
-ce mécanisme, ou construit sans révision »).
+Mesures de la passe : sur un build local du 21/10/2026, **13** des **14** HTML produits portent les
+DEUX balises (`404.html` n'en porte aucune — il est écrit hors de `transformIndexHtml`, et la sonde
+ne lit que l'accueil ; c'est la page d'erreur, hors des routes pré-rendues), et l'arbre publié vaut exactement `git rev-parse HEAD:frontend`
+(`b0d247249923…` pour `0bbff69887a7`) ; le garde, nourri de ce HTML réel, accepte un commit
+**documentaire** dont l'arbre est identique (`4ecf77ae982f`) en le disant, refuse un commit dont
+l'arbre diffère (`876e810c9072`) en nommant les deux arbres, et refuse en code 1 un artefact qui
+n'annonce que son SHA. La production d'avant cette passe n'annonçait **aucune** révision, et le
+garde l'a refusée en la nommant (« antérieur à ce mécanisme, ou construit sans révision »).
 
-Ce qui reste ouvert après ce correctif : la preuve porte sur la **révision de l'artefact HTML**,
-pas sur chaque fichier d'actif (ils sont déployés atomiquement par Vercel, mais rien ne le
-re-vérifie) ; les déploiements de **preview** (PR) ne sont pas vérifiés — par construction, la
+Ce qui reste ouvert après ce correctif : les actifs **JS, CSS et polices** sont jugés un par un, et
+les **images et cartes OG** le sont par leur tête et leur queue — pas leur MILIEU, qu'une modification
+laisssant les deux blocs intacts changerait sans être vue ; les **fichiers de données** (JSON, textes)
+ne sont listés par aucun manifeste ; les
+deux valeurs publiées par le HTML et le manifeste d'actifs sont des DÉCLARATIONS du build — elles
+prouvent la provenance annoncée et la chaîne HTML → manifeste → octets, pas que chaque octet servi
+soit celui d'un commit donné (elles sont écrites ensemble, à partir du même clone) ; les déploiements de **preview** (PR) ne sont pas vérifiés — par construction, la
 production ne dit rien d'une PR — et le mobile n'est pas couvert (l'artefact est un APK).
+
+### F21 — Le document pré-rendu d'un profil était lisible et INERTE — **fermé le 21/10/2026**
+
+Le profil `/workers/:id` est le seul document que le BACKEND écrit pour une page publique (rewrite
+Vercel `/workers/(.*)` → `/api/og/workers/$1`). Depuis le 20/10/2026 il portait titre, description,
+canonical et les deux cartes OG — donc il était indexable — mais **aucune balise `<script>`** : un
+visiteur arrivé par un lien partagé, à froid, recevait un texte sans châssis, sans navigation, sans
+avis cliquables, et rien ne le mesurait. Le compromis était écrit (« lisible sans JavaScript ») ;
+son coût ne l'était pas : ce lien est le SEUL chemin d'arrivée d'un visiteur qui n'a pas encore
+l'application ouverte.
+
+**Ce qui est vérifié désormais** — le document DÉMARRE l'application, sans perdre ce qu'un crawler lit :
+
+- le build publie deux chemins STABLES que le document peut citer sans connaître les noms hachés :
+  `/boot/worker-boot.js` (un module d'UNE importation vers l'entrée que les pages chargent déjà —
+  l'application n'est donc PAS dupliquée, et elle garde son cache `immutable`) et
+  `/boot/worker-app.css` (copie de la feuille servie, sans quoi l'application démarrerait sans style :
+  Vite extrait le CSS du JS). Écrits par `frontend/vite-plugins/worker-boot.js`, avant le manifeste
+  d'empreintes — donc `check-deployed-assets.js` vérifie leurs octets en production comme ceux des
+  autres actifs. `/boot/(.*)` est servi `must-revalidate` : un nom stable sous `immutable` figerait
+  l'ancienne application chez les visiteurs qui reviennent.
+- le document porte un bloc `<script type="application/json" id="kojo-worker-data">` HORS de `#root`
+  (React efface ce conteneur au montage) : la VUE PUBLIQUE déjà rendue, reprise par
+  `frontend/src/pages/WorkerProfile.js` comme état initial. Le profil s'affiche donc tout de suite,
+  sans squelette, puis l'API le rafraîchit. Deux refus du côté page : un bloc d'un AUTRE identifiant
+  est ignoré (la mauvaise personne), un bloc illisible retombe sur le chargement normal ; et une
+  relecture RATÉE n'efface pas le profil déjà rendu (il vient du serveur il y a quelques secondes).
+- les noms (chemins, `seedId`) vivent une fois dans `frontend/src/config/apercu-travailleur.js`, que
+  `scripts/site-meta.js` réexpose : le contrat hors ligne rend le module de production
+  (`backend/kojo_worker_og.py`) et exige ces valeurs, l'ordre `<link>` puis `<script type="module">`,
+  un bloc qui n'échappe pas `<` (une bio refermerait la balise — `<` devient `<`), et des
+  données ÉGALES à la vue rendue ; il vérifie AUSSI dans l'artefact que le boot importe une entrée
+  `/assets/` qui existe, que la feuille contient `.titre-page`, et que les deux sont ancrés dans
+  `asset-manifest.json`. La 404 du profil porte le même point d'entrée (un lien mort garde une issue)
+  et reste `noindex`.
+
+**Mesuré** (build local du 21/10/2026) : 71 actifs au manifeste, dont `/boot/worker-boot.js`
+(3 lignes, `import"/assets/index-SkCVOgBz.js"`) et `/boot/worker-app.css` (83 611 o, `.titre-page`
+présent) ; servi par un HTTP local, le document rend le profil complet dans le navigateur — châssis,
+navigation, badge « Moyens de paiement renseignés », note 4,8, deux avis — avec le CSS appliqué
+(`Cormorant Garamond`, 30 px) et le titre `Awa Diop — plomberie — Kojo` intact. **Preuves** :
+`backend/tests/test_workers_og.py` (`TestPointDEntree`, 5 cas : point d'entrée + feuille + ordre,
+bloc égal à la vue publique et hors de `#root`, `<` échappé, 404 qui démarre quand même, date ISO),
+`frontend/src/pages/__tests__/WorkerProfile.test.jsx` (4 cas d'aperçu : rendu immédiat sans squelette,
+aperçu d'un autre profil ignoré, aperçu illisible, relecture ratée sans effacement),
+`frontend/scripts/__tests__/check-worker-og-contract.test.js` (12 cas neufs, dont 5 sur les cibles de
+l'artefact) et `frontend/scripts/__tests__/worker-boot-injection.test.js` (10 cas).
+
+**Ce qui reste ouvert, et c'est dit** : la CSP du site est publiée par ce document depuis le
+22/10/2026 (cf. F23), et son EXÉCUTION — montage, profil peint, geste — est jugée depuis le même
+jour par `check-worker-interactive-production.js` (cf. F24) ; le contrat hors ligne, lui, juge
+les cibles, l'artefact et les données.
+
+### F22 — La fiche mission pré-rendue était lisible et INERTE — **fermé le 21/10/2026**
+
+La fiche `/jobs/:id` est pré-rendue par le backend (`kojo_job_og.py`, rewrite Vercel `/jobs/(.*)` →
+`/api/og/jobs/$1`) : titre, description, canonical et deux cartes OG y étaient, mais **aucune
+balise `<script>`** — un lien de mission partagé sur WhatsApp ouvrait donc une page sans châssis, sans
+navigation et sans propositions. Le même compromis que F21, sur la page qui reçoit le plus de liens
+partagés du produit.
+
+**Ce qui est vérifié désormais** :
+
+- le document cite les DEUX chemins stables du build (`/boot/worker-boot.js`, `/boot/worker-app.css`).
+  Une entrée et une feuille pour l'APPLICATION, pas par page : `frontend/src/config/apercu-mission.js`
+  les LIT dans `APERCU_TRAVAILLEUR`, donc un second couple de fichiers n'existe pas dans l'artefact et
+  ne peut pas vieillir séparément.
+- le bloc `<script type="application/json" id="kojo-job-data">` est la vue que `GET /jobs/:id` rend
+  DÉJÀ à un visiteur anonyme (`_job_view(job, None)`, allowlist `JobPublic`) : le routeur la passe au
+  rendu, le module ne la construit pas — un `geo`, un `client_id` ou un `disburse_token` ne peut donc
+  pas y apparaître. `frontend/src/pages/JobDetails.js` le reprend comme état initial et NE REPEINT PAS
+  le squelette pendant la relecture (`garderAffiche`) ; les trois refus du bloc (autre identifiant,
+  JSON illisible, relecture ratée) sont ceux du profil. La tête garde SON titre, SA description (désormais
+  aussi posée sur `<meta name="description">`, sinon l'onglet et la carte annonçaient deux textes) et
+  SA carte de partage.
+
+**Preuves** : `backend/tests/test_job_og_cycle.py` (`TestPointDEntree`, 4 cas) et
+`frontend/src/pages/__tests__/JobDetails.test.jsx` (4 cas).
+
+**Ce qui est vérifié en PRODUCTION depuis le 22/10/2026** : `frontend/scripts/check-job-page-production.js`
+(`.github/workflows/job-page-production-probe.yml`, cron 07:10) juge le document SERVI — la réécriture
+Vercel par une sentinelle (`kojo-sonde-reecriture-fiche` → 404 du backend, noindex, point d'entrée, aucun
+script `/assets/`), puis le démarrage de la fiche d'une mission réelle : point d'entrée chargé UNE fois,
+feuille présente AVANT le module, bloc `kojo-job-data` lisible et ACCORDÉ (même identifiant, même titre
+que le `<h1>`, même description que la balise, aucun champ que l'API publique ne publie), plus
+`canonical`, `og:url` et `twitter:url`. Trois sorties : 0 conforme, 1 refus nommé, 2 prémisse (aucune
+fiche au sitemap) — une prémisse n'est jamais un vert.
+
+**L'EXÉCUTION est jugée en PRODUCTION depuis le 22/10/2026** : `frontend/scripts/check-job-interactive-production.js`
+(`.github/workflows/job-interactive-production-probe.yml`, cron 07:16) ouvre la fiche dans un Chromium
+RÉEL, contexte VIERGE (aucune session), et juge trois faits dans l'ordre où un visiteur les vit :
+`#root` porte le châssis de l'application (`#root nav`, jamais la coquille statique écrite par
+`backend/kojo_job_og.py`) ; le `<h1>` peint est celui du bloc `kojo-job-data` (React a consommé la vue
+publique — ni squelette, ni une autre mission) ; et un clic RÉEL sur l'action de la carte mène à une
+navigation CLIENTE (un marqueur posé dans `window` AVANT le clic survit, l'adresse attendue est
+atteinte, `#root` porte encore le châssis). L'action se choisit dans l'état RENDU : l'ancre stable
+`[data-sonde="postuler-anonyme"]` (posée par `JobDetails` pour cette sonde) sur une mission OUVERTE —
+son absence est un refus —, sinon le lien de confiance `/how-it-works` du bandeau de séquestre.
+Un bouton mort, un `<a href>` sans routeur et une page d'arrivée sans châssis sont refusés NOMMÉMENT.
+Aucune ÉCRITURE : le geste ouvre `/login` ou `/how-it-works`. Trois sorties : 0 conforme, 1 refus nommé,
+2 prémisse (aucune fiche au sitemap, ou Chromium absent — outillage), jamais un vert. **Preuves** :
+`frontend/scripts/__tests__/check-job-interactive-production.test.js` (29 cas : chaque refus a son
+scénario, un serveur HTTP local réel pour la résolution du sitemap, le CLI et les trois sorts du
+verdict) et **trois mutations** au registre `guard-proofs.json`, chacune rejouée `[OK]` le 22/10/2026
+(montage absent toléré, navigation non cliente tolérée, action absente d'une mission ouverte tolérée).
+
+**Ce qui reste ouvert, et c'est dit** : la sonde ne juge que Chromium, une fiche par passage, et le
+RENDU VISUEL (géométrie, contraste, CLS) reste la suite e2e sur pile locale. Le PROFIL `/workers/:id` n'a plus cette limite : sa sonde navigateur juge le montage, le profil
+peint et le geste (cf. F24). La CSP du site y est publiée depuis le 22/10/2026 (cf. F23).
+
+### F23 — Les documents pré-rendus démarraient sans la CSP du site — **fermé le 22/10/2026**
+
+`vite-plugins/inject-production-csp.js` posait la politique du site dans les pages du BUILD, et les
+documents `/jobs/:id` et `/workers/:id` — écrits par le BACKEND (`backend/kojo_job_og.py`,
+`backend/kojo_worker_og.py`) — n'en portaient aucune : un lien partagé, seul chemin d'arrivée d'un
+visiteur à froid, démarrait l'application sans la politique du reste du site. Recopier la politique
+en Python aurait fait deux déclarations à tenir d'accord ; la copie est acceptée parce qu'elle est
+JUGÉE. `backend/kojo_csp.py` (`construire_csp`, stdlib uniquement) est l'unique producteur côté
+backend, et `balise_csp()` la publie dans les QUATRE documents (fiche, fiche 404, profil, profil
+404).
+
+Deux gardes, deux questions différentes :
+
+• `frontend/scripts/check-csp-contract.js` (étape `frontend-build`) — les deux CALCULS : sept cas de
+  référence (aucun réglage, origine seule, origine à normaliser, Plausible seul, GA4 seul, les deux,
+  réglages invalides qui ne doivent RIEN ouvrir) rendent des chaînes IDENTIQUES octet pour octet des
+  deux côtés, les quatre documents publient cette politique, et le plugin du build ne peut pas la
+  contourner (rien n'est injecté en développement, sinon le HMR casserait en silence). Un interpréteur
+  Python absent est un ÉCHEC en CI.
+• `frontend/scripts/check-csp-documents-production.js`
+  (`.github/workflows/csp-documents-production-probe.yml`, cron 07:22) — les deux ENVIRONNEMENTS : la
+  politique que le SITE sert sur une page du build (l'accueil, ou `--reference`), puis celle que
+  SERVENT la fiche et le profil (sitemap, ou `--job` / `--worker`), comparées directive par directive.
+  Le build Vercel lit `VITE_API_URL` / `VITE_PLAUSIBLE_DOMAIN` / `VITE_GA_MEASUREMENT_ID`, le backend
+  Fly lit `BACKEND_PUBLIC_URL` / `PLAUSIBLE_DOMAIN` / `GA_MEASUREMENT_ID` : deux identifiants ajoutés
+  d'un seul côté ne cassaient rien de visible et changeaient la politique des documents. Trois
+  sorties : 0 conforme, 1 refus nommé (page témoin muette, document muet, politique divergente,
+  document qui ne répond pas 200), 2 prémisse (ni fiche ni profil au sitemap) — jamais un vert, un
+  seul des deux documents suffisant à mesurer. Ce qu'elle ne juge pas, écrit : les directives
+  elles-mêmes (hors ligne), les en-têtes HTTP (`frame-ancestors` de `frontend/vercel.json`) et le
+  montage.
+
+**Preuves** : `frontend/scripts/__tests__/csp-document.test.js` (16 cas — la règle PARTAGÉE de
+lecture et de comparaison, pure, avec le double décodage et l'ordre des directives),
+`frontend/scripts/__tests__/check-csp-contract.test.js` (21 cas) et
+`frontend/scripts/__tests__/check-csp-documents-production.test.js` (19 cas, dont les trois sorties
+du verdict et le CLI), plus **trois mutations** au registre `guard-proofs.json` (source manquante non
+nommée, politique divergente tolérée, document divergent toléré).
+
+### F24 — Le profil pré-rendu démarrait sans que React monte — **fermé le 22/10/2026**
+
+`check-worker-page-production.js` juge le DOCUMENT servi d'un profil : réécriture, point d'entrée,
+feuille avant le module, bloc accordé au `<h1>`, cartes OG. Un document parfait peut charger un
+module qui ne s'exécute pas, et un crawler n'en voit rien — il lit le HTML. Le seul arrivant d'un
+lien partagé recevait alors un profil statique, sans châssis ni geste : c'était la limite déclarée
+de F21.
+
+`frontend/scripts/check-worker-interactive-production.js`
+(`.github/workflows/worker-interactive-production-probe.yml`, cron 07:26) ouvre le profil dans un
+Chromium RÉEL, contexte VIERGE (aucune session), et juge trois faits : `#root` porte le châssis
+(`#root nav`, jamais la coquille statique écrite par `kojo_worker_og.py`), le `<h1>` peint est le
+nom du bloc `kojo-worker-data` (React a consommé la vue publique), et un clic RÉEL sur
+`[data-sonde="voir-missions"]` — l'ancre stable posée par `WorkerProfile` pour cette sonde — mène
+à une navigation CLIENTE vers `/jobs` : un marqueur posé dans `window` avant le clic survit,
+l'adresse est atteinte, `#root` porte encore le châssis. Un bouton mort, un `<a href>` sans
+routeur et une page d'arrivée sans châssis sont refusés nommément. Le GESTE et le MARQUEUR sont
+CEUX de la fiche mission (`check-job-interactive-production.js`) : une seconde définition
+divergerait au premier correctif. Aucune écriture — le geste ouvre la liste des missions.
+Trois sorties : 0 conforme, 1 refus nommé, 2 prémisse (aucun profil au sitemap, ou Chromium
+absent — outillage), une prémisse n'étant jamais un vert.
+
+**Ce qu'elle ne juge pas, et c'est dit** : le document (c'est sa sonde), le rendu visuel
+(géométrie, contraste, CLS — suite e2e sur pile locale), la matrice des moteurs (Chromium seul)
+et plus d'un profil par passage.
+
+**Preuves** : `frontend/scripts/__tests__/check-worker-interactive-production.test.js` (25 cas :
+chaque refus a son scénario, un serveur HTTP local réel pour la résolution du sitemap, le CLI et
+les trois sorts du verdict) et **trois mutations** au registre `guard-proofs.json`, chacune
+rejouée `[OK]` le 22/10/2026 (nom absent toléré, autre personne tolérée, chemin d'arrivée non
+jugé).
 
 ## 4. Gardes jamais prouvés
 
@@ -2186,10 +2510,11 @@ chaque PR vers `main` (sauf mention contraire).
   peut pas vérifier, c'est que les valeurs existent sur Vercel** : le test
   prouve le mécanisme, pas la configuration du déploiement (cf. §7).
 - Le build Vite aboutit avec `VITE_API_URL` de production.
-- **Sur `main`**, le frontend SERVI annonce la révision dont il est construit : le build publie la
-  balise `kojo-build-revision` et `check-deployed-revision.js` la compare au commit poussé (ou au
-  dernier commit ayant touché `frontend/`). C'est cette ligne qui fait qu'un `main` vert signifie
-  « le site servi est celui de ce commit », et plus seulement « le build a réussi » (cf. F19).
+- **Sur `main`**, le frontend SERVI annonce la révision **et l'arbre `frontend/`** dont il est
+  construit (`kojo-build-revision`, `kojo-build-tree`), et `check-deployed-revision.js` compare cet
+  arbre **publié** à celui du commit poussé (ou du dernier commit ayant touché `frontend/`). C'est
+  cette ligne qui fait qu'un `main` vert signifie « le site servi est celui de ce commit », et plus
+  seulement « le build a réussi » (cf. F19) — sans qu'une fusion documentaire la fasse rougir.
 - Shells de pré-rendu présents dans **chaque** page pré-rendue (`jobs.html`,
   `login.html`, `register.html`, `forgot-password.html`, `payment.html`,
   `how-it-works.html`, `support.html` — h1, contenu, liens internes et
@@ -2338,9 +2663,10 @@ chaque PR vers `main` (sauf mention contraire).
 - **Le frontend servi est vérifié lui aussi, et par un autre moyen** (21/09/2026) :
   le déploiement de production du frontend n'est pas commandé par la CI (Vercel
   le fait depuis l'app GitHub), donc c'est l'ARTEFACT qui publie sa révision
-  (`kojo-build-revision`) et `check-deployed-revision.js` qui la compare, sur
-  `main`, au commit poussé ou au dernier commit ayant touché `frontend/`
-  (cf. F19). Restent hors de cette vérification : les actifs un par un (leur
+  **et son arbre** (`kojo-build-revision`, `kojo-build-tree`) et
+  `check-deployed-revision.js` qui compare, sur `main`, l'**arbre `frontend/`
+  publié** à celui du commit poussé ou du dernier commit ayant touché
+  `frontend/` (cf. F19). Restent hors de cette vérification : les actifs un par un (leur
   déploiement est atomique côté Vercel, mais rien ne le re-vérifie), les
   déploiements de **preview** des PR, et le mobile (`mobile-build` compile un APK,
   il ne vérifie rien de ce qui est servi).
@@ -2476,6 +2802,8 @@ Ces angles morts historiques ont été **fermés et vérifiés par des gardes au
 
 | **« LE CORPUS DE PRODUCTION VIDE NE VAUT PAS UN VERT » — trois sondes de production sortaient en 0 en annonçant, chacune, qu'elles n'avaient rien mesuré** | 12/10/2026 | **La mesure.** Le 12/10/2026 la production ne servait **aucune mission vivante** : `GET /api/jobs?status=open` → `[]`, sitemap de **8 URL dont ZÉRO fiche**, `/api/public/stats` → `open_jobs: 0, completed_jobs: 0, reviews: 0`. Trois sondes passaient au vert en le disant à voix basse (`::notice`) : `check-og-images.js` (« aucune mission en base … la branche 200 n'a PAS été exercée »), `check-og-job-200.js` (« cycle IGNORÉ » — le déploiement réel n'est pas une adresse que ce job contrôle, et la CI n'écrit pas chez le client) et `check-seo-production.js` (« 0 fiche jugée », en `--strict` compris). Un lecteur du résumé ne pouvait pas distinguer « vérifié » de « rien mesuré » : c'est la forme de silence de F9, appliquée à un CORPUS et non à une étape. **Les trois surfaces, recensées.** (1) `og-images:fiche-200` — branche 200 de `/jobs/:id` (méta OG d'une mission réelle, og:title, cartes Pillow wide 1200×630 + carrée 1200×1200) ; (2) `og-job-200:cycle` — cycle complet création → 200 → suppression → verrou 404 + noindex + sitemap ; (3) `seo-production:fiches` — fiches `/jobs/:id` de la sonde SEO (canonical, title, description), les DEUX sources concordant sur un corpus vide. **La décision.** Le corpus est DÉCLARÉ (`frontend/scripts/corpus-missions.js` : plancher 1, statuts `open` + `in_progress`, lecture par l'API publique) et chaque surface aveugle est DÉCLARÉE avec son chemin, son motif (≥ 40 caractères : POURQUOI elle est aveugle), son remède (ce qu'il faudrait pour la mesurer, ou où elle l'est déjà) et sa date. Une sonde qui atteint cet état publie un **`::warning`** nommant tout cela — bruyant, et volontairement NON bloquant pour un état de données (une sonde rouge en permanence est une sonde qu'on apprend à ignorer) — et **REFUSE (sortie 1) si la surface n'est pas déclarée** : un vert qui n'a rien mesuré ne doit pas pouvoir s'écrire en silence. **Le garde.** `frontend/scripts/check-corpus-missions.js` (step de `frontend-build`, un check requis) balaie **TOUT** `frontend/scripts/` (76 fichiers lus le 12/10/2026) et refuse : une lecture du corpus par une sonde NON déclarée (une sonde ajoutée demain est donc couverte sans être inscrite nulle part — les mentions en COMMENTAIRE ne comptent pas, et c'est nécessaire : `lhci-cls-budgets.cjs`, `mesure-lighthouse-locale.mjs` et `vercel-rewrite-server.js` en parlent en prose), une déclaration PÉRIMÉE (surface que sa sonde ne demande plus, sonde déclarée qui ne lit plus le corpus, surface absente de la liste de sa sonde, exemption de registre sans sujet), une déclaration MUETTE (sonde qui ne consulte pas `verdictDeSurfaceVide`, ou qui ne publie aucun `::warning`), un motif, un remède ou une date trop courts, une clé de registre sans constante exportée, et il refuse de conclure sous ses planchers de lecture (30 fichiers, 3 sondes, 3 surfaces, 1 corpus). Relevé en production le 12/10/2026 : `node scripts/check-corpus-missions.js` vert (3 surfaces déclarées) et `node scripts/check-seo-production.js --strict` **0**, avec le `::warning` de la surface `seo-production:fiches` dans le résumé du run. **Preuve** : `frontend/scripts/__tests__/check-corpus-missions.test.js` (**28 cas**, dont une arborescence de scripts cassée montée en bac temporaire et le CLI exécuté en sous-processus) et **5 mutations** rejouées `[OK]` (refus d'une surface non déclarée neutralisé, lecture non déclarée tolérée, planchers neutralisés, avertissement d'une sonde neutralisé, balayage vidé), registre à **107 gardes / 177 mutations**. **Ce que la décision ne fait pas, écrit pour ne pas être pris pour couvert** : un `::warning` ne bloque aucune fusion (il rend l'état public à chaque run), et une surface DÉCLARÉE n'est pas pour autant mesurée ailleurs — son remède dit où elle l'est (la pile locale de la CI, `backend/tests/test_job_og_cycle.py` en processus, ou une mission à publier). Détail : § 2.14 de `AUDIT-VERIFICATIONS-NON-BLOQUANTES.md`. |
 | **LA FORME D'UNE FICHE `/jobs/:id` JUGÉE SANS CORPUS : le canari de contrôle** | 16/10/2026 | **Le trou resté ouvert après la ligne précédente.** Déclarer une surface aveugle rend l'état public ; ça ne la mesure pas. Or une des trois (`seo-production:fiches`, et avec elle la forme du document qu'un crawler lit : `<title>`, `meta description`, `robots`, `canonical`, `og:url`, `twitter:url`, `og:title`, `<h1>` statique) ne dépend pas des DONNÉES mais de l'existence d'une mission à juger : les jours sans mission — ceux où la demande est faible — étaient donc des jours de silence, exactement là où la sonde aurait dû jurer. **La décision.** `frontend/scripts/check-job-form-canari.js` (step de `lighthouse-ci`, à côté du cycle OG, toujours AVANT Lighthouse pour que la mission ne soit plus dans /jobs) FABRIQUE la mission qu'il juge : création étiquetée `[CI]` (`POST /api/jobs`), jugement de la fiche SERVIE, suppression TOUJOURS, puis verrou (404 + noindex, carte OG 404, absente du sitemap) — et la contrepartie qui rend ce verrou non vide : la mission doit être LISTÉE au sitemap avant sa suppression. Rien n'est recopié : charge utile, jeton, lecture du sitemap et verrou appartiennent à `check-og-job-200.js`, les balises à `site-meta.js`, les cartes à `runOgImageCheck`. **Le mandat.** Le cycle ÉCRIT, et c'est la confusion adresse-auditée/adresse-écrite qui avait créé une mission de test en base réelle le 20/09/2026 : la question est posée à la seule adresse MODIFIÉE — écriture libre sur loopback (la pile locale du job, à chaque run), et en production SEULEMENT sous mandat délibéré `KOJO_CANARI_ALLOW_WRITE=1`, jamais posé par un run de PR. Sans mandat : `::warning` déclaré (surface `job-form-canari:forme`), et REFUS (sortie 1) si la surface quitte le registre. **Mesuré le 16/10/2026.** Cycle complet sur pile locale en vraies requêtes HTTP (création → forme jugée 0 défaut → cartes 1200×630 et 1200×1200 → listée au sitemap → suppression → verrou) : **sortie 0**. Chemin d'échec : la même pile servant `x-robots-tag: noindex` sur une fiche vivante sort en **1** en nommant le défaut, et supprime quand même sa mission. Contre le déploiement réel sans mandat : **sortie 0**, aucun écrit, `::warning` publié. **Preuve** : `frontend/scripts/__tests__/check-job-form-canari.test.js` (**35 cas**, la règle de forme cas par cas sur un document injecté) + **3 mutations** rejouées `[OK]` (mandat non vérifié, défauts non remontés, canonical d'une autre page toléré), restaurations à empreinte SHA-1 identique. **Ce qu'il ne couvre pas, écrit** : la forme des missions du CLIENT reste lue là où le corpus est réel — le canari juge la forme d'UNE fiche, il ne publie pas de corpus, et les deux surfaces de la ligne précédente restent déclarées aveugles quand il n'y a aucune mission. Détail : § 2.15 de `AUDIT-VERIFICATIONS-NON-BLOQUANTES.md`. |
+
+| **LE DOCUMENT SERVI DE `/workers/:id` N'ÉTAIT JUGÉ PAR PERSONNE : la réécriture Vercel pouvait être perdue en silence** | 21/10/2026 | **Le trou.** Depuis le 21/10/2026 le document pré-rendu d'un profil démarre l'application (point d'entrée stable `/boot/worker-boot.js`, feuille `/boot/worker-app.css`, bloc `kojo-worker-data`), mais RIEN ne jugeait le document que la production sert réellement : `check-worker-og-contract.js` exécute le backend HORS LIGNE, `check-spa-routes.js` lit la CONFIGURATION des rewrites de `vercel.json`. Or une réécriture perdue ne casse rien de visible : Vercel répond **200** avec la coque SPA — document valide, indexable, sans canonical de profil, sans cartes OG de travailleur, sans `<h1>` —, donc aucun test ne rougissait pendant que chaque lien partagé perdait son aperçu. **La décision.** `frontend/scripts/check-worker-page-production.js` juge la production, et son PREMIER verdict ne dépend d'aucune donnée : un identifiant SENTINELLE (`kojo-sonde-reecriture`, improbable par construction, aucune écriture) doit répondre le 404 du backend — noindex, point d'entrée, aucun script de bundle ; une coque SPA répondrait 200 + `/assets/…js`. Le second verdict juge la fiche d'un profil réel, pris au sitemap (la surface par laquelle un crawler la découvre) ou passé à `--worker` : canonical ET `og:url` égaux à l'adresse demandée, DEUX cartes OG (`…png` 1200×630 + `…-square.png` 1200×1200) vérifiées en HTTP réel (200, `image/png`, signature PNG — le HTML peut annoncer des cartes 404), `twitter:*`, `<h1>` unique accordé au bloc de données, point d'entrée, feuille. **« Zéro `<script>` » a changé de sens, et la règle est plus stricte** : le document charge UN module, donc la sonde refuse tout script AUTRE que le point d'entrée déclaré, tout script en ligne, et tout `/assets/…js` (la signature de la coque) — un document qui aurait perdu son point d'entrée est refusé aussi, puisqu'il ne démarre plus. **Trois sorties** : 0 conforme, 1 refus nommé (le défaut ET le fichier à corriger), 2 prémisse (`aucun profil publié`, marque « prémisse (aucun verdict rendu ici) ») — une prémisse n'est jamais un vert, et la réécriture reste mesurée par la sentinelle. **Preuve** : `frontend/scripts/__tests__/check-worker-page-production.test.js` (**34 cas** : chaque fait de l'en-tête éprouvé seul sur un document conforme, coque SPA, 404 sans noindex ni point d'entrée, résolution sitemap/`--worker`, cartes en HTTP, sonde entière à `fetch` injecté, et un **serveur HTTP local réel** qui exerce le CLI dans ses TROIS sorties — un `spawnSync` y bloquait la boucle et faisait paraître la sonde pendue, mesuré puis corrigé). Ce qu'elle ne juge pas, écrit : le TEXTE du titre et de la description (coupe en points de code) reste au contrat hors ligne, sinon deux gardes se contrediraient un jour sur une phrase. |
 
 ## 8. Tenir ce document à jour
 

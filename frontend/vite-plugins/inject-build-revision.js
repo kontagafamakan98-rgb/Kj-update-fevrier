@@ -1,8 +1,8 @@
-// Publie la RÉVISION du build dans le HTML statique (build seulement).
+// Publie la RÉVISION et l'ARBRE du build dans le HTML statique (build seulement).
 
 import { execFileSync } from 'node:child_process'
 
-import { BUILD_REVISION_META } from '../scripts/site-meta.js'
+import { BUILD_REVISION_META, BUILD_TREE_DIR, BUILD_TREE_META } from '../scripts/site-meta.js'
 
 /**
  * La révision du DÉPÔT dans lequel ce build tourne, si c'en est un.
@@ -65,6 +65,45 @@ export function revisionFrom(env = {}, { depot = revisionDuDepot } = {}) {
 }
 
 /**
+ * L'ARBRE `frontend/` du dépôt dans lequel ce build tourne, si c'en est un.
+ *
+ * ── Pourquoi l'artefact publie l'arbre, et pas seulement le SHA ───────────
+ * La propriété à tenir est « aucun changement de `frontend/` n'est absent de la
+ * production ». Le SHA n'en est qu'un raccourci, faux dès qu'une fusion ne
+ * touche pas le frontend : Vercel laisse alors la production sur le build
+ * précédent (mesuré le 21/10/2026), et le commit servi n'est ni la tête de
+ * `main` ni le dernier commit ayant touché `frontend/`. Le garde comparait donc
+ * les arbres — mais il devait lire celui du commit SERVI, ce qui exigeait ce
+ * commit dans SON clone : un clone superficiel rendait l'arbre incomparable, et
+ * la vérification sortait en prémisse (code 2) pour un fait qui n'appartenait
+ * pas à la production.
+ *
+ * Le build, lui, EST dans le dépôt : `git rev-parse HEAD:frontend` lui donne
+ * l'arbre exact du code qu'il compile. L'artefact le publie donc, et le garde
+ * n'a plus besoin que des arbres des commits ATTENDUS — ceux de `main`, toujours
+ * présents.
+ *
+ * Aucune exception ne sort : un build hors dépôt git rend '', le build publie
+ * alors sa révision SANS arbre (s'il en a une par variable), et le garde refuse
+ * en nommant l'absence — jamais en comparant à une valeur inventée.
+ *
+ * @param {Function} [commande] Exécuteur injectable (tests).
+ * @returns {string} L'arbre git de `frontend/` à HEAD, ou '' hors dépôt.
+ */
+export function arbreDuDepot(commande = execFileSync) {
+  try {
+    return String(
+      commande('git', ['rev-parse', `HEAD:${BUILD_TREE_DIR}`], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      })
+    ).trim()
+  } catch (_erreur) {
+    return ''
+  }
+}
+
+/**
  * Meta `kojo-build-revision` : ce que le déploiement de production annonce.
  *
  * ── Ce que ce plugin ferme ─────────────────────────────────────────────────
@@ -81,30 +120,49 @@ export function revisionFrom(env = {}, { depot = revisionDuDepot } = {}) {
  * Elle va dans le HTML STATIQUE (pas dans le bundle) pour la même raison que
  * les balises SEO : c'est ce qu'un client reçoit sans exécuter de JavaScript.
  *
+ * Deux balises, un même artefact : `kojo-build-revision` (le commit, pour dire
+ * de quoi on parle et pour le chemin rapide) et `kojo-build-tree` (l'ARBRE
+ * `frontend/`, qui porte le verdict). Les deux vont dans la TÊTE du HTML servi.
+ *
+ * L'arbre est publié SEULEMENT quand le dépôt le donne : sans `.git` le build
+ * n'invente rien, et l'absence est refusée en production en la nommant.
+ *
  * @param {object} [options]
  * @param {Object<string, string>} [options.env] Environnement du build.
  * @param {Function} [options.depot] Source « dépôt » injectable (tests) : c'est
  *   par elle qu'on exerce le cas « aucune révision disponible » sans sortir du
  *   dépôt, où git en donne toujours une.
+ * @param {Function} [options.arbre] Source de l'ARBRE injectable (tests), même
+ *   raison : hors dépôt git, il n'y a rien à publier.
  * @returns {object} Plugin Vite.
  */
-export function injectBuildRevisionPlugin({ env = {}, depot = revisionDuDepot } = {}) {
+export function injectBuildRevisionPlugin({
+  env = {},
+  depot = revisionDuDepot,
+  arbre = arbreDuDepot,
+} = {}) {
   return {
     name: 'inject-build-revision',
     apply: 'build',
     transformIndexHtml(html) {
       const revision = revisionFrom(env, { depot })
       if (!revision) return html
-      return {
-        html,
-        tags: [
-          {
-            tag: 'meta',
-            attrs: { name: BUILD_REVISION_META, content: revision },
-            injectTo: 'head',
-          },
-        ],
+      const tree = String(arbre() || '').trim()
+      const tags = [
+        {
+          tag: 'meta',
+          attrs: { name: BUILD_REVISION_META, content: revision },
+          injectTo: 'head',
+        },
+      ]
+      if (tree) {
+        tags.push({
+          tag: 'meta',
+          attrs: { name: BUILD_TREE_META, content: tree },
+          injectTo: 'head',
+        })
       }
+      return { html, tags }
     },
   }
 }

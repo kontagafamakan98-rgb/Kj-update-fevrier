@@ -596,7 +596,8 @@ def verifier_production_frontend(base: BaseDistante, timeout_minutes: int = 10) 
         return False
     log(
         f"Révisions acceptées : {base.fusion[:10]} (merge) ou "
-        f"{dernier_frontend[:10]} (dernier commit frontend sur {base.ref})"
+        f"{dernier_frontend[:10]} (dernier commit frontend sur {base.ref}) — "
+        "le verdict porte sur l'arbre frontend/ PUBLIÉ par l'artefact servi"
     )
 
     cmd = [
@@ -619,9 +620,56 @@ def verifier_production_frontend(base: BaseDistante, timeout_minutes: int = 10) 
     if res.returncode == 0:
         log_succes("Vercel production : Révision validée et servie !")
         return True
-    else:
-        log_erreur("Vercel production : Délais dépassé ou révision non servie.")
+    if res.returncode == 2:
+        # Prémisse : l'arbre d'une révision ATTENDUE est illisible dans ce clone.
+        # Le commit SERVI, lui, n'est plus lu localement (le build publie son
+        # arbre) : ce code 2 parle du clone, pas du déploiement, et accuser
+        # Vercel enverrait chercher au mauvais endroit.
+        log_erreur(
+            "Vercel production : arbre frontend/ d'une révision attendue illisible "
+            "dans ce clone — aucun verdict rendu sur le déploiement."
+        )
         return False
+    log_erreur("Vercel production : Délais dépassé ou révision non servie.")
+    return False
+
+
+def verifier_actifs_production() -> bool:
+    """Les ACTIFS (JS, CSS, polices) et les CONTENUS (images, cartes OG) servis
+    sont-ils ceux de l'artefact ?
+
+    Le contrôle de révision prouve que le HTML servi vient de la fusion ; il ne dit
+    rien des fichiers que ce HTML charge. Vercel déploie un artefact atomiquement,
+    mais rien ne le re-vérifiait : un HTML neuf avec des actifs restés en arrière
+    sert une page qui ne correspond pas à son bundle.
+
+    La sonde suit la chaîne HTML → manifeste (`kojo-build-assets`) → octets de
+    chaque actif ; pour les images et les cartes OG, elle lit un ÉCHANTILLON de
+    tête et de queue en plages HTTP, sous un budget d'octets — au-delà, elle
+    DÉCLARE les contenus non échantillonnés au lieu de les compter comme
+    vérifiés. Elle rend 2 quand elle ne peut PAS conclure (invocation) : ce
+    n'est pas un verdict sur les actifs, et le dire évite d'accuser Vercel.
+    """
+    log(
+        f"Contrôle des ACTIFS et CONTENUS servis par VERCEL (JS, CSS, polices, images, "
+        f"cartes OG) sur {URL_FRONTEND_PROD}..."
+    )
+    res = subprocess.run(
+        ["node", "scripts/check-deployed-assets.js"],
+        cwd=str(FRONTEND_DIR),
+        capture_output=False,
+    )
+    if res.returncode == 0:
+        log_succes("Vercel production : actifs conformes au manifeste de l'artefact !")
+        return True
+    if res.returncode == 2:
+        log_erreur(
+            "Vercel production : sonde d'actifs non exécutable (invocation impossible) — "
+            "aucun verdict rendu sur les actifs."
+        )
+        return False
+    log_erreur("Vercel production : actifs servis ≠ manifeste de l'artefact.")
+    return False
 
 
 def verifier_seo_production_strict() -> bool:
@@ -847,12 +895,23 @@ def main(argv=None) -> int:
             "la sonde porterait sur une autre production que celle qui vient d'être livrée."
         )
 
+    # Les actifs se jugent sur le MÊME artefact que la révision vient de confirmer :
+    # sans cette confirmation, la sonde lirait une autre production que celle qui
+    # vient d'être livrée.
+    ok_actifs = verifier_actifs_production() if ok_front else False
+    if not ok_front:
+        log(
+            "Sonde d'actifs NON exécutée : la révision servie n'est pas confirmée — "
+            "elle jugerait une autre production que celle qui vient d'être livrée."
+        )
+
     ok_back = verifier_production_backend(base, options.timeout_prod) if base else False
 
     refus = [
         nom
         for nom, ok in (
             ("Vercel (révision servie)", ok_front),
+            ("Actifs servis (Vercel)", ok_actifs),
             ("SEO strict (production)", ok_seo),
             ("Fly.io (révision servie)", ok_back),
         )
@@ -862,7 +921,7 @@ def main(argv=None) -> int:
         log_succes("Trajet de livraison COMPLET terminé avec succès !")
         log(
             f"PR #{pr_number} intégrée dans main ({merge_sha[:10]}). Production Vercel et "
-            "Fly.io à jour, sonde SEO stricte verte."
+            "Fly.io à jour, actifs et sonde SEO stricte conformes."
         )
         return 0
     log_erreur(

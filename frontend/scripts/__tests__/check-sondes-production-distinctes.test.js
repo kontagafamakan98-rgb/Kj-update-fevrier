@@ -81,9 +81,13 @@ const WF_SESSION = lire(WORKFLOWS.session);
  * Le titre de la SEULE annotation d'erreur qu'une sonde publie. Exiger qu'il n'y
  * en ait qu'un est le point de la garde : deux titres dans une sonde, et le
  * lecteur ne sait plus quel refus il lit.
+ *
+ * Le PUITS est `console.error` ou un `error` injecté : le code de sortie
+ * (0/1/2) se juge sans lancer de processus, donc `main` reçoit son puits — la
+ * garde lit le TITRE, pas le nom de la fonction qui l'écrit.
  */
 const titreDerreur = (source) => {
-  const trouves = [...source.matchAll(/console\.error\(`::error title=([^`]+)::/g)].map(
+  const trouves = [...source.matchAll(/(?:console\.)?error\(`::error title=([^`]+)::/g)].map(
     (trouve) => trouve[1]
   );
   expect(trouves, 'chaque sonde publie UN SEUL titre d’erreur').toHaveLength(1);

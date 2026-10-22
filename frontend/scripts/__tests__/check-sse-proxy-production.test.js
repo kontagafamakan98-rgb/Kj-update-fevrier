@@ -34,6 +34,7 @@ import {
   analyserFlux,
   budgetDuPremierEvenement,
   jugeDuTransfert,
+  main,
   runSseProxyProbe,
 } from '../check-sse-proxy-production.js';
 import {
@@ -470,5 +471,65 @@ describe('runSseProxyProbe — la traversée, mesurée bout en bout', () => {
     expect(resultat.errors.join(' ')).toContain('au-delà du budget de 120 ms');
     // Et le second fait est là aussi : les deux trames sont arrivées ensemble.
     expect(resultat.errors.join(' ')).toContain('même vidage');
+  });
+});
+
+describe('la ligne de commande — un code par issue, jugé sans réseau', () => {
+  /**
+   * Le faux-vert que cette section empêche : un code de sortie ANNONCÉ mais
+   * jamais mesuré. Les trois issues de cette sonde étaient déjà distinctes
+   * (0/1/2), mais `main` sortait par `process.exit` en lisant `process.argv` :
+   * la seule preuve possible était de lancer un processus, donc la promesse
+   * n'était tenue par aucun cas. Ici, la sonde est INJECTÉE.
+   */
+  it('sort en 0 quand le flux traverse, en transmettant la base jugée', async () => {
+    const vues = [];
+    const code = await main(['--base', 'https://exemple.test'], {
+      run: async (options) => {
+        vues.push(options);
+        return { ok: true, premisse: false, attempts: 1, errors: [], mesures: [] };
+      },
+      error: () => {},
+    });
+    expect(code).toBe(0);
+    expect(vues).toHaveLength(1);
+    expect(vues[0].base).toBe('https://exemple.test');
+  });
+
+  it('sort en 2 pour une PRÉMISSE, et dit qu’aucun verdict n’est rendu', async () => {
+    const erreurs = [];
+    const code = await main(['--base', 'https://exemple.test'], {
+      run: async () => ({
+        ok: false,
+        premisse: true,
+        attempts: 0,
+        errors: [`${MARQUE_PREMISSE} : compte CI absent`],
+        mesures: [],
+      }),
+      error: (message) => erreurs.push(String(message)),
+    });
+    expect(code).toBe(2);
+    const lignes = erreurs.join('\n');
+    expect(lignes).toContain(MARQUE_PREMISSE);
+    expect(lignes).toContain(TITRE_ERREUR);
+    expect(lignes).toContain('Aucun verdict rendu');
+  });
+
+  it('sort en 1 pour un refus du FLUX — le code dit que la sonde a jugé', async () => {
+    const erreurs = [];
+    const code = await main(['--base', 'https://exemple.test'], {
+      run: async () => ({
+        ok: false,
+        premisse: false,
+        attempts: 2,
+        errors: [`${FAMILLE} : premier événement au-delà du budget`],
+        mesures: [],
+      }),
+      error: (message) => erreurs.push(String(message)),
+    });
+    expect(code).toBe(1);
+    // Un refus ne porte PAS le discours de prémisse : les deux codes ne se
+    // confondent ni à la lecture ni dans le verdict du job.
+    expect(erreurs.join('\n')).not.toContain('Aucun verdict rendu');
   });
 });

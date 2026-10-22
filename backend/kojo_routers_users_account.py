@@ -429,6 +429,11 @@ USER_DATA_BY_EMAIL_FIELD = "email"
 NO_USER_DATA_COLLECTIONS = (
     "revoked_tokens",  # jti + date d'expiration, aucune identité
     "settings",        # configuration globale (taux de commission)
+    # Compteur de dépense de l'assistant IA : le jour, un nombre d'appels et un
+    # nombre de caractères, agrégés pour tout le service — aucun lien vers un
+    # compte (le chat est sans état côté Kojo, cf. kojo_ai_budget). Il n'a donc
+    # rien à rendre dans un export, et il périme par sa règle de conservation.
+    "ai_usage",
 )
 
 # Secrets qui ne sortent JAMAIS d'un export : ils ne servent pas la personne qui

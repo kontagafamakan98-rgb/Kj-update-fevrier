@@ -198,6 +198,13 @@ OPTIONAL_KEYS = {
     # absence sur Fly n'est pas une divergence.
     "NEON_AI_GATEWAY_BASE_URL", "NEON_AI_GATEWAY_TOKEN",
     "NEON_AI_GATEWAY_MODEL", "NEON_AI_GATEWAY_TIMEOUT_SECONDS",
+    # Budget de l'assistant (plafond de dépense par jour UTC) : les deux
+    # plafonds et la durée de conservation du compteur ont un défaut dans
+    # `kojo_settings` (200 appels, 250 000 caractères, 90 jours), donc leur
+    # absence sur Fly est un réglage laissé au défaut, pas une config
+    # incomplète — et c'est le défaut qui borne la facture.
+    "NEON_AI_GATEWAY_DAILY_CALLS", "NEON_AI_GATEWAY_DAILY_PROMPT_CHARS",
+    "AI_USAGE_RETENTION_DAYS",
     # Sequestre a deux temps : les deux reglages ont un defaut de repli dans
     # `kojo_settings` (7 jours, balayage horaire) et le delai REFUSE le demarrage
     # sous 1 jour. Leur absence sur Fly n'est donc pas une divergence doc-prod :

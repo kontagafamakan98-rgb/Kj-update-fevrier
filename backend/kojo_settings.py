@@ -290,6 +290,73 @@ if not 1 <= COMPLETION_SWEEP_INTERVAL_MINUTES <= 1440:
         "le balayage doit tourner au moins une fois par jour (1..1440 minutes)."
     )
 
+# --- Litige tracé (`kojo_job_disputes.py`) ---
+# Un désaccord entre le client et le travailleur a désormais un ÉTAT, une
+# ÉCHÉANCE et une DÉCISION du propriétaire, au lieu d'un ticket support sans
+# trace. Tant qu'un litige est OUVERT, l'argent ne part pas : ni la validation
+# du client, ni la libération automatique ne le versent, sinon la contestation
+# ne protégerait rien. L'échéance est la FENÊTRE D'ARBITRAGE : passée sans
+# décision, le désaccord se referme et la règle ordinaire reprend (le silence
+# prolongé favorise le travailleur, comme `COMPLETION_AUTO_RELEASE_DAYS`) —
+# une fenêtre sans conséquence serait une fenêtre décorative.
+LITIGE_DECISION_DAYS = int(os.environ.get('LITIGE_DECISION_DAYS', '5'))
+LITIGE_SWEEP_INTERVAL_MINUTES = int(
+    os.environ.get('LITIGE_SWEEP_INTERVAL_MINUTES', '60')
+)
+
+if LITIGE_DECISION_DAYS < 1:
+    raise RuntimeError(
+        f"LITIGE_DECISION_DAYS={LITIGE_DECISION_DAYS} : une fenêtre d'arbitrage "
+        "nulle ou négative refermerait le litige avant que le propriétaire "
+        "puisse le lire. La borne basse est 1 jour."
+    )
+if not 1 <= LITIGE_SWEEP_INTERVAL_MINUTES <= 1440:
+    raise RuntimeError(
+        f"LITIGE_SWEEP_INTERVAL_MINUTES={LITIGE_SWEEP_INTERVAL_MINUTES} : "
+        "le balayage des échéances doit tourner au moins une fois par jour "
+        "(1..1440 minutes)."
+    )
+
+# --- Alerte « litiges tranchés SANS réponse » (kojo_scheduler) ---
+# La file d'arbitrage dit ce qui reste à faire ; elle ne dit pas si l'arbitre
+# tranche SANS avoir lu l'autre partie. `mesures_arbitrage` publie ce chiffre à
+# la demande, dans la file — mais personne ne le regarde s'il ne vient pas à
+# lui. Ce passage compare la part sur une FENÊTRE GLISSANTE au seuil ci-dessous
+# et prévient le propriétaire UNE FOIS PAR DÉPASSEMENT (le retour sous le seuil
+# réarme, comme le rétablissement du fournisseur email).
+#
+# Fenêtre 90 jours : sous le PLANCHER de mesure (10 décisions) un taux n'est
+# pas publié, et un marché qui tranche quelques litiges par mois atteindrait
+# rarement ce plancher sur 30 jours — mesurer sur 90 évite de publier « trop peu
+# de litiges » à perpétuité. Le seuil est une PART (0..1), pas un pourcentage.
+LITIGE_SANS_REPONSE_SEUIL = float(os.environ.get('LITIGE_SANS_REPONSE_SEUIL', '0.5'))
+LITIGE_SANS_REPONSE_FENETRE_JOURS = int(
+    os.environ.get('LITIGE_SANS_REPONSE_FENETRE_JOURS', '90')
+)
+# Fréquence du jugement (minutes). Quotidien : un arbitrage ne change pas
+# d'heure en heure, et le passage relit l'historique des décisions.
+LITIGE_ALERTE_INTERVAL_MINUTES = int(
+    os.environ.get('LITIGE_ALERTE_INTERVAL_MINUTES', '1440')
+)
+
+if not 0 < LITIGE_SANS_REPONSE_SEUIL < 1:
+    raise RuntimeError(
+        f"LITIGE_SANS_REPONSE_SEUIL={LITIGE_SANS_REPONSE_SEUIL} : le seuil est "
+        "une PART strictement entre 0 et 1. À 1 il ne serait jamais dépassé "
+        "(une alerte qui ne peut pas partir), à 0 il partirait sur la première "
+        "décision un peu malheureuse."
+    )
+if not 1 <= LITIGE_SANS_REPONSE_FENETRE_JOURS <= 3650:
+    raise RuntimeError(
+        f"LITIGE_SANS_REPONSE_FENETRE_JOURS={LITIGE_SANS_REPONSE_FENETRE_JOURS} : "
+        "la fenêtre doit couvrir au moins un jour et au plus dix ans."
+    )
+if not 1 <= LITIGE_ALERTE_INTERVAL_MINUTES <= 1440:
+    raise RuntimeError(
+        f"LITIGE_ALERTE_INTERVAL_MINUTES={LITIGE_ALERTE_INTERVAL_MINUTES} : "
+        "le jugement doit tourner au moins une fois par jour (1..1440 minutes)."
+    )
+
 # Récompense de parrainage (FCFA) créditée quand le filleul termine sa
 # PREMIÈRE mission : une part au parrain, une part au filleul.
 REFERRAL_SPONSOR_REWARD = float(os.environ.get('REFERRAL_SPONSOR_REWARD', '500'))
@@ -623,3 +690,26 @@ AI_GATEWAY_MODEL = os.environ.get('NEON_AI_GATEWAY_MODEL', 'claude-haiku-4-5').s
 # Un appel modèle est facturé et plus lent qu'une requête interne : borne
 # explicite, pour qu'un gateway lent ne bloque pas un worker indéfiniment.
 AI_GATEWAY_TIMEOUT_SECONDS = int(os.environ.get('NEON_AI_GATEWAY_TIMEOUT_SECONDS', '30'))
+
+# Budget de l'assistant : le plafond de DÉPENSE, par jour UTC et pour tout le
+# service (voir kojo_ai_budget.py). La limite de débit (20 POST / 5 min / IP,
+# kojo_rate_limit) borne le débit, pas la facture : une attaque répartie ou un
+# pic la traverse, et chaque tour est facturé. Ces deux compteurs sont donc
+# GLOBAUX, et lus à chaque demande — un assistant qui coûte plus qu'il ne rend
+# service doit s'arrêter tout seul, sans déploiement.
+#
+# Défauts : 200 appels et 250 000 caractères de prompt par jour. À 700 jetons de
+# réponse au plus par appel (le défaut de `chat_completion`) et un prompt borné
+# à 16 tours de 2 000 caractères par le modèle d'entrée, c'est la borne qu'on
+# accepte de payer quotidiennement pour une fonctionnalité facultative ; la
+# baisser est un choix d'exploitation, la monter un choix budgétaire.
+AI_GATEWAY_DAILY_CALLS = int(os.environ.get('NEON_AI_GATEWAY_DAILY_CALLS', '200'))
+AI_GATEWAY_DAILY_PROMPT_CHARS = int(
+    os.environ.get('NEON_AI_GATEWAY_DAILY_PROMPT_CHARS', '250000')
+)
+
+# Combien de temps le compteur d'une journée reste en base. Il ne porte aucune
+# identité (deux nombres et une date), il n'existe que pour constater la dépense
+# passée — donc une règle de conservation, appliquée par la base comme les
+# autres (kojo_retention.RETENTION_RULES, publiée par PRIVACY.md).
+AI_USAGE_RETENTION_DAYS = int(os.environ.get('AI_USAGE_RETENTION_DAYS', '90'))

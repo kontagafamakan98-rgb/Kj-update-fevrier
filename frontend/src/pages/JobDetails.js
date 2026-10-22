@@ -10,6 +10,10 @@ import ProposalModal from '../components/ProposalModal';
 // Fin de mission à DEUX temps : le travailleur déclare, le client valide, et
 // l'échéance libère le séquestre si le client ne répond pas (kojo_job_completion).
 import CompletionPanel from '../components/CompletionPanel';
+// LITIGE TRACÉ : le désaccord a un état, une échéance d'arbitrage et une
+// décision du propriétaire (kojo_job_disputes). Tant qu'il est ouvert, l'argent
+// ne bouge pas — le panneau le DIT au lieu de le laisser deviner.
+import DisputePanel from '../components/DisputePanel';
 import { jobsAPI } from '../services/apiEndpoints';
 import { handleApiError } from '../services/api';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/jobDetails';
@@ -26,6 +30,7 @@ import { MapPin, ShieldCheck } from 'lucide-react';
 import { PaymentMethodsBadge, WorkerTrustBadge } from '../utils/workerTrustLevel';
 import { usePageTitle, usePageOpenGraph, absoluteUrl } from '../utils/seo';
 import { jobSeo } from '../utils/jobSeo';
+import { lireApercuMission } from '../config/apercu-mission';
 import {
   extractProposalId,
   extractProposalMessage,
@@ -154,9 +159,20 @@ function MessageBubble({ message, isCurrentUser, authorName }) {
 }
 
 export default function JobDetails() {
-  const [job, setJob] = useState(null);
+  // L'identifiant est lu AVANT les états : l'aperçu pré-rendu (ci-dessous) se
+  // choisit sur lui, et un `useState` ne peut pas s'initialiser depuis une
+  // valeur déclarée plus bas.
+  const { id } = useParams();
+  // LA FICHE PRÉ-RENDUE EST L'ÉTAT INITIAL (21/10/2026). Le document servi par
+  // le backend porte la vue publique déjà rendue (`kojo-job-data`, cf.
+  // `src/config/apercu-mission.js`) : la fiche s'affiche donc tout de suite,
+  // sans squelette, et la relecture de l'API ne fait que la rafraîchir. Un bloc
+  // absent (navigation interne) ou d'une autre mission rend `null` — le
+  // chargement habituel a lieu, exactement comme avant cette passe.
+  const [apercu] = useState(() => lireApercuMission(id));
+  const [job, setJob] = useState(() => (apercu ? normalizeJobRecord(apercu) : null));
   const [proposals, setProposals] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!apercu);
   const [showProposalModal, setShowProposalModal] = useState(false);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -177,12 +193,19 @@ export default function JobDetails() {
   const [markingCompletion, setMarkingCompletion] = useState(false);
   const [confirmingCompletion, setConfirmingCompletion] = useState(false);
   const [completionError, setCompletionError] = useState('');
+  // Litige tracé — états séparés de ceux du séquestre : ouvrir un désaccord et
+  // déclarer la fin sont deux gestes différents, un seul indicateur laisserait
+  // les deux boutons actifs.
+  const [disputeError, setDisputeError] = useState('');
+  const [disputeNotice, setDisputeNotice] = useState('');
+  const [openingDispute, setOpeningDispute] = useState(false);
+  const [respondingDispute, setRespondingDispute] = useState(false);
+  const [withdrawingDispute, setWithdrawingDispute] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState(null);
   const [paymentStatusLoading, setPaymentStatusLoading] = useState(false);
   const discussionSectionRef = useRef(null);
   const discussionInputRef = useRef(null);
 
-  const { id } = useParams();
   const { user } = useAuth();
   const { t, currentLanguage } = useLanguage();
   const pageT = makeScopedTranslator(currentLanguage, t);
@@ -198,7 +221,15 @@ export default function JobDetails() {
   // donc l'URL de la page doit venir du rendu courant — sinon le canonical
   // reste posé sur la mission précédente (Google consolide alors la nouvelle
   // vers l'ancienne).
-  usePageTitle(seo.title || t('jobDetailsTitleFallback'), { canonicalPath: seo.canonicalPath });
+  // `description` : la balise `<meta name="description">` est la contrepartie
+  // de `og:description` — la laisser à la valeur du document précédent pendant
+  // que la carte de partage annonce la mission ferait deux descriptions selon
+  // le canal. Elle est vide tant que la mission n'est pas connue : le hook ne
+  // touche alors à rien, ce qui laisse la valeur du document pré-rendu.
+  usePageTitle(seo.title || t('jobDetailsTitleFallback'), {
+    description: seo.description,
+    canonicalPath: seo.canonicalPath,
+  });
   // OG dynamique : un lien /jobs/:id partagé (WhatsApp, Facebook) montre le
   // titre et la description réels de la mission au lieu du texte générique.
   usePageOpenGraph({
@@ -345,7 +376,13 @@ export default function JobDetails() {
   }, [discussionTarget?.id, user?.id]);
 
   const loadJobDetails = async () => {
-    setLoading(true);
+    // Une fiche DÉJÀ lisible (l'aperçu pré-rendu du document servi) reste à
+    // l'écran pendant la relecture : la remplacer par le squelette ferait
+    // clignoter le contenu que le backend vient de servir — le visiteur voit
+    // disparaître la fiche qu'il avait sous les yeux au moment où l'application
+    // démarre. Le squelette n'est donc peint que s'il n'y a rien à montrer.
+    const garderAffiche = Boolean(job) && String(job.id || '') === String(id);
+    if (!garderAffiche) setLoading(true);
     setError('');
     setMessageError('');
     try {
@@ -376,7 +413,14 @@ export default function JobDetails() {
       }
     } catch (jobError) {
       safeLog?.error?.('Error loading job details:', jobError);
-      setError(handleApiError(jobError, pageT('loadError') || t('loadJobFailed')));
+      // Une relecture ratée n'efface PAS la fiche pré-rendue : elle vient du
+      // serveur il y a quelques secondes, et une panne réseau ferait clignoter
+      // « mission introuvable » sur une fiche qui s'affichait très bien. Le
+      // message d'erreur reste réservé au cas sans aperçu, où il n'y a
+      // vraiment rien à montrer.
+      if (!apercu) {
+        setError(handleApiError(jobError, pageT('loadError') || t('loadJobFailed')));
+      }
     } finally {
       setLoading(false);
     }
@@ -611,6 +655,65 @@ export default function JobDetails() {
     }
   };
 
+  const handleOpenDispute = async (reason) => {
+    if (!job?.id) return;
+    setOpeningDispute(true);
+    setDisputeError('');
+    setDisputeNotice('');
+    setMessageSuccess('');
+
+    try {
+      const response = await jobsAPI.openDispute(job.id, { reason });
+      const updatedJob = response?.data?.job;
+      if (updatedJob) setJob((previous) => (previous ? { ...previous, ...updatedJob } : updatedJob));
+      setDisputeNotice(pageT('disputeOpenedNotice'));
+      // Le statut de paiement affiche le gel : le rafraîchir évite qu'une
+      // pastille « séquestré » continue de promettre un versement.
+      await refreshPaymentStatus();
+    } catch (openError) {
+      setDisputeError(handleApiError(openError, pageT('disputeError')));
+    } finally {
+      setOpeningDispute(false);
+    }
+  };
+
+  const handleRespondDispute = async ({ position, note }) => {
+    if (!job?.id) return;
+    setRespondingDispute(true);
+    setDisputeError('');
+    setDisputeNotice('');
+
+    try {
+      const response = await jobsAPI.respondDispute(job.id, { position, note });
+      const updatedJob = response?.data?.job;
+      if (updatedJob) setJob((previous) => (previous ? { ...previous, ...updatedJob } : updatedJob));
+      setDisputeNotice(pageT('disputeResponseSentNotice'));
+    } catch (respondError) {
+      setDisputeError(handleApiError(respondError, pageT('disputeError')));
+    } finally {
+      setRespondingDispute(false);
+    }
+  };
+
+  const handleWithdrawDispute = async () => {
+    if (!job?.id) return;
+    setWithdrawingDispute(true);
+    setDisputeError('');
+    setDisputeNotice('');
+
+    try {
+      const response = await jobsAPI.withdrawDispute(job.id);
+      const updatedJob = response?.data?.job;
+      if (updatedJob) setJob((previous) => (previous ? { ...previous, ...updatedJob } : updatedJob));
+      setDisputeNotice(pageT('disputeWithdrawnNotice'));
+      await refreshPaymentStatus();
+    } catch (withdrawError) {
+      setDisputeError(handleApiError(withdrawError, pageT('disputeError')));
+    } finally {
+      setWithdrawingDispute(false);
+    }
+  };
+
   if (loading) {
     // Skeleton structuré (source unique dans SkeletonLoader) : réplique la
     // hauteur du contenu réel (bouton retour + carte en-tête + carte
@@ -723,9 +826,15 @@ export default function JobDetails() {
 
               {/* Visiteur anonyme (découverte publique) : inviter à se
                   connecter pour postuler — les mutations restent réservées
-                  aux comptes authentifiés. */}
+                  aux comptes authentifiés. `data-sonde` est l'ancre STABLE de
+                  cette action, pour la sonde de production qui clique
+                  réellement dessus (`check-job-interactive-production.js`) :
+                  ni le libellé (cinq langues) ni une classe de peinture ne
+                  peuvent servir d'ancre — le premier change avec la
+                  traduction, la seconde avec un redessin, soit deux faux
+                  rouges pour un geste intact. */}
               {!user && (job?.status === 'open' || !job?.status) && !assignedWorkerId && (
-                <button onClick={() => navigate('/login')} className="rounded-[3px] bg-orange-600 px-4 py-3 font-semibold text-white hover:bg-orange-700">
+                <button data-sonde="postuler-anonyme" onClick={() => navigate('/login')} className="rounded-[3px] bg-orange-600 px-4 py-3 font-semibold text-white hover:bg-orange-700">
                   {pageT('loginToApply') || t('jobUiApply')}
                 </button>
               )}
@@ -856,6 +965,23 @@ export default function JobDetails() {
             marking={markingCompletion}
             confirming={confirmingCompletion}
             error={completionError}
+          />
+
+          {/* Le litige vit AVEC la mission : il ne s'affiche qu'aux parties (le
+              serveur ne le rend même pas aux autres comptes). */}
+          <DisputePanel
+            job={job}
+            isOwner={isJobOwner}
+            isWorker={assignedToCurrentWorker}
+            currentUserId={user?.id || user?._id || ''}
+            onOpen={handleOpenDispute}
+            onRespond={handleRespondDispute}
+            onWithdraw={handleWithdrawDispute}
+            opening={openingDispute}
+            responding={respondingDispute}
+            withdrawing={withdrawingDispute}
+            error={disputeError}
+            notice={disputeNotice}
           />
 
           <div className="carte-editoriale carte-publique">

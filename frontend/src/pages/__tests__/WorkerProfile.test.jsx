@@ -33,6 +33,7 @@ vi.mock('../../contexts/LanguageContext', async (importOriginal) => {
 });
 
 const { default: WorkerProfile } = await import('../WorkerProfile.js');
+const { APERCU_TRAVAILLEUR } = await import('../../config/apercu-travailleur.js');
 
 const rendre = () =>
   render(
@@ -67,12 +68,32 @@ const reponse = (corps, statut = 200) => ({
   json: async () => corps,
 });
 
+/**
+ * Pose le bloc de données que le document pré-rendu porte (`kojo_worker_og.py`).
+ *
+ * Le bloc vit HORS de `#root` dans le document servi : les tests le posent donc
+ * sur `document.body`, comme le backend l'écrit.
+ */
+const poserApercu = (donnees, { id = APERCU_TRAVAILLEUR.SEED_ID } = {}) => {
+  const noeud = document.createElement('script');
+  noeud.type = 'application/json';
+  noeud.id = id;
+  noeud.textContent = typeof donnees === 'string' ? donnees : JSON.stringify(donnees);
+  document.body.appendChild(noeud);
+  return noeud;
+};
+
 beforeEach(() => {
   global.fetch = vi.fn();
 });
 
 afterEach(() => {
   cleanup();
+  // Le bloc survit à `cleanup()` (il n'est pas dans le conteneur React) : sans
+  // ce retrait, l'aperçu d'un cas serait lu par le suivant.
+  document
+    .querySelectorAll(`#${APERCU_TRAVAILLEUR.SEED_ID}`)
+    .forEach((noeud) => noeud.remove());
   vi.clearAllMocks();
 });
 
@@ -175,6 +196,62 @@ describe('Profil public d’un travailleur', () => {
 
     expect(screen.getByRole('heading', { name: 'Binta Diallo' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Awa Diallo' })).not.toBeInTheDocument();
+  });
+
+  it('affiche TOUT DE SUITE le profil déjà rendu par le serveur, sans squelette', async () => {
+    // Le document pré-rendu porte la vue publique : le premier rendu doit être
+    // le profil, pas un squelette qui remplacerait le contenu que le visiteur
+    // vient de voir dans le HTML.
+    poserApercu(PROFIL);
+    global.fetch.mockResolvedValueOnce(reponse({ ...PROFIL, first_name: 'Binta' }));
+
+    rendre();
+
+    // AVANT toute résolution de requête : le nom est déjà là, et aucun
+    // squelette n'est peint.
+    expect(screen.getByRole('heading', { name: 'Awa Diallo' })).toBeInTheDocument();
+    expect(document.querySelector('[aria-busy="true"]')).toBeNull();
+    expect(screen.getByText('Travail impeccable.')).toBeInTheDocument();
+
+    // Puis la relecture de l'API rafraîchit sans repasser par le squelette.
+    expect(await screen.findByRole('heading', { name: 'Binta Diallo' })).toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignore un aperçu d’un AUTRE profil', async () => {
+    // Un cache de document peut servir le bloc d'un profil pour une autre URL :
+    // l'afficher montrerait la mauvaise personne.
+    poserApercu({ ...PROFIL, id: 'w-autre', first_name: 'Zainab' });
+    global.fetch.mockResolvedValueOnce(reponse({ ...PROFIL, first_name: 'Binta' }));
+
+    rendre();
+
+    expect(document.querySelector('[aria-busy="true"]')).not.toBeNull();
+    expect(screen.queryByText('Zainab')).not.toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Binta Diallo' })).toBeInTheDocument();
+  });
+
+  it('un aperçu ILLISIBLE retombe sur le chargement normal', async () => {
+    poserApercu('{"id":');
+    global.fetch.mockResolvedValueOnce(reponse(PROFIL));
+
+    rendre();
+
+    expect(document.querySelector('[aria-busy="true"]')).not.toBeNull();
+    expect(await screen.findByRole('heading', { name: 'Awa Diallo' })).toBeInTheDocument();
+  });
+
+  it('une relecture RATÉE n’efface pas le profil déjà rendu', async () => {
+    // Le contenu vient du serveur il y a quelques secondes : une page de profil
+    // valable vaut mieux qu'un message d'erreur qui la remplace.
+    poserApercu(PROFIL);
+    global.fetch.mockRejectedValueOnce(new Error('réseau indisponible'));
+
+    rendre();
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole('heading', { name: 'Awa Diallo' })).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('une lecture échouée s’annonce et se relance', async () => {

@@ -41,10 +41,19 @@ from kojo_models import NotificationType
 from kojo_retention import RETENTION_RULES
 from kojo_job_alerts import passage_digest
 from kojo_job_completion import passage_liberations_auto
+from kojo_job_disputes import (
+    PLANCHER_MESURE,
+    mesure_sans_reponse,
+    passage_litiges_expires,
+)
 from kojo_settings import (
     COMPLETION_SWEEP_INTERVAL_MINUTES,
     EMAIL_HEALTH_ALERT_INTERVAL_MINUTES,
     JOB_ALERT_DIGEST_INTERVAL_MINUTES,
+    LITIGE_ALERTE_INTERVAL_MINUTES,
+    LITIGE_SANS_REPONSE_FENETRE_JOURS,
+    LITIGE_SANS_REPONSE_SEUIL,
+    LITIGE_SWEEP_INTERVAL_MINUTES,
     OWNER_EMAIL,
     OWNER_USER_ID,
     PAYOUT_ALERT_REMINDER_DAYS,
@@ -323,6 +332,33 @@ async def completion_auto_release_loop():
             break
         except Exception as exc:
             logger.warning(f"⚠️ Erreur balayage des libérations automatiques: {exc}")
+
+
+async def litige_expiry_loop():
+    """Tâche de fond : referme les litiges dont la fenêtre d'arbitrage est passée.
+
+    Même modèle que `completion_auto_release_loop` : sommeil d'abord (pas de
+    rafale au redémarrage), bail partagé entre instances (sinon N machines
+    écriraient N fois le même fait), erreurs isolées par passage.
+
+    Ce que cette boucle ne fait pas, et c'est une décision : elle ne tranche
+    PAS le désaccord. Elle CONSTATE que personne n'a tranché, journalise
+    l'échéance, prévient le propriétaire et rend la main à la règle
+    ordinaire — un balayeur qui déciderait à la place du propriétaire
+    déplacerait l'argent sur un silence, pas sur un jugement.
+    """
+    while True:
+        try:
+            await asyncio.sleep(LITIGE_SWEEP_INTERVAL_MINUTES * 60)
+            await executer_si_bail(
+                "litige_expiry",
+                timedelta(minutes=LITIGE_SWEEP_INTERVAL_MINUTES),
+                passage_litiges_expires,
+            )
+        except asyncio.CancelledError:
+            break
+        except Exception as exc:
+            logger.warning(f"⚠️ Erreur balayage des litiges échus: {exc}")
 
 
 async def payout_stuck_sweeper_loop():
@@ -641,3 +677,233 @@ async def job_alert_digest_loop():
             break
         except Exception as exc:
             logger.warning(f"⚠️ Erreur résumé alertes emploi: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# ALERTE « LITIGES TRANCHÉS SANS RÉPONSE »
+# ---------------------------------------------------------------------------
+#
+# Ce que cette boucle ajoute, et pourquoi elle n'est pas une seconde mesure :
+# `mesures_arbitrage` (et `mesure_sans_reponse`) publient un CHIFFRE à la
+# demande, dans la file d'arbitrage — là où le propriétaire travaille, mais
+# seulement quand il y vient. Un arbitre qui décide SANS lire l'autre partie ne
+# se voit pas dans sa propre file : chaque litige y ressemble à un dossier de
+# plus, et le taux reste à 60 % tant que personne ne l'ouvre. Ici, le chiffre
+# vient à lui, avec la conséquence nommée.
+#
+# LE SEUIL ET LA PÉRIODE SE LISENT dans `kojo_settings` (`LITIGE_SANS_REPONSE_*`),
+# ils ne sont pas recopiés. La fenêtre est GLISSANTE et se juge sur
+# `dispute.resolved_at` : un litige ouvert il y a six mois et tranché hier
+# appartient à la période — c'est la DÉCISION qu'on surveille, pas l'ouverture.
+#
+# UNE SEULE ALERTE PAR DÉPASSEMENT, et l'état qui le permet : un document par
+# sujet dans `scheduler_alerts` (`_id` = `litige_arbitrage`, état et non
+# journal). La `signature` porte le seuil, la fenêtre ET le plancher : changer
+# l'un d'eux change ce qui est mesuré, donc le dépassement est NEUF. Le retour
+# SOUS le seuil réarme (`retabli_at`) ; une période trop pauvre pour publier un
+# taux (`None`, sous `PLANCHER_MESURE`) n'est PAS un rétablissement — sans
+# décisions, il n'y a aucune preuve que l'arbitrage va mieux, et réarmer là
+# ferait repartir une alerte à chaque passage qui repasse au-dessus.
+
+LITIGE_ALERT_COLLECTION = "scheduler_alerts"
+_LITIGE_ALERT_SUBJECT = "litige_arbitrage"
+
+
+def _signature_depassement(seuil: float, fenetre_jours: int) -> str:
+    """L'identité du dépassement : ce qui a été mesuré, et avec quelle règle."""
+    return "sans_reponse:seuil=%s:fenetre=%s:plancher=%s" % (
+        seuil,
+        fenetre_jours,
+        PLANCHER_MESURE,
+    )
+
+
+async def arbitrage_sans_reponse_alert_once(now: Optional[datetime] = None) -> dict:
+    """Un passage : mesure la période et alerte si le seuil est DÉPASSÉ.
+
+    Retourne un résumé testable {sante, taux, tranches, sans_reponse, alertes,
+    retablissements, alertes_ignorees}. `alertes` vaut 1 exactement quand une
+    alerte part sur ce passage ; `alertes_ignorees` 1 quand le même dépassement
+    était déjà signalé ; `retablissements` 1 quand un dépassement signalé
+    repasse sous le seuil.
+
+    « Dépasse » est STRICT : à la valeur du seuil, la mesure ne dépasse pas —
+    et c'est aussi le retour qui réarme.
+    """
+    now = now or datetime.now(timezone.utc)
+    mesure = await mesure_sans_reponse(
+        LITIGE_SANS_REPONSE_FENETRE_JOURS, maintenant=now
+    )
+    tranches = mesure["tranches"]["total"]
+    sans_reponse = mesure["tranches"]["sans_reponse"]
+    taux = mesure["tranches"]["taux_sans_reponse"]
+    signature = _signature_depassement(
+        LITIGE_SANS_REPONSE_SEUIL, LITIGE_SANS_REPONSE_FENETRE_JOURS
+    )
+
+    collection = db[LITIGE_ALERT_COLLECTION]
+    etat = await collection.find_one({"_id": _LITIGE_ALERT_SUBJECT}) or {}
+    resume = {
+        "sante": "inconnue",
+        "taux": taux,
+        "tranches": tranches,
+        "sans_reponse": sans_reponse,
+        "alertes": 0,
+        "retablissements": 0,
+        "alertes_ignorees": 0,
+    }
+    commun = {
+        "signature": signature,
+        "seuil": LITIGE_SANS_REPONSE_SEUIL,
+        "fenetre_jours": LITIGE_SANS_REPONSE_FENETRE_JOURS,
+        "plancher": PLANCHER_MESURE,
+        "taux": taux,
+        "tranches": tranches,
+        "sans_reponse": sans_reponse,
+        "mesure_le": now,
+    }
+
+    # ── Pas de taux publiable : ce n'est PAS un rétablissement ──────────────
+    if taux is None:
+        changement = dict(
+            commun,
+            sante=etat.get("sante") or "inconnue",
+            insuffisant=True,
+        )
+        await collection.update_one(
+            {"_id": _LITIGE_ALERT_SUBJECT}, {"$set": changement}, upsert=True
+        )
+        resume["sante"] = changement["sante"]
+        resume["insuffisant"] = 1
+        logger.info(
+            "⚖️ Alerte arbitrage : %s décision(s) dans la fenêtre, sous le "
+            "plancher de %s — aucun taux publié, aucun verdict."
+            % (tranches, PLANCHER_MESURE)
+        )
+        return resume
+
+    # ── Sous (ou à) le seuil : rien à signaler, et on RÉARME ────────────────
+    if taux <= LITIGE_SANS_REPONSE_SEUIL:
+        changement = dict(commun, sante="saine")
+        if etat.get("sante") == "alertee":
+            changement["retabli_at"] = now
+            resume["retablissements"] = 1
+            logger.info(
+                "✅ Arbitrage de nouveau sous le seuil (%s <= %s) : "
+                "l'alerte est réarmée." % (taux, LITIGE_SANS_REPONSE_SEUIL)
+            )
+        await collection.update_one(
+            {"_id": _LITIGE_ALERT_SUBJECT}, {"$set": changement}, upsert=True
+        )
+        resume["sante"] = "saine"
+        return resume
+
+    # ── Dépassement : le MÊME n'alerte qu'une fois ──────────────────────────
+    deja_signale = (
+        etat.get("sante") == "alertee" and etat.get("signature") == signature
+    )
+    changement = dict(commun, sante="alertee")
+    if deja_signale:
+        await collection.update_one(
+            {"_id": _LITIGE_ALERT_SUBJECT}, {"$set": changement}, upsert=True
+        )
+        resume["sante"] = "alertee"
+        resume["alertes_ignorees"] = 1
+        logger.debug(
+            "Arbitrage : dépassement déjà signalé (%s %%) — pas de seconde alerte."
+            % round(taux * 100)
+        )
+        return resume
+
+    part = round(taux * 100)
+    seuil_pourcent = round(LITIGE_SANS_REPONSE_SEUIL * 100)
+    owner_id = await resolve_owner_id() or OWNER_USER_ID
+    await notify_user_localized(
+        user_id=owner_id,
+        key="owner_litiges_sans_reponse",
+        notif_type=NotificationType.GENERAL,
+        related_type="litige",
+        part=part,
+        seuil=seuil_pourcent,
+        jours=LITIGE_SANS_REPONSE_FENETRE_JOURS,
+        tranches=tranches,
+        sans_reponse=sans_reponse,
+    )
+
+    alerte_envoyee = False
+    alerte_erreur = ""
+    if OWNER_EMAIL:
+        try:
+            await send_email_via_active_provider(
+                OWNER_EMAIL,
+                "KOJO — Arbitrage : %s %% des litiges tranchés sans réponse" % part,
+                "Sur les %s litiges TRANCHÉS des %s derniers jours, %s l'ont été "
+                "sans qu'aucune réponse de l'autre partie n'existe (%s %%, au-delà "
+                "du seuil de %s %%).\n\n"
+                "Conséquence : l'arbitre a tranché sur une seule version, et les "
+                "décisions ne peuvent pas être relues avec l'autre partie.\n"
+                "À vérifier : la file d'arbitrage (GET /api/owner/litiges) et les "
+                "mesures (GET /api/owner/litiges/mesures) — délai de décision, "
+                "réponses à temps, décisions sans réponse.\n"
+                "Le retour sous le seuil RÉ-ARME cette alerte : un nouveau "
+                "dépassement donnera un nouvel email ; le même, jamais deux."
+                % (
+                    tranches,
+                    LITIGE_SANS_REPONSE_FENETRE_JOURS,
+                    sans_reponse,
+                    part,
+                    seuil_pourcent,
+                ),
+            )
+            alerte_envoyee = True
+        except Exception as exc:
+            # L'email est le canal SECONDAIRE (la notification in-app vient de
+            # partir) : un échec est écrit, jamais tu — sinon le propriétaire
+            # croirait à une alerte reçue.
+            alerte_erreur = str(exc)[:_EMAIL_ALERT_DETAIL_MAX]
+            logger.warning("⚠️ Email d'alerte arbitrage échoué: %s" % exc)
+    else:
+        alerte_erreur = "OWNER_EMAIL non configuré"
+        logger.warning(
+            "⚠️ Alerte arbitrage : OWNER_EMAIL absent — la notification in-app "
+            "est le seul canal."
+        )
+
+    changement["alertee_at"] = now
+    changement["alerte_envoyee"] = alerte_envoyee
+    changement["alerte_erreur"] = alerte_erreur
+    await collection.update_one(
+        {"_id": _LITIGE_ALERT_SUBJECT}, {"$set": changement}, upsert=True
+    )
+    resume["sante"] = "alertee"
+    resume["alertes"] = 1
+    logger.warning(
+        "🚨 Arbitrage : %s %% des %s litiges tranchés sans réponse (seuil %s %%) "
+        "— alerte envoyée (email=%s)." % (part, tranches, seuil_pourcent, alerte_envoyee)
+    )
+    return resume
+
+
+async def litige_arbitrage_alert_loop():
+    """Tâche de fond : juge périodiquement la part de décisions sans réponse.
+
+    Même modèle que les autres boucles : sommeil d'abord (aucun passage au
+    redémarrage, ni à chaque déploiement), annulable proprement au shutdown,
+    erreurs isolées par itération, et un BAIL par passage — sans lui, N machines
+    Fly jugeraient N fois et pourraient alerter N fois.
+
+    Le travail vit dans `arbitrage_sans_reponse_alert_once` : il est appelable
+    directement par un test, sans horloge à attendre.
+    """
+    while True:
+        try:
+            await asyncio.sleep(LITIGE_ALERTE_INTERVAL_MINUTES * 60)
+            await executer_si_bail(
+                "litige_arbitrage_alert",
+                timedelta(minutes=LITIGE_ALERTE_INTERVAL_MINUTES),
+                arbitrage_sans_reponse_alert_once,
+            )
+        except asyncio.CancelledError:
+            break
+        except Exception as exc:
+            logger.warning(f"⚠️ Erreur alerte arbitrage sans réponse: {exc}")

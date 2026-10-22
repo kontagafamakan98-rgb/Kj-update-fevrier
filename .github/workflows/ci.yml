@@ -1032,6 +1032,19 @@ jobs:
         working-directory: frontend
         run: node scripts/check-worker-og-contract.js
 
+      # La CSP du site est déclarée UNE fois (src/config/csp.js) et recopiée en
+      # Python (backend/kojo_csp.py) pour que les documents pré-rendus la
+      # publient. Ce garde exécute les DEUX calculs sur sept jeux d'entrées et
+      # exige des chaînes IDENTIQUES, puis rend les quatre documents (fiche,
+      # fiche 404, profil, profil 404) et vérifie qu'ils publient cette
+      # politique — et que le plugin du build ne la contourne pas. Sans lui, la
+      # copie Python dérivait en silence au premier fournisseur ajouté d'un seul
+      # côté, et un lien partagé démarrait l'application sans la politique du
+      # reste du site.
+      - name: Check CSP contract (site ↔ documents pré-rendus)
+        working-directory: frontend
+        run: node scripts/check-csp-contract.js
+
       # Régression « chunk partagé pack2PageI18n » : le découpage par scope
       # (un dictionnaire par page lazy) ne doit pas réapparaître comme chunk
       # commun portant ≥ 3 dictionnaires (l'ancien monolithe ~60 kB chargé
@@ -1278,16 +1291,22 @@ jobs:
       #     retard laissait `main` vert pendant que le site servait l'ancien
       #     bundle (exactement ce que F8 a fermé côté backend) ;
       #   • ce qui doit être vrai : aucun changement de `frontend/**` n'est
-      #     absent de la production. Deux révisions sont donc acceptées — le
-      #     commit poussé (Vercel redéploie chaque push de `main` : mesuré sur
-      #     les 12 derniers commits) et le dernier commit ayant touché
-      #     `frontend/` (l'état laissé par un push sans changement de frontend
-      #     si le déployeur en ignorait un) ;
+      #     absent de la production. C'est une propriété d'ARBRE, pas de SHA.
+      #     Le build PUBLIE l'arbre de `frontend/` (`kojo-build-tree`) et le
+      #     garde le compare à celui des commits attendus : deux SHA différents
+      #     avec le MÊME arbre sont acceptés (fusion documentaire : Vercel
+      #     laisse la production sur le build précédent, mesuré le 21/10/2026) ;
+      #     deux arbres différents sont refusés. Le SHA égal reste le chemin
+      #     rapide ;
+      #   • le commit SERVI n'a plus besoin d'exister dans ce clone (il le
+      #     fallait pour lire son arbre) : le cas « arbre incomparable » en
+      #     code 2 a disparu, et `fetch-depth` ne sert plus à ça ;
       #   • la fenêtre d'attente (~3 min) absorbe un déploiement en cours :
       #     mesuré, Vercel termine 0,4 à 0,6 min après le commit ;
-      #   • un refus nomme sa cause (aucune révision annoncée / révision différente
-      #     / site injoignable — défi de l'edge Vercel compris) ; une invocation
-      #     qui ne dit pas quoi comparer échoue en code 2, jamais en vert.
+      #   • un refus nomme sa cause (aucune révision annoncée / aucun arbre
+      #     annoncé / arbre différent / site injoignable — défi de l'edge Vercel
+      #     compris) ; une invocation qui ne dit pas quoi comparer échoue en
+      #     code 2, jamais en vert.
       # `main` seulement : sur une PR, la production ne dit rien de la PR.
       - name: Le frontend servi est-il celui de ce commit ?
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -1306,7 +1325,7 @@ jobs:
             echo "::error::aucune révision attendue calculée — la vérification ne peut pas conclure"
             exit 2
           fi
-          echo "Révisions acceptées : $ATTENDU (commit poussé) ou $DERNIER_FRONTEND (dernier commit ayant touché frontend/)"
+          echo "Révisions acceptées : $ATTENDU (commit poussé) ou $DERNIER_FRONTEND (dernier commit ayant touché frontend/) — le verdict porte sur l'arbre frontend/ PUBLIÉ par l'artefact, comparé à ceux de ces commits"
           node scripts/check-deployed-revision.js --attendu "$ATTENDU" --sinon "$DERNIER_FRONTEND" --tentatives 9 --delai 20
 
       # ── LA PRODUCTION VIENT D'ÊTRE DÉPLOYÉE : la sonde SEO stricte la lit ────
@@ -1338,6 +1357,88 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         working-directory: frontend
         run: node scripts/check-seo-production.js --strict
+
+      # ── LES ACTIFS SERVIS SONT-ILS CEUX DE L'ARTEFACT ? ─────────────────
+      # Le step de révision prouve que le HTML servi vient de `main` ; il ne dit
+      # RIEN du JS, du CSS ni des polices que ce HTML charge. Vercel déploie un
+      # artefact atomiquement, mais rien ne le re-vérifiait (c'était l'angle
+      # mort déclaré de F19) : un HTML neuf servi avec des actifs restés en
+      # arrière donne une page qui ne correspond pas à son bundle, et `main`
+      # restait vert.
+      #
+      # La chaîne jugée est HTML → manifeste → octets : le build écrit
+      # `asset-manifest.json` (une empreinte SHA-256 par actif) et ancre
+      # l'empreinte de CE manifeste dans chaque page (`kojo-build-assets`). Le
+      # manifeste doit être celui annoncé (sinon il vient d'un autre build, et
+      # il ne garantit rien), et chaque actif doit porter l'empreinte qu'il
+      # déclare. Un manifeste sous son plancher est un refus, jamais un vert.
+      #
+      # Les IMAGES et CARTES OG sont échantillonnées (tête et queue, 4 Kio de
+      # chaque côté) en plages HTTP, sous un budget d'octets : le fichier entier
+      # ferait télécharger des mégaoctets. Budget épuisé = `N sur M` déclaré +
+      # `::warning`, zéro contenu lu = refus.
+      #
+      # MÊME garde `main` : sur une PR, la production ne dit rien de la PR. Le
+      # step tourne APRÈS la révision et la sonde SEO : il juge un artefact dont
+      # le déploiement a déjà été constaté, et il ne retarde pas la sonde SEO
+      # (qui doit rester collée à la vérification de révision).
+      #
+      # CE QU'ELLE COÛTE EST PUBLIÉ, vert compris : fichiers jugés, octets
+      # réellement téléchargés, requêtes, durée et part du budget des contenus
+      # partent dans le résumé du run (`$GITHUB_STEP_SUMMARY`, que le script
+      # écrit lui-même — rien à cabler ici). Sans ce chiffre, un manifeste qui
+      # grossit à chaque image ajoutée ne se verrait que le jour du refus, sur
+      # une livraison qui n'a rien changé.
+      - name: Les actifs servis sont-ils ceux de l'artefact ?
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        working-directory: frontend
+        run: node scripts/check-deployed-assets.js
+
+      # ── LA PREVIEW DE LA PR EST-ELLE L'ARTEFACT DE SA TÊTE ? ────────────────
+      # La sonde ci-dessus ne juge que `main`, et c'est structurel : une PR ne
+      # dit rien de la production. Elle laissait donc l'artefact d'une PR
+      # vérifié par PERSONNE avant fusion — l'écart se découvrait en production,
+      # sur la livraison qu'il fallait corriger. Ici la MÊME chaîne (HTML →
+      # manifeste ancré → octets de chaque actif, contenus échantillonnés sous
+      # budget) est jouée sur le déploiement Vercel de la RÉVISION poussée.
+      #
+      # L'origine se RÉSOUT par la révision (`--sha`), pas par le commentaire de
+      # l'app Vercel : ce dernier peut désigner un commit précédent, et une
+      # chaîne cohérente sur un artefact périmé rendrait un vert sur le mauvais
+      # objet. Le filtre `sha` de l'API Vercel ne rend que CE commit.
+      #
+      # La preview est fermée par défaut (Deployment Protection) : le jeton de
+      # contournement part en en-tête sur CHAQUE lecture, et il n'est jamais
+      # imprimé. Un mur de protection sans jeton n'accuse pas l'artefact : c'est
+      # une PRÉMISSE (code 2), publiée en `::warning` et dans le résumé du run —
+      # jamais un vert, jamais un rouge du code de la PR. Le code 2 est donc
+      # TOLÉRÉ ici, explicitement : sur une PR issue d'un fork les secrets ne
+      # sont pas fournis, et sur un projet sans déploiement de PR il n'y a rien
+      # à juger. Ce que la tolérance coûte est écrit : ces PR-là ne sont pas
+      # vérifiées avant fusion (limite déclarée dans CI-COVERAGE.md).
+      #
+      # Le code 1 (chaîne incohérente, manifeste d'un autre build, actif
+      # réécrit, build de la PR en ERROR) ÉCHOUE le job, donc le check requis
+      # `frontend-build` — la correction se fait avant la fusion, pas après.
+      - name: Preview Vercel — l'artefact de cette PR est-il ancré à son commit ?
+        if: github.event_name == 'pull_request'
+        working-directory: frontend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
+          VERCEL_PROJECT_NAME: ${{ secrets.VERCEL_PROJECT_NAME }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          KOJO_REVISION_PR: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          echo "Preview de la révision ${KOJO_REVISION_PR} — chaîne HTML → manifeste → octets"
+          STATUT=0
+          node scripts/check-deployed-assets.js --preview --sha "$KOJO_REVISION_PR" --tentatives 12 --delai 15 || STATUT=$?
+          if [ "$STATUT" -eq 2 ]; then
+            echo "::warning title=Preview Vercel — aucun verdict::l'artefact de cette PR n'a pas pu être jugé (cause nommée ci-dessus et dans le résumé du run) : aucune conclusion n'est tirée de cet artefact. La production reste jugée sur main par le step précédent."
+            exit 0
+          fi
+          exit "$STATUT"
 
       # ── COMBIEN la base est-elle en retard, et depuis QUAND la production ? ──
       # Le step ci-dessus répond OUI/NON (« le frontend servi est-il celui de ce

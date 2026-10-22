@@ -67,6 +67,18 @@ async def complete_job_and_release_payment(
     if job.get("client_id") != current_user.id and not _est_owner(current_user):
         raise HTTPException(status_code=403, detail="Access denied")
 
+    # Une route HISTORIQUE ne doit pas devenir une porte de service du litige :
+    # elle libère immédiatement, donc elle aussi est gelée tant que le désaccord
+    # vit. Le propriétaire a sa propre route de décision, qui journalise.
+    if completion._litige_bloquant(job):  # noqa: SLF001 - la règle a un propriétaire
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Un litige est ouvert sur cette mission : la décision appartient "
+                "au propriétaire, le paiement reste gelé jusque-là."
+            ),
+        )
+
     resultat = await completion.liberer_sequestre(job, acteur_id=current_user.id)
 
     # Une déclaration qui existait devient « validée » : la libération est

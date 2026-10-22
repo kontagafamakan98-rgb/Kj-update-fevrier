@@ -151,6 +151,21 @@ export const libelleSonde = (base, api) => `${FAMILLE} sur ${base} (API ${api}${
 export const premisse = (fait) => `${MARQUE_PREMISSE} · ${fait} ${RENVOI_EXPOSITION}`;
 
 /**
+ * Le résultat ne porte-t-il QUE des prémisses ?
+ *
+ * C'est ce qui sépare, au CODE DE SORTIE, « la sonde n'a pas pu juger » (2) de
+ * « la session a été perdue » (1). Les deux sortaient en 1 : le texte les
+ * distinguait, le code non — donc un run rouge ne disait pas, à lui seul, s'il
+ * fallait poser un secret ou corriger les attributs du cookie. Un mélange (au
+ * moins un défaut mesuré) reste un refus, jamais une prémisse.
+ *
+ * @param {string[]} errors Messages du résultat.
+ * @returns {boolean} Vrai si tous les échecs sont des prémisses.
+ */
+export const estPremisse = (errors) =>
+  Array.isArray(errors) && errors.length > 0 && errors.every((error) => String(error).includes(MARQUE_PREMISSE));
+
+/**
  * L'origine COMPLÈTE de l'hôte qui porte un cookie de session.
  *
  * Un cookie ne porte NI schéma NI port : son `domain` seul ne refait pas l'URL
@@ -590,6 +605,7 @@ export async function runSessionReloadProbe({
       'sans session ouverte, aucun rechargement ne peut être jugé.';
     return {
       ok: false,
+      premisse: true,
       errors: [`${libelleSonde(cleanBase, cleanApi)} : ${premisse(fait)}`],
       notices: [],
       checked: [],
@@ -642,7 +658,7 @@ export async function runSessionReloadProbe({
     last.errors = last.errors.map((error) => `${label} : ${error}`);
   }
 
-  return { ...last, attempts: used };
+  return { ...last, premisse: !last.ok && estPremisse(last.errors), attempts: used };
 }
 
 /**
@@ -672,14 +688,33 @@ export function parseArgs(argv = []) {
   return options;
 }
 
+/**
+ * La ligne de commande — couture INJECTABLE, pour que le CODE DE SORTIE soit
+ * jugé sans réseau ni navigateur.
+ *
+ * Les trois issues sont nommées, et deux d'entre elles se ressemblaient : une
+ * prémisse (aucun verdict) sortait en **1**, comme une session perdue. Un run
+ * rouge ne disait donc pas s'il fallait poser un secret ou corriger le code.
+ *
+ * @param {string[]} argv Arguments après `node script`.
+ * @param {object} deps `run` (la sonde), `log`, `error`.
+ * @returns {Promise<number>} 0 vert, 1 session perdue, 2 prémisse (aucun verdict).
+ */
+export async function main(
+  argv = process.argv.slice(2),
+  { run = runSessionReloadProbe, log = console.log, error = console.error } = {}
+) {
+  const result = await run(parseArgs(argv));
+  // Une prémisse n'est pas un DÉFAUT : la ligne de tête le dit, comme le code.
+  const état = result.ok ? 'session restaurée' : result.premisse ? MARQUE_PREMISSE : 'DÉFAUT';
+  log(`Sonde de session au rechargement — ${état} (${result.attempts} tentative(s))`);
+  for (const line of result.checked) log(`  ✓ ${line}`);
+  for (const notice of result.notices) log(`::notice title=Session production::${notice}`);
+  for (const message of result.errors) error(`::error title=Session production::${message}`);
+  if (result.ok) return 0;
+  return result.premisse ? 2 : 1;
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  const result = await runSessionReloadProbe(parseArgs(process.argv.slice(2)));
-  console.log(
-    `Sonde de session au rechargement — ${result.ok ? 'session restaurée' : 'DÉFAUT'} ` +
-      `(${result.attempts} tentative(s))`
-  );
-  for (const line of result.checked) console.log(`  ✓ ${line}`);
-  for (const notice of result.notices) console.log(`::notice title=Session production::${notice}`);
-  for (const error of result.errors) console.error(`::error title=Session production::${error}`);
-  if (!result.ok) process.exit(1);
+  process.exitCode = await main();
 }

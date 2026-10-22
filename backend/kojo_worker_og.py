@@ -24,9 +24,55 @@ exactement cette paire que `scripts/check-worker-og-contract.js` compare sur des
 profils de référence — dont des textes à caractères astraux à la frontière de la
 coupe. Aucune des deux copies ne peut donc bouger seule, et la coupe se compte en
 POINTS DE CODE des deux côtés (voir `DESCRIPTION_LIMIT` dans `kojo_job_og.py`).
+
+LE DOCUMENT DÉMARRE AUSSI L'APPLICATION (21/10/2026). Jusqu'ici un visiteur à
+froid sur `/workers/:id` recevait le document statique et RIEN d'autre : ni
+châssis, ni navigation, ni bouton, ni avis cliquables — le prix, assumé, d'un
+contenu lisible sans JavaScript. Le prix était trop cher, parce que c'était le
+seul chemin d'arrivée d'un lien partagé. Le document publie donc désormais deux
+chemins STABLES du build — `/boot/worker-boot.js` (qui importe l'entrée hachée
+des pages) et `/boot/worker-app.css` (copie de la feuille servie) — produits par
+`frontend/vite-plugins/worker-boot.js`, ainsi qu'un bloc de DONNÉES (la vue
+publique déjà rendue) que React reprend comme état initial : le profil s'affiche
+sans squelette, puis la page relit l'API. Les trois noms sont confrontés au
+déclaratif du frontend (`POINT_ENTREE_TRAVAILLEUR` dans `scripts/site-meta.js`)
+par le contrat hors ligne, jamais recopiés en silence.
+
+Ce que ce fichier ne fait PAS : il n'ajoute aucune donnée. Le bloc de données
+est la vue que `kojo_routers_workers_public.profil_public` a déjà construite
+(allowlist champ par champ) — le pré-rendu ne reçoit rien d'autre, donc il ne
+peut pas publier un email, un téléphone ou une position qu'il n'a pas.
+
+LA CSP DU SITE Y EST PUBLIÉE DEPUIS LE 22/10/2026. Les pages du build la
+reçoivent de `vite-plugins/inject-production-csp.js` ; ce document-ci n'est pas
+une page du build, et il n'en portait donc aucune — un lien partagé ouvrait un
+profil qui démarre l'application sans la politique du site. La déclaration
+unique vit dans `frontend/src/config/csp.js` ; `kojo_csp` en est la copie
+Python (stdlib, sans `kojo_settings`, comme ce module), confrontée octet pour
+`octet par `frontend/scripts/check-csp-contract.js`, et la sonde de production
+compare la politique SERVIE ici à celle que le site sert.
 """
 
-from kojo_job_og import DESCRIPTION_LIMIT, escape_xml
+# Les chemins STABLES que le document cite viennent de `kojo_job_og` : c'est
+# l'APPLICATION (une entrée, une feuille), pas une page, et la fiche mission
+# cite donc les mêmes fichiers. Les DUPLIQUER ici ferait deux déclarations à
+# garder d'accord — et le contrat hors ligne n'en compare qu'une par document.
+# Seul l'identifiant du bloc de données est propre à ce document : il doit être
+# IDENTIQUE à `POINT_ENTREE_TRAVAILLEUR` (scripts/site-meta.js), sinon le
+# renommage d'un seul côté ferait lire un bloc absent (profil qui démarre par un
+# squelette, alors que la vue était déjà rendue).
+from kojo_csp import balise_csp
+from kojo_job_og import (
+    BOOT_SCRIPT,
+    BOOT_STYLE,
+    DESCRIPTION_LIMIT,
+    balise_seed,
+    escape_xml,
+    point_entree_balises,
+    seed_json,
+)
+
+SEED_ID = "kojo-worker-data"
 
 # Replis : le MÊME texte des deux côtés (workerSeo.js). Un profil sans nom, sans
 # bio, sans compétence, sans avis et sans ville n'a rien à dire — mais une balise
@@ -197,12 +243,14 @@ def worker_meta_lines(worker):
 
 
 def worker_og_html(worker: dict, base: str) -> str:
-    """HTML pré-rendu (crawlers sans JavaScript) d'un profil /workers/:id.
+    """HTML pré-rendu d'un profil /workers/:id — lisible sans JS, exécutable avec.
 
-    Même forme que la fiche mission : méta (titre, description, canonical, cartes
-    wide + carrée) et un `<h1>` statique — le contenu réel, avant tout boot
-    React. Aucune balise `<script>` : le document est LISIBLE, pas exécutable,
-    et c'est ce que les crawlers de partage savent lire.
+    Même forme que la fiche mission pour la tête : méta (titre, description,
+    canonical, cartes wide + carrée) et un `<h1>` statique dans `#root`, ce qu'un
+    crawler lit. Depuis le 21/10/2026, la page porte EN PLUS le point d'entrée du
+    build et le bloc de données de la vue publique : un visiteur à froid obtient
+    aussi l'application (châssis, navigation, avis), React reprenant le profil
+    déjà rendu au lieu de le remplacer par un squelette.
     """
     worker_id = str(worker.get("id") or "")
     nom = nom_complet(worker) or "Travailleur"
@@ -217,7 +265,10 @@ def worker_og_html(worker: dict, base: str) -> str:
     corps = (
         "<!DOCTYPE html>\n<html lang=\"fr\">\n<head>\n"
         "<meta charset=\"utf-8\" />\n"
-        f"<title>{t}</title>\n"
+        # La politique AVANT toute ressource : elle s'applique au premier script
+        # que le document cite, pas après coup.
+        + balise_csp()
+        + f"<title>{t}</title>\n"
         f"<meta name=\"description\" content=\"{d}\" />\n"
         "<meta name=\"robots\" content=\"index, follow\" />\n"
         f"<link rel=\"canonical\" href=\"{url}\" />\n"
@@ -240,7 +291,10 @@ def worker_og_html(worker: dict, base: str) -> str:
         f"<meta name=\"twitter:title\" content=\"{t}\" />\n"
         f"<meta name=\"twitter:description\" content=\"{d}\" />\n"
         f"<meta name=\"twitter:image\" content=\"{wide}\" />\n"
-        "</head>\n<body>\n"
+        # Le CSS d'abord : il bloque le premier rendu, donc le profil n'est
+        # jamais peint ni nu ni « habillé après coup ». Le module est différé.
+        + point_entree_balises()
+        + "</head>\n<body>\n"
         "<div id=\"root\">\n"
         "<div class=\"h-16 bg-white border-b border-gray-200\"></div>\n"
         "<div class=\"max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8\">\n"
@@ -251,17 +305,32 @@ def worker_og_html(worker: dict, base: str) -> str:
             if secondaire
             else ""
         )
-        + "</div>\n</div>\n</body>\n</html>\n"
+        # `</div>` ferme le conteneur max-w-7xl, le second ferme `#root` : le
+        # bloc de données doit venir APRÈS les deux (voir juste en dessous).
+        + "</div>\n</div>\n"
+        # HORS de `#root` : React efface le contenu de ce conteneur au montage,
+        # donc un bloc placé dedans disparaîtrait avant d'être lu par la page.
+        + balise_seed(SEED_ID, worker)
+        + "</body>\n</html>\n"
     )
     return corps
 
 
 def worker_og_html_404() -> str:
-    """HTML neutre pour un profil inconnu — explicite noindex, comme la fiche."""
+    """HTML neutre pour un profil inconnu — explicite noindex, comme la fiche.
+
+    Il porte le MÊME point d'entrée que la fiche : un lien partagé devenu mort
+    ouvre alors l'application (châssis, navigation, page « introuvable » de
+    l'app) au lieu d'un texte nu sans issue. `noindex` reste, évidemment : c'est
+    l'INDEXATION qui est refusée, pas la navigation.
+    """
     return (
         "<!DOCTYPE html>\n<html lang=\"fr\">\n<head>\n"
         "<meta charset=\"utf-8\" />\n"
-        "<title>Travailleur introuvable — Kojo</title>\n"
+        # La 404 démarre AUSSI l'application : elle porte donc la même politique.
+        + balise_csp()
+        + "<title>Travailleur introuvable — Kojo</title>\n"
         "<meta name=\"robots\" content=\"noindex, nofollow\" />\n"
-        "</head>\n<body>\n<div id=\"root\"></div>\n</body>\n</html>\n"
+        + point_entree_balises()
+        + "</head>\n<body>\n<div id=\"root\"></div>\n</body>\n</html>\n"
     )

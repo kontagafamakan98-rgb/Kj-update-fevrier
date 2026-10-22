@@ -8,6 +8,10 @@ import { makeScopedTranslator } from '../utils/pack2PageI18n/commissionDashboard
 import { devLog, safeLog } from '../utils/env';
 import { Banknote, BarChart3, Hash, CalendarDays, Ban, Briefcase, Wallet, Waves, CreditCard } from 'lucide-react';
 import OwnerMissionEvents from '../components/OwnerMissionEvents';
+// LITIGE TRACÉ : la file d'arbitrage (kojo_job_disputes). Sans elle, une
+// contestation resterait ouverte sans qu'aucun écran ne la montre, et l'échéance
+// déciderait à la place du propriétaire.
+import OwnerDisputes from '../components/OwnerDisputes';
 
 const CommissionDashboard = () => {
   const { user } = useAuth();
@@ -247,6 +251,8 @@ const CommissionDashboard = () => {
             />
           </div>
         </div>
+
+        <OwnerDisputes />
 
         <OwnerMissionEvents />
 

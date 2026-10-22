@@ -53,6 +53,19 @@ export const jobsAPI = {
   confirmJobCompletion: (jobId) => api.post(`/jobs/${jobId}/completion/confirm`),
   /** @returns {Promise<object>} {status, payout_status...} statut du paiement. */
   getPaymentStatus: (jobId) => api.get(`/jobs/${jobId}/payment-status`),
+  /** LITIGE — une partie OUVRE le désaccord (motif ≥ 20 caractères). Le serveur
+   *  gèle le paiement et pose l'échéance d'arbitrage ; le litige voyage ensuite
+   *  dans la mission (`job.dispute`), donc aucune route de lecture séparée.
+   *  @returns {Promise<object>} {message, dispute, job}. */
+  openDispute: (jobId, payload) => api.post(`/jobs/${jobId}/dispute`, payload),
+  /** LITIGE — l'AUTRE partie oppose sa version, UNE seule fois. La position
+   *  emploie le vocabulaire de la décision (`release_worker` / `refund_client`) :
+   *  l'arbitre lit ce que chaque côté demande dans les termes de son choix.
+   *  @returns {Promise<object>} {message, dispute, job}. */
+  respondDispute: (jobId, payload) => api.post(`/jobs/${jobId}/dispute/response`, payload),
+  /** LITIGE — la partie qui l'a ouvert le RETIRE (accord retrouvé).
+   *  @returns {Promise<object>} {message, dispute, job}. */
+  withdrawDispute: (jobId) => api.post(`/jobs/${jobId}/dispute/withdraw`),
 };
 
 const stripKojoMarker = (value) => String(value || '').replace(/\[KOJO_JOB:[^\]]+\]\s*/gi, '').trim();
