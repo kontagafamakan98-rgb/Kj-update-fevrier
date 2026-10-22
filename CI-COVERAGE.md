@@ -1901,9 +1901,31 @@ aurait dû déployer (`frontend/scripts/check-deployed-revision.js`).
   avec `premisse: true` sort en **2** avec le titre `Arbre attendu illisible`, et **sans** le titre du
   vrai retard ; avec `premisse: false`, le même verdict sort en **1** en portant ce titre-là. Sans le
   second, le code 2 pourrait n'être qu'un hasard.
+- **« EN FILE » N'EST PAS « EN RETARD »** (22/10/2026), et c'est l'incident qui l'a rendu
+  nécessaire : la fusion de **#184** (21/10/2026, `25642ef5`) a laissé `main` **rouge** — les neuf
+  tentatives se sont épuisées à **15:21**, et Vercel n'a créé le déploiement de production qu'à
+  **15:40:33**, soit **22 min** après la fusion (le run suivant a servi, cf. #186). Le garde mesurait
+  VRAI (la production ne servait pas ce commit) mais son message nommait TROIS causes sans les
+  distinguer — build échoué, en file d'attente, jamais déclenché —, qui demandent trois corrections
+  différentes. Allonger la fenêtre ne tenait pas : `frontend-build` a un plafond de **20 min** et en
+  consomme déjà ~19.
+
+  Le garde interroge donc l'API Vercel (`/v7/deployments?sha=…`, le client de `preview-vercel.js`,
+  filtré sur `target == production` ET `meta.githubCommitSha`), après la fenêtre HTTP : un
+  déploiement **QUEUED/BUILDING/INITIALIZING** rend une **PRÉMISSE** (code 2, `::warning`, motif
+  nommé) — la production n'a pas encore eu l'occasion de servir cette révision ; **ERROR/CANCELED**,
+  **aucun déploiement** et un **arbre différent** restent des **rouges**, chacun nommé ; un état
+  **non lu** (jeton absent, API injoignable) laisse le refus d'avant, avec la raison de la non-lecture
+  — aucune prémisse n'est inventée. Le step de `frontend-build` **tolère le 2** en le disant
+  (`::warning` + résumé) et échoue sur 1 ; il publie `sert=oui|non`, et les deux lectures qui SUIVENT
+  (sonde SEO stricte, actifs servis) ne tournent que sur `oui` — juger l'ancien artefact en le
+  présentant comme le nouveau serait le faux vert voisin. `livrer.py` nomme les DEUX causes du code 2
+  et arrête la livraison sans prononcer de refus sur le dépôt. Mutations : `frontend-servi: un
+  deploiement en file accepte comme retard` (rejouée `[OK]`, elle rougit la prémisse ET sa
+  propagation).
 - Preuve d'échec rejouable : `frontend/scripts/__tests__/check-deployed-revision.test.js`
-  (30 cas, `fetch`, `arbreDe` et `verifier` injectés, aucun réseau) pour les refus, l'attente, le code
-  du CLI et l'**arbre** :
+  (41 cas, `fetch`, `arbreDe`, `etatDeploiement` et `verifier` injectés, aucun réseau) pour les
+  refus, l'attente, le code du CLI, l'**arbre** et l'état du déploiement :
   même arbre **publié** accepté sur deux SHA différents (la fusion documentaire), arbres différents
   refusés en les nommant, artefact sans arbre refusé en code 1, arbre ATTENDU illisible rendu en
   prémisse, chemin rapide qui n'appelle pas git, arbre abrégé refusé comme absent, plus la lecture
@@ -1911,8 +1933,10 @@ aurait dû déployer (`frontend/scripts/check-deployed-revision.js`).
   `frontend/scripts/__tests__/build-revision-injection.test.js` (7 cas, pilotant le VRAI
   `vite.config.js`) pour la publication des balises — dont l'arbre, comparé à `git rev-parse
   HEAD:frontend` et absent quand le dépôt n'en donne pas — sans quoi le garde refuserait TOUTE
-  production, y compris une production correcte. **Six** mutations du registre font chacune rougir
+  production, y compris une production correcte. **Sept** mutations du registre font chacune rougir
   le test propriétaire, nommé : `frontend-revision: la comparaison accepte une autre revision`,
+  `frontend-servi: un deploiement en file accepte comme retard` (22/10/2026 — sans elle, une file
+  Vercel redeviendrait un retard du dépôt),
   `frontend-revision: le refus d'une production muette disparait`, `frontend-revision: un arbre
   frontend different est accepte` — cette dernière neutralise le refus des arbres DIFFÉRENTS, donc
   un vrai retard (ou un build d'une autre branche) repasserait au vert ; elle rougit `refuse quand

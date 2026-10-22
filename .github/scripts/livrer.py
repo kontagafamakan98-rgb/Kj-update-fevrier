@@ -621,13 +621,16 @@ def verifier_production_frontend(base: BaseDistante, timeout_minutes: int = 10) 
         log_succes("Vercel production : Révision validée et servie !")
         return True
     if res.returncode == 2:
-        # Prémisse : l'arbre d'une révision ATTENDUE est illisible dans ce clone.
-        # Le commit SERVI, lui, n'est plus lu localement (le build publie son
-        # arbre) : ce code 2 parle du clone, pas du déploiement, et accuser
-        # Vercel enverrait chercher au mauvais endroit.
+        # Prémisse : aucun verdict n'a été rendu, et deux causes se partagent ce
+        # code — le déploiement de production est EN FILE chez Vercel
+        # (QUEUED/BUILDING/INITIALIZING), ou l'arbre d'une révision ATTENDUE est
+        # illisible dans ce clone. Aucune ne décrit le code livré, et accuser
+        # Vercel d'un retard dans le premier cas enverrait chercher au mauvais
+        # endroit : la livraison s'arrête, sans prononcer de refus sur le dépôt.
         log_erreur(
-            "Vercel production : arbre frontend/ d'une révision attendue illisible "
-            "dans ce clone — aucun verdict rendu sur le déploiement."
+            "Vercel production : aucun verdict rendu (prémisse) — déploiement "
+            "encore en file chez Vercel, ou arbre frontend/ d'une révision attendue "
+            "illisible dans ce clone. Relancer la livraison quand le déploiement a abouti."
         )
         return False
     log_erreur("Vercel production : Délais dépassé ou révision non servie.")

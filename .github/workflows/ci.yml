@@ -1308,9 +1308,28 @@ jobs:
       #     compris) ; une invocation qui ne dit pas quoi comparer échoue en
       #     code 2, jamais en vert.
       # `main` seulement : sur une PR, la production ne dit rien de la PR.
+      # ── CODE 2 : PRÉMISSE, DONC AUCUN VERDICT ──────────────────────────────
+      # Deux cas rendent 2, et aucun ne décrit le code livré : le déploiement de
+      # production est EN FILE chez Vercel (QUEUED/BUILDING/INITIALIZING, lu par
+      # l'API — la fusion de #184 a attendu 22 min le 21/10/2026, et `main`
+      # rougissait sur cette file), ou la révision attendue est illisible dans ce
+      # clone. Le step TOLÈRE donc 2 en le disant (`::warning` + résumé), et
+      # échoue sur 1 (révision ≠ attendue, build en ERROR/CANCELED, aucun
+      # déploiement, production muette, site injoignable).
+      #
+      # La sortie `sert` est ce qui empêche le faux vert voisin : les deux
+      # lectures qui SUIVENT (sonde SEO stricte, actifs servis) supposent qu'un
+      # déploiement NOUVEAU vient d'être mis en ligne. Sur une prémisse, elles ne
+      # sont pas exécutées — juger l'ancien artefact en le présentant comme le
+      # nouveau serait exactement le vert que ce dépôt refuse.
       - name: Le frontend servi est-il celui de ce commit ?
+        id: revision-servie
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         working-directory: frontend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
+          VERCEL_PROJECT_NAME: ${{ secrets.VERCEL_PROJECT_NAME }}
         run: |
           # `-e` REMIS le 12/10/2026 : le step s'en passait sans motif écrit, et un
           # step qui n'abandonne pas sur une commande en échec peut perdre son
@@ -1326,7 +1345,19 @@ jobs:
             exit 2
           fi
           echo "Révisions acceptées : $ATTENDU (commit poussé) ou $DERNIER_FRONTEND (dernier commit ayant touché frontend/) — le verdict porte sur l'arbre frontend/ PUBLIÉ par l'artefact, comparé à ceux de ces commits"
-          node scripts/check-deployed-revision.js --attendu "$ATTENDU" --sinon "$DERNIER_FRONTEND" --tentatives 9 --delai 20
+          STATUT=0
+          node scripts/check-deployed-revision.js --attendu "$ATTENDU" --sinon "$DERNIER_FRONTEND" --tentatives 9 --delai 20 || STATUT=$?
+          if [ "$STATUT" -eq 2 ]; then
+            echo "sert=non" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Révision servie — aucun verdict::la révision servie n'a pas reçu de verdict (prémisse nommée ci-dessus : déploiement Vercel encore en file, ou révision attendue illisible dans ce clone). Les deux lectures qui en dépendent — sonde SEO stricte et actifs servis — sont SAUTÉES sur ce run."
+            echo "Révision servie : aucune conclusion (prémisse, code 2) — la sonde SEO stricte et la vérification des actifs ne sont pas exécutées sur ce run." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ "$STATUT" -ne 0 ]; then
+            echo "sert=non" >> "$GITHUB_OUTPUT"
+            exit "$STATUT"
+          fi
+          echo "sert=oui" >> "$GITHUB_OUTPUT"
 
       # ── LA PRODUCTION VIENT D'ÊTRE DÉPLOYÉE : la sonde SEO stricte la lit ────
       # Le step ci-dessus vient de constater que la production SERT le frontend de
@@ -1354,7 +1385,7 @@ jobs:
       # (`main` seulement) : sur une PR, la production ne dit rien de la PR, et un
       # repli local ferait refuser la sonde (elle ne conclut pas sur du local).
       - name: La production vient d'être déployée — la sonde SEO stricte la lit maintenant
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.revision-servie.outputs.sert == 'oui'
         working-directory: frontend
         run: node scripts/check-seo-production.js --strict
 
@@ -1390,7 +1421,7 @@ jobs:
       # grossit à chaque image ajoutée ne se verrait que le jour du refus, sur
       # une livraison qui n'a rien changé.
       - name: Les actifs servis sont-ils ceux de l'artefact ?
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.revision-servie.outputs.sert == 'oui'
         working-directory: frontend
         run: node scripts/check-deployed-assets.js
 

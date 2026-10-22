@@ -24,15 +24,19 @@ import { describe, expect, it, vi } from 'vitest';
 import { BUILD_REVISION_META, BUILD_TREE_META } from '../site-meta.js';
 import {
   DOSSIER_FRONTEND,
+  ETATS_EN_FILE,
   LONGUEUR_SHA_MIN,
   arbreFrontend,
   arbreServi,
   baseAutorisée,
   comparer,
+  etatDeploiementProduction,
   interroger,
   lireOptions,
   main,
   normaliser,
+  optionsVercel,
+  qualifierRefus,
   revisionServie,
   revisionsAttendues,
   verifierServie,
@@ -449,5 +453,161 @@ describe('check-deployed-revision — lire le vrai arbre frontend/', () => {
     expect(arbre).toBe('');
     expect(erreur).toMatch(/absent de ce clone/);
     expect(erreur).toMatch(/révision ATTENDUE/);
+  });
+});
+
+describe('check-deployed-revision — « en file » n’est pas « en retard » (21/10/2026)', () => {
+  // Le 21/10/2026, la fusion de #184 a laissé `main` rouge : la fenêtre de 3 min
+  // du garde expirait à 15:21, Vercel n'a créé le déploiement de production
+  // qu'à 15:40. Le garde mesurait VRAI, mais son message indistinguait un build
+  // échoué, une file d'attente et un déploiement jamais déclenché — trois
+  // corrections différentes. Ces cas ancrent la distinction.
+  const refus = comparer('abc1234def', [POUSSÉ]);
+  const apiQui = (charge) => vi.fn(async () => réponse({ corps: JSON.stringify(charge) }));
+  const déploiement = { token: 'jeton-de-test', teamId: '', projet: 'kj-update-fevrier' };
+
+  it('lit l’état du déploiement de PRODUCTION, et ignore une preview du même commit', async () => {
+    const fetchImpl = apiQui({
+      deployments: [
+        { uid: 'dpl_preview', target: 'preview', readyState: 'READY', meta: { githubCommitSha: POUSSÉ } },
+        { uid: 'dpl_prod', target: 'production', readyState: 'QUEUED', meta: { githubCommitSha: POUSSÉ } },
+      ],
+    });
+    const état = await etatDeploiementProduction(POUSSÉ, { ...déploiement, fetchImpl });
+    expect(état.trouve).toBe(true);
+    expect(état.etat).toBe('QUEUED');
+    expect(état.id).toBe('dpl_prod');
+    expect(état.erreur).toBeNull();
+  });
+
+  it('ne prend pas la preview du même commit pour un déploiement de production', async () => {
+    const état = await etatDeploiementProduction(POUSSÉ, {
+      ...déploiement,
+      fetchImpl: apiQui({
+        deployments: [
+          { uid: 'dpl_preview', target: 'preview', readyState: 'READY', meta: { githubCommitSha: POUSSÉ } },
+        ],
+      }),
+    });
+    expect(état.trouve).toBe(false);
+    expect(état.erreur).toBeNull();
+  });
+
+  it('ne lit rien sans jeton, et le dit au lieu d’inventer une prémisse', async () => {
+    const fetchImpl = vi.fn();
+    const état = await etatDeploiementProduction(POUSSÉ, { token: '', fetchImpl });
+    expect(état.trouve).toBe(false);
+    expect(état.erreur).toMatch(/jeton Vercel absent/);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('lit les coordonnées Vercel dans l’environnement, jamais recopiées', () => {
+    expect(optionsVercel({ VERCEL_TOKEN: ' t ', VERCEL_PROJECT_NAME: ' p ' })).toEqual({
+      token: 't',
+      teamId: '',
+      projet: 'p',
+    });
+    const défaut = optionsVercel({});
+    expect(défaut.token).toBe('');
+    expect(défaut.projet).toBe('kj-update-fevrier');
+  });
+
+  it('rend une PRÉMISSE quand le déploiement est en vol, et le nomme', async () => {
+    const verdict = await qualifierRefus(refus, [POUSSÉ], {
+      deploiement: déploiement,
+      etatDeploiement: async () => ({ trouve: true, etat: 'BUILDING', id: 'dpl_42', erreur: null }),
+    });
+    expect(verdict.ok).toBe(false);
+    // Le point du lot : ni vert, ni rouge du code — une mesure qui n'a pas eu lieu.
+    expect(verdict.premisse).toBe(true);
+    expect(verdict.message).toContain('est en BUILDING');
+    expect(verdict.message).toContain('dpl_42');
+    expect(verdict.message).toContain('22 min');
+    expect(ETATS_EN_FILE.has('QUEUED')).toBe(true);
+  });
+
+  it('garde le ROUGE quand le build Vercel a échoué, en nommant l’état', async () => {
+    const verdict = await qualifierRefus(refus, [POUSSÉ], {
+      deploiement: déploiement,
+      etatDeploiement: async () => ({ trouve: true, etat: 'ERROR', id: 'dpl_43', erreur: null }),
+    });
+    expect(verdict.ok).toBe(false);
+    expect(verdict.premisse).toBeFalsy();
+    expect(verdict.message).toContain('est en ERROR');
+    expect(verdict.message).toMatch(/build Vercel en échec/);
+  });
+
+  it('garde le ROUGE quand aucun déploiement n’existe, et le dit', async () => {
+    const verdict = await qualifierRefus(refus, [POUSSÉ], {
+      deploiement: déploiement,
+      etatDeploiement: async () => ({ trouve: false, etat: '', id: '', erreur: null }),
+    });
+    expect(verdict.ok).toBe(false);
+    expect(verdict.premisse).toBeFalsy();
+    expect(verdict.message).toMatch(/Aucun déploiement/);
+    expect(verdict.message).toMatch(/déploiement manquant/);
+  });
+
+  it('laisse le refus inchangé quand l’état n’a pas pu être lu, sans prémisse inventée', async () => {
+    const verdict = await qualifierRefus(refus, [POUSSÉ], {
+      deploiement: { token: '' },
+    });
+    expect(verdict.premisse).toBeFalsy();
+    expect(verdict.message.startsWith(refus.message)).toBe(true);
+    expect(verdict.message).toMatch(/État Vercel NON LU/);
+  });
+
+  it('ne qualifie ni une production muette, ni un site injoignable (l’API n’y dit rien)', async () => {
+    const etatDeploiement = vi.fn();
+    const muet = await qualifierRefus(comparer('', [POUSSÉ]), [POUSSÉ], { etatDeploiement });
+    expect(muet.message).toBe(comparer('', [POUSSÉ]).message);
+    expect(etatDeploiement).not.toHaveBeenCalled();
+    const injoignable = await qualifierRefus(
+      { ok: false, message: `aucune réponse exploitable de https://exemple.test : HTTP 503` },
+      [POUSSÉ],
+      { etatDeploiement }
+    );
+    expect(injoignable.message).toMatch(/aucune réponse exploitable/);
+    expect(etatDeploiement).not.toHaveBeenCalled();
+  });
+
+  it('propage la prémisse du déploiement en vol au lieu de l’effacer', async () => {
+    const { ok, premisse, motif } = await verifierServie({
+      base: 'https://exemple.test',
+      attendues: [POUSSÉ],
+      fetchImpl: fetchQui([() => réponse({ corps: page(DERNIER_FRONTEND, { arbre: ARBRE_B }) })]),
+      arbreDe: arbreDeTable({ [POUSSÉ]: ARBRE_A }),
+      tentatives: 1,
+      dormir: async () => {},
+      log: () => {},
+      deploiement: déploiement,
+      etatDeploiement: async () => ({ trouve: true, etat: 'QUEUED', id: 'dpl_44', erreur: null }),
+    });
+    expect(ok).toBe(false);
+    expect(premisse).toBe(true);
+    expect(motif).toContain('est en QUEUED');
+  });
+
+  it('sort en code 2 avec un AVERTISSEMENT quand le déploiement est en file', async () => {
+    // Le code de sortie est ce que la CI et `livrer.py` consomment : un 2 rendu
+    // ici, avec un `::warning`, est la forme « aucun verdict » (à distinguer
+    // d'un `::error`, qui se lit comme un retard du dépôt).
+    const sorties = [];
+    const sortie = vi.spyOn(console, 'log').mockImplementation((m) => sorties.push(String(m)));
+    try {
+      const code = await main(['--attendu', POUSSÉ, '--base', 'https://exemple.test'], {
+        verifier: async () => ({
+          ok: false,
+          premisse: true,
+          journal: ['tentative 9/9 : révision servie ≠ attendue'],
+          motif: 'déploiement de e9a131c24694 (dpl_45) est en QUEUED : la production n’a pas ENCORE servi cette révision',
+        }),
+      });
+      expect(code).toBe(2);
+      expect(sorties.join('\n')).toContain('::warning title=Déploiement Vercel en file');
+      expect(sorties.join('\n')).not.toContain('Révision du frontend ≠ attendue');
+    } finally {
+      sortie.mockRestore();
+    }
   });
 });

@@ -6176,6 +6176,27 @@
       ]
     },
     {
+      "id": "exercice-restauration: un runbook tronque conclut quand meme",
+      "garde": ".github/scripts/check-exercice-restauration.py",
+      "cible": ".github/scripts/check-exercice-restauration.py",
+      "trouve": "    if len(texte) < PLANCHER_CARACTERES:",
+      "remplace": "    if False and len(texte) < PLANCHER_CARACTERES:",
+      "runner": "python",
+      "preuve": "backend/tests/test_exercice_restauration_fraicheur.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_exercice_restauration_fraicheur.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_exercice_restauration_fraicheur.py::TestLesReperes::test_un_runbook_tronque_ne_conclut_pas"
+      ]
+    },
+    {
       "id": "sse-proxy: un premier evenement tardif tolere",
       "garde": "frontend/scripts/check-sse-proxy-production.js",
       "cible": "frontend/scripts/check-sse-proxy-production.js",
@@ -6641,6 +6662,26 @@
       "cwd": "backend",
       "attend": [
         "FAILED tests/test_exercice_restauration_fraicheur.py::TestLesReperes::test_un_exercice_prepare_mais_non_execute_ne_compte_pas"
+      ]
+    },
+    {
+      "id": "frontend-servi: un deploiement en file accepte comme retard",
+      "garde": "frontend/scripts/check-deployed-revision.js",
+      "cible": "frontend/scripts/check-deployed-revision.js",
+      "trouve": "  if (ETATS_EN_FILE.has(lu.etat)) {",
+      "remplace": "  if (false && ETATS_EN_FILE.has(lu.etat)) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-deployed-revision.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-deployed-revision.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "rend une PRÉMISSE quand le déploiement est en vol, et le nomme"
       ]
     },
     {

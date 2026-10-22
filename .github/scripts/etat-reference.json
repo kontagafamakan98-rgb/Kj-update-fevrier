@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-22",
-    "motif": "Les trois reglages de l'alerte d'arbitrage (seuil, fenetre, intervalle) sont declares OPTIONNELS : kojo_settings porte leurs defauts et refuse le demarrage hors bornes, donc leur absence sur Fly n'est pas une divergence doc-prod.",
+    "motif": "Le garde distingue un deploiement Vercel en file (premisse, code 2) d'un build echoue, d'un deploiement manquant et d'un arbre different : la fusion de #184 avait laisse main rouge sur 22 min de file Vercel.",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -51,7 +51,6 @@
       ".github/scripts/check-test-existence-assertions.py": "7ec8f91c23750854f3c90749491cccdaf7f0bcaf387fc03312c1384eee6b5213",
       ".github/scripts/check-workflow-pins.py": "16b8576486a9224e6fdd7192aadda61a53f5d354e1321f50796c87bb2eeac516",
       ".github/scripts/install-gitleaks.sh": "4105763e64eaa2b1498c8e8c46913062274e67e5a31c4f108cfdc21bed3a41d1",
-      ".github/scripts/livrer.py": "c5008f492f013dd57b930401d8b7263d3ef9ac25246b00aac56de98e56ad5d79",
       ".github/scripts/perimetre_gate.py": "5095501bb20d63d788f4f0aa069a85e3583a9295acaaba4bacef54de2bf1179e",
       ".github/scripts/rapport-secrets.py": "231c6e9b180ac25dea480d9d56d2a8fa3cf5ddfe32e79a1b4b6be8780c51965d",
       "backend/kojo_balises.py": "3596f3a55094902f31f1327c93d744551e30c959262c97f64c9b6beb4e437f67",
@@ -85,7 +84,6 @@
       "frontend/scripts/check-css-inline-budget.js": "8fd97dddf10b3bf287713bc1dd5ef3e8e73df884a4e64aba8ba37a7dcb78e87d",
       "frontend/scripts/check-css-selecteurs-morts.js": "f6da1417e610d2cdddf032b350f097adccf1ecd272b91028c082626c0c0c63eb",
       "frontend/scripts/check-deployed-assets.js": "ac7c121c98ebd3af6562d69eaf46eab539fe0836064d99e35a7d3eb72a79cf3e",
-      "frontend/scripts/check-deployed-revision.js": "0a4029e3ee80263007259b315670b6e4d6a9cfb387c33d7d2aa36f1300b5feea",
       "frontend/scripts/check-drapeaux-emoji.js": "43c50d9cbc0693221ebfa973e136c0577c3082a4288c93c4d4b73bb04f7da732",
       "frontend/scripts/check-formulaire-differe.js": "793bb7255fb90f25baf7703dca0f4b87b801be837831cab6fdde862a1abd327f",
       "frontend/scripts/check-generated-icons.js": "77a863dfbfa23145f74528e1a04489802fd4bc03dd4db0eaeeb44883ffec9e69",
@@ -139,7 +137,9 @@
       "frontend/scripts/check-csp-documents-production.js": "35344837c96bd19d8a60d3f7d07a4fbdafd4281d3094f1a541c95870687c5ad2",
       "frontend/scripts/csp-document.js": "5b5e21a221dbef12a7e86401db297ec9b7cb16a0d55aaf18f5c6b1ba641fe825",
       "frontend/scripts/check-worker-interactive-production.js": "98afe75b3d3ff80e0cf150558d73d1ea088a33ca484dfed5d8b9a3a4520b71fa",
-      ".github/scripts/check-fly-env-drift.py": "a39f47f904e31fee5f636a1b1500b5d5de22f3d2f80fa725e082124416420fb7"
+      ".github/scripts/check-fly-env-drift.py": "a39f47f904e31fee5f636a1b1500b5d5de22f3d2f80fa725e082124416420fb7",
+      ".github/scripts/livrer.py": "c75275f97715585a7a600cc91f2e6d0f6d9082eb4cf216e3cee4f4b89049ce40",
+      "frontend/scripts/check-deployed-revision.js": "94aea1e166cebfc3c87c0addb7d83d3c75c43d64da096264296d68e97ae15a36"
     }
   },
   "hors_perimetre": [

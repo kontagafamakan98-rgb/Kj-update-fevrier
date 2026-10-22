@@ -79,6 +79,24 @@
  * faux rouge observé sur la production, cf. `resolve-vercel-url.sh`) est nommé
  * comme tel, donc reconnu au lieu d'être confondu avec un frontend en retard.
  *
+ * ── « EN FILE » N'EST PAS « EN RETARD » (22/10/2026) ────────────────────────
+ * La fusion de #184 (21/10/2026) a laissé `main` rouge : la fenêtre de 3 min
+ * expirait à 15:21, Vercel n'a créé le déploiement de production qu'à 15:40 —
+ * 22 min de file. Le garde mesurait VRAI (la production ne servait pas ce
+ * commit) mais son message nommait TROIS causes possibles sans les distinguer :
+ * build échoué, en file d'attente, jamais déclenché. Trois corrections
+ * différentes sous un seul rouge, donc un rouge qu'on apprend à ignorer.
+ *
+ * Allonger la fenêtre ne tenait pas : le job `frontend-build` a un plafond de
+ * 20 min et en consomme déjà ~19 (mesuré le 22/10/2026). L'API Vercel, elle,
+ * SAIT : `/v7/deployments?sha=…` rend les déploiements de la révision avec leur
+ * `readyState`. Un déploiement QUEUED/BUILDING/INITIALIZING est une mesure qui
+ * n'a pas encore eu lieu — une PRÉMISSE (code 2), comme la résolution de preview
+ * qui utilise le même client. Un build ERROR/CANCELED, une révision sans AUCUN
+ * déploiement, et une production qui sert un autre arbre restent des rouges, et
+ * le message dit lequel. Sans jeton, rien n'est inventé : le refus reste celui
+ * d'avant, avec la raison de la non-lecture.
+ *
  * Usage :
  *   cd frontend && node scripts/check-deployed-revision.js \
  *     --attendu "$GITHUB_SHA" --sinon "$(git -C .. rev-list -1 HEAD -- frontend/)"
@@ -96,6 +114,10 @@ import {
   isLoopbackUrl,
   metaContent,
 } from './site-meta.js';
+// L'API Vercel et son client vivent dans `preview-vercel.js` : un SECOND client
+// HTTP aurait sa propre gestion d'erreur, et les deux pourraient diverger sur ce
+// qui est lisible. Le jeton, l'équipe et le projet sont les MÊMES variables.
+import { PROJET_DEFAUT, REVISION, vercelApi } from './preview-vercel.js';
 
 // Le dossier dont l'ARBRE décide du verdict. Un seul propriétaire : le jour où
 // le déployeur sert autre chose que `frontend/`, c'est ici que ça se dit — et
@@ -118,6 +140,17 @@ export const REVISIONS_ABSENTES = new Set(['', 'inconnue', 'unknown', 'none', 'n
 
 // Un seul en-tête, pour que la requête soit identifiable dans les journaux du CDN.
 const PROBE_HEADERS = { 'user-agent': 'kojo-deployed-revision/1.0' };
+
+// ── L'ÉTAT DU DÉPLOIEMENT, quand la production ne sert pas encore la révision ──
+// Un déploiement EN VOL n'est pas un retard mesuré : la production n'a pas
+// encore eu l'occasion de servir cette révision, donc aucun verdict n'est rendu
+// ici (code 2). Lui donner le rouge du retard ferait porter au code un fait de
+// file d'attente Vercel — l'incident du 21/10/2026 (22 min de file, `main` rouge).
+export const ETATS_EN_FILE = new Set(['QUEUED', 'BUILDING', 'INITIALIZING']);
+
+// États terminaux d'un ÉCHEC : là, le déploiement a eu lieu et n'a pas abouti.
+// Ce n'est ni une file ni une prémisse — le build est à corriger.
+export const ETATS_ECHEC_DEPLOIEMENT = new Set(['ERROR', 'CANCELED']);
 
 /**
  * Les en-têtes qui DATENT le déploiement, rendus avec le corps de la réponse.
@@ -205,6 +238,179 @@ export function revisionServie(html) {
 export function arbreServi(html) {
   const valeur = String(metaContent(String(html ?? ''), BUILD_TREE_META) ?? '').trim();
   return ARBRE_GIT.test(valeur) ? valeur.toLowerCase() : '';
+}
+
+/**
+ * Les coordonnées Vercel lues dans l'environnement, jamais recopiées ailleurs.
+ *
+ * Les MÊMES variables que `check-deployed-assets.js --preview` et
+ * `livrer.py` : le jeton, l'équipe et le nom de projet n'ont qu'une source.
+ *
+ * @param {object} [env] Environnement (injectable en test). Défaut `process.env`.
+ * @returns {{token: string, teamId: string, projet: string}}
+ */
+export function optionsVercel(env = process.env) {
+  return {
+    token: String(env?.VERCEL_TOKEN ?? '').trim(),
+    teamId: String(env?.VERCEL_TEAM_ID ?? '').trim(),
+    projet: String(env?.VERCEL_PROJECT_NAME ?? '').trim() || PROJET_DEFAUT,
+  };
+}
+
+/**
+ * L'état du déploiement de PRODUCTION d'une révision, ou la raison de son absence.
+ *
+ * Le filtre `sha` rend les déploiements de CE commit ; on ne retient que
+ * `target === 'production'` (une preview du même commit ne dit rien de la
+ * production) et on vérifie `meta.githubCommitSha`, comme `preview-vercel.js` :
+ * l'API rend parfois des voisins, et attribuer leur état à cette révision
+ * reviendrait à juger un autre artefact.
+ *
+ * Jamais d'exception : `erreur` non nul veut dire « état non lu » (jeton absent,
+ * API illisible) — l'appelant garde alors son refus d'avant au lieu d'inventer
+ * une prémisse.
+ *
+ * @param {string} révision SHA poussé (7 à 40 caractères).
+ * @param {object} [options] `token`, `teamId`, `projet`, `fetchImpl`.
+ * @returns {Promise<{trouve: boolean, etat: string, id: string, erreur: string|null}>}
+ */
+export async function etatDeploiementProduction(révision, {
+  token,
+  teamId = '',
+  projet = PROJET_DEFAUT,
+  fetchImpl = fetch,
+} = {}) {
+  const rev = normaliser(révision).toLowerCase();
+  if (!REVISION.test(rev)) {
+    return {
+      trouve: false,
+      etat: '',
+      id: '',
+      erreur: `révision « ${révision ?? ''} » illisible : l'état d'un déploiement se lit pour un identifiant de commit`,
+    };
+  }
+  const jeton = String(token ?? '').trim();
+  if (!jeton) {
+    return {
+      trouve: false,
+      etat: '',
+      id: '',
+      erreur:
+        `jeton Vercel absent (VERCEL_TOKEN) : l'état du déploiement de ${rev.slice(0, 12)} ` +
+        'n\'a PAS été lu — « en file » et « jamais déclenché » restent confondus, comme avant.',
+    };
+  }
+
+  let liste;
+  try {
+    liste = await vercelApi(
+      `/v7/deployments?projectId=${encodeURIComponent(projet)}&sha=${rev}&limit=20`,
+      { token: jeton, teamId, fetchImpl }
+    );
+  } catch (error) {
+    return {
+      trouve: false,
+      etat: '',
+      id: '',
+      erreur: `état des déploiements de ${rev.slice(0, 12)} illisible (${error.message})`,
+    };
+  }
+
+  const déploiements = Array.isArray(liste?.deployments) ? liste.deployments : [];
+  const production = déploiements.filter(
+    (d) =>
+      d &&
+      d.target === 'production' &&
+      String(d.meta?.githubCommitSha ?? '').trim().toLowerCase() === rev
+  );
+  if (!production.length) {
+    return { trouve: false, etat: '', id: '', erreur: null };
+  }
+  const retenu = production[0];
+  return {
+    trouve: true,
+    etat: String(retenu.readyState ?? '').trim().toUpperCase(),
+    id: String(retenu.uid || retenu.id || ''),
+    erreur: null,
+  };
+}
+
+/**
+ * Qualifie un refus avec ce que Vercel sait du DÉPLOIEMENT, quand il le sait.
+ *
+ * Ce que fait cette fonction, et pourquoi elle existe : le refus du garde dit
+ * « la production ne sert pas cette révision » sans pouvoir distinguer un build
+ * échoué d'une file d'attente (l'incident du 21/10/2026). Elle interroge l'API
+ * pour UNE question étroite — l'état du déploiement de production de la
+ * révision attendue — et rend :
+ *   • une PRÉMISSE si le déploiement est en vol (QUEUED/BUILDING/INITIALIZING) ;
+ *   • le même refus, nommé, si le build est en ERROR/CANCELED ;
+ *   • le même refus s'il n'y a AUCUN déploiement de cette révision ;
+ *   • le même refus, inchangé, si l'état n'a pas pu être lu (jeton, API).
+ * Elle ne rend JAMAIS un succès : le déploiement existe et bouge, mais la
+ * production ne sert pas encore son artefact.
+ *
+ * @param {object} verdict Verdict déjà rendu (`ok: false`).
+ * @param {Array<string>} attendues Révisions acceptées.
+ * @param {object} [options] `deploiement` (identifiants), `etatDeploiement`, `fetchImpl`.
+ * @returns {Promise<object>} Le verdict, éventuellement précisé.
+ */
+export async function qualifierRefus(verdict, attendues = [], {
+  deploiement = optionsVercel(),
+  etatDeploiement = etatDeploiementProduction,
+  fetchImpl = fetch,
+} = {}) {
+  if (!verdict || verdict.ok || verdict.premisse) return verdict;
+  const message = String(verdict.message ?? '');
+  // Ces trois refus ne parlent pas du déploiement : une production muette, un
+  // artefact sans arbre publié, un site injoignable. L'API n'y changerait rien
+  // et l'interroger donnerait un chiffre qui ne décrit pas ce refus-là.
+  if (/AUCUNE révision|AUCUN arbre|aucune réponse exploitable/.test(message)) return verdict;
+
+  const cibles = attendues.map(normaliser).filter(Boolean);
+  let lu = null;
+  let erreur = null;
+  for (const cible of cibles) {
+    const état = await etatDeploiement(cible, { ...deploiement, fetchImpl });
+    if (état?.trouve) {
+      lu = { ...état, cible };
+      break;
+    }
+    erreur = état?.erreur || erreur;
+  }
+
+  if (!lu) {
+    const cause = erreur
+      ? ` État Vercel NON LU : ${erreur}`
+      : ` Aucun déploiement de ${cibles.map((c) => c.slice(0, 12)).join(' ou ')} côté Vercel : ` +
+        "le push n'en a déclenché AUCUN — ce n'est pas une file d'attente, c'est un déploiement manquant.";
+    return { ...verdict, message: message + cause };
+  }
+
+  const suite = `${lu.cible.slice(0, 12)}${lu.id ? ` (${lu.id})` : ''} est en ${lu.etat}`;
+  if (ETATS_EN_FILE.has(lu.etat)) {
+    return {
+      ok: false,
+      premisse: true,
+      message:
+        `déploiement de ${suite} : la production n'a pas ENCORE servi cette révision, ` +
+        "donc aucun verdict n'est rendu ici (prémisse) — ce n'est ni un build échoué ni un " +
+        "déploiement manquant. Vercel a mis 22 min à créer le déploiement d'une fusion le " +
+        "21/10/2026 ; la fenêtre d'attente de ce garde (≈ 3 min) est plus courte que cette file.",
+    };
+  }
+  if (ETATS_ECHEC_DEPLOIEMENT.has(lu.etat)) {
+    return {
+      ...verdict,
+      message: `${message} Le déploiement de ${suite} : ce n'est pas une file d'attente, c'est un build Vercel en échec.`,
+    };
+  }
+  return {
+    ...verdict,
+    message:
+      `${message} Le déploiement de ${suite} : il existe, mais la production ne sert pas son ` +
+      'arbre — vérifier l\'alias de production (un déploiement READY que le domaine ne sert pas).',
+  };
 }
 
 /**
@@ -488,6 +694,8 @@ export async function verifierServie({
   interrogerImpl = interroger,
   arbreDe = arbreFrontend,
   cwd = process.cwd(),
+  deploiement = optionsVercel(),
+  etatDeploiement = etatDeploiementProduction,
 } = {}) {
   const journal = [];
   let dernier = null;
@@ -510,7 +718,21 @@ export async function verifierServie({
     if (verdict.ok) return { ok: true, journal, premisse: false, parArbre: Boolean(verdict.parArbre) };
     if (tentative < total) await dormir(delai);
   }
-  return { ok: false, journal, premisse: Boolean(dernier?.premisse) };
+  // La fenêtre est épuisée : le refus est vrai, mais sa CAUSE ne l'est pas
+  // encore. L'API Vercel dit si un déploiement de cette révision est en vol
+  // (prémisse, donc aucun verdict), en échec, ou absent — trois corrections
+  // différentes que le message du garde ne pouvait pas distinguer seul.
+  const qualifié = await qualifierRefus(dernier, attendues, {
+    deploiement,
+    etatDeploiement,
+    fetchImpl,
+  });
+  return {
+    ok: false,
+    journal,
+    premisse: Boolean(qualifié?.premisse),
+    motif: String(qualifié?.message ?? ''),
+  };
 }
 
 /**
@@ -593,7 +815,7 @@ export async function main(argv = process.argv.slice(2), { verifier = verifierSe
   // cette couture le CODE 2 — la prémisse TOLÉRÉE, qui ne doit pas accuser le
   // déploiement — ne serait nommé par aucun cas, et un `return 1` posé là
   // passerait la suite entière sans qu'un test bronche.
-  const { ok, journal, premisse } = await verifier(options);
+  const { ok, journal, premisse, motif } = await verifier(options);
   if (ok) {
     console.log(
       `::notice title=Frontend servi::${journal[journal.length - 1]} — le site sert bien un ` +
@@ -602,12 +824,20 @@ export async function main(argv = process.argv.slice(2), { verifier = verifierSe
     return 0;
   }
 
-  const dernier = journal[journal.length - 1] || 'aucune tentative';
+  // `motif` porte la qualification du refus (état du déploiement Vercel) ; le
+  // journal, lui, garde chaque tentative, sans quoi un rejeu perdrait l'heure
+  // à laquelle chaque essai a eu lieu.
+  const dernier = motif || journal[journal.length - 1] || 'aucune tentative';
   if (premisse) {
-    // La seule prémisse restante : l'arbre d'une révision ATTENDUE est illisible
-    // dans ce clone. Ce n'est pas un frontend en retard — le code 2 le dit à la
-    // CI et à `livrer.py`, qui ne doivent pas accuser le déploiement.
-    console.log(`::error title=Arbre attendu illisible::${dernier}`);
+    // Deux prémisses, deux titres : un déploiement EN VOL (Vercel travaille) et
+    // un CLONE qui ne contient pas la révision attendue ne se réparent pas au
+    // même endroit. Le code 2 est le même — c'est le fait que la CI et
+    // `livrer.py` doivent lire comme « aucun verdict », pas comme un retard.
+    if (/est en (QUEUED|BUILDING|INITIALIZING)/.test(dernier)) {
+      console.log(`::warning title=Déploiement Vercel en file::${dernier}`);
+    } else {
+      console.log(`::error title=Arbre attendu illisible::${dernier}`);
+    }
     return 2;
   }
   if (dernier.includes('AUCUNE révision')) {
