@@ -14,8 +14,15 @@ const jobs = [];
 // `/profile` n'avait aucun pays à montrer — ni, par conséquent, aucune carte de
 // localisation à différer (`e2e/helpers/parcours-carte.js` lit ce même pays).
 const users = new Map([
-  ['demo@example.com', { id: 'demo-user', email: 'demo@example.com', password: 'password', user_type: 'worker', country: 'senegal', first_name: 'Demo', last_name: 'Worker', is_verified: true, payment_accounts_count: 2 }],
-  ['client@example.com', { id: 'demo-client', email: 'client@example.com', password: 'password', user_type: 'client', country: 'senegal', first_name: 'Demo', last_name: 'Client', is_verified: true, payment_accounts_count: 2 }],
+  // `email_verified` est le champ que la porte lit (`ProtectedRoute`,
+  // frontend/src/App.js) : il vient du modèle backend, donc du VRAI login. La
+  // fixture ne le portait pas, et depuis que l'inscription aboutit sans compte
+  // de paiement, tout parcours connecté atterrissait sur /payment-verification
+  // au lieu de /dashboard — 30 cas e2e tombés d'un coup, tous par la même
+  // redirection. `is_verified` reste publié (minimum de comptes atteint), mais
+  // ce n'est plus lui qui décide de l'entrée.
+  ['demo@example.com', { id: 'demo-user', email: 'demo@example.com', password: 'password', user_type: 'worker', country: 'senegal', first_name: 'Demo', last_name: 'Worker', email_verified: true, is_verified: true, payment_accounts_count: 2 }],
+  ['client@example.com', { id: 'demo-client', email: 'client@example.com', password: 'password', user_type: 'client', country: 'senegal', first_name: 'Demo', last_name: 'Client', email_verified: true, is_verified: true, payment_accounts_count: 2 }],
 ]);
 const sessions = new Map();
 const proposals = [];
@@ -229,7 +236,7 @@ const send = (res, status, body, headers = {}) => {
     // lire un cookie — c'est exactement la dépendance que le modèle doit pouvoir
     // trancher. La production expose le même en-tête (server.py,
     // CORSMiddleware(expose_headers=[... 'X-Kojo-CSRFToken'])).
-    'Access-Control-Expose-Headers': 'X-Kojo-CSRFToken',
+    'Access-Control-Expose-Headers': 'X-Kojo-CSRFToken, X-Total-Count',
     ...(csrfAEchoer && !headers['X-Kojo-CSRFToken'] ? { 'X-Kojo-CSRFToken': csrfAEchoer } : {}),
     ...headers
   });
@@ -402,7 +409,16 @@ const server = http.createServer(async (req, res) => {
       const category = url.searchParams.get('category') || '';
       const filtered = jobs.filter((job) => (!query || job.title.toLowerCase().includes(query)) && (!category || job.category === category));
       const data = filtered.slice((page - 1) * limit, page * limit);
-      return send(res, 200, { data, jobs: data, page, limit, has_more: page * limit < filtered.length, total: filtered.length });
+      // La VRAIE route rend une LISTE NUE (`GET /jobs`, response_model=list[JobPublic])
+      // et publie le compte du filtre dans `X-Total-Count`. La fixture répondait
+      // `{data, jobs, total}` : quand le client a demandé `withHeaders`, la
+      // réponse est devenue `{data: <corps>, headers}` et le corps enveloppé n'a
+      // plus été reconnu comme une liste — `/jobs` s'est affichée VIDE, et deux
+      // parcours anonymes (user-flows) sont tombés sur « aucun élément ».
+      // Une fixture qui n'a pas la forme de ce qu'elle remplace ne mesure rien.
+      return send(res, 200, data, {
+        'X-Total-Count': String(filtered.length),
+      });
     }
     if (req.method === 'GET' && /^\/jobs\/[^/]+$/.test(path)) {
       const job = jobs.find((item) => item.id === path.split('/').pop());
@@ -415,7 +431,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { user, token, access_token: token, token_expires_at: Date.now() + 3600000 }, enTetesDeSession(token));
     }
     if (req.method === 'POST' && path === '/auth/register-verified') {
-      const body = await readBody(req); const user = { id: `user-${users.size + 1}`, email: body.email, password: body.password, user_type: body.user_type || 'client', first_name: body.first_name || 'Demo', last_name: body.last_name || 'User', is_verified: true, payment_accounts_count: 2 };
+      const body = await readBody(req); const user = { id: `user-${users.size + 1}`, email: body.email, password: body.password, user_type: body.user_type || 'client', first_name: body.first_name || 'Demo', last_name: body.last_name || 'User', email_verified: true, is_verified: true, payment_accounts_count: 2 };
       users.set(user.email, user); const token = `fixture-${user.id}`; sessions.set(token, user);
       return send(res, 201, { user, token, access_token: token, token_expires_at: Date.now() + 3600000 }, enTetesDeSession(token));
     }
@@ -445,7 +461,22 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req); const payment = { id: `payment-${payments.length + 1}`, status: 'pending', ...body }; payments.push(payment); return send(res, 201, { payment, checkout_url: `http://127.0.0.1:${port}/fixture-checkout/${payment.id}` });
     }
     if (req.method === 'GET' && path === '/payments/status') return send(res, 200, { status: 'pending' });
-    if (req.method === 'GET' && path === '/public/stats') return send(res, 200, { jobs: jobs.length, workers: 1, completed_jobs: 0 });
+    // Les SIX champs de la vraie route (`GET /public/stats`,
+    // backend/kojo_routers_public.py) : la fixture n'en servait que trois, donc
+    // la bande de faits de l'accueil gardait un « — » (« avis ») que React
+    // n'aurait pas dû peindre — et ce tiret, identique à celui de la coquille
+    // pré-rendue à une AUTRE ligne, se faisait apparier au mauvais endroit par
+    // le garde de géométrie, qui le lisait comme un décalage.
+    if (req.method === 'GET' && path === '/public/stats') {
+      return send(res, 200, {
+        workers: 1,
+        clients: 0,
+        open_jobs: jobs.filter((job) => job.status === 'open').length,
+        completed_jobs: 0,
+        reviews: 0,
+        countries: 4,
+      });
+    }
     return send(res, 404, { detail: 'Fixture route not implemented' });
   } catch (error) {
     return send(res, 400, { detail: error.message });

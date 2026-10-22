@@ -53,7 +53,7 @@ const cheminDe = (url) => new URL(url).pathname;
 const ROUTES = config.ci.collect.url.map(cheminDe);
 
 /** Un run Lighthouse minimal, mais complet pour les assertions déclarées. */
-const lhr = (route, { cls, score = 0.99, lcp = 1000, tbt = 10, fcp = 1000 } = {}) => ({
+const lhr = (route, { cls, score = 0.99, lcp = 1000, tbt = 10, fcp = 1000, accessibilite = 1 } = {}) => ({
   finalUrl: `https://kojoforafrica.cc.cd${route}`,
   audits: {
     'cumulative-layout-shift': { score: 1, numericValue: cls },
@@ -61,7 +61,10 @@ const lhr = (route, { cls, score = 0.99, lcp = 1000, tbt = 10, fcp = 1000 } = {}
     'total-blocking-time': { score: 1, numericValue: tbt },
     'first-contentful-paint': { score: 1, numericValue: fcp },
   },
-  categories: { performance: { score } },
+  // La note d'accessibilité est portée par CHAQUE run : elle est assertée sur
+  // toutes les pages (socle), donc un run qui ne la publie pas ferait rougir
+  // l'assertion pour une raison qui n'a rien à voir avec l'artefact.
+  categories: { performance: { score }, accessibility: { score: accessibilite } },
 });
 
 /** Les 3 runs d'un job, à la même valeur CLS. */
@@ -189,7 +192,7 @@ describe('lighthouserc — budgets CLS par route (assertMatrix)', () => {
     const lent = (route) => troisRuns(route, 0).map((run, i) => ({
       ...run,
       audits: { ...run.audits, 'largest-contentful-paint': { score: 0, numericValue: 4256 + i } },
-      categories: { performance: { score: 0.85 } },
+      categories: { performance: { score: 0.85 }, accessibility: { score: 1 } },
     }));
 
     const assertes = ROUTES.filter((route) => !Object.hasOwn(LCP_PRODUIT_PAR_UNE_REPONSE, route));
@@ -220,6 +223,29 @@ describe('lighthouserc — budgets CLS par route (assertMatrix)', () => {
         ),
       },
     ]);
+  });
+
+  it('asserte la NOTE d’accessibilité sur CHAQUE page, et elle mord', () => {
+    // La note est déterministe (DOM + styles peints), donc elle ne prend pas le
+    // traitement « meilleur des 3 runs » du bruit machine : elle est portée par
+    // le socle optimiste comme les autres budgets explicites.
+    for (const route of ROUTES) {
+      expect(soclePour(route, SOCLE_GLOBAL)['categories:accessibility'], route).toEqual([
+        'error',
+        { minScore: 0.95 },
+      ]);
+    }
+
+    // La mesure MORD : une page qui descend à 0,90 rougit, et c'est bien
+    // l'accessibilité qui est nommée — pas une moyenne pondérée de score.
+    const degrade = troisRuns('/login', 0).map((run) => ({
+      ...run,
+      categories: { ...run.categories, accessibility: { score: 0.9 } },
+    }));
+    const verdicts = echecs(degrade);
+
+    expect(verdicts.map((v) => v.auditId)).toEqual(['categories']);
+    expect(verdicts[0]).toMatchObject({ auditProperty: 'accessibility', passed: false });
   });
 
   it('refuse d’auditer une page sans budget CLS mesuré', () => {

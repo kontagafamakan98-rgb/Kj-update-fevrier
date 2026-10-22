@@ -15,12 +15,23 @@ from kojo_models import PaymentAccount, WA_PHONE_RULES
 from kojo_settings import logger
 from typing import Optional
 
-def validate_payment_accounts(payment_accounts: PaymentAccount, user_type: str, country: Optional[str] = None) -> dict:
+def validate_payment_accounts(
+    payment_accounts: PaymentAccount,
+    user_type: str,
+    country: Optional[str] = None,
+    exiger_minimum: bool = True,
+) -> dict:
     """Valide les comptes de paiement selon le type d'utilisateur.
 
     `country` (optionnel, si connu) : Wave n'est OPÉRÉ que au Sénégal et en
     Côte d'Ivoire (canaux PayDunya réels) — un compte malien/burkinabé qui ne
     lierait que Wave serait validé ici puis bloqué au moment du paiement.
+
+    `exiger_minimum=False` (inscription, depuis le 22/10/2026) : la FORME des
+    comptes fournis est vérifiée, mais l'absence de compte n'est plus un refus.
+    `is_verified` y répond alors honnêtement (minimum atteint ou non) au lieu
+    d'être vrai par construction. Les appelants qui bornent un AJOUT de comptes
+    gardent le défaut `True` : la règle n'est pas déplacée, seulement différée.
     """
     if country:
         country_value = getattr(country, "value", str(country)).lower().replace(' ', '_')
@@ -58,24 +69,28 @@ def validate_payment_accounts(payment_accounts: PaymentAccount, user_type: str, 
         linked_accounts += 1
         account_details['bank_account'] = mask_bank_account_info(payment_accounts.bank_account)
     
-    # Validation selon le type d'utilisateur
-    if user_type == "client":
-        if linked_accounts < 1:
+    # Le MINIMUM dépend du type de compte.
+    minimum = 1 if user_type == "client" else 2 if user_type == "worker" else 0
+
+    # Validation selon le type d'utilisateur (seulement quand on borne un AJOUT)
+    if exiger_minimum:
+        if user_type == "client" and linked_accounts < minimum:
             raise HTTPException(
-                status_code=400, 
+                status_code=400,
                 detail="Les clients doivent lier au moins 1 moyen de paiement (Orange Money, Wave ou Compte bancaire)"
             )
-    elif user_type == "worker":
-        if linked_accounts < 2:
+        elif user_type == "worker" and linked_accounts < minimum:
             raise HTTPException(
                 status_code=400,
                 detail="Les travailleurs doivent lier au minimum 2 moyens de paiement sur 3 disponibles (Orange Money, Wave, Compte bancaire)"
             )
-    
+
     return {
         "linked_accounts_count": linked_accounts,
         "account_details": account_details,
-        "is_verified": True
+        # Vrai SEULEMENT si le minimum est atteint : le drapeau « moyens de
+        # paiement renseignés » ne peut plus être vrai sur un compte vide.
+        "is_verified": linked_accounts >= minimum
     }
 ALL_PREFIXES_70_99 = [str(i) for i in range(70, 100)]
 COTE_DIVOIRE_ALL_MOBILE_PREFIXES = (

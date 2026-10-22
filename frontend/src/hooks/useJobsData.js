@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { jobsAPI } from '../services/apiEndpoints';
 import { handleApiError } from '../services/api';
-import { normalizeJobList } from '../utils/jobDisplayBridge';
+import { normalizeJobList, totalPublie } from '../utils/jobDisplayBridge';
 import { safeLog } from '../utils/env';
 
 export const JOB_TAB_DISCOVER = 'discover';
@@ -9,7 +9,16 @@ export const JOB_TAB_APPLICATIONS = 'applications';
 export const JOB_TAB_MISSIONS = 'missions';
 export const JOBS_PAGE_SIZE = 12;
 
-export function useJobsData({ effectiveTab, filters, setFilters, searchParams, user, errorMessages, prefetch }) {
+/**
+ * Le tri envoyé au serveur, ou `undefined` pour l'ordre par défaut.
+ *
+ * L'ordre chronologique est celui que le serveur applique SANS paramètre :
+ * l'envoyer explicitement rendrait la requête différente de celle du
+ * préchargement (donc deux requêtes au lieu d'une) pour un résultat identique.
+ */
+export const triDemande = (tri) => (tri && tri !== 'recent' ? tri : undefined);
+
+export function useJobsData({ effectiveTab, filters, setFilters, searchParams, user, errorMessages, prefetch, position }) {
   const consumePrefetch = prefetch?.consume;
   const snapshotPrefetch = prefetch?.snapshot;
 
@@ -60,11 +69,20 @@ export function useJobsData({ effectiveTab, filters, setFilters, searchParams, u
       : undefined,
     ids: effectiveTab === JOB_TAB_APPLICATIONS ? 'applications' : undefined,
     status: effectiveTab === JOB_TAB_DISCOVER ? 'open' : filters.status || 'open',
+    // Le préchargement ne porte que l'ordre par défaut : `matches()` refuse
+    // tout autre tri (`tri`), sinon une liste triée par budget — ou par
+    // distance — serait seedée par la liste chronologique, et le tri demandé ne
+    // serait jamais appliqué.
+    tri: triDemande(filters.sort),
   };
   // Aucune impurity : `snapshot` ne consomme rien, c'est l'effet qui consomme.
   const prefetchState = snapshotPrefetch ? snapshotPrefetch(prefetchParams) : null;
   const seed = prefetchState?.value
-    ? { jobs: prefetchState.value, hasMore: prefetchState.value.length === JOBS_PAGE_SIZE }
+    ? {
+      jobs: prefetchState.value,
+      hasMore: prefetchState.value.length === JOBS_PAGE_SIZE,
+      total: prefetchState.total ?? null,
+    }
     : null;
 
   const [jobs, setJobs] = useState(() => seed?.jobs ?? []);
@@ -72,6 +90,9 @@ export function useJobsData({ effectiveTab, filters, setFilters, searchParams, u
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(() => seed?.hasMore ?? false);
+  // Le NOMBRE de missions du filtre, publié par `X-Total-Count`. `null` tant
+  // qu'il n'a pas été mesuré : ce n'est pas zéro, et l'écran n'en invente pas.
+  const [total, setTotal] = useState(() => seed?.total ?? null);
   const [loadError, setLoadError] = useState(null);
   const [appliedJobIds, setAppliedJobIds] = useState(null);
   const requestSequence = useRef(0);
@@ -89,6 +110,20 @@ export function useJobsData({ effectiveTab, filters, setFilters, searchParams, u
       const params = { limit: JOBS_PAGE_SIZE, page: targetPage };
       if (filters.search.trim()) params.q = filters.search.trim();
       if (filters.category) params.category = filters.category;
+      const tri = triDemande(filters.sort);
+      if (tri) {
+        // Le paramètre du serveur est `tri`, pas `sort` : l'envoyer sous le nom
+        // `sort` était ignoré en silence par FastAPI, et le select annonçait un
+        // ordre que le serveur n'avait jamais appliqué.
+        params.tri = tri;
+        // Une distance se mesure depuis un POINT : le serveur refuse
+        // `tri=distance` sans lat/lng (400 nommé), et la page ne demande cet
+        // ordre qu'une fois la position connue.
+        if (tri === 'distance' && position) {
+          params.lat = position.latitude;
+          params.lng = position.longitude;
+        }
+      }
       // Le pays est un filtre de DÉCOUVERTE : le backend l'accepte depuis
       // toujours (`GET /jobs?country=mali`) et il est la seule façon de voir
       // les offres d'un autre pays que le sien. Il ne s'applique donc pas aux
@@ -122,16 +157,20 @@ export function useJobsData({ effectiveTab, filters, setFilters, searchParams, u
           setJobs(prefetched.jobs);
           setPage(1);
           setHasMore(prefetched.hasMore);
+          setTotal(prefetched.total ?? null);
           return;
         }
       }
 
-      const response = await jobsAPI.getAll(params);
+      // `withHeaders` : le count du filtre voyage dans `X-Total-Count`. Le corps
+      // reste la liste que cette fonction normalisait déjà.
+      const response = await jobsAPI.getAll(params, { withHeaders: true });
       const nextJobs = normalizeJobList(Array.isArray(response) ? response : response?.data || []);
       if (requestId !== requestSequence.current) return;
       setJobs((previous) => (append ? [...previous, ...nextJobs] : nextJobs));
       setPage(targetPage);
       setHasMore(nextJobs.length === JOBS_PAGE_SIZE);
+      setTotal(append ? total : totalPublie(response));
     } catch (error) {
       if (requestId !== requestSequence.current) return;
       safeLog.error('Jobs load error', error);
@@ -181,7 +220,7 @@ export function useJobsData({ effectiveTab, filters, setFilters, searchParams, u
   useEffect(() => {
     loadJobs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveTab, filters.search, filters.category, filters.country, filters.status, user?.id, user?.user_type]);
+  }, [effectiveTab, filters.search, filters.category, filters.country, filters.status, filters.sort, user?.id, user?.user_type, position]);
 
   return {
     jobs,
@@ -189,6 +228,7 @@ export function useJobsData({ effectiveTab, filters, setFilters, searchParams, u
     loadingMore,
     page,
     hasMore,
+    total,
     loadError,
     appliedJobIds,
     loadJobs,

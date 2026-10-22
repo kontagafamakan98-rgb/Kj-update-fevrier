@@ -102,8 +102,20 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 // vit ailleurs : e2e/heros-format.spec.js, qui lit les octets de la réponse,
 // exige UNE seule requête pour la photo de tête et l'absence de tout JPEG du
 // héros sur la navigation.
+// ── 22/10/2026 : 130 → 131 Ko, POUR LA PREUVE SOCIALE DE L'ACCUEIL ────────
+// La bande de faits du héros lit désormais `GET /api/public/stats` et formate
+// ses trois compteurs dans la langue courante (`utils/preuveSociale.js`) : ce
+// code vit dans le chunk d'accueil, EAGER parce que c'est la page d'arrivée —
+// la charger à la demande ajouterait un aller-retour au premier écran, ce que
+// ce budget n'a jamais demandé. Mesure du jour : 130,1 Ko gzip (133 176 o des
+// sept chunks référencés), soit 56 o au-dessus de l'ancien plafond — et ce
+// n'est pas un import repassé en statique : les six chunks `vendor*` n'ont pas
+// bougé (react-dom 41 673 o, router 13 756 o, lucide 7 468 o, react 2 868 o),
+// seul `Home` porte la règle. Le plafond passe donc à 131 Ko, avec 0,9 Ko de
+// marge : un relèvement de 1 Ko pour 56 o mesurés laisserait sinon le prochain
+// hachage de build décider à la place du développeur.
 export const BUDGETS = {
-  initialGzip: 130 * 1024, // JS initial (chunks référencés par index.html), gzip
+  initialGzip: 131 * 1024, // JS initial (chunks référencés par index.html), gzip
   largestChunkGzip: 200 * 1024, // plus gros chunk JS, gzip
   totalRaw: 5.5 * 1024 * 1024, // build/ entier, brut (voir les deux mesures ci-dessus)
 };

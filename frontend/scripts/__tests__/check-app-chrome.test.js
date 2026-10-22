@@ -31,14 +31,19 @@ import {
   CHROME_OUVERTURE,
   CHROME_FERMETURE,
   FERMETURE_DE_L_APPLICATION,
+  LIEN_EVITEMENT_HTML,
+  LIBELLE_EVITEMENT,
   NAV_PLACEHOLDER,
   chromeDePage,
   piedDePage,
 } from '../../vite-plugins/prerender/app-chrome.js';
+import fr from '../../src/i18n/fr.json';
 import {
   APP_CLASS,
   COLONNE_CLASS,
+  LIEN_EVITEMENT_CLASS,
   MAIN_CLASS,
+  MAIN_ID,
   PIED_ADRESSE_CLASS,
   PIED_CLASS,
   PIED_INTERIEUR_CLASS,
@@ -85,9 +90,35 @@ describe('app-chrome — le chrome est la copie de celui de l’app', () => {
     // construction.
     expect(CHROME_OUVERTURE).toContain(`<div class="${APP_CLASS}">`);
     expect(CHROME_OUVERTURE).toContain(`<div class="${COLONNE_CLASS}">`);
-    expect(CHROME_OUVERTURE).toContain(`<main class="${MAIN_CLASS}">`);
+    // `main` porte désormais son identifiant (cible du lien d'évitement) et
+    // `tabindex="-1"` — c'est `class=` qui doit rester la classe du domicile,
+    // pas la forme entière de la balise.
+    expect(CHROME_OUVERTURE).toContain(`id="${MAIN_ID}"`);
+    expect(CHROME_OUVERTURE).toContain('tabindex="-1"');
+    expect(CHROME_OUVERTURE).toContain(`class="${MAIN_CLASS}"`);
     expect(CHROME_FERMETURE).toBe('</main>');
     expect(FERMETURE_DE_L_APPLICATION).toBe('</div></div>');
+  });
+
+  it('le LIEN D’ÉVITEMENT est publié par la coquille, avec la cible de main', () => {
+    // Il doit être le PREMIER élément du chrome : un lien placé après la navbar
+    // ne fait plus gagner la traversée qu'il existe pour éviter.
+    expect(CHROME_OUVERTURE.indexOf(LIEN_EVITEMENT_HTML)).toBeGreaterThanOrEqual(0);
+    expect(CHROME_OUVERTURE.indexOf(LIEN_EVITEMENT_HTML)).toBeLessThan(
+      CHROME_OUVERTURE.indexOf(NAV_PLACEHOLDER)
+    );
+    expect(LIEN_EVITEMENT_HTML).toContain(`class="${LIEN_EVITEMENT_CLASS}"`);
+    expect(LIEN_EVITEMENT_HTML).toContain(`href="#${MAIN_ID}"`);
+    // La CIBLE existe dans le même document : un href vers un identifiant
+    // absent est un lien mort, donc un lien d'évitement qui n'évite rien.
+    expect(CHROME_OUVERTURE).toContain(`id="${MAIN_ID}"`);
+  });
+
+  it('le libellé du lien d’évitement est CELUI du dictionnaire français', () => {
+    // Copie acceptée parce que JUGÉE : la coquille publie du français, et une
+    // clé retouchée doit rougir ici plutôt que de publier un texte périmé.
+    expect(LIBELLE_EVITEMENT).toBe(fr.skipToContent);
+    expect(LIEN_EVITEMENT_HTML).toContain(fr.skipToContent);
   });
 
   it('le PIED DE PAGE est lu au même domicile que celui de src/App.js', () => {

@@ -7,7 +7,9 @@ résolution d'identifiant (celle de `kojo_identifiants`, `identifiant_job_query`
 sont ici parce qu'elles n'ont de sens que pour ces trois routes.
 """
 import asyncio
+import math
 import re
+import unicodedata
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -20,9 +22,73 @@ from kojo_core import db, get_current_user, get_current_user_optional
 from kojo_job_categories import _category_search_variants
 from kojo_job_refunds import execute_paydunya_refund
 from kojo_models import JobPublic, JobStatus, NotificationType, User
+from kojo_recherche_missions import (
+    MAX_CANDIDATS_DISTANCE,
+    RAYON_TERRE_KM,
+    distance_km,
+    filtre_texte,
+    termes_de_requete,
+)
 from kojo_settings import OWNER_EMAIL, logger
 
 router = APIRouter()
+
+
+# ── RECHERCHE INSENSIBLE AUX ACCENTS (22/10/2026) ────────────────────────────
+# `$regex` comparait le texte BRUT : « senegal » ne trouvait pas « Sénégal », et
+# « plomberie » ne trouvait pas « Plomberie » (seul `$options: "i"` était posé).
+# Sur un clavier de téléphone ouest-africain, personne ne tape les accents : la
+# recherche ne trouvait donc pas ce qu'on lui demandait, sans le dire.
+#
+# Chaque lettre accentuée devient une CLASSE de caractères. Ce n'est pas un
+# index (voir le tri et les index de `kojo_db`) : c'est la correction du
+# résultat, qui comptait plus que la vitesse sur ce volume.
+_EQUIVALENTS_ACCENTS = {
+    "a": "aàâäã",
+    "e": "eéèêë",
+    "i": "iîï",
+    "o": "oôöõ",
+    "u": "uùûü",
+    "c": "cç",
+    "n": "nñ",
+    "y": "yÿ",
+}
+
+
+def _distance_du_document(doc: dict, lat: float, lng: float) -> float:
+    """Distance d'une mission au point donné, en km — `inf` si la position est illisible.
+
+    Un `geo` qui existe mais dont les coordonnées ne sont pas deux nombres
+    (document importé à la main) ne doit ni faire tomber la liste, ni passer
+    pour « très proche » : il finit l'ordre, il ne le commence pas.
+    """
+    coordonnees = (doc.get("geo") or {}).get("coordinates") or []
+    try:
+        lng_doc, lat_doc = float(coordonnees[0]), float(coordonnees[1])
+    except (TypeError, ValueError, IndexError):
+        return math.inf
+    return distance_km(lat, lng, lat_doc, lng_doc)
+
+
+def _motif_recherche(texte: str) -> str:
+    """Motif `$regex` du texte, avec les accents rendus interchangeables.
+
+    Le texte est DÉSACCENTÉ puis mis en minuscules (`SÉNÉGAL` → `senegal`), et
+    seulement ensuite échappé : une requête contenant `.*` ou `(` reste une
+    chaîne à chercher, jamais une expression. Sans la première étape, un « é »
+    tapé restait un « é » littéral dans le motif et ne trouvait jamais le
+    « e » du document — la souplesse n'allait que dans un sens.
+    """
+    desaccentue = "".join(
+        caractere
+        for caractere in unicodedata.normalize("NFKD", str(texte).strip().lower())
+        if not unicodedata.combining(caractere)
+    )
+    echappe = re.escape(desaccentue)
+    return "".join(
+        f"[{_EQUIVALENTS_ACCENTS[caractere]}]" if caractere in _EQUIVALENTS_ACCENTS else caractere
+        for caractere in echappe
+    )
 
 
 
@@ -80,8 +146,14 @@ async def get_jobs(
     category: Optional[str] = None,
     limit: int = Query(default=50, ge=1, le=100),
     page: int = Query(default=1, ge=1),
-    # Recherche plein texte simple (titre + description), insensible à la casse.
+    # Recherche par mot (titre, description, catégorie, adresse), insensible à
+    # la casse ET aux accents (voir `_motif_recherche`).
     q: Optional[str] = Query(default=None, max_length=100),
+    # Ordre de la liste : `recent` (défaut, comportement historique), `budget`
+    # (le mieux payé d'abord) ou `distance` (la plus proche d'abord, depuis
+    # lat/lng — obligatoires pour ce tri, et seules les missions qui PORTENT
+    # une position peuvent être classées : les autres n'ont pas de distance).
+    tri: Optional[str] = Query(default="recent", pattern="^(recent|budget|distance)$"),
     # Si défini, limite la liste aux jobs dont l'id est dans la liste
     # (séparée par des virgules, max 100) — utilisé par les onglets
     # « Mes candidatures » du frontend.
@@ -101,12 +173,16 @@ async def get_jobs(
     current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """Liste des jobs avec filtres (statut, catégorie, recherche q, ids,
-    mine=posted/assigned, pays, rayon lat/lng/radius_km). Accessible en
-    lecture publique (visiteur anonyme : vue nettoyée).
+    mine=posted/assigned, pays, rayon lat/lng/radius_km) et tri (`tri`).
+    `tri=distance` exige lat/lng et ne classe que les missions qui portent une
+    position ; il ne rend AUCUNE distance (l'ordre seul) — la vue publique ne
+    gagne donc aucun champ géographique.
+    Accessible en lecture publique (visiteur anonyme : vue nettoyée).
 
     Returns:
         list[dict]: vues de jobs via _job_view (le contenu diffère selon
-        que l'utilisateur est connecté ou non).
+        que l'utilisateur est connecté ou non). Le nombre de missions
+        correspondant au filtre est publié dans `X-Total-Count`.
     """
     try:
         query = {}
@@ -130,21 +206,41 @@ async def get_jobs(
                 query["assigned_worker_id"] = current_user.id
             else:
                 raise HTTPException(status_code=400, detail="Paramètre mine invalide")
-        if q:
-            q_escaped = re.escape(str(q).strip())
-            query["$and"] = [
-                {"$or": [
-                    {"title": {"$regex": q_escaped, "$options": "i"}},
-                    {"description": {"$regex": q_escaped, "$options": "i"}},
-                ]}
-            ]
+        # ── LA RECHERCHE : L'INDEX D'ABORD, LE FRAGMENT ENSUITE (22/10/2026) ──
+        # `$regex` ne peut s'appuyer sur aucun index : chaque frappe balayait la
+        # collection. L'index texte `recherche_missions` sert les MOTS (casse et
+        # accents pliés, mesuré) ; il ne sait pas trouver une frappe partielle
+        # (« plomb » ne trouve pas « Plomberie »), donc le fragment reste le
+        # REPLI — quand aucun mot ne correspond, pas en même temps. Deux
+        # chemins, un seul résultat : celui de l'index quand il a quelque chose
+        # à dire, sinon celui du fragment.
+        recherche_texte = None
+        recherche_fragment = None
+        if q and str(q).strip():
+            termes = termes_de_requete(q)
+            if termes:
+                recherche_texte = filtre_texte(termes)
+            motif = _motif_recherche(q)
+            # Quatre endroits, pas deux : une mission « Plomberie » dont le
+            # titre dit « réparer un robinet » se trouve par sa CATÉGORIE, et
+            # « Dakar » se trouve par l'ADRESSE de la mission.
+            recherche_fragment = {
+                "$or": [
+                    {"title": {"$regex": motif, "$options": "i"}},
+                    {"description": {"$regex": motif, "$options": "i"}},
+                    {"category": {"$regex": motif, "$options": "i"}},
+                    {"location.address": {"$regex": motif, "$options": "i"}},
+                ]
+            }
 
         # Rayon : $geoWithin + $centerSphere (rayon en radians = km / 6371).
         # Nécessite l'index 2dsphere sur jobs.geo (créé au boot).
         if lat is not None and lng is not None and radius_km is not None:
+            # `RAYON_TERRE_KM` est celui du tri par distance : deux constantes
+            # déplaceraient la frontière du rayon de quelques centaines de mètres.
             query["geo"] = {
                 "$geoWithin": {
-                    "$centerSphere": [[lng, lat], float(radius_km) / 6371.0]
+                    "$centerSphere": [[lng, lat], float(radius_km) / RAYON_TERRE_KM]
                 }
             }
 
@@ -162,10 +258,91 @@ async def get_jobs(
                     {"country": None}
                 ]
 
-        # Pagination : offset = (page - 1) * limit. Le client déduit
-        # « plus de résultats » du fait que la page est pleine.
+        # ── LE TRI PAR DISTANCE N'ORDONNE QUE CE QUI A UNE POSITION ─────
+        # Une mission sans `geo` n'a pas de distance : la trier « à la fin »
+        # ferait publier un total que le tri ne tient pas, et la dernière page
+        # ne contiendrait que des missions non classées. Elles sortent donc du
+        # filtre — comme pour `radius_km`, où le même fait est déjà assumé.
+        if tri == "distance":
+            if lat is None or lng is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Le tri par distance exige lat et lng : sans position, il n'y a pas de distance à calculer.",
+                )
+            if "geo" not in query:
+                query["geo"] = {"$exists": True}
+
+        # ── LA RECHERCHE ARBITRE : L'INDEX, SINON LE FRAGMENT ──────────
+        # L'index texte est interrogé en premier, et son compte est lu : un
+        # index qui ne trouverait rien laisse la main au fragment, qui trouve
+        # encore les frappes partielles. Un index ABSENT (création refusée,
+        # collection récente) ne fait pas tomber la route : le repli s'applique
+        # et le journal le dit — l'index est une optimisation, pas la garantie.
+        total = None
+        if recherche_texte is not None:
+            candidat = {**query, **recherche_texte}
+            try:
+                total = await db.jobs.count_documents(candidat)
+            except Exception as exc:
+                logger.warning(
+                    f"⚠️ Recherche texte indisponible ({exc}) : repli sur la recherche par fragment"
+                )
+                total = 0
+            if total:
+                query = candidat
+        if not total and recherche_fragment is not None:
+            # `$and` et non `{**query, "$or": …}` : un compte CONNECTÉ porte
+            # déjà un `$or` (son pays), et l'écrasement retirerait ce filtre en
+            # silence — la recherche rendrait les missions d'un autre pays.
+            query = {**query, "$and": [recherche_fragment]}
+
+        # ── COMBIEN, ET DANS QUEL ORDRE (22/10/2026) ────────────────────
+        # La liste ne disait ni combien de missions correspondent, ni dans
+        # quel ordre elles sortaient. Le client DÉDUISAIT « plus de
+        # résultats » d'une page pleine : une page 2 incomplète annonçait donc
+        # « fini » alors qu'une mission avait été clôturée entre-temps, et
+        # personne ne pouvait savoir s'il en restait 3 ou 300. Le total est
+        # mesuré sur le MÊME filtre que la page (donc il ne ment pas quand un
+        # pays, une catégorie ou une recherche resserre la liste), et publié
+        # en en-tête : le corps reste la liste que les clients lisent déjà.
+        if total is None:
+            total = await db.jobs.count_documents(query)
+
+        # Le tri par distance lit TOUS les candidats (Mongo ne sait pas trier
+        # par distance sans `$geoNear`, que la doublure de test refuse) : on
+        # REFUSE au-delà du plafond plutôt que de trier une partie des missions
+        # et de présenter le résultat comme un ordre.
+        if tri == "distance" and total > MAX_CANDIDATS_DISTANCE:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Trier par distance demande de lire toutes les missions du filtre ({total}), "
+                    f"au-delà de {MAX_CANDIDATS_DISTANCE} : resserrez radius_km ou un autre filtre."
+                ),
+            )
+
+        response.headers["X-Total-Count"] = str(total)
+
+        # Pagination : offset = (page - 1) * limit.
         offset = max(0, (page - 1) * limit)
-        jobs = await db.jobs.find(query).sort("created_at", -1).skip(offset).to_list(limit)
+        if tri == "distance":
+            documents = await db.jobs.find(query).to_list(None)
+            # Deux tris STABLES : la chronologie d'abord (départage), puis la
+            # distance (ordre principal). `sorted` est stable, donc deux
+            # missions à la même distance restent dans l'ordre chronologique.
+            documents.sort(key=lambda doc: str(doc.get("created_at") or ""), reverse=True)
+            documents.sort(key=lambda doc: _distance_du_document(doc, lat, lng))
+            jobs = documents[offset:offset + limit]
+        else:
+            curseur = db.jobs.find(query)
+            if tri == "budget":
+                # Le mieux payé d'abord. Une mission sans `budget_max` passe en
+                # dernier (Mongo place les manquants avant les nombres en
+                # descendant) : elle n'est pas « gratuite », elle est muette.
+                curseur = curseur.sort([("budget_max", -1), ("created_at", -1)])
+            else:
+                curseur = curseur.sort("created_at", -1)
+            jobs = await curseur.skip(offset).to_list(limit)
 
         # Cache-Control : la liste PUBLIQUE (visiteur anonyme) ne change que
         # par les créations/clôtures de missions — on la sert avec un cache

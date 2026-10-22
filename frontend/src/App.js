@@ -28,7 +28,9 @@ import { CONTACT, SOCIAL_LINKS, mailtoHref, telHref } from './config/contact';
 import {
   APP_CLASS,
   COLONNE_CLASS,
+  LIEN_EVITEMENT_CLASS,
   MAIN_CLASS,
+  MAIN_ID,
   PIED_ADRESSE_CLASS,
   PIED_CLASS,
   PIED_INTERIEUR_CLASS,
@@ -139,7 +141,12 @@ function ProtectedRoute({ children }) {
   // une protection de l'argent : le backend refuse un décaissement sans
   // compte (`get_mobile_money_account` → 400), donc la garantie tient sans
   // cette porte. Ils sont demandés là où ils servent : /payment et le retrait.
-  if (!user.is_verified) {
+  // C'est l'EMAIL qui bloque, jamais les comptes de paiement : depuis le
+  // 22/10/2026 une inscription aboutit SANS compte de paiement, donc
+  // `is_verified` (qui dit « minimum de comptes atteint ») est faux pour un
+  // compte parfaitement valide. Juger sur lui renvoyait ces gens vers un
+  // écran de paiement à chaque route protégée.
+  if (!user.email_verified) {
     return <Navigate to="/payment-verification" replace state={{ resumeAfterLogin: true, userData: user }} />;
   }
   
@@ -210,11 +217,15 @@ function LegalFooter() {
           <a href={CONTACT.whatsappUrl} target="_blank" rel="noreferrer" className={PIED_LIEN_CLASS}>
             {t('contactWhatsapp')}
           </a>
+          {/* Le nom accessible de ce lien est son texte VISIBLE
+              (« Itinéraire ») : `aria-label="Google Maps"` le remplaçait, et
+              WCAG 2.5.3 interdit qu'une étiquette masque le texte affiché
+              (refus mesuré par la sonde d'accessibilité, 22/10/2026, routes
+              publiques comprises). `title` porte la désignation SEO. */}
           <a
             href={CONTACT.mapsUrl}
             target="_blank"
             rel="noreferrer"
-            aria-label="Google Maps"
             title="Google Maps"
             className={PIED_LIEN_CLASS}
           >
@@ -338,6 +349,17 @@ function AppRoutes() {
     // pré-rendues posent leur propre fond, donc ce changement ne touche que
     // celles qui n'en posaient pas.
     <div className={COLONNE_CLASS}>
+      {/* ── LE LIEN D'ÉVITEMENT, PREMIER ÉLÉMENT FOCALISABLE (22/10/2026) ───
+          Au clavier, on atteignait le contenu d'une page APRÈS avoir traversé
+          toute la barre de navigation — menus, cloche, langue — et cela à
+          chaque page. Ce lien est le premier arrêt de la touche Tab, invisible
+          tant qu'il n'a pas le focus ; son `href` désigne `MAIN_ID`, que
+          `main` porte ci-dessous et que la coquille pré-rendue publie aussi.
+          Il est peint par les DEUX canaux (ici et app-chrome.js) : un lien
+          absent de la coquille serait absent avant l'hydratation, donc absent
+          pour qui arrive sur le document. */}
+      <a className={LIEN_EVITEMENT_CLASS} href={`#${MAIN_ID}`}>{t('skipToContent')}</a>
+
       {/* Network Status and Offline Indicator */}
       <NetworkStatus />
       <OfflineIndicator />
@@ -377,7 +399,11 @@ function AppRoutes() {
           bouge plus verticalement → élimine le CLS mesuré (0.129 volet
           Dashboard, 0.112 Profile) causé par le footer qui accompagnait la
           hauteur du contenu en chargement. */}
-      <main className={MAIN_CLASS}>
+      {/* `tabIndex={-1}` : la cible du lien d'évitement doit pouvoir RECEVOIR
+          le focus au clavier (un `<main>` ne l'est pas naturellement), sinon
+          l'activation du lien ne fait que défiler la page et le focus reste
+          dans la barre — la moitié du geste, présentée comme le tout. */}
+      <main id={MAIN_ID} tabIndex={-1} className={MAIN_CLASS}>
         <Suspense fallback={<PageSkeleton />}>
           <Routes>
             {/* Public routes - eagerly loaded */}

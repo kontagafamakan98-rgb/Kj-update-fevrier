@@ -3,6 +3,9 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
 import { authAPI, handleApiError } from '../services/api';
+// Le compte est créé à la FIN de cette page (22/10/2026) : la session doit
+// donc s'établir ici, sans repasser par un écran de comptes de paiement.
+import { useAuth } from '../contexts/AuthContext';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/emailVerification';
 import { clearRegistrationFlow, loadRegistrationFlow, mergeRegistrationFlow } from '../utils/registrationFlowStorage';
 import { devLog, safeLog } from '../utils/env';
@@ -19,10 +22,10 @@ const EmailVerificationPage = () => {
   const { t, currentLanguage } = useLanguage();
   const pageT = makeScopedTranslator(currentLanguage, t);
   const toast = useToast();
+  const { autoLoginAfterRegistration } = useAuth();
 
   const persistedFlow = loadRegistrationFlow();
   const userData = location.state?.userData || persistedFlow?.userData || null;
-  const paymentAccounts = location.state?.paymentAccounts || persistedFlow?.paymentAccounts || null;
   const emailVerificationToken = location.state?.emailVerificationToken || persistedFlow?.emailVerificationToken || null;
 
   const [otp, setOtp] = useState('');
@@ -59,7 +62,6 @@ const EmailVerificationPage = () => {
 
     mergeRegistrationFlow({
       userData,
-      paymentAccounts,
       emailVerificationToken,
       currentStep: 'email-verification'
     });
@@ -68,7 +70,7 @@ const EmailVerificationPage = () => {
       initialSendTriggeredRef.current = true;
       handleSendCode('send');
     }
-  }, [emailVerificationToken, navigate, paymentAccounts, userData]);
+  }, [emailVerificationToken, navigate, userData]);
 
   useEffect(() => {
     const hasActiveCountdown = cooldownSeconds > 0 || expiresInSeconds > 0;
@@ -179,20 +181,41 @@ const EmailVerificationPage = () => {
         purpose: 'signup'
       });
 
-      toast.success(pageT('emailVerified'));
-
-      mergeRegistrationFlow({
-        userData,
-        paymentAccounts,
-        emailVerificationToken: verificationResult.verification_token,
-        currentStep: 'payment-verification'
+      // ── LE COMPTE EST CRÉÉ ICI (22/10/2026) ─────────────────────────
+      // Cette page renvoyait vers /payment-verification, qui exigeait UN
+      // compte mobile money (client) ou DEUX (travailleur) avant de créer le
+      // compte : il fallait donc ouvrir deux numéros valides avant d'avoir un
+      // identifiant, là où le canal réel du marché (un groupe WhatsApp) ne
+      // demande rien. Les comptes de paiement sont désormais FACULTATIFS à
+      // l'inscription : la garantie dont on a besoin (« être payé ») vit au
+      // décaissement, où le backend refuse sans compte, et l'écran les
+      // demande là où ils servent (/profile, /payment).
+      const inscription = await authAPI.registerVerified({
+        ...userData,
+        email_verification_token: verificationResult.verification_token
       });
 
-      navigate('/payment-verification', {
+      const autoLoginResult = autoLoginAfterRegistration(inscription.user, inscription.access_token);
+      if (!autoLoginResult.success) {
+        throw new Error(pageT('autoLoginError'));
+      }
+
+      clearRegistrationFlow();
+
+      toast.success(pageT('welcomeToast', { firstName: inscription.user.first_name }));
+
+      if (inscription.referral_applied) {
+        const welcomeBonus = Number(inscription.referral_welcome_bonus || 0);
+        toast.success(welcomeBonus > 0
+          ? pageT('referralAppliedWithBonusToast', { amount: welcomeBonus })
+          : pageT('referralAppliedToast'));
+      }
+
+      navigate('/dashboard', {
+        replace: true,
         state: {
-          userData,
-          paymentAccounts,
-          emailVerificationToken: verificationResult.verification_token
+          message: pageT('dashboardMessage', { firstName: inscription.user.first_name }),
+          type: 'success'
         }
       });
     } catch (apiError) {
@@ -238,7 +261,7 @@ const EmailVerificationPage = () => {
           <span className="hidden h-px w-12 bg-stone-300 sm:block" aria-hidden="true"></span>
           <StepDot number="2" label={pageT('stepEmail')} etat="courant" />
           <span className="hidden h-px w-12 bg-stone-300 sm:block" aria-hidden="true"></span>
-          <StepDot number="3" label={pageT('stepPayments')} etat="a-venir" />
+          <StepDot number="3" label={pageT('stepDone')} etat="a-venir" />
         </div>
 
         <div className="carte-editoriale overflow-hidden">
@@ -304,7 +327,7 @@ const EmailVerificationPage = () => {
               </div>
             </form>
 
-            <div className="mt-8 grid gap-4 md:grid-cols-2">
+            <div className="mt-8">
               <button
                 type="button"
                 onClick={() => {
@@ -315,15 +338,6 @@ const EmailVerificationPage = () => {
               >
                 {pageT('backToRegister')}
               </button>
-              {emailVerificationToken ? (
-                <button
-                  type="button"
-                  onClick={() => navigate('/payment-verification', { state: { userData, paymentAccounts, emailVerificationToken } })}
-                  className="bouton bouton-clair"
-                >
-                  {pageT('backToPayments')}
-                </button>
-              ) : <div />}
             </div>
           </div>
         </div>

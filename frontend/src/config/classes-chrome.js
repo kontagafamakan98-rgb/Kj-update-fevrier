@@ -86,6 +86,32 @@ export const NAV_RANGEE_CLASS = `flex justify-between ${HAUTEUR_NAV_CLASS}`;
 /** `main.flex-1` : le contenu s'étire, le pied de page reste ancré. */
 export const MAIN_CLASS = 'flex-1 pb-24 md:pb-0';
 
+/**
+ * L'identifiant de `main` — la CIBLE du lien d'évitement.
+ *
+ * Il est lu par les DEUX canaux (src/App.js et la coquille) pour la même
+ * raison que les classes : un identifiant qui ne correspondrait qu'à une des
+ * deux peintures ferait d'un lien d'évitement un lien mort sur l'autre, et
+ * c'est exactement le défaut qu'un lien d'évitement existe pour éviter.
+ */
+export const MAIN_ID = 'contenu-principal';
+
+/**
+ * Le LIEN D'ÉVITEMENT : le premier élément focalisable de la page.
+ *
+ * Sans lui, un utilisateur au clavier doit traverser TOUTE la barre de
+ * navigation — ses menus, la cloche, le sélecteur de langue — avant d'atteindre
+ * le contenu de la page, à chaque page. La règle WCAG 2.4.1 le demande, et la
+ * règle CSS (src/index.css, `.lien-evitement`) le garde invisible tant qu'il n'a
+ * pas le focus : rien ne change à l'écran, donc rien ne change à la géométrie
+ * comparée entre la coquille et React.
+ *
+ * Déclaré ici comme les autres classes du chrome : les deux canaux le peignent
+ * (React au montage, la coquille avant tout JavaScript), et une valeur recopiée
+ * d'un côté seulement divergerait en silence.
+ */
+export const LIEN_EVITEMENT_CLASS = 'lien-evitement';
+
 /** Le pied de page légal, peint par src/App.js et par chaque coquille. */
 export const PIED_CLASS = 'border-t verre-barre';
 export const PIED_INTERIEUR_CLASS = `${CONTENEUR_CLASS} py-4 space-y-3`;
@@ -114,6 +140,7 @@ export const CLASSES_CHROME = {
   CONTENEUR_CLASS,
   NAV_RANGEE_CLASS,
   MAIN_CLASS,
+  LIEN_EVITEMENT_CLASS,
   PIED_CLASS,
   PIED_INTERIEUR_CLASS,
   PIED_ADRESSE_CLASS,

@@ -33,14 +33,17 @@ vi.mock('../../contexts/LanguageContext', async (importOriginal) => {
   };
 });
 
+// La SESSION est mutable : le rappel « ajoute un compte de paiement » dépend
+// de ce que le compte porte, et figer un seul utilisateur ne le prouverait pas.
+const etat = vi.hoisted(() => ({
+  session: { id: 'client-1', user_type: 'client', first_name: 'Awa', is_verified: true },
+}));
+
 vi.mock('../../contexts/AuthContext', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
-    useAuth: () => ({
-      user: { id: 'client-1', user_type: 'client', first_name: 'Awa', is_verified: true },
-      loading: false,
-    }),
+    useAuth: () => ({ user: etat.session, loading: false }),
   };
 });
 
@@ -80,8 +83,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('Tableau de bord — la lecture échouée se dit', () => {
-  it('une panne affiche l’erreur, offre de réessayer, et n’affiche PAS des zéros', async () => {
+describe('Tableau de bord — la lecture échouée se dit', () => {  it('une panne affiche l’erreur, offre de réessayer, et n’affiche PAS des zéros', async () => {
     jobsAPI.getAll.mockRejectedValueOnce(new Error('réseau indisponible'));
 
     rendre();
@@ -123,5 +125,31 @@ describe('Tableau de bord — la lecture échouée se dit', () => {
     // La mission est bien dans la liste (titre réel, pas un exemple).
     expect(screen.getByText('Réparer une pompe')).toBeInTheDocument();
     expect(jobsAPI.getAll).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('Tableau de bord — les comptes de paiement se RAPPELLENT, sans bloquer', () => {
+  it('un compte sans moyen de paiement lit une occasion, avec le chemin pour l’ajouter', async () => {
+    etat.session = { id: 'client-1', user_type: 'client', first_name: 'Awa', is_verified: false };
+    jobsAPI.getAll.mockResolvedValueOnce([]);
+
+    rendre();
+
+    const rappel = await screen.findByText(/Tu n’as pas encore de compte de paiement/);
+    // Ce n'est PAS une erreur : rien n'est annoncé comme une alerte.
+    expect(rappel.closest('[role="alert"]')).toBeNull();
+
+    const lien = screen.getByRole('link', { name: 'Ajouter un compte de paiement' });
+    expect(lien.getAttribute('href')).toBe('/profile');
+  });
+
+  it('un compte déjà payé ne voit pas le rappel', async () => {
+    etat.session = { id: 'client-1', user_type: 'client', first_name: 'Awa', is_verified: true };
+    jobsAPI.getAll.mockResolvedValueOnce([]);
+
+    rendre();
+
+    await waitFor(() => expect(jobsAPI.getAll).toHaveBeenCalled());
+    expect(screen.queryByText(/Tu n’as pas encore de compte de paiement/)).not.toBeInTheDocument();
   });
 });

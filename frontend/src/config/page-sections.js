@@ -498,6 +498,18 @@ export const PAGE_SECTIONS = {
     stats: [
       { labelKey: 'countriesCovered', fallback: '4', shellText: '4', icone: 'countryGlobe' },
       { labelKey: 'customerSupport', fallback: '7j/7', shellText: '7j/7', icone: 'contactCall' },
+      // ── LA PREUVE MESURÉE (22/10/2026) ──────────────────────────────────
+      // Trois entrées de plus, et leur valeur publiée est « — » : le HTML
+      // pré-rendu ne peut pas appeler `/api/public/stats` (il est écrit au
+      // BUILD), donc il publie « pas mesuré ici » plutôt qu'un chiffre figé
+      // qui aurait l'air mesuré. React remplace ce tiret par la mesure dès
+      // que la route répond, DANS LE MÊME NŒUD (même boîte, même classe) :
+      // aucun décalage de mise en page, aucune seconde peinture de la bande.
+      // La règle de ce remplacement vit dans `utils/preuveSociale.js`, et
+      // elle n'invente jamais de repli chiffré.
+      { labelKey: 'measuredWorkers', fallback: '—', shellText: '—', icone: 'client' },
+      { labelKey: 'measuredCompletedJobs', fallback: '—', shellText: '—', icone: 'step3' },
+      { labelKey: 'measuredReviews', fallback: '—', shellText: '—', icone: 'check' },
     ],
     // Le bloc « séquestre » de l'accueil ouvre sur un glyphe que la page
     // (src/pages/Home.js) et sa coquille publiaient chacune en littéral — le

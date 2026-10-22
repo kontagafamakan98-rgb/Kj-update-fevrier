@@ -638,7 +638,10 @@ app.add_middleware(
     # `X-Request-ID` est EXPOSÉ : sans ça, le JavaScript ne peut pas le lire
     # (il est là, mais invisible), et un utilisateur qui signale une panne n'a
     # aucun moyen de la nommer.
-    expose_headers=["Content-Range", "X-Content-Range", "X-Kojo-CSRFToken", "X-Request-ID"],
+    # `X-Total-Count` : le nombre de missions du filtre. Sans cette exposition,
+    # l'en-tête ARRIVE mais le JavaScript ne peut pas le lire (même règle que
+    # `X-Request-ID`), donc la liste ne pourrait pas dire combien elle en a.
+    expose_headers=["Content-Range", "X-Content-Range", "X-Kojo-CSRFToken", "X-Request-ID", "X-Total-Count"],
     max_age=86400,
 )
 

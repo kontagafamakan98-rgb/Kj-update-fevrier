@@ -624,3 +624,78 @@ async def test_la_recherche_porte_aussi_sur_la_description(client):
     corps = resp.json()
     missions = corps["jobs"] if isinstance(corps, dict) else corps
     assert [m["id"] for m in missions] == [attendue["id"]]
+
+
+@faux_mode_seulement
+class TestTexte:
+    """`$text` : la doublure doit dire ce que l'index dit, pas autre chose.
+
+    Les quatre faits ci-dessous ont été MESURÉS sur MongoDB 7.0.14 avec
+    `default_language: "none"` (voir `kojo_recherche_missions`) : casse et
+    accents pliés, OU entre termes, aucun radical. Une doublure qui ferait un
+    ET, plierait les radicaux ou chercherait dans un champ non indexé ferait
+    passer ici une recherche que la production refuserait — ou l'inverse.
+    """
+
+    async def test_le_texte_plie_la_casse_et_les_accents(self):
+        collection = await _semer("texte_pliage", [
+            {"id": "1", "title": "Réparation à Sénégal"},
+            {"id": "2", "title": "Peinture salon"},
+        ])
+
+        for requete in ("senegal", "SÉNÉGAL", "Sénégal"):
+            trouves = await collection.find({"$text": {"$search": requete}}).to_list()
+            assert [d["id"] for d in trouves] == ["1"], (
+                f"«{requete}» n'a pas trouvé le texte accentué : l'index le fait (mesuré)"
+            )
+
+    async def test_les_termes_sont_un_ou_pas_un_et(self):
+        collection = await _semer("texte_ou", [
+            {"id": "1", "title": "Plomberie", "description": "Fuite urgente"},
+            {"id": "2", "title": "Plomberie", "description": "Installation neuve"},
+            {"id": "3", "title": "Peinture", "description": "Deux murs"},
+        ])
+
+        trouves = await collection.find({"$text": {"$search": "plomberie fuite"}}).to_list()
+
+        assert {d["id"] for d in trouves} == {"1", "2"}, (
+            "Mongo fait un OU (mesuré) : un ET ici rendrait la doublure plus stricte que la CI"
+        )
+
+    async def test_aucune_radicalisation(self):
+        collection = await _semer("texte_radical", [
+            {"id": "1", "title": "Une fuite sous l'évier"},
+        ])
+
+        trouves = await collection.find({"$text": {"$search": "fuites"}}).to_list()
+
+        assert trouves == [], (
+            "la langue « none » ne radicalise pas : « fuites » ne trouve pas « fuite » "
+            "(mesuré ; avec « french », les deux se rejoignent)"
+        )
+
+    async def test_la_recherche_ne_porte_que_sur_les_champs_indexes(self):
+        collection = await _semer("texte_champs", [
+            {"id": "1", "title": "Peinture", "notes": "plomberie"},
+            {"id": "2", "title": "Plomberie"},
+        ])
+
+        trouves = await collection.find({"$text": {"$search": "plomberie"}}).to_list()
+
+        assert [d["id"] for d in trouves] == ["2"], (
+            "`notes` n'est pas dans CHAMPS_TEXTE : l'index ne le voit pas"
+        )
+
+    async def test_une_option_non_implementee_leve(self):
+        collection = await _semer("texte_option", [{"id": "1", "title": "Plomberie"}])
+
+        with pytest.raises(FakeDbUnsupportedOperator, match="caseSensitive"):
+            await collection.find(
+                {"$text": {"$search": "plomberie", "$caseSensitive": True}}
+            ).to_list()
+
+    async def test_un_search_vide_leve(self):
+        collection = await _semer("texte_vide", [{"id": "1", "title": "Plomberie"}])
+
+        with pytest.raises(FakeDbUnsupportedOperator, match="vide"):
+            await collection.find({"$text": {"$search": ""}}).to_list()

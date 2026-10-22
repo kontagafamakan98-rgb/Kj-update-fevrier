@@ -86,3 +86,21 @@ export const normalizeJobRecord = (raw) => {
 };
 
 export const normalizeJobList = (items) => Array.isArray(items) ? items.map(normalizeJobRecord).filter((item) => item.id) : [];
+
+/**
+ * Nombre de missions publié par `GET /jobs` (`X-Total-Count`), ou `null`.
+ *
+ * Il est lu sur la RÉPONSE (en-tête), pas déduit de la liste : une page
+ * pleine ne prouve pas qu'il en reste, une page incomplète ne prouve pas
+ * qu'il n'en reste plus. `null` n'est pas `0` — un compte absent n'est pas un
+ * compte nul, et l'écran n'en affiche alors aucun.
+ *
+ * @param {object|Array} response Réponse de `jobsAPI.getAll(..., { withHeaders: true })`
+ *   (`{ data, headers }`), ou la liste seule (serveur/appelant sans en-têtes).
+ * @returns {number|null}
+ */
+export const totalPublie = (response) => {
+  const brut = response?.headers?.get?.('X-Total-Count');
+  const nombre = Number.parseInt(String(brut ?? ''), 10);
+  return Number.isFinite(nombre) && nombre >= 0 ? nombre : null;
+};

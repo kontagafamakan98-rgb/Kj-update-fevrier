@@ -19,7 +19,11 @@ import { api } from './api';
 
 export const jobsAPI = {
   /** @returns {Promise<object>} {jobs, total, page, limit, has_more...}. */
-  getAll: (params = {}) => api.get('/jobs', { params }),
+  // `options` permet de demander les EN-TÊTES de la réponse
+  // (`{ withHeaders: true }` → `{ data, headers }`) : `GET /jobs` publie le
+  // nombre de missions du filtre dans `X-Total-Count`, qu'un tableau nu ne
+  // peut pas porter.
+  getAll: (params = {}, options = {}) => api.get('/jobs', { params, ...options }),
   /** @returns {Promise<object>} {job} mission complète. */
   getById: (id) => api.get(`/jobs/${id}`),
   /** @returns {Promise<object>} {job} mission créée (response_model=Job). */

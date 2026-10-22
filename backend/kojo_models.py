@@ -550,7 +550,14 @@ class UserWithPayment(BaseModel):
     legal_documents_accepted: bool = Field(..., description="Acceptation obligatoire de la Politique de confidentialité et des conditions d'utilisation")
     legal_documents_accepted_at: Optional[datetime] = None
     legal_documents_version: str = Field(min_length=5, max_length=120)
-    payment_accounts: PaymentAccount
+    # OPTIONNEL depuis le 22/10/2026. Un compte doit pouvoir exister AVANT
+    # d'avoir des moyens de paiement : ceux-ci ne servent qu'au premier
+    # encaissement (client) ou au premier versement (travailleur), et les
+    # exiger ici obligeait un travailleur à saisir DEUX numéros mobile money
+    # avant même d'avoir un compte — mesuré comme la première cause du faible
+    # nombre de travailleurs. La garantie dont on a besoin vit côté paiement
+    # (`get_mobile_money_account` refuse un décaissement sans compte).
+    payment_accounts: Optional[PaymentAccount] = None
     email_verification_token: Optional[str] = None
     # Code de parrainage saisi à l'inscription (via ?ref= dans l'URL)
     referral_code: Optional[str] = Field(None, max_length=40)

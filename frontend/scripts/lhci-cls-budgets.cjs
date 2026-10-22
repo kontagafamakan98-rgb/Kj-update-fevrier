@@ -676,6 +676,19 @@ const socleMobile = (hote) => {
   // TBT_MOBILE est le RETRAIT, et il est documenté dans RETRAITS.
   const tbt = TBT_MOBILE[hote];
   if (tbt) socle['total-blocking-time'] = ['error', { maxNumericValue: plafondDe(tbt.pire, tbt.marge) }];
+  // ── L'ACCESSIBILITÉ EST UNE NOTE, PAS UN TEMPS (22/10/2026) ──────────────
+  // Elle ne dépend pas du CPU du runner (elle est calculée sur le DOM et les
+  // styles peints), donc elle n'a aucune raison d'hériter du traitement
+  // « meilleur des 3 runs » réservé au bruit machine : la note est la même
+  // d'un run à l'autre. Seuil 0,95 — une marge de 5 points sur la note
+  // PARFAITE mesurée le 22/10/2026 sur les ONZE coquilles publiques du build
+  // (`/`, `/login`, `/jobs`, `/about`, `/support`, `/how-it-works`,
+  // `/register`, `/forgot-password`, `/contact`, `/privacy`, `/terms` : 1,00
+  // partout, Lighthouse 13.5.0, `--only-categories=accessibility`), et le
+  // plancher « bon » de Lighthouse est 0,90. Ce que la note couvre en plus du
+  // scan axe des e2e : les règles WCAG que le scan ne joue pas sur les dix
+  // routes publiques (contraste compris), sur les quatorze pages auditées ici.
+  socle['categories:accessibility'] = ['error', { minScore: 0.95 }];
   return socle;
 };
 

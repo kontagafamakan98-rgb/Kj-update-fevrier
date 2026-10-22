@@ -16,8 +16,8 @@ from pydantic import BaseModel, Field, ValidationError
 from kojo_core import db
 from kojo_models import (
     Country, EmailOtpRequest, EmailOtpResendRequest,
-    EmailOtpVerifyRequest, Language, PasswordResetConfirmRequest, User,
-    UserLogin, UserType, UserWithPayment, WorkerProfile,
+    EmailOtpVerifyRequest, Language, PasswordResetConfirmRequest,
+    PaymentAccount, User, UserLogin, UserType, UserWithPayment, WorkerProfile,
 )
 from kojo_settings import (
     AUTH_COOKIE_NAME,
@@ -491,7 +491,7 @@ async def reset_password_with_verified_token(payload: PasswordResetConfirmReques
 @router.post("/auth/register-verified")
 async def register_user_verified(user_data: UserWithPayment, response: Response):
     """Inscription avec vérification OBLIGATOIRE de l'email (OTP) et
-    validation obligatoire des comptes de paiement.
+    comptes de paiement FACULTATIFS (demandés au premier encaissement).
 
     SECURITE : depuis que /auth/register (sans vérification) a été retiré,
     CETTE route est le seul chemin d'inscription. Le jeton de vérification
@@ -528,11 +528,18 @@ async def register_user_verified(user_data: UserWithPayment, response: Response)
         if existing_user:
             log_and_raise_http_exception(400, "Cette adresse email est déjà utilisée")
         
-        # Valider les comptes de paiement selon le type d'utilisateur (le pays
-        # permet de refuser Wave là où le canal n'est pas opéré).
+        # Les comptes de paiement sont FACULTATIFS à l'inscription (22/10/2026) :
+        # on vérifie la FORME de ceux qui sont fournis, sans refuser un compte
+        # qui n'en a pas encore. `is_verified` dit alors la vérité (minimum
+        # atteint ou non) au lieu d'être vrai par construction. La contrainte
+        # qui protège l'argent n'est pas déplacée : `get_mobile_money_account`
+        # refuse toujours un décaissement sans compte.
         try:
             payment_validation = validate_payment_accounts(
-                user_data.payment_accounts, user_data.user_type, user_data.country
+                user_data.payment_accounts or PaymentAccount(),
+                user_data.user_type,
+                user_data.country,
+                exiger_minimum=False,
             )
         except HTTPException as e:
             raise e

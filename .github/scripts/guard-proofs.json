@@ -1126,6 +1126,14 @@
       "motif": "le VERRE DES MESSAGES ne se juge pas a l'oeil : ce module lit les regles REELLES de src/index.css (pas une fixture), compose chaque pile de couches avec son alpha reel par-dessus le sable ET par-dessus l'encre du site (le pire fond d'une surface flottante), retient le pire des deux et le compare aux seuils WCAG (4,5:1 pour le texte, 3:1 pour un objet graphique). Mesure du 19/10/2026 : l'encre secondaire du panneau (stone-500) tenait 4,56:1 sur le papier mais 3,17:1 sur le verre compose, sous le seuil d'un petit texte, et le filet jaune 500 ne tenait que 1,84:1 — d'ou --kojo-encre-douce et les teintes 700. Il REFUSE une exigence dont la regle a disparu (supprimer une surface la rendrait plus verte en la rendant plus courte), une couleur qu'il ne sait pas composer (var() non declare, currentColor, degrade : il ne devine rien), et de conclure sous son plancher de paires mesurees."
     },
     {
+      "chemin": "frontend/scripts/contraste-jetons.js",
+      "role": "garde",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/contraste-jetons.test.js",
+      "runner": "vitest",
+      "motif": "le contraste des surfaces OPAQUES ne se juge pas a l'oeil : ce module apparie les jetons `--kojo-*` de src/index.css (l'encre et son fond, chacun declare a UN seul endroit) et mesure le ratio WCAG de chaque couple que le site peint vraiment. Il refuse trois choses, nommees : un jeton dont la valeur a derive de celle mesuree, un jeton declare que plus aucune regle ne peint (une garantie qui ne peint rien), et un couple sous son seuil avec son ratio et son remede. Planchers de lecture : 14 jetons et 10 couples, sous lesquels il refuse de conclure plutot que de rendre un vert sur un CSS qu'il lit a peine."
+    },
+    {
       "chemin": ".github/scripts/install-gitleaks.sh",
       "role": "garde",
       "invoque_par": "ci",
@@ -6316,6 +6324,26 @@
       "cwd": "frontend",
       "attend": [
         "paires en défaut"
+      ]
+    },
+    {
+      "id": "contraste-jetons: la formule de contraste neutralisee",
+      "garde": "frontend/scripts/contraste-jetons.js",
+      "cible": "frontend/scripts/contraste-jetons.js",
+      "trouve": "  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);",
+      "remplace": "  return (Math.max(a, b) + 0.5) / (Math.min(a, b) + 0.5);",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/contraste-jetons.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/contraste-jetons.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "le calcul de contraste suit la formule WCAG (noir/blanc = 21:1)"
       ]
     },
     {

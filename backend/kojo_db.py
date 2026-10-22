@@ -10,6 +10,7 @@ Extrait de `kojo_core`, qui n'en garde que la facade : le nom continue d'y
 etre servi (`from kojo_core import X`) pour ses importeurs. La surface
 publique de la facade est figee par `tests/test_core_surface.py`.
 """
+from kojo_recherche_missions import CHAMPS_TEXTE, LANGUE_TEXTE, NOM_INDEX_TEXTE
 from kojo_retention import RETENTION_RULES
 from kojo_settings import logger
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -76,6 +77,22 @@ async def create_database_indexes():
         await db.jobs.create_index([("status", 1), ("category", 1)])
         await db.jobs.create_index([("status", 1), ("created_at", -1)])
         await db.jobs.create_index([("created_at", -1)])  # For sorting by date
+        # Tri par BUDGET (`GET /jobs?tri=budget`) : sans cet index, la liste
+        # était ENTIÈREMENT triée en mémoire à chaque ouverture, et le tri
+        # portait sur la seule colonne `created_at`.
+        await db.jobs.create_index([("status", 1), ("budget_max", -1)])
+        await db.jobs.create_index([("budget_max", -1)])
+        # Recherche par MOTS (`GET /jobs?q=`) : un index texte, pas seulement
+        # les `$regex` — ceux-ci ne peuvent pas s'appuyer sur un index et
+        # balayaient la collection à chaque frappe. Les champs, la langue et le
+        # nom viennent de `kojo_recherche_missions` (un seul propriétaire, lu
+        # aussi par la requête et par la doublure de test) : une liste recopiée
+        # ici indexerait d'autres champs que ceux que la recherche interroge.
+        await db.jobs.create_index(
+            [(champ, "text") for champ in CHAMPS_TEXTE],
+            default_language=LANGUE_TEXTE,
+            name=NOM_INDEX_TEXTE,
+        )
         # Géospatial : recherche par rayon (GET /jobs?lat=&lng=&radius_km=)
         await db.jobs.create_index([("geo", "2dsphere")])
 
