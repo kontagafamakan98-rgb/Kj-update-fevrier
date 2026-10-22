@@ -174,7 +174,15 @@ class TestLeFiltreEstBienAuPointDeRegle:
             if re.search(r"\b%s\s*\(" % POINT_DE_REGLE, source)
         }
 
-        assert appelants >= {"kojo_email.py", "kojo_payments.py", "kojo_routers_support.py", "kojo_scheduler.py"}, (
+        # L'alerte propriétaire d'un ticket support vit dans
+        # `kojo_support_tickets` (propriétaire unique de l'ouverture, partagé
+        # par le formulaire web et l'escalade WhatsApp) : c'est donc LUI qui
+        # doit paraître ici, et `kojo_routers_support.py` ne l'envoie plus
+        # lui-même — le déplacer ailleurs redeviendrait un envoi hors règle.
+        assert appelants >= {
+            "kojo_email.py", "kojo_payments.py", "kojo_support_tickets.py",
+            "kojo_scheduler.py",
+        }, (
             "modules qui passent par %s : %s — un envoi produit a disparu, ou il a "
             "été déplacé hors du point de règle"
             % (POINT_DE_REGLE, sorted(appelants))
