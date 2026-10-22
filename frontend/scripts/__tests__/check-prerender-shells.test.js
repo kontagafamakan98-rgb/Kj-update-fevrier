@@ -130,8 +130,19 @@ const appMetaMutations = [
 const CLIENT_PAGES = ['app.html', '404.html'];
 
 const tempDirs = [];
+// ── Le nettoyage est une OPÉRATION WINDOWS, et il échouait sur Windows ──────
+// Mesuré le 22/10/2026 sur le poste de développement : 50 cas verts, 1 rouge,
+// et le rouge tombait dans cet `afterEach` — « EPERM, Permission denied » sur
+// le répertoire de la fixture, donc un échec de NETTOYAGE présenté comme un
+// échec de règle. La cause est celle de Windows : le processus du garde vient
+// de sortir et le système tient encore ses poignées quelques millisecondes
+// (le dossier est son `cwd`), si bien qu'un `rmSync` immédiat le voit BUSY.
+// `maxRetries`/`retryDelay` sont FAITS pour ces codes-là, et seulement quand
+// `recursive` est vrai : c'est le délai qui manquait, pas la force.
 afterEach(() => {
-  for (const dir of tempDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
+  for (const dir of tempDirs.splice(0)) {
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  }
 });
 
 /** La carte og:image attendue d'une coquille, LUE dans la table unique. */
