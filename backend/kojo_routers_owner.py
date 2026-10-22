@@ -554,6 +554,10 @@ async def get_dispute_measures(owner_user = Depends(verify_owner_access)):
     décisions prises SANS réponse (l'arbitre a tranché sur une seule version),
     et délai entre la réponse et la décision.
 
+    Les taux valent `null` sous le plancher : un pourcentage sur trois litiges
+    n'est pas une mesure. `fenetres` rejoue les mêmes chiffres sur 30 et 90
+    jours, pour distinguer l'état actuel de l'historique.
+
     Returns:
         dict: {mesure_le, plancher, depuis, litiges: {total, lus, tronque},
         etats, reponse: {avec_reponse, avant_echeance, apres_echeance,
@@ -562,9 +566,6 @@ async def get_dispute_measures(owner_user = Depends(verify_owner_access)):
         delai_reponse_decision: {n, mediane_heures, moyenne_heures,
         max_heures, incoherents}, fenetres: [{fenetre_jours, depuis,
         decisions: {...}, reponses: {...}, delai_reponse_decision: {...}}]}.
-        Les taux valent `null` sous le plancher : un pourcentage sur trois
-        litiges n'est pas une mesure. `fenetres` rejoue les mêmes chiffres sur
-        30 et 90 jours, pour distinguer l'état actuel de l'historique.
     """
     return await litiges.mesures_arbitrage()
 
@@ -594,11 +595,13 @@ async def decide_mission_dispute(
     (`liberer_sequestre` pour le versement, `execute_paydunya_refund` pour le
     remboursement) : cette route décide, elle ne paie pas elle-même.
 
+    Quand le paiement échoue, `dispute_state` vaut `decision_failed`, `echec`
+    nomme le code, `relance` vaut True et le message dit l'action à faire : le
+    litige n'est PAS refermé.
+
     Returns:
-        dict: {message, decision, payment_outcome, dispute_state}. Quand le
-        paiement échoue, `dispute_state` vaut `decision_failed`, `echec` nomme
-        le code, `relance` vaut True et le message dit l'action à faire : le
-        litige n'est PAS refermé.
+        dict: {message, decision, payment_outcome, dispute_state, echec,
+        relance} — les deux derniers ne sont rendus que sur un échec.
     """
     job = await litiges.litiges_du_job(job_id)
     if not job:

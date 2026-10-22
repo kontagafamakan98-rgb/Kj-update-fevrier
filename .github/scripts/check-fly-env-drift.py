@@ -211,6 +211,14 @@ OPTIONAL_KEYS = {
     # c'est le defaut qui s'applique, et la valeur est ecrite dans
     # backend/SAUVEGARDES_ATLAS.md (section sequestre) pour qui veut la changer.
     "COMPLETION_AUTO_RELEASE_DAYS", "COMPLETION_SWEEP_INTERVAL_MINUTES",
+    # Alerte d'arbitrage (part de decisions prises sans reponse) : le seuil, la
+    # fenetre glissante et la cadence de la boucle ont tous un defaut dans
+    # `kojo_settings` (0,5 ; 90 jours ; 1 440 min) et les deux premiers sont
+    # VALIDES au demarrage (0 < seuil < 1, fenetre entre 1 et 3 650 jours). Leur
+    # absence sur Fly est donc un reglage laisse au defaut — le defaut qui
+    # declenche l'alerte a 50 % sur 90 jours —, pas une config incomplete.
+    "LITIGE_SANS_REPONSE_SEUIL", "LITIGE_SANS_REPONSE_FENETRE_JOURS",
+    "LITIGE_ALERTE_INTERVAL_MINUTES",
 }
 
 # Keys connues mais NON sensibles (valeur vérifiable côté doc). Leur digest
