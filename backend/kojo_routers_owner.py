@@ -21,6 +21,7 @@ import kojo_job_disputes as litiges
 from kojo_core import (
     is_database_available, verify_owner_access,
 )
+import kojo_commission as paliers_commission
 from kojo_payments import (
     get_effective_commission_rate,
     maj_sequestre,
@@ -286,6 +287,51 @@ async def update_commission_settings(
     except Exception as e:
         logging.error(f"Error updating commission settings: {e}")
         raise HTTPException(status_code=500, detail="Erreur serveur")
+
+@router.get("/owner/commission-paliers")
+async def get_commission_tiers(owner_user = Depends(verify_owner_access)):
+    """Paliers de commission : la configuration ET le taux de croisière.
+
+    Les deux chiffres vont ensemble : « lancement 0 % » ne se lit pas sans le
+    taux standard auquel il se compare. Le taux standard reste résolu par
+    `kojo_payments.get_effective_commission_rate` — un seul propriétaire.
+
+    Returns:
+        dict: {status, paliers (actif, seuils, taux), taux_standard_percent}.
+    """
+    configuration = await paliers_commission.configuration()
+    taux_standard = await get_effective_commission_rate()
+    return {
+        "status": "success",
+        "paliers": configuration,
+        "taux_standard_percent": round(taux_standard * 100, 2),
+    }
+
+
+@router.post("/owner/commission-paliers")
+async def update_commission_tiers(
+    reglages: dict,
+    owner_user = Depends(verify_owner_access),
+):
+    """Règle les paliers de commission — PROPRIÉTAIRE UNIQUEMENT.
+
+    Un refus nomme le champ fautif (400) au lieu de réparer la valeur en
+    silence : un taux saisi 60 et ramené à 50 ferait croire que le barème est
+    appliqué alors qu'il ne l'est pas.
+
+    Returns:
+        dict: {status, message, paliers} — la configuration RÉELLEMENT relue.
+    """
+    try:
+        configuration = await paliers_commission.enregistrer(reglages)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {
+        "status": "success",
+        "message": "Paliers de commission mis à jour",
+        "paliers": configuration,
+    }
+
 
 @router.post("/owner/payments/{payment_id}/retry-refund")
 async def retry_payment_refund(payment_id: str, owner_user = Depends(verify_owner_access)):

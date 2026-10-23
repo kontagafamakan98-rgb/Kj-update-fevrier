@@ -12,6 +12,10 @@ import OwnerMissionEvents from '../components/OwnerMissionEvents';
 // contestation resterait ouverte sans qu'aucun écran ne la montre, et l'échéance
 // déciderait à la place du propriétaire.
 import OwnerDisputes from '../components/OwnerDisputes';
+// PALIERS DE COMMISSION : le barème (lancement / standard / fidélité) se règle
+// ici et nulle part ailleurs — sans écran, la route propriétaire serait un
+// réglage que seul un appel manuel pourrait changer.
+import OwnerCommissionTiers from '../components/OwnerCommissionTiers';
 
 const CommissionDashboard = () => {
   const { user } = useAuth();
@@ -251,6 +255,8 @@ const CommissionDashboard = () => {
             />
           </div>
         </div>
+
+        <OwnerCommissionTiers />
 
         <OwnerDisputes />
 

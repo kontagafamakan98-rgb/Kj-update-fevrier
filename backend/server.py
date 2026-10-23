@@ -63,10 +63,13 @@ from kojo_payments import (
 import kojo_live
 from kojo_scheduler import (
     completion_auto_release_loop,
+    compter_missions_ouvertes,
     email_provider_alert_loop,
     job_alert_digest_loop,
     litige_arbitrage_alert_loop,
     litige_expiry_loop,
+    marche_vide_alert_loop,
+    missions_sans_proposition_alert_loop,
     payout_stuck_sweeper_loop,
     retention_purge_loop,
 )
@@ -510,8 +513,24 @@ async def metrics_prometheus(authorization: Optional[str] = Header(default=None)
             detail="Jeton de métriques absent ou invalide",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    # Le corpus est le SEUL chiffre que la base seule connaît. Il est lu ici
+    # (une requête COUNT indexée par scrape, soit une toutes les 30 s) plutôt
+    # que dans `kojo_metrics`, qui reste sans I/O. Une lecture en panne n'omet
+    # que la jauge : les compteurs mémoire restent publiés, et un 0 inventé
+    # ferait passer une panne de base pour une place de marché vide.
+    #
+    # La RÈGLE du comptage est celle de `kojo_scheduler.compter_missions_ouvertes`,
+    # partagée avec l'alerte « marché vide » : deux comptages écrits séparément
+    # finiraient par ne plus compter la même chose, et la jauge dirait « vide »
+    # pendant que l'alerte se tairait (ou l'inverse).
+    corpus = {}
+    try:
+        corpus["missions_ouvertes"] = await compter_missions_ouvertes()
+    except Exception as exc:  # pragma: no cover - dépend du client Mongo
+        logger.warning("⚠️ Métriques : comptage des missions ouvertes impossible (%s)", exc)
+
     return Response(
-        content=render_metrics(),
+        content=render_metrics(corpus=corpus),
         media_type=METRICS_CONTENT_TYPE,
         # Des compteurs sont un instantané : un cache intermédiaire servirait
         # une valeur périmée en croyant mesurer le présent.
@@ -723,6 +742,18 @@ async def lifespan(application: FastAPI):
     # glissante (kojo_scheduler). La file dit ce qui reste à faire ; cette
     # boucle dit si l'arbitre tranche sans avoir lu les deux versions.
     litige_alerte_task = asyncio.create_task(litige_arbitrage_alert_loop())
+    # PLACE DE MARCHÉ VIDE : sans cette boucle, zéro mission ouverte ne se lisait
+    # que sur /metrics — un scrape que personne n'ouvre. Le 23/10/2026, il a
+    # fallu onze jours de prémisses SEO pour l'apercevoir. Le seuil est une
+    # DURÉE (24 h par défaut), pas un instant : un creux entre deux missions
+    # n'est pas une panne, une journée entière sans rien à postuler en est une.
+    marche_task = asyncio.create_task(marche_vide_alert_loop())
+    # MISSIONS SANS PROPOSITION : l'offre est là et personne ne postule. C'est
+    # l'autre moitié du diagnostic de liquidité — et elle ne se voit nulle part
+    # tant qu'on n'ouvre pas chaque mission une par une.
+    sans_proposition_task = asyncio.create_task(
+        missions_sans_proposition_alert_loop()
+    )
     # BUS TEMPS RÉEL (Redis pub/sub) : le fan-out reste en mémoire, le bus le
     # PROLONGE aux autres workers et machines. Sans REDIS_URL, rien ne change
     # (le process publie et sert ses propres flux) — et `start_bus` DIT la perte
@@ -744,6 +775,8 @@ async def lifespan(application: FastAPI):
     completion_task.cancel()
     litige_task.cancel()
     litige_alerte_task.cancel()
+    marche_task.cancel()
+    sans_proposition_task.cancel()
     try:
         await asyncio.gather(
             rate_limit_task,
@@ -753,6 +786,8 @@ async def lifespan(application: FastAPI):
             job_alert_task,
             completion_task,
             litige_task,
+            marche_task,
+            sans_proposition_task,
             litige_alerte_task,
         )
     except asyncio.CancelledError:

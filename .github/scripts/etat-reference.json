@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-23",
-    "motif": "la sonde refuse désormais un texte NON FINAL (brouillon de raisonnement, phrase répétée, marqueur [KOJO_TICKET] visible) : le fichier change parce que le verdict change, et cet état-là est la référence. Même périmètre, même cible de mutation ; seules les 105 empreintes restent identiques ailleurs.",
+    "motif": "Sante de la place : deux alertes proprietaire (marche vide ; missions ouvertes sans aucune proposition, jointe des DEUX cotes sur id/job_id/_id de la mission et job_id/_id de la proposition), avec perimetres de lecture bornes et declares, trois sorties et deux premisses.",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -61,7 +61,6 @@
       "backend/kojo_routers_jobs_tracking.py": "591a5cfc8bbca952ce99d864e07b551f8dc2b5d6b0f0755156a36b90c3fb7ca5",
       "backend/kojo_routers_users.py": "93b34ef87ebd8d4f75368fb7619d85e43e23ff891f3b03255f936a6c66d45d5f",
       "backend/kojo_routers_users_push.py": "85a2e4017a51444818caf8fd6042fa2f63b464d034fb830e22310544d73f72b7",
-      "backend/kojo_scheduler.py": "49cc2d2a36fe5fb2451934d7f553a3445ef05fbf30db3f383631cae0be74131f",
       "backend/scripts/audit_docstrings.py": "fc1092b0f72619462c8d5e056dc652729f0a65e40abf171d249ed3993dc9ff39",
       "backend/scripts/audit_none_signatures.py": "2eef502b52f9c7e3482bd414ba9388105edd000be2b1a03e71195e1f4baa65d1",
       "backend/scripts/check_atlas_backups.py": "e41a5b799d7128cfa98e6e34424ad30988a88274a302c484c48c9e8aa0b44c83",
@@ -137,11 +136,12 @@
       "frontend/scripts/check-worker-interactive-production.js": "98afe75b3d3ff80e0cf150558d73d1ea088a33ca484dfed5d8b9a3a4520b71fa",
       ".github/scripts/livrer.py": "c75275f97715585a7a600cc91f2e6d0f6d9082eb4cf216e3cee4f4b89049ce40",
       "frontend/scripts/check-deployed-revision.js": "94aea1e166cebfc3c87c0addb7d83d3c75c43d64da096264296d68e97ae15a36",
-      "backend/server.py": "7a23995dfcdcc872cfd77045c105ddb1f746e514afaac86cd7bc57224956bca0",
       "frontend/scripts/contraste-jetons.js": "f11f4eea5297e136f45449677aa2e102f43b34779669a889ad828754da52b899",
       "frontend/scripts/check-bundle-size.js": "9bfe5571d368451bb14c3f5cd0770a440f252aa134643ccf7c256541472e6690",
-      ".github/scripts/check-fly-env-drift.py": "ddfa85c837d658377745fceeed157970c73d144437a718df9ba23a7d29994cbd",
-      "backend/scripts/check_ai_assistant_probe.py": "2ce9e4a4acca1a3cdd2a651ee976e14cfda9db09fee76b0f5f61ecf9fd42d94d"
+      "backend/scripts/check_ai_assistant_probe.py": "2ce9e4a4acca1a3cdd2a651ee976e14cfda9db09fee76b0f5f61ecf9fd42d94d",
+      "backend/server.py": "f6ecf18abeded8ad87211e87db68a9a76b8fc54c3813a216789789be681f1760",
+      ".github/scripts/check-fly-env-drift.py": "3579cbc0d2fbb330382d3aee0f9e3816d28fc416a23696a52ef3480ec1e6c7c7",
+      "backend/kojo_scheduler.py": "d341bbe1be8ea1a36da3e754d1e1c9f422fb9a598a17fd2e00b801a0fef90ae3"
     }
   },
   "hors_perimetre": [

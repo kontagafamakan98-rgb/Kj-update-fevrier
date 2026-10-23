@@ -128,6 +128,11 @@ async def test_le_profil_complet_publie_la_reputation_et_les_avis(client: AsyncC
         "missions_completed": 2,
         "rating_average": 4.7,
         "rating_count": 2,
+        # Aucun litige sur ce profil : les deux compteurs sont PUBLIÉS à zéro
+        # plutôt qu'omis — une fiche qui tairait le chiffre laisserait croire
+        # que le sujet n'est pas suivi.
+        "disputes_total": 0,
+        "disputes_lost": 0,
     }
     # Le plus récent d'abord, et seulement le PRÉNOM du réviseur.
     assert [avis["rating"] for avis in corps["reviews"]] == [4, 5]
@@ -166,6 +171,46 @@ async def test_un_profil_sans_avis_ne_s_affiche_pas_zero_etoile(client: AsyncCli
     assert corps["stats"]["rating_average"] is None
     assert corps["stats"]["rating_count"] == 0
     assert corps["reviews"] == []
+
+
+async def test_les_litiges_publies_comptent_les_desaccords_reels(client: AsyncClient):
+    """Le SEUL chiffre négatif de la réputation, et ce qu'il compte.
+
+    Engagé : un désaccord ouvert ou tranché. Pas un retrait — l'accord a été
+    retrouvé. Perdu : tranché en faveur du client (`refund_client`). Les deux
+    se lisent sans que l'écran ait à interpréter quoi que ce soit.
+    """
+    await _travailleur()
+    await db_insert("jobs", {
+        "id": "litige-tranche-client", "assigned_worker_id": IDENTIFIANT,
+        "status": "completed", "dispute": {"state": "resolved", "decision": "refund_client"},
+    })
+    await db_insert("jobs", {
+        "id": "litige-tranche-travailleur", "assigned_worker_id": IDENTIFIANT,
+        "status": "completed", "dispute": {"state": "resolved", "decision": "release_worker"},
+    })
+    await db_insert("jobs", {
+        "id": "litige-ouvert", "assigned_worker_id": IDENTIFIANT,
+        "status": "in_progress", "dispute": {"state": "open", "decision": None},
+    })
+    await db_insert("jobs", {
+        "id": "litige-retire", "assigned_worker_id": IDENTIFIANT,
+        "status": "completed", "dispute": {"state": "withdrawn"},
+    })
+    await db_insert("jobs", {
+        "id": "mission-sans-litige", "assigned_worker_id": IDENTIFIANT,
+        "status": "completed",
+    })
+    # Le litige d'un AUTRE travailleur ne compte pas.
+    await db_insert("jobs", {
+        "id": "litige-voisin", "assigned_worker_id": "worker-autre",
+        "status": "completed", "dispute": {"state": "resolved", "decision": "refund_client"},
+    })
+
+    corps = (await client.get(f"/api/workers/{IDENTIFIANT}")).json()
+
+    assert corps["stats"]["disputes_total"] == 3
+    assert corps["stats"]["disputes_lost"] == 1
 
 
 async def test_un_client_n_a_pas_de_profil_public_de_travailleur(client: AsyncClient):

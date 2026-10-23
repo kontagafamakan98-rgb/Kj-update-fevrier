@@ -432,6 +432,8 @@ def construire_app(lenteur_email: float = 0.0):
     server.retention_purge_loop = _boucle_inactive
     server.email_provider_alert_loop = _boucle_inactive
     server.litige_arbitrage_alert_loop = _boucle_inactive
+    server.marche_vide_alert_loop = _boucle_inactive
+    server.missions_sans_proposition_alert_loop = _boucle_inactive
 
     if lenteur_email > 0:
         import kojo_email

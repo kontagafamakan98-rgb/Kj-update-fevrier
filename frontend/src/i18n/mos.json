@@ -937,5 +937,9 @@
   "iconContactWhatsapp": "💬",
   "iconContactSendEmail": "✉️",
   "iconContactAddress": "📍",
-  "faqMarker": "+"
+  "faqMarker": "+",
+  "commissionTierLancement": "Komisõ ka be ye f tʋʋm pɑɑlã la (offre pɑɑl).",
+  "commissionTierRecurrent": "Komisõ boogame: tarif fidélité wã tʋʋmda.",
+  "workerDisputesLabel": "Zãnga",
+  "workerDisputesLost": "{count} be clientã nengẽ"
 }

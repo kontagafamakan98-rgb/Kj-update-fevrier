@@ -173,6 +173,31 @@ async def profil_public(worker_id: str):
     )
     nombre_avis = await db.reviews.count_documents({"reviewee_id": identifiant})
 
+    # ── Litiges : le SEUL chiffre négatif de la réputation ────────────────
+    # Une note moyenne se lit bien quand on a vingt avis ; elle ne dit rien de
+    # la seule chose qu'un client redoute — que l'argent se bloque. Le nombre
+    # de litiges ENGAGÉS sur les missions du travailleur et le nombre tranchés
+    # en faveur du client se publient donc à côté de la note, même quand ils
+    # valent zéro : une absence de litige est une information, et une fiche qui
+    # la tairait laisserait croire que le sujet n'est pas suivi.
+    #
+    # Un litige RETIRÉ ne compte pas : l'accord a été retrouvé, il n'a jamais
+    # été tranché. Un litige encore OUVERT compte — c'est un désaccord réel.
+    litiges_engages = await db.jobs.count_documents(
+        {
+            "assigned_worker_id": identifiant,
+            "dispute.state": {"$exists": True, "$ne": "withdrawn"},
+            "deleted": {"$ne": True},
+        }
+    )
+    litiges_perdus = await db.jobs.count_documents(
+        {
+            "assigned_worker_id": identifiant,
+            "dispute.decision": "refund_client",
+            "deleted": {"$ne": True},
+        }
+    )
+
     # La moyenne est celle que le routeur d'avis RECALCULE à chaque écriture
     # (une seule vérité). `None` — et non 0.0 — quand personne n'a encore noté :
     # un profil neuf ne doit pas s'afficher « 0 étoile », ce qui se lit comme un
@@ -233,6 +258,11 @@ async def profil_public(worker_id: str):
             "missions_completed": int(missions_terminees or 0),
             "rating_average": moyenne,
             "rating_count": int(nombre_avis or 0),
+            # Deux compteurs plutôt qu'un taux : un taux calculé sur trois
+            # missions se lirait comme une garantie. L'écran décide quand un
+            # ratio devient lisible, la donnée reste un FAIT.
+            "disputes_total": int(litiges_engages or 0),
+            "disputes_lost": int(litiges_perdus or 0),
         },
         "reviews": [
             _avis_public(avis, prenoms.get(avis.get("reviewer_id")))

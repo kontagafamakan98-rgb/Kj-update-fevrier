@@ -228,6 +228,18 @@ OPTIONAL_KEYS = {
     # declenche l'alerte a 50 % sur 90 jours —, pas une config incomplete.
     "LITIGE_SANS_REPONSE_SEUIL", "LITIGE_SANS_REPONSE_FENETRE_JOURS",
     "LITIGE_ALERTE_INTERVAL_MINUTES",
+    # Alerte « place de marche VIDE » : la duree de vide toleree et la cadence
+    # de la boucle ont un defaut dans `kojo_settings` (24 h ; 60 min), et la
+    # duree est VALIDEE au demarrage (1..720). Leur absence sur Fly est donc un
+    # reglage laisse au defaut — celui qui alerte apres une journee sans
+    # mission ouverte —, pas une config incomplete.
+    "MARCHE_VIDE_ALERTE_HEURES", "MARCHE_VIDE_ALERTE_INTERVALLE_MINUTES",
+    # Alerte « missions ouvertes sans aucune proposition » : l'anciennete et la
+    # cadence ont un defaut dans `kojo_settings` (3 jours ; 360 min), borne au
+    # demarrage. Absence sur Fly = reglage laisse au defaut, pas une config
+    # incomplete.
+    "MISSIONS_SANS_PROPOSITION_JOURS",
+    "MISSIONS_SANS_PROPOSITION_INTERVALLE_MINUTES",
 }
 
 # Keys connues mais NON sensibles (valeur vérifiable côté doc). Leur digest

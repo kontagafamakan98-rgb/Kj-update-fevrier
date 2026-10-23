@@ -937,5 +937,9 @@
   "iconContactWhatsapp": "💬",
   "iconContactSendEmail": "✉️",
   "iconContactAddress": "📍",
-  "faqMarker": "+"
+  "faqMarker": "+",
+  "commissionTierLancement": "No commission: launch offer on your first jobs.",
+  "commissionTierRecurrent": "Loyalty rate applied: your commission is reduced.",
+  "workerDisputesLabel": "Disputes",
+  "workerDisputesLost": "{count} decided for the client"
 }

@@ -461,10 +461,14 @@ PAYMENT_PUBLIC_FIELDS = frozenset({
     "job_id",
     "payer_id",
     "receiver_id",
-    # Montants et commission
+    # Montants et commission — le palier est publié AVEC le taux : une remise
+    # (lancement, fidélité) doit pouvoir être lue par la personne qui la reçoit
+    # et par l'écran qui l'affiche, sans seconde requête.
     "amount",
     "commission_amount",
     "commission_rate",
+    "commission_tier",
+    "commission_tier_reason",
     "worker_amount",
     # Statut métier
     "status",
