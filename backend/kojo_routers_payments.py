@@ -27,6 +27,7 @@ from kojo_core import (
 from kojo_shared import (
     apply_referral_payout_confirmed, notify_user_localized, _dispatch_address_to_worker,
 )
+from kojo_commission import resoudre_taux as resoudre_palier_commission
 from kojo_payments import (
     PAYDUNYA_CHANNELS,
     build_checkout_redirect_url, build_payment_callback_url,
@@ -41,6 +42,23 @@ from kojo_payments import (
 from kojo_identifiants import identifiant_query, identifiant_job_query
 
 router = APIRouter()
+
+
+def _taux_fige(record) -> Optional[float]:
+    """Taux FIGÉ sur un paiement déjà émis (décimal), ou None s'il est absent.
+
+    Une facture réutilisée doit être relue avec SON taux, pas avec le taux du
+    jour : entre deux clics, un palier a pu changer, et recalculer la
+    répartition donnerait au client un montant qui ne correspond plus à la
+    facture qu'il vient de payer.
+    """
+    valeur = record.get("commission_rate")
+    if valeur is None:
+        return None
+    try:
+        return float(valeur) / 100.0
+    except (TypeError, ValueError):
+        return None
 
 
 def _reponse_checkout_reutilise(record, breakdown) -> dict:
@@ -350,14 +368,30 @@ async def get_payment_quote(request: PaymentQuoteRequest):
         amount, commission, total…} (détail du breakdown).
     """
     channel = get_paydunya_channel(request.payment_method.value, request.country)
-    rate = await get_effective_commission_rate()
-    breakdown = calculate_payment_breakdown(request.amount, rate)
+
+    # Le palier suit le TRAVAILLEUR, pas la requête : le client peut nommer le
+    # travailleur qu'il a l'intention de payer, sinon la mission payée désigne
+    # le sien. Une valeur fournie par le client n'est donc qu'une intention —
+    # c'est le document de la mission qui tranche, comme pour le montant.
+    travailleur = request.worker_id
+    if not travailleur and request.job_id:
+        job = await db.jobs.find_one(
+            {**identifiant_job_query(request.job_id), "deleted": {"$ne": True}}
+        )
+        travailleur = (job or {}).get("assigned_worker_id")
+    palier = await resoudre_palier_commission(travailleur)
+    breakdown = calculate_payment_breakdown(request.amount, palier["taux"])
     return {
         'provider': 'paydunya',
         'configured': is_paydunya_configured(),
         'channel': channel,
         'country': normalize_payment_country(request.country),
         'payment_method': request.payment_method.value,
+        # Le palier est publié AVEC le montant : une remise qui ne se lit pas
+        # n'existe pas pour la personne qui la reçoit.
+        'commission_tier': palier['palier'],
+        'commission_tier_reason': palier['motif'],
+        'missions_completed': palier['missions_terminees'],
         **breakdown
     }
 
@@ -419,8 +453,10 @@ async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_
             "payer_id": current_user.id,
         })
         if deja:
+            taux = _taux_fige(deja)
             breakdown = calculate_payment_breakdown(
-                deja.get("amount") or 0, await get_effective_commission_rate()
+                deja.get("amount") or 0,
+                taux if taux is not None else await get_effective_commission_rate(),
             )
             return _reponse_checkout_reutilise(deja, breakdown)
 
@@ -434,7 +470,11 @@ async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_
         "status": "pending",
     })
     if existing_pending and existing_pending.get("checkout_url"):
-        breakdown = calculate_payment_breakdown(existing_pending.get("amount") or 0, await get_effective_commission_rate())
+        taux = _taux_fige(existing_pending)
+        breakdown = calculate_payment_breakdown(
+            existing_pending.get("amount") or 0,
+            taux if taux is not None else await get_effective_commission_rate(),
+        )
         return _reponse_checkout_reutilise(existing_pending, breakdown)
 
     is_owner_user = bool(OWNER_EMAIL) and current_user.email == OWNER_EMAIL
@@ -477,8 +517,12 @@ async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_
 
     normalized_country = normalize_payment_country(request.country or current_user.country)
     channel = get_paydunya_channel(request.payment_method.value, normalized_country)
-    rate = await get_effective_commission_rate()
-    breakdown = calculate_payment_breakdown(resolved_amount, rate)
+    # Le palier est résolu sur le travailleur ATTRIBUÉ (`resolved_worker_id`,
+    # lu du document de la mission) — jamais sur un identifiant de la requête :
+    # sinon n'importe qui obtiendrait le tarif de lancement en nommant un
+    # travailleur inconnu.
+    palier = await resoudre_palier_commission(resolved_worker_id)
+    breakdown = calculate_payment_breakdown(resolved_amount, palier["taux"])
 
     # Validation du montant minimum PayDunya (200 FCFA) AVANT de créer
     # l'enregistrement en base et d'appeler l'API — évite de créer un
@@ -505,6 +549,12 @@ async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_
         'provider_channel': channel,
         'commission_amount': breakdown['commission_amount'],
         'worker_amount': breakdown['worker_amount'],
+        # Le taux et le palier sont FIGÉS sur la facture : un changement de
+        # barème après coup ne réécrit pas une mission déjà payée, et les
+        # statistiques du propriétaire additionnent ce qui a été encaissé.
+        'commission_rate': breakdown['commission_rate'],
+        'commission_tier': palier['palier'],
+        'commission_tier_reason': palier['motif'],
         'idempotency_key': request.idempotency_key or None,
         # TTL : les factures PENDING jamais terminées sont purgées par l'index
         # de kojo_retention après PAYMENT_PENDING_EXPIRY_HOURS. La durée est
@@ -531,10 +581,14 @@ async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_
             "payer_id": current_user.id,
         })
         if gagnant:
+            taux_du_gagnant = _taux_fige(gagnant)
             return _reponse_checkout_reutilise(
                 gagnant,
                 calculate_payment_breakdown(
-                    gagnant.get("amount") or 0, await get_effective_commission_rate()
+                    gagnant.get("amount") or 0,
+                    taux_du_gagnant
+                    if taux_du_gagnant is not None
+                    else await get_effective_commission_rate(),
                 ),
             )
         raise HTTPException(

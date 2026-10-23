@@ -105,7 +105,17 @@ const Payment = () => {
       const [config, liveQuote] = await Promise.all([
         CommissionService.getProviderConfig(),
         form.amount > 0
-          ? CommissionService.getQuote({ amount: form.amount, paymentMethod: form.method, country: form.country })
+          ? CommissionService.getQuote({
+            amount: form.amount,
+            paymentMethod: form.method,
+            country: form.country,
+            // La mission porte le TRAVAILLEUR dont dépend le palier de
+            // commission : sans ces deux identifiants, le devis afficherait le
+            // taux standard alors que la facture applique le tarif de
+            // lancement — et le client lirait une répartition fausse.
+            workerId: jobPaymentContext?.workerId,
+            jobId: jobPaymentContext?.jobId,
+          })
           : Promise.resolve(null)
       ]);
       setProviderConfig(config);
@@ -140,7 +150,13 @@ const Payment = () => {
         return;
       }
       try {
-        const liveQuote = await CommissionService.getQuote({ amount: form.amount, paymentMethod: form.method, country: form.country });
+        const liveQuote = await CommissionService.getQuote({
+          amount: form.amount,
+          paymentMethod: form.method,
+          country: form.country,
+          workerId: jobPaymentContext?.workerId,
+          jobId: jobPaymentContext?.jobId,
+        });
         if (!cancelled) setQuote(liveQuote);
       } catch (err) {
         if (!cancelled) setError(handleApiError(err, t('paymentError')));
@@ -212,6 +228,8 @@ const Payment = () => {
         amount: Number(form.amount),
         paymentMethod: form.method,
         country: form.country,
+        workerId: jobPaymentContext?.workerId || null,
+        jobId: jobPaymentContext?.jobId || null,
       });
       const previousCommission = quote?.commission_amount;
       setQuote(freshQuote);
@@ -402,6 +420,20 @@ const Payment = () => {
                   <p className="tuile-mesure-chiffre">{Number(quote.worker_amount || 0).toLocaleString()} XOF</p>
                 </div>
               </div>
+            )}
+
+            {/* Le PALIER se dit sous la répartition : une remise que la
+                personne qui la reçoit ne peut pas lire n'existe pas. Le
+                standard ne dit rien — ce n'est pas une nouvelle. */}
+            {quote?.commission_tier === 'lancement' && (
+              <p className="mt-3 text-sm text-stone-700" data-section="palier-commission">
+                {t('commissionTierLancement')}
+              </p>
+            )}
+            {quote?.commission_tier === 'recurrent' && (
+              <p className="mt-3 text-sm text-stone-700" data-section="palier-commission">
+                {t('commissionTierRecurrent')}
+              </p>
             )}
 
             {!user ? (

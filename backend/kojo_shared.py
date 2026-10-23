@@ -324,6 +324,16 @@ _NOTIF_MSG: Dict[str, Dict[str, Dict[str, str]]] = {
         # français. Une décision prise sans lire l'autre partie est un fait
         # d'arbitrage, pas un message à traduire approximativement.
         "owner_litiges_sans_reponse": {"title": "⚖️ Litiges tranchés sans réponse", "body": "{sans_reponse} des {tranches} litiges tranchés des {jours} derniers jours l'ont été SANS réponse de l'autre partie ({part} %, au-delà du seuil de {seuil} %). L'arbitre a tranché sur une seule version. File d'arbitrage : GET /owner/litiges, mesures : GET /owner/litiges/mesures."},
+        # Alerte d'EXPLOITATION, fr et en seulement, même raison que les trois
+        # précédentes : elle nomme une route et une série Prometheus ;
+        # `_get_notif_msgs` sert déjà le repli français. Une place de marché à
+        # zéro mission est un fait d'exploitation — pas un message à traduire
+        # approximativement en wolof.
+        "owner_marche_vide": {"title": "🚨 Place de marché vide", "body": "Aucune mission OUVERTE en base depuis {duree} h (seuil {heures} h). Les travailleurs n'ont rien à postuler, aucune fiche n'est indexable et le revenu est nul. Vérifier la publication (GET /api/jobs?status=open) et la jauge kojo_missions_ouvertes (/metrics)."},
+        # Le complément de la précédente : l'offre est LÀ et personne ne postule.
+        # Même raison pour le fr/en seulement : la phrase nomme un seuil de jours
+        # et une route, et `_get_notif_msgs` sert déjà le repli français.
+        "owner_missions_sans_proposition": {"title": "📭 Missions sans aucune proposition", "body": "{count} mission(s) ouverte(s) sur {total} attendent depuis plus de {jours} jour(s) sans AUCUNE proposition — la plus ancienne depuis {plus_ancienne} jour(s). L'offre existe et personne ne postule : vérifier le prix demandé, la ville et la catégorie (un métier sans travailleur inscrit dans cette ville ne recevra jamais de candidature). Liste : GET /api/jobs?status=open."},
     },
     "en": {
         "dispute_opened_client": {"title": "⚖️ Dispute opened", "body": "The worker opened a dispute on « {job_title} ». The payment is frozen: the owner must decide before {date}."},
@@ -370,6 +380,8 @@ _NOTIF_MSG: Dict[str, Dict[str, Dict[str, str]]] = {
         "owner_email_provider_down": {"title": "🚨 Email provider silent", "body": "The active email provider « {provider} » can no longer send ({motif}): {detail}. No Kojo email is going out (login codes, resets). Check EMAIL_PROVIDER, its keys and sender, then /monitor/email."},
         "owner_rate_limit_repli_memoire": {"title": "🚨 Rate limiter fell back to memory", "body": "Redis is unreachable: limits are counted PER PROCESS since {replis} failover(s). They still apply, but multiplied by the number of workers while the outage lasts. Check REDIS_URL and the Redis service."},
         "owner_litiges_sans_reponse": {"title": "⚖️ Disputes decided without a reply", "body": "{sans_reponse} of the {tranches} disputes decided in the last {jours} days were decided WITHOUT any reply from the other party ({part} %, above the {seuil} % threshold). The arbitrator decided on a single version. Arbitration queue: GET /owner/litiges, measures: GET /owner/litiges/mesures."},
+        "owner_marche_vide": {"title": "🚨 Empty marketplace", "body": "No OPEN job in the database for {duree} h (threshold {heures} h). Workers have nothing to apply to, no page is indexable and revenue is zero. Check publishing (GET /api/jobs?status=open) and the kojo_missions_ouvertes gauge (/metrics)."},
+        "owner_missions_sans_proposition": {"title": "📭 Jobs with no proposal at all", "body": "{count} of {total} open job(s) have waited more than {jours} day(s) with NO proposal at all — the oldest for {plus_ancienne} day(s). The offer exists and nobody applies: check the asking price, the city and the category (a trade with no registered worker in that city will never receive a proposal). Listing: GET /api/jobs?status=open."},
     },
     "wo": {
         "dispute_opened_client": {"title": "⚖️ Litige ubbeeku na", "body": "Liggéeykat bi ubbeeku na litige ci « {job_title} ». Fey bi ñu ko taxawal : propriétaire bi wara ko tëg ba {date}."},

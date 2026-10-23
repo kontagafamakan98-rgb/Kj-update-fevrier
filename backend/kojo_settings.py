@@ -357,6 +357,75 @@ if not 1 <= LITIGE_ALERTE_INTERVAL_MINUTES <= 1440:
         "le jugement doit tourner au moins une fois par jour (1..1440 minutes)."
     )
 
+# --- Alerte « place de marché VIDE » (kojo_scheduler) ---
+# Le 23/10/2026 la production comptait ZÉRO mission ouverte sans qu'aucun
+# tableau de bord ne le dise : les sondes de SEO ont rendu des PRÉMISSES pendant
+# onze jours, et le chiffre ne vivait que sur `/metrics` — que personne n'ouvre.
+# Une place de marché qui ne publie plus rien est un incident d'exploitation, au
+# même titre qu'un fournisseur email muet ; il doit venir au propriétaire.
+#
+# La mesure est une DURÉE, pas un instant : un marché peut rester vide une heure
+# entre deux missions sans que rien ne soit cassé, et une alerte qui partirait
+# là s'apprendrait à être ignorée (le rouge permanent de F9).
+# `MARCHE_VIDE_ALERTE_HEURES` borne donc la CONTINUITÉ du vide, mesurée depuis
+# `vide_depuis` — un état EN BASE, pour qu'un redémarrage ou un déploiement ne
+# remette pas le chronomètre à zéro (sinon une instance redéployée chaque jour
+# ne franchirait jamais le seuil).
+#
+# Défaut 24 h : le temps qu'un jour ouvré passe, et exactement la durée que
+# `METRIQUES.md` annonce pour l'alerte de la jauge `kojo_missions_ouvertes`.
+# 0 n'est pas accepté : taire l'alerte se fait en réglant une durée longue, pas
+# en l'éteignant d'un zéro dont personne ne se souviendrait.
+MARCHE_VIDE_ALERTE_HEURES = int(os.environ.get('MARCHE_VIDE_ALERTE_HEURES', '24'))
+MARCHE_VIDE_ALERTE_INTERVALLE_MINUTES = int(
+    os.environ.get('MARCHE_VIDE_ALERTE_INTERVALLE_MINUTES', '60')
+)
+
+if not 1 <= MARCHE_VIDE_ALERTE_HEURES <= 720:
+    raise RuntimeError(
+        f"MARCHE_VIDE_ALERTE_HEURES={MARCHE_VIDE_ALERTE_HEURES} : la durée doit "
+        "couvrir au moins une heure et au plus trente jours (1..720). À 0 "
+        "l'alerte ne pourrait pas partir, et une alerte qui ne peut pas partir "
+        "n'existe pas."
+    )
+if not 1 <= MARCHE_VIDE_ALERTE_INTERVALLE_MINUTES <= 1440:
+    raise RuntimeError(
+        f"MARCHE_VIDE_ALERTE_INTERVALLE_MINUTES={MARCHE_VIDE_ALERTE_INTERVALLE_MINUTES} "
+        ": le jugement doit tourner au moins une fois par jour (1..1440 minutes)."
+    )
+
+# --- Alerte « missions ouvertes SANS AUCUNE proposition » (kojo_scheduler) ---
+# L'alerte « marché vide » dit que l'OFFRE a disparu ; celle-ci dit que l'offre
+# est là et que PERSONNE n'a répondu. Une mission publiée depuis trois jours sans
+# une seule candidature n'est pas un détail : elle est mal datée, trop chère,
+# invisible — ou dans une ville où aucun travailleur n'est inscrit. Ce sont
+# quatre corrections différentes, et aucune n'est visible sur un tableau de bord
+# qui ne compte que des missions.
+#
+# Le seuil est une ANCIENNETÉ (jours) : en dessous, une mission sans proposition
+# est une mission qui vient de paraître. 1..90 jours.
+MISSIONS_SANS_PROPOSITION_JOURS = int(
+    os.environ.get('MISSIONS_SANS_PROPOSITION_JOURS', '3')
+)
+# Cadence du jugement (minutes). Toutes les six heures : la file grossit lentement,
+# et relire les propositions plus souvent ne changerait rien.
+MISSIONS_SANS_PROPOSITION_INTERVALLE_MINUTES = int(
+    os.environ.get('MISSIONS_SANS_PROPOSITION_INTERVALLE_MINUTES', '360')
+)
+
+if not 1 <= MISSIONS_SANS_PROPOSITION_JOURS <= 90:
+    raise RuntimeError(
+        f"MISSIONS_SANS_PROPOSITION_JOURS={MISSIONS_SANS_PROPOSITION_JOURS} : "
+        "l'ancienneté doit couvrir au moins un jour et au plus 90 jours. À 0, "
+        "toute mission publiée à l'instant serait déjà « sans réponse »."
+    )
+if not 1 <= MISSIONS_SANS_PROPOSITION_INTERVALLE_MINUTES <= 1440:
+    raise RuntimeError(
+        f"MISSIONS_SANS_PROPOSITION_INTERVALLE_MINUTES="
+        f"{MISSIONS_SANS_PROPOSITION_INTERVALLE_MINUTES} : le jugement doit "
+        "tourner au moins une fois par jour (1..1440 minutes)."
+    )
+
 # Récompense de parrainage (FCFA) créditée quand le filleul termine sa
 # PREMIÈRE mission : une part au parrain, une part au filleul.
 REFERRAL_SPONSOR_REWARD = float(os.environ.get('REFERRAL_SPONSOR_REWARD', '500'))
@@ -646,6 +715,15 @@ DEFAULT_SECURITY_HEADERS = {
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Permissions-Policy": "geolocation=(self), microphone=(), camera=()",
     "Cross-Origin-Opener-Policy": "same-origin",
+    # Une réponse d'API n'a rien à faire dans un <img>, un <script> ou un
+    # <iframe> d'un autre site : sans cette politique, un tiers peut charger
+    # une réponse JSON comme ressource et la lire par effet de bord (mesure de
+    # taille, attaques par oracle). `same-site` garde les documents pré-rendus
+    # et le frontend (même site, sous-domaines distincts) fonctionnels.
+    "Cross-Origin-Resource-Policy": "same-site",
+    # Ferme les politiques cross-domain de Flash/PDF héritées : aucun client
+    # légitime du site n'en a besoin, et leur défaut est permissif.
+    "X-Permitted-Cross-Domain-Policies": "none",
     "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://res.cloudinary.com; connect-src 'self' https://api.cloudinary.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
 }
 

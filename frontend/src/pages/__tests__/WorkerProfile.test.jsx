@@ -120,6 +120,37 @@ describe('Profil public d’un travailleur', () => {
     expect(options.headers.Authorization).toBeUndefined();
   });
 
+  it('publié les litiges, y compris quand il n’y en a aucun', async () => {
+    // Le chiffre négatif de la réputation : une fiche qui le tairait ferait
+    // croire que le sujet n'est pas suivi. Ici un litige perdu sur trois.
+    global.fetch.mockResolvedValueOnce(reponse({
+      ...PROFIL,
+      stats: { ...PROFIL.stats, disputes_total: 3, disputes_lost: 1 },
+    }));
+
+    rendre();
+
+    const tuile = await screen.findByText('Litiges');
+    expect(tuile.closest('[data-section="litiges-travailleur"]')?.textContent).toContain('3');
+    expect(document.body.textContent).toContain('dont 1 en faveur du client');
+  });
+
+  it('un travailleur sans litige affiche zéro plutôt que rien', async () => {
+    global.fetch.mockResolvedValueOnce(reponse({
+      ...PROFIL,
+      stats: { ...PROFIL.stats, disputes_total: 0, disputes_lost: 0 },
+    }));
+
+    rendre();
+
+    const tuile = await screen.findByText('Litiges');
+    const bloc = tuile.closest('[data-section="litiges-travailleur"]');
+    expect(bloc?.textContent).toContain('0');
+    // Aucune précision « en faveur du client » quand le compte est nul : un
+    // « 0 » suffit, et une phrase pour rien serait du bruit.
+    expect(bloc?.textContent).not.toContain('en faveur du client');
+  });
+
   it('un travailleur sans avis n’affiche pas « 0 » mais une absence', async () => {
     global.fetch.mockResolvedValueOnce(
       reponse({ ...PROFIL, stats: { missions_completed: 0, rating_average: null, rating_count: 0 }, reviews: [] })

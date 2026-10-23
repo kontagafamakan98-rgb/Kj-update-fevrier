@@ -937,5 +937,9 @@
   "iconContactWhatsapp": "💬",
   "iconContactSendEmail": "✉️",
   "iconContactAddress": "📍",
-  "faqMarker": "+"
+  "faqMarker": "+",
+  "commissionTierLancement": "Commission offerte : offre de lancement sur vos premières missions.",
+  "commissionTierRecurrent": "Tarif fidélité appliqué : votre commission est réduite.",
+  "workerDisputesLabel": "Litiges",
+  "workerDisputesLost": "dont {count} en faveur du client"
 }

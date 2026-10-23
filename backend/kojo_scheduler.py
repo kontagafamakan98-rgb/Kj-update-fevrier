@@ -40,6 +40,7 @@ from kojo_models import NotificationType
 # chaque règle son filtre (kojo_retention), qui porte aussi l'index TTL.
 from kojo_retention import RETENTION_RULES
 from kojo_job_alerts import passage_digest
+from kojo_identifiants import identifiants_query
 from kojo_job_completion import passage_liberations_auto
 from kojo_job_disputes import (
     PLANCHER_MESURE,
@@ -54,6 +55,10 @@ from kojo_settings import (
     LITIGE_SANS_REPONSE_FENETRE_JOURS,
     LITIGE_SANS_REPONSE_SEUIL,
     LITIGE_SWEEP_INTERVAL_MINUTES,
+    MARCHE_VIDE_ALERTE_HEURES,
+    MARCHE_VIDE_ALERTE_INTERVALLE_MINUTES,
+    MISSIONS_SANS_PROPOSITION_INTERVALLE_MINUTES,
+    MISSIONS_SANS_PROPOSITION_JOURS,
     OWNER_EMAIL,
     OWNER_USER_ID,
     PAYOUT_ALERT_REMINDER_DAYS,
@@ -907,3 +912,597 @@ async def litige_arbitrage_alert_loop():
             break
         except Exception as exc:
             logger.warning(f"⚠️ Erreur alerte arbitrage sans réponse: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# ALERTE « PLACE DE MARCHÉ VIDE »
+# ---------------------------------------------------------------------------
+#
+# Ce que cette boucle ajoute, et pourquoi elle vit ICI plutôt que dans un
+# tableau de bord : le 23/10/2026 la production comptait ZÉRO mission ouverte,
+# et le fait n'existait que sur `/metrics` — un scrape que personne n'ouvre. Il
+# a fallu onze jours de PRÉMISSES dans les sondes de SEO pour s'en apercevoir.
+# Une place de marché sans mission n'a rien à faire postuler, aucune fiche à
+# indexer et aucun revenu : c'est une panne d'exploitation, et elle se dit.
+#
+# LA MESURE EST UNE DURÉE, jamais un instant. Un marché peut être vide une
+# heure entre deux missions sans que rien ne soit cassé ; alerter là-dessus
+# produirait cet avertissement qu'on apprend à ignorer. Le seuil
+# (`MARCHE_VIDE_ALERTE_HEURES`) borne la CONTINUITÉ du vide, lue depuis
+# `vide_depuis` — un état EN BASE, donc un redémarrage ne remet pas le
+# chronomètre à zéro (sans quoi une machine redéployée chaque jour ne
+# franchirait jamais le seuil, et l'alerte serait décorative).
+#
+# LA RÈGLE DU CORPUS EST PARTAGÉE : `compter_missions_ouvertes` est lue par la
+# jauge `kojo_missions_ouvertes` de `/metrics` ET par ce passage. Deux comptages
+# écrits séparément finiraient par ne plus compter la même chose, et le jour où
+# ils divergeraient, la jauge dirait « vide » pendant que l'alerte se tairait.
+#
+# UNE LECTURE EN PANNE N'EST PAS UN MARCHÉ VIDE : elle est écrite
+# (`lecture_erreur`) et n'alerte pas — une panne de base ne doit pas produire
+# une alerte sur la mauvaise cause, ni réarmer celle qui court.
+#
+# UNE SEULE ALERTE PAR ÉPISODE, réarmée par le RETOUR d'une mission ouverte
+# (`retabli_at`), comme les deux autres alertes d'exploitation. Un seuil
+# modifié est un épisode NEUF : la `signature` le porte.
+
+MARCHE_ALERT_COLLECTION = "scheduler_alerts"
+_MARCHE_ALERT_SUBJECT = "marche_vide"
+
+
+async def compter_missions_ouvertes() -> int:
+    """Le corpus OUVERT, selon l'unique règle du produit.
+
+    Publique parce que la jauge `/metrics` s'en sert : une seule définition de
+    « mission ouverte » (statut `open`, non supprimée), donc un tableau de bord
+    et une alerte qui ne peuvent pas se contredire.
+    """
+    return int(
+        await db.jobs.count_documents({"status": "open", "deleted": {"$ne": True}})
+    )
+
+
+def _signature_marche_vide(heures: int) -> str:
+    """L'identité de l'épisode : ce qui a été mesuré, et avec quelle règle."""
+    return "marche_vide:heures=%s" % heures
+
+
+async def marche_vide_alert_once(now: Optional[datetime] = None) -> dict:
+    """Un passage : mesure la continuité du vide et alerte au-delà du seuil.
+
+    Retourne un résumé testable {etat, missions_ouvertes, vide_depuis_heures,
+    alertes, retablissements, alertes_ignorees} : `alertes` vaut 1 exactement
+    quand une alerte est partie sur ce passage, `alertes_ignorees` 1 quand le
+    même épisode durait déjà, `retablissements` 1 quand une mission ouverte est
+    réapparue.
+
+    Trois états : `saine` (au moins une mission ouverte), `vide` (vide, sous le
+    seuil), `alertee` (vide, seuil franchi, alerte partie).
+    """
+    now = now or datetime.now(timezone.utc)
+    collection = db[MARCHE_ALERT_COLLECTION]
+    etat = await collection.find_one({"_id": _MARCHE_ALERT_SUBJECT}) or {}
+    signature = _signature_marche_vide(MARCHE_VIDE_ALERTE_HEURES)
+    resume = {
+        "etat": "inconnu",
+        "missions_ouvertes": None,
+        "vide_depuis_heures": None,
+        "alertes": 0,
+        "retablissements": 0,
+        "alertes_ignorees": 0,
+    }
+
+    # ── La lecture avant tout : une panne n'est pas un vide ─────────────────
+    try:
+        ouvertes = await compter_missions_ouvertes()
+    except Exception as exc:
+        erreur = str(exc)[:_EMAIL_ALERT_DETAIL_MAX]
+        await collection.update_one(
+            {"_id": _MARCHE_ALERT_SUBJECT},
+            {"$set": {"lecture_erreur": erreur, "derniere_mesure_at": now}},
+            upsert=True,
+        )
+        resume["etat"] = "lecture_impossible"
+        resume["lecture_erreur"] = erreur
+        logger.warning(
+            "⚠️ Alerte marché vide: comptage des missions ouvertes impossible (%s) "
+            "— aucun verdict, et l'état en cours n'est pas réarmé." % erreur
+        )
+        return resume
+
+    resume["missions_ouvertes"] = ouvertes
+    commun = {
+        "signature": signature,
+        "heures": MARCHE_VIDE_ALERTE_HEURES,
+        "missions_ouvertes": ouvertes,
+        "derniere_mesure_at": now,
+        "lecture_erreur": "",
+    }
+
+    # ── Des missions ouvertes : la place respire, et on RÉARME ──────────────
+    if ouvertes > 0:
+        changement = dict(commun, etat="saine", vide_depuis=None)
+        if etat.get("etat") in ("vide", "alertee"):
+            changement["retabli_at"] = now
+            resume["retablissements"] = 1
+            logger.info(
+                "✅ Place de marché de nouveau pourvue (%s mission(s) ouverte(s)) : "
+                "l'alerte 'marché vide' est réarmée." % ouvertes
+            )
+        await collection.update_one(
+            {"_id": _MARCHE_ALERT_SUBJECT}, {"$set": changement}, upsert=True
+        )
+        resume["etat"] = "saine"
+        return resume
+
+    # ── Vide : depuis QUAND ? Le chronomètre vit en base ────────────────────
+    vide_depuis = _parse_payment_ts(etat.get("vide_depuis"))
+    horodatage_illisible = 0
+    if etat.get("vide_depuis") is not None and vide_depuis is None:
+        # Une date illisible n'est ni « depuis toujours » (elle déclencherait
+        # l'alerte sur une donnée qu'on ne sait pas lire) ni « maintenant »
+        # (elle remettrait le chronomètre en silence) : elle est COMPTÉE, et le
+        # chronomètre repart de cet instant, qui est un fait mesuré.
+        horodatage_illisible = 1
+        vide_depuis = now
+    if vide_depuis is None:
+        vide_depuis = now
+    duree = now - vide_depuis
+    if duree.total_seconds() < 0:
+        # Une horloge en arrière (ou un état écrit dans le futur) ne se lit pas
+        # comme une longue panne : on repart de maintenant, et le fait est
+        # publié dans l'état.
+        horodatage_illisible = 1
+        vide_depuis = now
+        duree = timedelta(0)
+
+    heures_ecoulees = round(duree.total_seconds() / 3600, 1)
+    resume["vide_depuis_heures"] = heures_ecoulees
+    changement = dict(
+        commun,
+        vide_depuis=vide_depuis,
+        vide_heures=heures_ecoulees,
+        horodatage_illisible=horodatage_illisible,
+    )
+
+    # ── Sous le seuil : c'est un creux, pas un incident ─────────────────────
+    if duree < timedelta(hours=MARCHE_VIDE_ALERTE_HEURES):
+        changement["etat"] = "vide"
+        await collection.update_one(
+            {"_id": _MARCHE_ALERT_SUBJECT}, {"$set": changement}, upsert=True
+        )
+        resume["etat"] = "vide"
+        logger.info(
+            "📉 Place de marché vide depuis %s h (seuil %s h) — sous le seuil, "
+            "aucune alerte." % (heures_ecoulees, MARCHE_VIDE_ALERTE_HEURES)
+        )
+        return resume
+
+    # ── Seuil franchi : le MÊME épisode n'alerte qu'une fois ────────────────
+    deja_signale = (
+        etat.get("etat") == "alertee" and etat.get("signature") == signature
+    )
+    changement["etat"] = "alertee"
+    if deja_signale:
+        await collection.update_one(
+            {"_id": _MARCHE_ALERT_SUBJECT}, {"$set": changement}, upsert=True
+        )
+        resume["etat"] = "alertee"
+        resume["alertes_ignorees"] = 1
+        logger.debug(
+            "Marché vide : épisode déjà signalé (depuis %s) — pas de seconde alerte."
+            % (etat.get("vide_depuis") or "inconnu")
+        )
+        return resume
+
+    owner_id = await resolve_owner_id() or OWNER_USER_ID
+    await notify_user_localized(
+        user_id=owner_id,
+        key="owner_marche_vide",
+        notif_type=NotificationType.GENERAL,
+        related_type="marche",
+        duree=heures_ecoulees,
+        heures=MARCHE_VIDE_ALERTE_HEURES,
+    )
+
+    alerte_envoyee = False
+    alerte_erreur = ""
+    if OWNER_EMAIL:
+        try:
+            await send_email_via_active_provider(
+                OWNER_EMAIL,
+                "KOJO — Place de marché vide depuis %s h" % heures_ecoulees,
+                "Aucune mission OUVERTE en base depuis %s h (seuil d'alerte : %s h).\n\n"
+                "Conséquence : les travailleurs n'ont rien à postuler, il n'y a "
+                "aucune fiche à indexer (les sondes de SEO rendent des prémisses) "
+                "et le revenu est nul. Une place de marché qui publie zéro mission "
+                "n'est pas un creux, c'est une panne.\n"
+                "À vérifier : la publication (GET /api/jobs?status=open), la jauge "
+                "kojo_missions_ouvertes sur /metrics, et les comptes clients qui "
+                "devraient publier.\n"
+                "Le RETOUR d'une mission ouverte RÉ-ARME cette alerte : un nouvel "
+                "épisode donnera un nouvel email ; le même, jamais deux.\n"
+                % (heures_ecoulees, MARCHE_VIDE_ALERTE_HEURES),
+            )
+            alerte_envoyee = True
+        except Exception as exc:
+            # L'email est le canal SECONDAIRE (la notification in-app vient de
+            # partir) : un échec est écrit, jamais tu.
+            alerte_erreur = str(exc)[:_EMAIL_ALERT_DETAIL_MAX]
+            logger.warning("⚠️ Email d'alerte marché vide échoué: %s" % exc)
+    else:
+        alerte_erreur = "OWNER_EMAIL non configuré"
+        logger.warning(
+            "⚠️ Alerte marché vide : OWNER_EMAIL absent — la notification in-app "
+            "est le seul canal."
+        )
+
+    changement["alertee_at"] = now
+    changement["alerte_envoyee"] = alerte_envoyee
+    changement["alerte_erreur"] = alerte_erreur
+    await collection.update_one(
+        {"_id": _MARCHE_ALERT_SUBJECT}, {"$set": changement}, upsert=True
+    )
+    resume["etat"] = "alertee"
+    resume["alertes"] = 1
+    logger.warning(
+        "🚨 Place de marché vide depuis %s h (seuil %s h) — alerte envoyée "
+        "(email=%s)." % (heures_ecoulees, MARCHE_VIDE_ALERTE_HEURES, alerte_envoyee)
+    )
+    return resume
+
+
+async def marche_vide_alert_loop():
+    """Tâche de fond : juge périodiquement si la place de marché est vide.
+
+    Même modèle que les autres boucles : sommeil d'abord (aucun passage au
+    redémarrage, ni à chaque déploiement), annulable proprement au shutdown,
+    erreurs isolées par itération, et un BAIL par passage — sans lui, N machines
+    Fly jugeraient N fois et pourraient alerter N fois.
+
+    Le travail vit dans `marche_vide_alert_once` : il est appelable directement
+    par un test, avec une horloge injectée.
+    """
+    while True:
+        try:
+            await asyncio.sleep(MARCHE_VIDE_ALERTE_INTERVALLE_MINUTES * 60)
+            await executer_si_bail(
+                "marche_vide_alert",
+                timedelta(minutes=MARCHE_VIDE_ALERTE_INTERVALLE_MINUTES),
+                marche_vide_alert_once,
+            )
+        except asyncio.CancelledError:
+            break
+        except Exception as exc:
+            logger.warning(f"⚠️ Erreur alerte marché vide: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# ALERTE « MISSIONS OUVERTES SANS AUCUNE PROPOSITION »
+# ---------------------------------------------------------------------------
+#
+# Le complément de l'alerte précédente, et pas sa répétition. « Marché vide »
+# dit que l'OFFRE a disparu ; ici l'offre est LÀ et personne n'a répondu. Une
+# mission publiée depuis plusieurs jours sans une seule candidature n'est pas
+# un détail d'affichage : elle est trop chère, mal datée, invisible dans la
+# liste — ou située dans une ville où aucun travailleur n'est inscrit. Quatre
+# corrections différentes, et aucune n'est visible sur un tableau de bord qui ne
+# compte que des missions.
+#
+# LA MESURE EST UNE ANCIENNETÉ, pas une absence : une mission publiée il y a une
+# heure sans proposition est une mission qui vient de paraître. Seules les
+# missions plus vieilles que `MISSIONS_SANS_PROPOSITION_JOURS` (3 par défaut)
+# et SANS AUCUNE proposition (aucun statut : une candidature refusée reste une
+# candidature) sont comptées, avec leur plus ancienne en jours.
+#
+# DEUX LECTURES, DEUX PRÉMISSES : si les missions ne se lisent pas, on ne sait
+# rien ; si les PROPOSITIONS ne se lisent pas, on ne peut pas conclure « aucune
+# proposition » — et conclure le contraire ferait alerter sur TOUTES les
+# missions ouvertes à chaque panne de la collection `job_proposals`. Dans les
+# deux cas : l'erreur est écrite, rien n'est envoyé, et l'épisode en cours n'est
+# pas réarmé.
+#
+# CE QUI EST BORNÉ EST DÉCLARÉ : au-delà de `MAX_MISSIONS_MESUREES` le compte
+# est un PLANCHER (`tronque` dans l'état) ; au-delà de `MAX_PROPOSITIONS_LUES`
+# on ne sait pas quelles missions ont reçu une candidature, donc on ne conclut
+# rien (`mesure_tronquee`, aucune alerte).
+#
+# UNE ALERTE PAR CROISSANCE DE LA FILE, pas une par passage : le même nombre de
+# missions en attente ne se répète pas toutes les six heures (c'est le rappel
+# qu'on apprend à ignorer). Une mission de plus qui vieillit fait GRANDIR le
+# compte — c'est un fait neuf, donc une alerte neuve. Une proposition reçue fait
+# DESCENDRE le compte : pas d'alerte, mais le niveau retenu baisse, et le retour
+# à zéro réarme (`retabli_at`) pour un épisode ultérieur.
+
+MISSIONS_SANS_PROPOSITION_COLLECTION = "scheduler_alerts"
+_MISSIONS_SANS_PROPOSITION_SUBJECT = "missions_sans_proposition"
+# Borne de lecture des missions : au-delà, la mesure est TRONQUÉE et le dit.
+MAX_MISSIONS_MESUREES = 500
+# Borne de lecture des propositions : 5 000 lignes pour au plus 500 missions
+# sans candidature, c'est dix par mission. Atteindre le plafond ne prouve pas
+# qu'une mission n'a rien reçu : c'est une mesure qu'on ne sait pas conclure,
+# donc une PRÉMISSE (aucune alerte), jamais un « aucune proposition » par défaut.
+MAX_PROPOSITIONS_LUES = 5000
+# Identifiants conservés dans l'état : de quoi agir sur les plus urgentes, pas
+# une archive. Triés du plus ancien au plus récent.
+MAX_MISSIONS_CITEES = 10
+
+
+def _signature_missions_sans_proposition(jours: int) -> str:
+    """L'identité de l'épisode : ce qui a été mesuré, et avec quelle règle."""
+    return "sans_proposition:jours=%s" % jours
+
+
+def _cles_mission(job: dict) -> set:
+    """Toutes les façons dont une proposition peut désigner cette mission.
+
+    Un document de mission porte son identifiant dans `id`, `job_id` (ancien)
+    ou `_id` (jeu importé) ; la proposition, elle, a été écrite avec la chaîne
+    que le client avait reçue. Comparer sur une seule forme laisserait croire
+    qu'une mission ancienne n'a jamais reçu de candidature — et ferait alerter
+    sur une mission qui a déjà trouvé preneur.
+    """
+    return {
+        str(valeur)
+        for valeur in (job.get("id"), job.get("job_id"), job.get("_id"))
+        if valeur not in (None, "")
+    }
+
+
+async def missions_sans_proposition_alert_once(now: Optional[datetime] = None) -> dict:
+    """Un passage : compte les missions anciennes sans aucune proposition.
+
+    Retourne un résumé testable {etat, missions_ouvertes, sans_proposition,
+    plus_ancienne_jours, alertes, retablissements, alertes_ignorees}.
+
+    Deux états : `saine` (aucune mission en attente) et `alertee` (un niveau a
+    été signalé ; le niveau retenu est le PLUS HAUT atteint, donc une file qui
+    redescend sans se vider ne réalerte pas, et une file qui grossit le fait).
+    """
+    now = now or datetime.now(timezone.utc)
+    collection = db[MISSIONS_SANS_PROPOSITION_COLLECTION]
+    etat = await collection.find_one({"_id": _MISSIONS_SANS_PROPOSITION_SUBJECT}) or {}
+    signature = _signature_missions_sans_proposition(MISSIONS_SANS_PROPOSITION_JOURS)
+    resume = {
+        "etat": "inconnu",
+        "missions_ouvertes": None,
+        "sans_proposition": None,
+        "plus_ancienne_jours": None,
+        "alertes": 0,
+        "retablissements": 0,
+        "alertes_ignorees": 0,
+    }
+
+    async def _premisse(code: str, erreur: str) -> dict:
+        """Une lecture en panne : on l'écrit, on n'envoie rien, on ne réarme pas."""
+        await collection.update_one(
+            {"_id": _MISSIONS_SANS_PROPOSITION_SUBJECT},
+            {"$set": {code: erreur, "derniere_mesure_at": now}},
+            upsert=True,
+        )
+        resume["etat"] = "lecture_impossible"
+        resume["lecture_erreur"] = erreur
+        logger.warning(
+            "⚠️ Alerte missions sans proposition : lecture impossible (%s) — "
+            "aucun verdict, et l'état en cours n'est pas réarmé." % erreur
+        )
+        return resume
+
+    # ── 1. Les missions ouvertes ────────────────────────────────────────────
+    try:
+        missions = await db.jobs.find(
+            {"status": "open", "deleted": {"$ne": True}}
+        ).to_list(MAX_MISSIONS_MESUREES + 1)
+    except Exception as exc:
+        return await _premisse("lecture_erreur", str(exc)[:_EMAIL_ALERT_DETAIL_MAX])
+
+    tronque = len(missions) > MAX_MISSIONS_MESUREES
+    missions = missions[:MAX_MISSIONS_MESUREES]
+    resume["missions_ouvertes"] = len(missions)
+
+    seuil = timedelta(days=MISSIONS_SANS_PROPOSITION_JOURS)
+    anciennes = []  # [(publiée_le, clé, mission)]
+    date_illisible = 0
+    for job in missions:
+        publiee = _parse_payment_ts(job.get("posted_at")) or _parse_payment_ts(
+            job.get("created_at")
+        )
+        cle = str(job.get("id") or job.get("job_id") or job.get("_id") or "")
+        if publiee is None:
+            # Une date illisible n'est PAS « très ancienne » (elle alerterait sur
+            # une donnée qu'on ne sait pas lire) ni « récente » en silence : elle
+            # est comptée, et elle sort de la mesure.
+            date_illisible += 1
+            continue
+        if cle and now - publiee >= seuil:
+            anciennes.append((publiee, cle, job))
+
+    commun = {
+        "signature": signature,
+        "jours": MISSIONS_SANS_PROPOSITION_JOURS,
+        "missions_ouvertes": len(missions),
+        "derniere_mesure_at": now,
+        "lecture_erreur": "",
+        "propositions_lecture_erreur": "",
+        "date_illisible": date_illisible,
+        "tronque": tronque,
+    }
+
+    # ── 2. Les propositions de ces missions (UNE requête, bornée) ──────────
+    cles = set()
+    for _publiee, cle, job in anciennes:
+        cles |= _cles_mission(job)
+    avec_proposition = set()
+    propositions_tronquees = False
+    if cles:
+        try:
+            propositions = await db.job_proposals.find(
+                identifiants_query(sorted(cles), ("job_id",))
+            ).to_list(MAX_PROPOSITIONS_LUES + 1)
+        except Exception as exc:
+            return await _premisse(
+                "propositions_lecture_erreur", str(exc)[:_EMAIL_ALERT_DETAIL_MAX]
+            )
+        propositions_tronquees = len(propositions) > MAX_PROPOSITIONS_LUES
+        # La mission peut être désignée par `job_id` (usage de l'app) ou par `_id`
+        # (jeu IMPORTÉ) — et c'est précisément l'une de ces deux formes que la
+        # requête ci-dessus a appariée. Ne garder que `job_id` rendrait invisibles
+        # les lignes importées qu'on vient de lire : la mission compterait comme
+        # « sans candidature » alors que sa proposition est sous nos yeux.
+        avec_proposition = set()
+        for proposition in propositions:
+            for valeur in (proposition.get("job_id"), proposition.get("_id")):
+                if valeur not in (None, ""):
+                    avec_proposition.add(str(valeur))
+
+    # ── 3. Ce qu'on ne sait pas conclure ──────────────────────────────────
+    if propositions_tronquees:
+        await collection.update_one(
+            {"_id": _MISSIONS_SANS_PROPOSITION_SUBJECT},
+            {"$set": dict(commun, propositions_tronquees=True)},
+            upsert=True,
+        )
+        resume["etat"] = "mesure_tronquee"
+        resume["propositions_tronquees"] = 1
+        logger.warning(
+            "⚠️ Alerte missions sans proposition : %s propositions lues, plafond "
+            "atteint — impossible de dire lesquelles sont sans candidature."
+            % MAX_PROPOSITIONS_LUES
+        )
+        return resume
+
+    sans = sorted(
+        (
+            (publiee, cle, job)
+            for publiee, cle, job in anciennes
+            if not (_cles_mission(job) & avec_proposition)
+        ),
+        key=lambda element: element[0],
+    )
+    resume["sans_proposition"] = len(sans)
+    plus_ancienne = (
+        round((now - sans[0][0]).total_seconds() / 86400, 1) if sans else None
+    )
+    resume["plus_ancienne_jours"] = plus_ancienne
+    changement = dict(
+        commun,
+        missions_sans_proposition=len(sans),
+        plus_ancienne_jours=plus_ancienne,
+        ids=[cle for _publiee, cle, _job in sans[:MAX_MISSIONS_CITEES]],
+    )
+
+    # ── 4. Plus rien en attente : la file est vide, donc on RÉARME ─────────
+    if not sans:
+        changement = dict(changement, etat="saine", alertee_pour=0)
+        if etat.get("etat") == "alertee":
+            changement["retabli_at"] = now
+            resume["retablissements"] = 1
+            logger.info(
+                "✅ Plus aucune mission ancienne sans proposition : l'alerte est "
+                "réarmée."
+            )
+        await collection.update_one(
+            {"_id": _MISSIONS_SANS_PROPOSITION_SUBJECT}, {"$set": changement}, upsert=True
+        )
+        resume["etat"] = "saine"
+        return resume
+
+    # ── 5. La file n'a pas grandi : déjà signalée ──────────────────────────
+    deja_signale = (
+        etat.get("etat") == "alertee"
+        and etat.get("signature") == signature
+        and len(sans) <= int(etat.get("alertee_pour") or 0)
+    )
+    changement["alertee_pour"] = int(etat.get("alertee_pour") or 0)
+    if deja_signale:
+        changement["etat"] = "alertee"
+        await collection.update_one(
+            {"_id": _MISSIONS_SANS_PROPOSITION_SUBJECT}, {"$set": changement}, upsert=True
+        )
+        resume["etat"] = "alertee"
+        resume["alertes_ignorees"] = 1
+        logger.debug(
+            "Missions sans proposition : file déjà signalée (%s) — pas de "
+            "seconde alerte." % len(sans)
+        )
+        return resume
+
+    owner_id = await resolve_owner_id() or OWNER_USER_ID
+    await notify_user_localized(
+        user_id=owner_id,
+        key="owner_missions_sans_proposition",
+        notif_type=NotificationType.GENERAL,
+        related_type="marche",
+        count=len(sans),
+        jours=MISSIONS_SANS_PROPOSITION_JOURS,
+        total=len(missions),
+        plus_ancienne=plus_ancienne,
+    )
+
+    alerte_envoyee = False
+    alerte_erreur = ""
+    if OWNER_EMAIL:
+        try:
+            await send_email_via_active_provider(
+                OWNER_EMAIL,
+                "KOJO — %s mission(s) sans aucune proposition" % len(sans),
+                "%s mission(s) ouverte(s) sur %s attendent depuis plus de %s jour(s) "
+                "SANS AUCUNE proposition (la plus ancienne depuis %s jour(s)).\n\n"
+                "Conséquence : l'offre existe et personne ne postule — la place ne "
+                "se remplit pas. À vérifier : le prix demandé, la ville et la "
+                "catégorie (un métier sans travailleur inscrit dans cette ville ne "
+                "recevra jamais de candidature), et la visibilité de la mission "
+                "(GET /api/jobs?status=open).\n"
+                "Le RETOUR de la file à zéro, ou une proposition reçue faisant "
+                "BAISSER le compte, ne déclenche aucun email ; une mission de plus "
+                "qui vieillit fait grandir la file et rouvre donc une alerte.\n"
+                % (len(sans), len(missions), MISSIONS_SANS_PROPOSITION_JOURS, plus_ancienne),
+            )
+            alerte_envoyee = True
+        except Exception as exc:
+            alerte_erreur = str(exc)[:_EMAIL_ALERT_DETAIL_MAX]
+            logger.warning("⚠️ Email d'alerte missions sans proposition échoué: %s" % exc)
+    else:
+        alerte_erreur = "OWNER_EMAIL non configuré"
+        logger.warning(
+            "⚠️ Alerte missions sans proposition : OWNER_EMAIL absent — la "
+            "notification in-app est le seul canal."
+        )
+
+    changement["etat"] = "alertee"
+    changement["alertee_pour"] = len(sans)
+    changement["alertee_at"] = now
+    changement["alerte_envoyee"] = alerte_envoyee
+    changement["alerte_erreur"] = alerte_erreur
+    await collection.update_one(
+        {"_id": _MISSIONS_SANS_PROPOSITION_SUBJECT}, {"$set": changement}, upsert=True
+    )
+    resume["etat"] = "alertee"
+    resume["alertes"] = 1
+    logger.warning(
+        "🚨 %s mission(s) sans proposition depuis plus de %s jour(s) — alerte "
+        "envoyée (email=%s)." % (len(sans), MISSIONS_SANS_PROPOSITION_JOURS, alerte_envoyee)
+    )
+    return resume
+
+
+async def missions_sans_proposition_alert_loop():
+    """Tâche de fond : juge périodiquement les missions sans candidature.
+
+    Même modèle que les autres boucles : sommeil d'abord, annulable au
+    shutdown, erreurs isolées par itération, et un BAIL par passage (N machines
+    n'alertent pas N fois). Le travail vit dans
+    `missions_sans_proposition_alert_once` : appelable avec une horloge.
+    """
+    while True:
+        try:
+            await asyncio.sleep(MISSIONS_SANS_PROPOSITION_INTERVALLE_MINUTES * 60)
+            await executer_si_bail(
+                "missions_sans_proposition_alert",
+                timedelta(minutes=MISSIONS_SANS_PROPOSITION_INTERVALLE_MINUTES),
+                missions_sans_proposition_alert_once,
+            )
+        except asyncio.CancelledError:
+            break
+        except Exception as exc:
+            logger.warning(f"⚠️ Erreur alerte missions sans proposition: {exc}")

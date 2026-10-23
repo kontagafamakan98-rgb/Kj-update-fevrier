@@ -4,8 +4,10 @@ Ce document est le contrat de collecte de `GET /metrics`
 ([`kojo_metrics.py`](kojo_metrics.py), route dans [`server.py`](server.py)).
 Chaque famille listée ci-dessous vient d'un compteur que le produit tient
 **déjà** (`kojo_live.bus_stats`, `kojo_live.partage_stats`,
-`kojo_rate_limit.rate_limit_stats`, `kojo_auth_core.revocation_stats`) : aucune
-mesure n'est calculée à la demande, et la route ne fait aucune I/O.
+`kojo_rate_limit.rate_limit_stats`, `kojo_auth_core.revocation_stats`) — sauf
+`kojo_missions_ouvertes`, le seul chiffre que la base seule connaît : la route
+en fait une lecture bornée par scrape (voir plus bas), et `kojo_metrics` reste
+sans I/O.
 
 ## Pourquoi une route protégée
 
@@ -144,6 +146,25 @@ process — `en_memoire` seul laisserait croire au partage.
 | `kojo_revocation_verifications_total` | counter | Vérifications abouties (liste noire lue) |
 | `kojo_revocation_echecs_total` | counter | Vérifications impossibles : jeton accepté sans liste noire (repli fail-open) |
 | `kojo_revocation_dernier_echec_timestamp_seconds` | gauge | Dernier échec (0 = aucun) |
+
+### Corpus de la place de marché
+
+| Série | Type | Sens |
+|---|---|---|
+| `kojo_missions_ouvertes` | gauge | Missions `open` en base, non supprimées. **0 = place de marché vide**, donc aucun effet de réseau, aucune fiche à indexer et un revenu nul |
+
+C'est la seule famille qui vient de la BASE : la route fait un `count_documents`
+indexé au moment du scrape (une lecture toutes les 30 s), et `kojo_metrics`
+reste sans I/O — le chiffre lui est passé. Si la lecture échoue, la jauge est
+**omise** et les autres familles restent publiées : un `0` inventé ferait
+passer une panne de base pour une place vide, et une alerte se déclencherait
+sur la mauvaise cause. Le 23/10/2026, la production comptait zéro mission
+ouverte sans qu'aucun tableau de bord ne le dise — cette jauge est le remède
+minimal, et la MÊME règle de comptage est lue par
+`kojo_scheduler.marche_vide_alert_once` : la série se collecte avec une alerte
+`kojo_missions_ouvertes == 0` maintenue pendant plus de 24 h, ET le backend la
+dit lui-même au propriétaire (`MARCHE_VIDE_ALERTE_HEURES`) une fois par
+épisode — un tableau de bord qui ne se consulte pas ne corrige rien.
 
 ## Ce que ces chiffres ne disent pas
 

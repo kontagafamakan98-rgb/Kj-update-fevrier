@@ -298,10 +298,23 @@ const WorkerProfile = () => {
 
       {/* La mesure qui fait choisir : les missions TERMINÉES. Une valeur
           absente s'écrit comme une absence (—), jamais comme un zéro. */}
-      <dl className="mt-6">
+      <dl className="mt-6 flex flex-wrap gap-4">
         <div className="carte-publique carte-editoriale max-w-xs">
           <dt className="text-xs uppercase tracking-wide text-stone-500">{t('completedJobs')}</dt>
           <dd className="mt-1 text-2xl font-bold text-stone-900">{stats.missions_completed ?? '—'}</dd>
+        </div>
+        {/* Le SEUL chiffre négatif de la réputation, publié même à zéro : une
+            fiche qui tairait les litiges laisserait croire que le sujet n'est
+            pas suivi. La précision « en faveur du client » n'apparaît que
+            lorsqu'il y en a — un « 0 » suffit pour le reste. */}
+        <div className="carte-publique carte-editoriale max-w-xs" data-section="litiges-travailleur">
+          <dt className="text-xs uppercase tracking-wide text-stone-500">{t('workerDisputesLabel')}</dt>
+          <dd className="mt-1 text-2xl font-bold text-stone-900">{stats.disputes_total ?? '—'}</dd>
+          {Number(stats.disputes_lost) > 0 && (
+            <p className="mt-1 text-xs text-stone-600">
+              {t('workerDisputesLost').replace('{count}', String(stats.disputes_lost))}
+            </p>
+          )}
         </div>
       </dl>
 

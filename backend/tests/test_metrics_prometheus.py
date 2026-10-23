@@ -236,6 +236,50 @@ class TestBranchement:
         )
 
 
+class TestCorpus:
+    """La mesure qui manquait : une place de marché VIDE se publie.
+
+    Le 23/10/2026, la production comptait zéro mission ouverte sans qu'aucun
+    tableau de bord ne le dise — et les sondes de SEO rendaient des prémisses
+    depuis onze jours. Le chiffre vient de la base (une lecture par scrape) ;
+    une lecture en panne l'OMET au lieu d'inventer zéro, sinon une panne de
+    base se lirait comme une place vide.
+    """
+
+    async def test_la_jauge_compte_les_missions_vivantes_seulement(
+        self, client: AsyncClient, monkeypatch
+    ):
+        monkeypatch.setattr(kojo_metrics, "METRICS_TOKEN", JETON)
+        from tests.conftest import db_insert
+
+        await db_insert("jobs", {"id": "ouverte-1", "status": "open"})
+        await db_insert("jobs", {"id": "ouverte-2", "status": "open"})
+        await db_insert("jobs", {"id": "supprimee", "status": "open", "deleted": True})
+        await db_insert("jobs", {"id": "en-cours", "status": "in_progress"})
+
+        texte = await _lire(client, ENTETE)
+
+        assert _valeur(texte, "kojo_missions_ouvertes") == "2"
+
+    async def test_une_lecture_en_panne_omet_la_jauge_sans_inventer_zero(
+        self, client: AsyncClient, monkeypatch
+    ):
+        monkeypatch.setattr(kojo_metrics, "METRICS_TOKEN", JETON)
+        import server as serveur
+
+        async def _panne(*args, **kwargs):
+            raise RuntimeError("base injoignable")
+
+        monkeypatch.setattr(serveur.db.jobs, "count_documents", _panne)
+
+        texte = await _lire(client, ENTETE)
+
+        assert "kojo_missions_ouvertes" not in texte
+        # Les compteurs mémoire restent publiés : une panne de base ne rend pas
+        # l'exposition muette.
+        assert "kojo_live_bus_publies_total" in texte
+
+
 class TestCollecteDeclaree:
     """Une famille non documentée est une famille que personne ne collecte."""
 

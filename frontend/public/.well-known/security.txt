@@ -1,0 +1,4 @@
+Contact: mailto:kojoapp98@gmail.com
+Expires: 2027-10-23T00:00:00.000Z
+Preferred-Languages: fr, en
+Canonical: https://kojoforafrica.cc.cd/.well-known/security.txt

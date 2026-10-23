@@ -68,6 +68,33 @@ class OwnerService {
     }
   }
 
+  /** Paliers de commission : configuration courante + taux de croisière.
+   *  Les deux chiffres vont ensemble — « lancement 0 % » ne se lit pas sans le
+   *  taux auquel il se compare.
+   *  @returns {Promise<object>} {status, paliers, taux_standard_percent}. */
+  async getCommissionTiers() {
+    try {
+      return await api.get('/owner/commission-paliers');
+    } catch (error) {
+      safeLog.error('❌ Erreur lecture paliers de commission:', error);
+      throw this._translateOwnerError(error, `Erreur serveur: ${error?.response?.status || 'inconnu'}`);
+    }
+  }
+
+  /** Enregistre les paliers de commission (propriétaire uniquement) et rend la
+   *  configuration RÉELLEMENT relue par le serveur.
+   *  @returns {Promise<object>} {status, message, paliers}. */
+  async updateCommissionTiers(paliers) {
+    try {
+      return await api.post('/owner/commission-paliers', paliers);
+    } catch (error) {
+      safeLog.error('❌ Erreur écriture paliers de commission:', error);
+      const detail = error?.response?.data?.detail;
+      if (detail) throw new Error(detail);
+      throw this._translateOwnerError(error, `Erreur serveur: ${error?.response?.status || 'inconnu'}`);
+    }
+  }
+
   /** @returns {Promise<object>} Journal métier d'une mission (propriétaire uniquement). */
   async getMissionBusinessEvents(jobId) {
     try {

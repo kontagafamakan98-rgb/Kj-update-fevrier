@@ -1,0 +1,59 @@
+# Dépendances : mises à jour automatisées, une fois par semaine.
+#
+# POURQUOI CE FICHIER. Le dépôt vérifie déjà ce qu'il INSTALLE (lock backend
+# avec empreintes SHA-256, `pip-audit` sur le lock, `npm audit` en CI, scan de
+# secrets) — mais il ne proposait rien pour SORTIR d'une version vulnérable :
+# une CVE publiée dans une dépendance transitive se découvrait à la main, ou au
+# moment où `pip-audit`/`npm audit` rougissait une PR sans rapport. Une PR
+# automatique n'est pas un verdissement : elle arrive avec la version corrigée,
+# les tests du dépôt la jugent, et le lock est régénéré par le même script que
+# le reste (`backend/scripts/maj_lock_requirements.py`, sur 3.11).
+#
+# CE QU'IL NE REMPLACE PAS : les gates de CI. Dependabot ouvre des PR ; il ne
+# fusionne rien, et une PR qui casse un test reste rouge.
+#
+# Cadence HEBDOMADAIRE et par lot : sur un dépôt à ~70 distributions Python,
+# une PR par paquet ferait plusieurs dizaines de PR par semaine et noierait les
+# vraies. Les correctifs de SÉCURITÉ, eux, ne sont pas regroupés à tort : un
+# `pull_request` de sécurité arrive seul et se lit pour lui-même.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "05:00"
+      timezone: "Africa/Dakar"
+    open-pull-requests-limit: 5
+    groups:
+      frontend-prod:
+        patterns: ["*"]
+        dependency-type: "production"
+      frontend-dev:
+        patterns: ["*"]
+        dependency-type: "development"
+
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "05:00"
+      timezone: "Africa/Dakar"
+    open-pull-requests-limit: 5
+    groups:
+      backend-python:
+        patterns: ["*"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "05:00"
+      timezone: "Africa/Dakar"
+    open-pull-requests-limit: 5
+    groups:
+      actions:
+        patterns: ["*"]

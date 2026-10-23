@@ -937,5 +937,9 @@
   "iconContactWhatsapp": "💬",
   "iconContactSendEmail": "✉️",
   "iconContactAddress": "📍",
-  "faqMarker": "+"
+  "faqMarker": "+",
+  "commissionTierLancement": "Komisio amul ci sa liggéey yi njëkk (offre u njëkk).",
+  "commissionTierRecurrent": "Komisio bi wàññi na: tarif fidélité bi ñu koy jefandikoo.",
+  "workerDisputesLabel": "Xeex",
+  "workerDisputesLost": "ci bi {count} ci client bi"
 }

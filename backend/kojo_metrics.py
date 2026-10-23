@@ -127,13 +127,20 @@ def _compteur(valeur) -> str:
     return str(max(0, nombre))
 
 
-def rendre() -> str:
+def rendre(corpus: Optional[dict] = None) -> str:
     """Texte d'exposition Prometheus (format texte 0.0.4).
 
     Une famille par chiffre : `# HELP` dit ce que le chiffre signifie quand il
     monte, `# TYPE` dit comment le lire (un compteur qui redescend est un bug,
     une jauge qui ne bouge pas n'en est pas un). Les valeurs viennent des
     accesseurs des modules propriétaires — aucune recopie d'état ici.
+
+    `corpus` porte les chiffres que la BASE seule connaît (aujourd'hui le
+    nombre de missions ouvertes). Il est calculé par la ROUTE, pas ici : ce
+    module reste sans I/O, et un scrape ne dépend que d'une lecture faite une
+    fois, au moment où le texte est rendu. Absent (tests unitaires, ou lecture
+    en panne), la jauge n'est pas publiée — une valeur inventée à 0 se lirait
+    comme une place de marché vide.
     """
     bus = bus_stats()
     partage = partage_stats()
@@ -279,6 +286,18 @@ def rendre() -> str:
         "Dernier echec de verification de revocation (0 = aucun).",
         _epoch(revocation.get("dernier_echec")),
     )
+
+    # ── Corpus (lu en base par la route, jamais ici) ────────────────────────
+    # C'est la mesure qui manquait le plus : le 23/10/2026 la production
+    # comptait ZÉRO mission ouverte, et aucun tableau de bord ne le disait —
+    # les sondes de SEO rendaient des prémisses pendant onze jours. Une place
+    # de marché vide est un incident d'exploitation, et il se publie comme tel.
+    if corpus is not None and corpus.get("missions_ouvertes") is not None:
+        jauge(
+            "kojo_missions_ouvertes",
+            "Missions ouvertes en base (place de marche VIDE quand la valeur est 0).",
+            corpus.get("missions_ouvertes"),
+        )
 
     # Le format texte se termine par un saut de ligne : un corps sans lui est
     # encore lisible, mais un client strict peut refuser la derniere ligne.
