@@ -68,10 +68,10 @@ jobs:
     # patienter jusqu'à l'abandon du runner (360 min) au lieu de rougir.
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
@@ -83,7 +83,7 @@ jobs:
 
       - name: Cache Playwright Chromium binaries
         id: playwright-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           # `restore-keys` : la clé exacte reste liée au lock, mais un changement

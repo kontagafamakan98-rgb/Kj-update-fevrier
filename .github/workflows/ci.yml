@@ -23,21 +23,21 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # `pyflakes` est installé à chaque run (non épinglé, donc rien dans le
       # dépôt ne dit quelle version il faut) : la clé de cache ne peut pas
       # décrire ce qui est installé, elle suit donc le fichier de référence des
       # dépendances Python du dépôt — comme `backend-tests` et `lighthouse-ci`.
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: backend/requirements.lock
 
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: npm
@@ -159,7 +159,7 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # actionlint : validité syntaxe ET sémantique de ci.yml (expressions
       # ${{ }}, if:, needs, uses, concurrency...). L'action officielle scane
@@ -357,10 +357,10 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
@@ -457,10 +457,10 @@ jobs:
           - 6379:6379
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
@@ -708,12 +708,12 @@ jobs:
       # (`git rev-list -1 HEAD -- frontend/`, plus bas) : sur un clone
       # superficiel, ce calcul ne verrait que le commit poussé et la seconde
       # révision acceptée serait toujours fausse.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: npm
@@ -793,7 +793,7 @@ jobs:
       # non plus : il n'y a rien à lui livrer, donc rien à mesurer. Durée de vie
       # courte, le consommateur étant le job suivant du même run.
       - name: Publier le build pour le rapport de taille
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-frontend
           path: frontend/build
@@ -1518,7 +1518,7 @@ jobs:
       # sans sa mesure dirait « non mesuré » pour un câblage cassé, plus difficile
       # à lire qu'un step en échec qui nomme sa cause.
       - name: Publier la mesure de livraison pour le commentaire de PR
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: retard-livraison
           path: frontend/.bundle-size/livraison.md
@@ -1554,12 +1554,12 @@ jobs:
     steps:
       # Historique complet : la cadence de livraison compare la révision (la tête
       # de la PR) à `origin/main`, que seul un clone complet fournit.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: npm
@@ -1575,7 +1575,7 @@ jobs:
       # « exactement les mêmes entrées » — une égalité qu'un commentaire ne
       # garantit pas et que deux builds séparés ne peuvent pas tenir.
       - name: Récupérer le build mesuré par frontend-build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-frontend
           path: frontend/build
@@ -1587,7 +1587,7 @@ jobs:
       # Absente au tout premier run : le rapport le dit au lieu d'inventer un
       # écart (« première mesure »).
       - name: Restore size baseline (main)
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: frontend/.bundle-size
           key: bundle-size-baseline-${{ github.sha }}
@@ -1606,7 +1606,7 @@ jobs:
       # mesure plus rien ici, il LIT une mesure — et un artefact manquant est un
       # câblage cassé, donc un échec nommé, pas un rapport muet.
       - name: Récupérer la mesure de livraison (prise une seule fois par run)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: retard-livraison
           path: frontend/.bundle-size
@@ -1637,7 +1637,7 @@ jobs:
 
       - name: Save size baseline (main only)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: frontend/.bundle-size
           key: bundle-size-baseline-${{ github.sha }}
@@ -1750,10 +1750,10 @@ jobs:
       pull-requests: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: npm
@@ -1765,7 +1765,7 @@ jobs:
 
       - name: Cache Playwright browser binaries
         id: playwright-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           # Le suffixe `v2` accompagne le passage à trois moteurs : les caches
@@ -1862,7 +1862,7 @@ jobs:
       # sur une exécution verte, c'est-à-dire presque toujours.
       - name: Upload Playwright report and engine gaps (always)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           # Le rapport HTML, le RÉSUMÉ des écarts placé DANS le rapport
@@ -1945,10 +1945,10 @@ jobs:
           - 27017:27017
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: npm
@@ -2033,7 +2033,7 @@ jobs:
       # n'est capturé par aucun motif yargs, et un test l'exige.
       - name: Set up Python 3.11 (repli local)
         if: ${{ !env.KOJO_LHCI_BASE_URL }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
@@ -2361,7 +2361,7 @@ jobs:
       # diagnostiquer un échec de budget). Toujours uploadés, même si le
       # job échoue (if: always()).
       - name: Upload Lighthouse reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: lighthouse-reports
@@ -2371,7 +2371,7 @@ jobs:
       # sans eux, un rouge sur le repli ne dit pas si c'est le backend, le
       # serveur de rewrites ou le cycle qui a échoué.
       - name: Upload local stack logs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: local-stack-logs
@@ -2387,7 +2387,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # EN PREMIER, avant Node/Java/SDK : ce contrôle répond en 0,17 s (mesuré)
       # là où le step APK ne démarre qu'à +39 s du job (mesuré sur le run
@@ -2401,7 +2401,7 @@ jobs:
         run: python3 .github/scripts/check-exec-bits.py
 
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: npm
@@ -2425,7 +2425,7 @@ jobs:
       # échoue sur « invalid source release: 21 ». Gradle 8.14 et AGP 8.13
       # supportent Java 21.
       - name: Set up Java 21 (Capacitor 8 / AGP 8.13)
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
@@ -2438,7 +2438,7 @@ jobs:
       # (compileSdk, variables.gradle) au premier build, les licences étant
       # acceptées juste en dessous.
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
         with:
           packages: 'platform-tools'
 
@@ -2508,7 +2508,7 @@ jobs:
       # HISTORIQUE COMPLET, exigé par la vérification de révision (politique du
       # job) : sur un clone superficiel, `git rev-list -1 HEAD -- backend/` ne
       # verrait qu'un commit et le garde refuserait de conclure (code 2).
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -2516,7 +2516,7 @@ jobs:
       # rien à redéployer pour un push qui ne touche que le frontend/docs.
       - name: Detect backend changes
         id: changes
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         with:
           filters: |
             backend:
@@ -2606,10 +2606,10 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24
 
@@ -2624,7 +2624,7 @@ jobs:
       # puisse dire de re-résoudre l'arbre — et un audit rejoué à l'identique
       # n'a pas à re-télécharger sa chaîne de dépendances.
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
@@ -2700,7 +2700,7 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # La plage se calcule contre la branche de base : sans historique, le
           # `git fetch` ci-dessous ne peut pas matérialiser `origin/<base>` et

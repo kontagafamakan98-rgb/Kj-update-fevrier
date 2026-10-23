@@ -66,13 +66,13 @@ jobs:
     # jusqu'à l'abandon du runner.
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Pas de `npm ci` : la sonde n'importe que des modules du dépôt et la
       # stdlib de Node. Installer la suite complète ajouterait un mode d'échec
       # (registre npm indisponible) qui masquerait le verdict cherché.
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
 

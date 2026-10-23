@@ -56,10 +56,10 @@ jobs:
     # patienter jusqu'à l'abandon du runner (360 min) au lieu de rougir.
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
 

@@ -67,10 +67,10 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: npm
@@ -113,7 +113,7 @@ jobs:
       # LHR run par run. `lhr-locaux` porte un fichier par run
       # (`<route>-<preset>-<i>.json`) plus `distribution-speed-index.json`.
       - name: Publier les LHR et la distribution
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: lhr-locaux
