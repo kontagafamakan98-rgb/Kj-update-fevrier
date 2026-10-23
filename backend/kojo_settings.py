@@ -698,8 +698,9 @@ AI_GATEWAY_TIMEOUT_SECONDS = int(os.environ.get('NEON_AI_GATEWAY_TIMEOUT_SECONDS
 # GLOBAUX, et lus à chaque demande — un assistant qui coûte plus qu'il ne rend
 # service doit s'arrêter tout seul, sans déploiement.
 #
-# Défauts : 200 appels et 250 000 caractères de prompt par jour. À 700 jetons de
-# réponse au plus par appel (le défaut de `chat_completion`) et un prompt borné
+# Défauts : 200 appels et 250 000 caractères de prompt par jour. À 2 000 jetons
+# de réponse au plus par appel (le défaut de `chat_completion`, raisonnement
+# compris) et un prompt borné
 # à 16 tours de 2 000 caractères par le modèle d'entrée, c'est la borne qu'on
 # accepte de payer quotidiennement pour une fonctionnalité facultative ; la
 # baisser est un choix d'exploitation, la monter un choix budgétaire.

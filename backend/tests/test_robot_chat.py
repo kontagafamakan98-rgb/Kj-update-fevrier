@@ -26,6 +26,7 @@ import pytest
 
 import kojo_ai_gateway
 import kojo_routers_support as support
+import kojo_support_assistant as politique
 from kojo_ai_gateway import AiGatewayError
 from kojo_rate_limit import get_rate_limit_bucket
 
@@ -73,6 +74,75 @@ class TestAssistantDesactive:
         await client.post(CHAT, json={"messages": [{"role": "user", "content": "Bonjour"}]})
 
         assert appels == [], "un assistant désactivé ne doit pas appeler le modèle (coût inutile)"
+
+
+# ---------------------------------------------------------------------------
+# Les procédures du produit
+# ---------------------------------------------------------------------------
+
+class TestProceduresDuProduit:
+    """L'assistant doit GUIDER, pas seulement escalader.
+
+    Sans ce bloc, il répondait « je ne sais pas » à « comment publier une
+    mission ? » — alors que le site a une page, des boutons et des délais. Le
+    test ne juge pas la prose : il juge que les parcours que la personne vient
+    chercher y sont, avec le libellé qu'elle voit à l'écran.
+    """
+
+    def test_les_quatre_parcours_sont_poses(self):
+        prompt = support.robot_system_prompt()
+
+        for attendu in (
+            "Publier un emploi",
+            "/create-job",
+            "Déclarer le travail terminé",
+            "Valider et payer le travailleur",
+            "Ouvrir un litige",
+            "code à 6 chiffres",
+        ):
+            assert attendu in prompt, (
+                f"« {attendu} » manque : l'assistant retomberait sur « je ne sais pas » "
+                "devant un parcours que le site explique pourtant"
+            )
+
+    def test_le_versement_est_automatique_et_les_delais_du_produit_sont_cites(self):
+        prompt = support.robot_system_prompt()
+
+        assert "pas de demande de retrait" in prompt, (
+            "un travailleur qui cherche un bouton « retirer » ne doit pas être envoyé "
+            "chercher un écran qui n'existe pas : le versement est automatique"
+        )
+        assert "7 jours" in prompt, "la libération automatique se dit (règle du produit)"
+        assert "5 jours" in prompt, "la fenêtre d'arbitrage du litige se dit aussi"
+
+    def test_interdire_la_promesse_ne_mure_pas_les_delais_du_produit(self):
+        prompt = support.robot_system_prompt()
+
+        assert "règle générale" in prompt, (                        "la nuance : les délais publics se citent sans engager ce dossier ; "
+            "sans elle, l'assistant refuse de dire 7 jours et paraît ignorant"
+        )
+        assert "Ne donne JAMAIS de montant" in prompt, (
+            "citer les délais ne rouvre pas l'accès aux montants d'un compte"
+        )
+
+    def test_la_reponse_ne_doit_pas_contenir_le_raisonnement(self):
+        """Mesuré le 23/10/2026 : le champ de réponse contenait le brouillon du
+        modèle (« Wait, should I include ticket? No… ») avant la vraie réponse.
+        Ce texte part TEL QUEL au client : la consigne doit rester dans le prompt.
+        """
+        prompt = support.robot_system_prompt()
+
+        assert "UNIQUEMENT la réponse finale" in prompt, (
+            "sans cette consigne, le raisonnement du modèle est rendu au visiteur"
+        )
+
+    def test_le_canal_whatsapp_garde_ses_consignes_avec_les_procedures(self):
+        prompt = support.robot_system_prompt(detecter_la_langue=True, canal="whatsapp")
+
+        assert "Publier un emploi" in prompt, "la politique est la même sur les deux canaux"
+        assert politique.CONSIGNE_SANS_FORMULAIRE in prompt, (
+            "sur WhatsApp il n'y a ni formulaire ni bouton : la consigne doit rester"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -340,6 +410,11 @@ class TestClientDuGateway:
         assert envoye["url"].endswith("/v1/chat/completions"), envoye["url"]
         assert envoye["headers"]["Authorization"] == "Bearer nt_live_test"
         assert envoye["json"]["model"] == "claude-haiku-4-5"
+        assert envoye["json"]["max_tokens"] >= 1500, (
+            "le raisonnement du modèle compte dans le même plafond : un défaut trop "
+            "bas coupait la réponse en pleine phrase (mesuré : 610-750 jetons de "
+            "raisonnement avant le premier mot de la réponse)"
+        )
         assert envoye["timeout"] == kojo_ai_gateway.AI_GATEWAY_TIMEOUT_SECONDS, (
             "un appel modèle sans borne de temps bloquerait le worker"
         )
@@ -351,6 +426,20 @@ class TestClientDuGateway:
             pytest.param(_FauxReponse(payload={"choices": []}), "sans texte", id="reponse sans choix"),
             pytest.param(_FauxReponse(payload=None), "sans texte", id="corps non JSON"),
             pytest.param(_reponse_modele("   "), "vide", id="texte blanc"),
+            pytest.param(
+                _FauxReponse(
+                    payload={
+                        "choices": [
+                            {
+                                "message": {"content": "Je ne peux pas voir ton paiement"},
+                                "finish_reason": "length",
+                            }
+                        ]
+                    }
+                ),
+                "tronquée",
+                id="plafond de jetons atteint",
+            ),
         ],
     )
     def test_les_echecs_sont_nommes(self, monkeypatch, reponse, attendu):
@@ -362,6 +451,58 @@ class TestClientDuGateway:
             kojo_ai_gateway.chat_completion([{"role": "user", "content": "Bonjour"}])
 
         assert attendu in str(erreur.value)
+
+    def test_une_reponse_tronquee_est_rejouee_avec_une_borne_doublee(self, monkeypatch):
+        """Le plafond est un défaut de BORNE, pas de service : un second essai
+        le corrige, là où un 502 aurait rendu le visiteur sans réponse."""
+        plafonds = []
+
+        def faux_post(url, headers=None, json=None, timeout=None):
+            plafonds.append(json["max_tokens"])
+            if len(plafonds) == 1:
+                return _FauxReponse(
+                    payload={
+                        "choices": [
+                            {"message": {"content": "Je ne peux pas voir ton"}, "finish_reason": "length"}
+                        ]
+                    }
+                )
+            return _reponse_modele("Réponse complète")
+
+        monkeypatch.setattr(kojo_ai_gateway, "AI_GATEWAY_BASE_URL", "https://branche-api.ai.example.tech")
+        monkeypatch.setattr(kojo_ai_gateway, "AI_GATEWAY_TOKEN", "nt_live_test")
+        monkeypatch.setattr(kojo_ai_gateway.requests, "post", faux_post)
+
+        texte = kojo_ai_gateway.chat_completion([{"role": "user", "content": "Bonjour"}])
+
+        assert texte == "Réponse complète"
+        assert plafonds == [2000, 4000], plafonds
+        assert plafonds[1] > plafonds[0], "le nouvel essai doit offrir plus de place, pas la même"
+
+    def test_une_troncature_qui_resiste_ne_boucle_pas(self, monkeypatch):
+        """Deux essais au plus : un raisonnement en boucle ne doit ni payer
+        l'attente sans fin ni empiler les appels au modèle."""
+        plafonds = []
+
+        def faux_post(url, headers=None, json=None, timeout=None):
+            plafonds.append(json["max_tokens"])
+            return _FauxReponse(
+                payload={
+                    "choices": [
+                        {"message": {"content": "coupé"}, "finish_reason": "length"}
+                    ]
+                }
+            )
+
+        monkeypatch.setattr(kojo_ai_gateway, "AI_GATEWAY_BASE_URL", "https://branche-api.ai.example.tech")
+        monkeypatch.setattr(kojo_ai_gateway, "AI_GATEWAY_TOKEN", "nt_live_test")
+        monkeypatch.setattr(kojo_ai_gateway.requests, "post", faux_post)
+
+        with pytest.raises(AiGatewayError) as erreur:
+            kojo_ai_gateway.chat_completion([{"role": "user", "content": "Bonjour"}])
+
+        assert "tronquée" in str(erreur.value)
+        assert len(plafonds) == 2, "un troisième appel ne se justifie pas"
 
     def test_une_panne_reseau_ne_laisse_pas_fuir_l_hote(self, monkeypatch):
         def refuse(*a, **k):

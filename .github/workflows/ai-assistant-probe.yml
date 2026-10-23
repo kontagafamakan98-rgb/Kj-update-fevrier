@@ -1,0 +1,42 @@
+name: Sonde de l'assistant support (daily)
+
+# ─── Sonde quotidienne de l'assistant support, en PRODUCTION ────────────────
+# `POST /api/support/robot/chat` est la seule route qui parle à un modèle : elle
+# a rendu un 502 (plafond de jetons épuisé), puis une réponse vide, puis un
+# texte qui ne citait aucune étape du produit — chaque fois sans que rien ne
+# rougisse. Cette sonde pose TROIS questions de référence (publier une mission,
+# être payé, litige) et juge la réponse SERVIE :
+#   * 200 exigé, un 502/503 est refusé en le NOMMANT ;
+#   * réponse non vide (plancher de longueur) ;
+#   * l'étape attendue est citée (`/create-job`, « versement », « litige ») ;
+#   * le texte est FINAL : ni brouillon (« Wait, should I include ticket? »,
+#     « Let me think », « Draft: »), ni phrase servie deux fois, ni marqueur
+#     `[KOJO_TICKET]` visible — le modèle avait rendu son raisonnement dans le
+#     champ que le visiteur lit.
+# Trois sorties : 0 conforme, 1 refus nommé, 2 prémisse (budget du jour atteint,
+# ou URL inutilisable) — une prémisse n'est jamais un vert.
+# Elle ne coûte que trois appels par jour au modèle.
+on:
+  schedule:
+    # 07:32 UTC : après les autres sondes de production de la matinée
+    - cron: '32 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  assistant-probe:
+    name: Sonde de l'assistant support
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Interroger l'assistant sur les trois parcours de référence
+        run: python backend/scripts/check_ai_assistant_probe.py
