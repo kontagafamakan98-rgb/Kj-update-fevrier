@@ -1732,6 +1732,12 @@ jobs:
     # test (runs 39827179335 et sa reprise). Une fois le cache réamorcé, la
     # suite tient largement dans 30 min ; le délai ne change AUCUN critère, il
     # cesse seulement de confondre « installation lente » et « tests rouges ».
+    #
+    # Le 23/10/2026 la même panne est revenue (run 39892471253) : cache froid,
+    # 19 min dans l'installation, job coupé à 30 min. Le budget n'a PAS été
+    # rallongé : l'étape d'installation est désormais PLAFONNÉE (12 min) et
+    # réessayée (voir plus bas), de sorte qu'une lenteur réseau coûte au pire
+    # ~10 min en se nommant, et laisse toujours au moins 18 min à la suite.
     timeout-minutes: 30
     needs: frontend-build
     # Le tableau des écarts par moteur est publié en COMMENTAIRE de PR (même
@@ -1780,14 +1786,46 @@ jobs:
           restore-keys: |
             playwright-browsers-v2-${{ runner.os }}-
 
-      - name: Install Playwright browser dependencies (and binaries if cache miss)
+      # L'INSTALLATION EST BORNÉE, et c'est l'attente qui l'est — pas le budget.
+      # Jusqu'au 23/10/2026 cette étape n'avait aucun plafond propre : sur le
+      # run de `main` 39892471253 elle a consommé **19 min des 30 du job**
+      # (cache froid, ~500 Mo de binaires), puis le job a été coupé avant que
+      # la suite ne tourne. Un job rouge pour un fait de réseau apprend
+      # seulement à ignorer le rouge.
+      #
+      # Ce qui empêche la répétition, sans allonger le délai :
+      #   • un plafond d'ÉTAPE (12 min), très en dessous des 30 du job, donc un
+      #     blocage échoue dans l'installation en la NOMMANT, et laisse au
+      #     moins 18 min au build et aux tests ;
+      #   • chaque tentative est bornée par `timeout` 300 s : une stall coûte
+      #     cinq minutes et une reprise, jamais un quart d'heure ;
+      #   • `PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT` à 30 s, écrit ici pour
+      #     être LU (une connexion qui ne répond pas échoue vite) ;
+      #   • deux tentatives : une lenteur PASSAGÈRE se répare seule, une panne
+      #     réelle échoue vite et le dit.
+      #
+      # `--with-deps` RESTE sur cette ligne : c'est elle que lit le garde du
+      # périmètre multi-moteurs (`moteurs-gestes.js`, « la ligne de CI qui
+      # installe les BINAIRES »), et les bibliothèques système sont l'autre
+      # moitié de la même installation.
+      - name: Install Playwright browsers and system dependencies
         working-directory: frontend
+        # 2 × 300 s + 10 s de pause = 610 s au pire, sous le plafond de 12 min.
+        timeout-minutes: 12
+        env:
+          # Défaut Playwright : 30 s. Écrit ici pour que la valeur soit LUE,
+          # pas héritée d'une version d'outil.
+          PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT: "30000"
         run: |
-          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
-            npx playwright install-deps chromium firefox webkit
-          else
-            npx playwright install --with-deps chromium firefox webkit
-          fi
+          for tentative in 1 2; do
+            if timeout 300 npx playwright install --with-deps chromium firefox webkit; then
+              exit 0
+            fi
+            echo "::warning::installation Playwright interrompue ou en échec (tentative ${tentative}/2), reprise dans 10 s"
+            sleep 10
+          done
+          echo "::error::les moteurs Playwright (chromium, firefox, webkit) n'ont pas pu être installés en deux tentatives — le job échoue ICI, pas dans les tests."
+          exit 1
 
       - name: Build frontend for E2E (fixture API URL)
         working-directory: frontend
