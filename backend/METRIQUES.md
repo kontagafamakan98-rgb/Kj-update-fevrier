@@ -147,6 +147,22 @@ process — `en_memoire` seul laisserait croire au partage.
 | `kojo_revocation_echecs_total` | counter | Vérifications impossibles : jeton accepté sans liste noire (repli fail-open) |
 | `kojo_revocation_dernier_echec_timestamp_seconds` | gauge | Dernier échec (0 = aucun) |
 
+### Relance client
+
+| Série | Type | Sens |
+|---|---|---|
+| `kojo_relances_envoyees_total` | counter | Relances envoyées par ce process (une par mission, après `CLIENT_SANS_PROPOSITION_HEURES`) |
+| `kojo_relances_echecs_total` | counter | Envois échoués : la mission reste à relancer au passage suivant |
+
+Ces deux compteurs disent ce que le process a **envoyé**, pas ce que les
+relances ont **produit**. Un compteur qui monte ne prouve pas qu'il sert :
+l'effet — missions relancées ayant reçu au moins une candidature APRÈS la
+relance, délai médian, taux sous plancher non publié — se mesure sur
+l'historique et se lit dans `GET /owner/relances/mesures`
+(`kojo_scheduler.mesure_relances`, 30 jours, plancher de 10 relances). Comme tous
+les compteurs de ce document, ils sont par process et repartent à zéro au
+redémarrage.
+
 ### Corpus de la place de marché
 
 | Série | Type | Sens |

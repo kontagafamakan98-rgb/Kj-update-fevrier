@@ -774,6 +774,13 @@ class TestBaseDistantePartagee:
             "trouver_ou_creer_pr",
             lambda *a, **k: {"number": 7, "head": {"sha": "a" * 40}},
         )
+        # La tête de la PR est confirmée par une lecture GitHub (voir
+        # test_livrer_tete_pr.py) : ce trajet-ci la simule déjà résolue.
+        monkeypatch.setattr(
+            livraison,
+            "attendre_tete_de_pr",
+            lambda *a, **k: {"number": 7, "head": {"sha": "a" * 40}},
+        )
         monkeypatch.setattr(livraison, "attendre_checks_ci", lambda *a, **k: True)
         monkeypatch.setattr(livraison, "fusionner_pr", lambda *a, **k: "a" * 40)
         monkeypatch.setattr(livraison, "synchroniser_et_nettoyer_local", lambda *a, **k: None)

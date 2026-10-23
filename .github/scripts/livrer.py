@@ -9,8 +9,13 @@ Enchaîne sans rupture :
      sous les yeux ;
   1. Pré-vol local (check-test-environment --avant-push, branches propres)
   2. Push de la branche de travail courante vers origin (sans fuite de secret)
-  3. Détection ou ouverture de la Pull Request sur GitHub
-  4. Attente active des checks du PÉRIMÈTRE DÉCLARÉ de la CI sur le commit de tête
+  3. Détection ou ouverture de la Pull Request sur GitHub, puis CONFIRMATION
+     que sa tête est le commit RÉELLEMENT poussé (`git rev-parse <branche>`) :
+     juste après un push, l'API peut encore rendre l'état d'AVANT (mesuré le
+     23/10/2026, PR #199), et juger les checks de l'ancien commit puis
+     fusionner le nouveau serait un verdict sur le mauvais objet — la
+     livraison attend, puis REFUSE en nommant les deux SHA
+  4. Attente active des checks du PÉRIMÈTRE DÉCLARÉ de la CI sur CE commit
      (`.github/scripts/gate-perimetre.json` : exactement les checks que la
      protection de `main` exige, ni plus ni moins)
   5. Fusion de la PR (méthode configurable : squash ou merge, défaut squash)
@@ -383,6 +388,46 @@ def trouver_ou_creer_pr(branche: str, titre: str | None, corps: str | None, jeto
     pr = appel_github("POST", "pulls", jeton, payload)
     log_succes(f"Pull Request créée : #{pr['number']} - {pr['html_url']}")
     return pr
+
+
+def attendre_tete_de_pr(pr_number: int, sha_attendu: str, jeton: str,
+                        timeout_secondes: int = 90, intervalle: int = 3) -> dict:
+    """Attend que la PR désigne la tête qui vient d'être POUSSÉE.
+
+    POURQUOI CE N'EST PAS UNE FORMALITÉ. Juste après un push, l'API peut encore
+    rendre l'état d'AVANT : mesuré le 23/10/2026 sur la PR #199, `head.sha`
+    valait `77398d61` alors que la branche venait d'être poussée en `ffa59a61`.
+    Le trajet surveillait alors les checks de l'ANCIEN commit, les trouvait
+    verts, et s'apprêtait à fusionner un commit dont il n'avait rien jugé — un
+    verdict sur le mauvais objet.
+
+    Le SHA attendu est un fait LOCAL (`git rev-parse <branche>`, lu par
+    l'appelant) : la propagation GitHub ne peut que le rejoindre. S'il ne le
+    rejoint pas dans la fenêtre, la livraison REFUSE en nommant les deux SHA —
+    jamais elle ne se rabat sur « ce que l'API dit », qui est exactement le
+    comportement qui a menti.
+    """
+    log(
+        "Attente de la tête de la PR #%s : %s (poussée)..."
+        % (pr_number, sha_attendu[:10])
+    )
+    fin = time.time() + timeout_secondes
+    derniere = ""
+    while True:
+        pr = appel_github("GET", f"pulls/{pr_number}", jeton)
+        derniere = ((pr.get("head") or {}).get("sha") or "")
+        if derniere == sha_attendu:
+            log("  Tête confirmée : la PR désigne le commit poussé.")
+            return pr
+        if time.time() >= fin:
+            raise RuntimeError(
+                "la PR #%s désigne %s alors que la branche a été poussée en %s — "
+                "surveiller l'autre commit jugerait des checks qui ne concernent pas "
+                "ce qui sera fusionné. Vérifier que le bon commit est bien celui de "
+                "la branche (ou relancer après la propagation de l'API)."
+                % (pr_number, derniere[:10] or "(aucun SHA rendu)", sha_attendu[:10])
+            )
+        time.sleep(intervalle)
 
 
 def attendre_checks_ci(sha: str, jeton: str, timeout_minutes: int = 25,
@@ -831,15 +876,30 @@ def main(argv=None) -> int:
     else:
         log("Étape push sautée (--skip-push).")
 
-    # 3. PR (recherche ou création)
+    # 2 bis. Le commit que cette livraison va RÉELLEMENT fusionner, lu dans le
+    # dépôt local. C'est le seul fait qui ne dépende pas de la propagation de
+    # l'API : le 23/10/2026, la PR #199 rendait encore l'ancien SHA juste après
+    # le push, et la livraison a surveillé les checks d'un commit qu'elle
+    # n'allait pas fusionner.
+    try:
+        sha_attendu = exec_cmd(["git", "rev-parse", branche])
+    except Exception as exc:
+        log_erreur(f"Impossible de lire la tête de la branche '{branche}' : {exc}")
+        return 1
+    if not sha_attendu:
+        log_erreur(f"La branche '{branche}' n'a pas de commit à livrer.")
+        return 1
+
+    # 3. PR (recherche ou création), puis CONFIRMATION de sa tête
     try:
         pr = trouver_ou_creer_pr(branche, options.titre, options.corps, jeton, options.reprise_pr)
+        pr = attendre_tete_de_pr(pr["number"], sha_attendu, jeton)
     except Exception as exc:
         log_erreur(f"Échec de l'étape PR : {exc}")
         return 1
 
     pr_number = pr["number"]
-    pr_head_sha = pr["head"]["sha"]
+    pr_head_sha = sha_attendu
 
     # 4. Attente des checks CI — ceux du périmètre déclaré, pas « tous les check-runs »
     attendus = noms_attendus(lire_perimetre()[0] or {})

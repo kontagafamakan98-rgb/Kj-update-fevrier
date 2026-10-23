@@ -31,7 +31,7 @@ from kojo_payments import (
 from kojo_routers_jobs import execute_paydunya_refund
 # Helpers du sweeper (kojo_scheduler) : source unique de vérité pour les
 # statuts incertains et le calcul de la durée de blocage.
-from kojo_scheduler import _STUCK_PAYOUT_STATUSES, _stuck_for
+from kojo_scheduler import _STUCK_PAYOUT_STATUSES, _stuck_for, mesure_relances
 from kojo_identifiants import identifiant_query
 
 router = APIRouter()
@@ -614,6 +614,32 @@ async def get_dispute_measures(owner_user = Depends(verify_owner_access)):
         decisions: {...}, reponses: {...}, delai_reponse_decision: {...}}]}.
     """
     return await litiges.mesures_arbitrage()
+
+
+@router.get("/owner/relances/mesures")
+async def get_relance_measures(owner_user = Depends(verify_owner_access)):
+    """Mesures de la RELANCE CLIENT, sur les missions relancées.
+
+    PROPRIÉTAIRE UNIQUEMENT. Les compteurs de `/metrics` disent combien de
+    relances sont parties ; ils ne disent pas si elles ont servi. Ces chiffres
+    répondent à la seule question qui compte : parmi les missions relancées de
+    la fenêtre, combien ont reçu au moins une candidature APRÈS la relance, et
+    après combien de temps.
+
+    Le taux vaut `null` sous `plancher` (un pourcentage sur trois envois est du
+    bruit) et sous une lecture tronquée — on ne sait alors plus quelles missions
+    ont reçu une candidature. Les exclusions sont comptées, jamais recasées : un
+    marqueur illisible ou futur, une candidature antérieure à la relance (la
+    donnée se contredit) et une candidature sans date lisible ont chacun leur
+    compteur.
+
+    Returns:
+        dict: {mesure_le, fenetre_jours, depuis, plancher, relances: {total,
+        lues, tronque}, mesurees, avec_candidature, sans_candidature,
+        taux_candidature, delai_candidature: {n, mediane_heures,
+        moyenne_heures, max_heures}, exclusions: {...}}.
+    """
+    return await mesure_relances()
 
 
 @router.get("/owner/missions/{job_id}/litige")
