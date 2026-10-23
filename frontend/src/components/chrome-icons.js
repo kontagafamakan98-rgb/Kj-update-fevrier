@@ -59,8 +59,14 @@ import { createElement } from 'react';
 export const ICONES = {
   // ── Navigation ────────────────────────────────────────────────────────────
   // La barre du haut (mobile) et le tiroir qu'elle ouvre.
-  menu: 'M4 6h16M4 12h16M4 18h16',
-  fermer: 'M6 18L18 6M6 6l12 12',
+  // Un tracé est un ÉLÉMENT `<path>` — pas sa seule donnée `d`. Une chaîne
+  // `M4 6h16…` injectée dans le `<svg>` devient un NŒUD DE TEXTE, que le
+  // navigateur ne peint jamais : le bouton du menu était donc une zone de
+  // 44 × 44 px SANS DESSIN, invisible sur téléphone alors qu'elle répondait au
+  // doigt (mesuré en production le 23/10/2026 : `<svg>` présent, 24 × 24,
+  // transparent). Le garde est `src/components/__tests__/chrome-icons.test.jsx`.
+  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  fermer: '<path d="M6 18L18 6M6 6l12 12"/>',
   // La barre du bas d'un visiteur non connecté : l'accueil, les emplois, le
   // contact (casque), l'entrée dans le compte.
   accueil:
@@ -93,11 +99,11 @@ export const ICONES = {
     '<rect width="20" height="16" x="2" y="4" rx="2"/>' +
     '<path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"/>',
   // ── Retours et état ───────────────────────────────────────────────────────
-  coche: 'M5 13l4 4L19 7',
+  coche: '<path d="M5 13l4 4L19 7"/>',
   // « Tout lu » : DEUX coches, comme le nom le dit. L'ancien tracé n'en portait
   // qu'une, donc l'icône promettait une action qu'elle ne dessinait pas.
   cocheDouble: '<path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/>',
-  croix: 'M18.364 5.636l-12.728 12.728m0-12.728l12.728 12.728',
+  croix: '<path d="M18.364 5.636l-12.728 12.728m0-12.728l12.728 12.728"/>',
   corbeille:
     '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>' +
     '<path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>' +

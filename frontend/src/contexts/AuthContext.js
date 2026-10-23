@@ -427,6 +427,12 @@ export function AuthProvider({ children }) {
   // utilisés uniquement si le compte est créé.
   const loginWithGoogle = async (profile = {}) => {
     try {
+      // `GoogleButton` importe ce module STATIQUEMENT : il est donc déjà évalué
+      // quand la page est peinte, et cet `import()` ne coûte aucun réseau au
+      // moment du clic. C'est une condition du correctif du 23/10/2026 : un
+      // chargement réseau AVANT `requestCode()` sortait de l'activation du clic,
+      // et le navigateur bloquait la fenêtre Google en silence (bouton qui
+      // « tourne », rien ne s'ouvre — mesuré en production sur mobile).
       const { getGoogleAuthCode } = await import('../utils/googleAuth');
       const code = await getGoogleAuthCode();
       if (!code) return { success: false, cancelled: true };

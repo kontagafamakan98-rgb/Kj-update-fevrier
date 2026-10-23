@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { isGoogleAuthEnabled } from '../utils/googleAuth';
+import { useEffect, useState } from 'react';
+import { isGoogleAuthEnabled, preloadGoogleAuth } from '../utils/googleAuth';
 
 /**
  * Bouton « Continuer avec Google » (SSO). Masqué si le client_id Google n'est
@@ -9,6 +9,12 @@ import { isGoogleAuthEnabled } from '../utils/googleAuth';
  */
 export default function GoogleButton({ onClick, label, disabled = false }) {
   const [loading, setLoading] = useState(false);
+
+  // Le SDK se charge à l'APPARITION du bouton, pas au clic : la fenêtre Google
+  // ne peut s'ouvrir que pendant l'activation du clic (cf. preloadGoogleAuth).
+  useEffect(() => {
+    preloadGoogleAuth();
+  }, []);
 
   if (!isGoogleAuthEnabled()) return null;
 
