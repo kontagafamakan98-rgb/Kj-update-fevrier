@@ -28,6 +28,7 @@ from kojo_settings import (
     AI_GATEWAY_MODEL,
     AI_GATEWAY_TIMEOUT_SECONDS,
     AI_GATEWAY_TOKEN,
+    logger,
 )
 
 # Chemin du dialecte unifié, compatible avec TOUS les modèles du catalogue
@@ -35,6 +36,13 @@ from kojo_settings import (
 # fonctionnalités propres à un fournisseur — pensées étendues, cache de
 # prompt — dont l'assistant support n'a pas besoin).
 CHAT_COMPLETIONS_PATH = "/v1/chat/completions"
+
+# Plafond ABSOLU d'un nouvel essai après troncature. Un modèle qui raisonne
+# peut épuiser n'importe quelle borne sur une question longue : le nouvel essai
+# ne doit donc pas être « la même borne, une fois de plus », mais une borne
+# doublée ET bornée, sinon un raisonnement en boucle ferait payer l'attente
+# sans jamais rendre de réponse.
+PLAFOND_JETONS_MAX = 4096
 
 
 class AiGatewayError(RuntimeError):
@@ -75,59 +83,97 @@ def chat_completion(
     messages: list,
     *,
     temperature: float = 0.2,
-    max_tokens: int = 700,
+    max_tokens: int = 2000,
 ) -> str:
     """Demande une réponse au modèle et rend son texte.
 
     SYNCHRONE (requests) : à appeler via `asyncio.to_thread` depuis une route
     async. Lève `AiGatewayError` avec la cause nommée (statut HTTP, réseau,
-    corps illisible, réponse sans texte) — jamais avec le jeton.
+    corps illisible, réponse tronquée par le plafond, réponse sans texte) —
+    jamais avec le jeton.
 
     Args:
         messages: liste de dicts `{"role": …, "content": …}` (rôles `system`,
             `user`, `assistant`).
         temperature: créativité du modèle ; basse = réponses factuelles.
         max_tokens: plafond de la réponse — borne le coût d'un appel public.
+
+            MESURÉ le 23/10/2026 sur le modèle de production : 610 à 750 jetons
+            partent dans le RAISONNEMENT avant le premier mot de la réponse, et
+            ces jetons comptent dans le même plafond. À 700, la réponse était
+            coupée en pleine phrase (`finish_reason: length`) — ou absente, ce
+            qui rendait un 502 « réponse vide » pour un modèle qui répondait
+            très bien. 2 000 laisse la place au raisonnement ET à la réponse, et
+            un dépassement est rejoué UNE fois avec une borne doublée (voir
+            `PLAFOND_JETONS_MAX`) plutôt que rendu au visiteur en 502.
     """
     if not is_configured():
         raise AiGatewayError("gateway non configuré (NEON_AI_GATEWAY_BASE_URL / NEON_AI_GATEWAY_TOKEN absents)")
 
     url = f"{_valeur_nette(AI_GATEWAY_BASE_URL).rstrip('/')}{CHAT_COMPLETIONS_PATH}"
-    try:
-        response = requests.post(
-            url,
-            headers={
-                "Authorization": f"Bearer {_valeur_nette(AI_GATEWAY_TOKEN)}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": AI_GATEWAY_MODEL,
-                "messages": messages,
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-            },
-            timeout=AI_GATEWAY_TIMEOUT_SECONDS,
-        )
-    except requests.RequestException as exc:
-        # La cause réseau nommée, l'hôte réduit à son domaine : un journal de
-        # production ne doit pas porter l'identifiant de branche en clair.
-        raise AiGatewayError(f"appel au gateway impossible ({type(exc).__name__})")
 
-    if response.status_code != 200:
-        # Le corps d'erreur du gateway nomme le problème (modèle absent du
-        # catalogue, quota, jeton révoqué) : tronqué, c'est le seul diagnostic
-        # utile en production.
-        raise AiGatewayError(
-            f"gateway HTTP {response.status_code} : {response.text[:200]}"
-        )
+    # DEUX essais au plus, jamais une boucle : le premier avec la borne de
+    # l'appelant, le second — UNIQUEMENT si le plafond a coupé la réponse — avec
+    # une borne doublée. Mesuré le 23/10/2026 : le modèle de production a épuisé
+    # 2 000 jetons en raisonnement sur une question d'une phrase, et le client
+    # recevait un 502 alors que la réponse arrivait au second essai. Un échec de
+    # transport ou un statut non 200 ne se rejoue pas : seul le plafond est
+    # rejouable, parce que lui seul est un défaut de BORNE, pas de service.
+    for tentative in range(2):
+        try:
+            response = requests.post(
+                url,
+                headers={
+                    "Authorization": f"Bearer {_valeur_nette(AI_GATEWAY_TOKEN)}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": AI_GATEWAY_MODEL,
+                    "messages": messages,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                },
+                timeout=AI_GATEWAY_TIMEOUT_SECONDS,
+            )
+        except requests.RequestException as exc:
+            # La cause réseau nommée, l'hôte réduit à son domaine : un journal de
+            # production ne doit pas porter l'identifiant de branche en clair.
+            raise AiGatewayError(f"appel au gateway impossible ({type(exc).__name__})")
 
-    try:
-        payload = response.json()
-        content = payload["choices"][0]["message"]["content"]
-    except (ValueError, KeyError, IndexError, TypeError):
-        raise AiGatewayError("réponse du gateway sans texte exploitable")
+        if response.status_code != 200:
+            # Le corps d'erreur du gateway nomme le problème (modèle absent du
+            # catalogue, quota, jeton révoqué) : tronqué, c'est le seul
+            # diagnostic utile en production.
+            raise AiGatewayError(
+                f"gateway HTTP {response.status_code} : {response.text[:200]}"
+            )
 
-    if not isinstance(content, str) or not content.strip():
-        raise AiGatewayError("réponse du gateway vide")
+        try:
+            payload = response.json()
+            choice = payload["choices"][0]
+            content = choice["message"]["content"]
+        except (ValueError, KeyError, IndexError, TypeError):
+            raise AiGatewayError("réponse du gateway sans texte exploitable")
 
-    return content.strip()
+        # Un plafond atteint n'est PAS une réponse : rendre le texte coupé ferait
+        # envoyer au client une phrase interrompue, et lire `content` vide ferait
+        # accuser le modèle d'être muet alors qu'il a seulement raisonné trop
+        # longtemps. La cause est donc nommée avant les deux.
+        if isinstance(choice, dict) and choice.get("finish_reason") == "length":
+            if tentative == 0 and max_tokens < PLAFOND_JETONS_MAX:
+                nouveau_plafond = min(max_tokens * 2, PLAFOND_JETONS_MAX)
+                logger.warning(
+                    "⚠️ Assistant IA : réponse tronquée à %s jetons, nouvel essai à %s",
+                    max_tokens,
+                    nouveau_plafond,
+                )
+                max_tokens = nouveau_plafond
+                continue
+            raise AiGatewayError(
+                f"réponse tronquée par le plafond de {max_tokens} jetons (finish_reason=length)"
+            )
+
+        if not isinstance(content, str) or not content.strip():
+            raise AiGatewayError("réponse du gateway vide")
+
+        return content.strip()

@@ -45,6 +45,57 @@ CONSIGNE_SANS_FORMULAIRE = (
     "simplement dans ta réponse."
 )
 
+# Les PROCÉDURES réelles du produit, et pas une paraphrase inventée : sans
+# elles, l'assistant répondait « je ne sais pas » à « comment publier une
+# mission ? » — vrai pour un conseiller, faux pour un support qui a le site
+# sous les yeux. Chaque fait ci-dessous se lit dans le dépôt, et le libellé
+# des actions est celui que l'utilisateur voit à l'écran :
+#
+#   * publication : `frontend/src/pages/Dashboard.js` (`postJob` →
+#     `/create-job`), champs de `JobCreate` (`kojo_models.py`), séquestre et
+#     moyens de paiement dans l'FAQ du site (`frontend/src/i18n/fr.json`) ;
+#   * versement : `kojo_payments.get_mobile_money_account` (Orange Money
+#     prioritaire, puis Wave ; la banque n'est pas un canal de décaissement),
+#     libellés de `pack2PageI18n/jobDetails.js`, libération automatique à
+#     `COMPLETION_AUTO_RELEASE_DAYS` (7 j) ;
+#   * litige : `kojo_job_disputes` (motif et note de 20 caractères,
+#     `LITIGE_DECISION_DAYS` = 5 j, retrait par l'ouvreur, deux issues) ;
+#   * compte : code à 6 chiffres, `EMAIL_OTP_EXPIRY_MINUTES` = 10 min,
+#     renvoi après `EMAIL_OTP_RESEND_COOLDOWN_SECONDS` = 60 s.
+#
+# Ce bloc ne dit JAMAIS ce qui est arrivé à un compte précis : il décrit la
+# règle, l'assistant n'a toujours aucune donnée.
+PROCEDURES_KOJO = (
+    "Ce que fait réellement Kojo — ce sont les étapes du site, réponds avec "
+    "elles et n'en invente pas d'autres :\n"
+    "- Publier une mission (client) : se connecter, puis tableau de bord → « Publier "
+    "un emploi » (/create-job) : titre, description, catégorie, budget, adresse, "
+    "durée. Les travailleurs postulent depuis la page des missions (/jobs) avec un "
+    "montant, un délai et un message. Le client choisit une proposition, la mission "
+    "passe « en cours » et il règle le montant en séquestre (Orange Money, Wave ou "
+    "carte) : l'argent reste bloqué chez Kojo, personne ne peut y toucher.\n"
+    "- Être payé (travailleur) : il n'y a pas de demande de retrait à faire, le "
+    "versement est automatique. Il faut un compte mobile money dans le profil "
+    "(Orange Money en priorité, sinon Wave ; un compte bancaire ne reçoit pas de "
+    "versement automatique). En fin de mission, le travailleur déclare la fin "
+    "(« Déclarer le travail terminé », 20 caractères minimum, jusqu'à 3 photos), le "
+    "client valide (« Valider et payer le travailleur ») et le montant part sur ce "
+    "compte, commission Kojo déduite (elle est affichée avant le paiement). Sans "
+    "validation du client, la libération est automatique au bout de 7 jours.\n"
+    "- Litige : les deux parties peuvent en ouvrir un depuis la mission "
+    "(« Ouvrir un litige », motif de 20 caractères minimum) ; le paiement est alors "
+    "gelé. L'autre partie répond une seule fois, le propriétaire tranche sous "
+    "5 jours (verser le travailleur ou rembourser le client), et celui qui a ouvert "
+    "le litige peut le retirer si un accord est trouvé. Une mission annulée avant "
+    "tout versement est remboursée automatiquement ; une annulation est refusée dès "
+    "qu'un versement est en cours ou effectué.\n"
+    "- Compte : à l'inscription un code à 6 chiffres arrive par email (valable "
+    "10 minutes, renvoi possible après 1 minute) ; sans ce code le compte n'est pas "
+    "confirmé. Les comptes de paiement (Orange Money, Wave) s'ajoutent depuis le "
+    "profil : facultatifs pour utiliser le site, nécessaires pour recevoir un "
+    "versement. Le site existe en français, anglais, wolof, bambara et mooré.\n"
+)
+
 
 def robot_system_prompt(
     language: Language = Language.FRENCH,
@@ -80,18 +131,28 @@ def robot_system_prompt(
         "Burkina Faso). Langue de réponse : " + langue + "\n"
         "Règles :\n"
         "- Réponses courtes et concrètes (120 mots maximum), sans jargon.\n"
+        # MESURÉ le 23/10/2026 : le modèle gratuit a rendu, dans le champ de
+        # réponse, son brouillon et ses hésitations (« Wait, should I include
+        # ticket? No… ») avant de répéter sa réponse. Le client WhatsApp ou la
+        # page /support affichent ce champ tel quel : la consigne est donc
+        # explicite, et vérifiée par un test.
+        "- Écris UNIQUEMENT la réponse finale, telle qu'elle doit être lue : "
+        "jamais ton raisonnement, ton brouillon, ni une répétition de la réponse.\n"
         "- Les paiements passent par Orange Money, Wave ou carte bancaire ; Kojo "
         "prélève une commission sur chaque mission. Ne donne JAMAIS de montant pour "
         "un cas précis : tu n'as accès à aucun compte.\n"
         "- Tu n'as accès à AUCUNE donnée de compte : ni solde, ni paiement, ni "
         "mission, ni identité. Ne prétends jamais le contraire et n'invente rien.\n"
-        "- Tu ne promets ni remboursement, ni déblocage, ni délai : ce sont des "
-        "décisions humaines.\n"
+        "- Tu ne promets pas l'issue d'un dossier (remboursement, déblocage) ni une "
+        "date pour un cas précis : ce sont des décisions humaines. En revanche les "
+        "règles et délais du produit (7 jours, 5 jours, 10 minutes) se citent "
+        "comme règle générale — jamais comme engagement sur ce dossier.\n"
         "- Si la demande dépend d'un compte ou d'un paiement précis, ou si tu ne "
         "sais pas, propose de transmettre la demande à l'équipe et termine ta "
         "réponse par " + TICKET_MARKER + " (seul, à la fin).\n"
         "- Hors sujet (insultes, sujets sans rapport avec Kojo) : refuse poliment "
-        "et ramène la conversation au support Kojo."
+        "et ramène la conversation au support Kojo.\n"
+        + PROCEDURES_KOJO
     )
     if canal == "whatsapp":
         consignes += "\n" + CONSIGNE_SANS_FORMULAIRE
