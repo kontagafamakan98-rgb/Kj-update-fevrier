@@ -1,22 +1,22 @@
 # --- Runtime dependencies (importées et utilisées par server.py) ---
 # FastAPI 0.143 : routes incluses rendues par `_IncludedRouter` (cf. tests/surface_contract.py)
-fastapi>=0.143.0,<0.144.0
+fastapi>=0.153.0,<0.154.0
 uvicorn>=0.54.0,<0.55.0
 cryptography>=50.0.2,<51.0.0
-python-dotenv>=1.0.1,<2.0.0
-pymongo>=4.18.3,<4.19.0
-pydantic>=2.0.0,<3.0.0
-email-validator>=2.2.0,<3.0.0
-pyjwt>=2.10.1,<3.0.0
-tzdata>=2024.2
+python-dotenv>=1.2.4,<2.0.0
+pymongo>=4.19.0,<4.20.0
+pydantic>=2.14.1,<3.0.0
+email-validator>=2.3.0,<3.0.0
+pyjwt>=2.15.1,<3.0.0
+tzdata>=2026.5
 motor>=3.7.1,<3.8.0
-requests>=2.31.0,<3.0.0
-python-multipart>=0.0.9,<0.1.0
-bcrypt>=4.0.0,<5.0.0
-cloudinary>=1.36.0,<2.0.0
+requests>=2.34.2,<3.0.0
+python-multipart>=0.0.32,<0.1.0
+bcrypt>=5.0.0,<6.0.0
+cloudinary>=1.46.3,<2.0.0
 # Stockage S3 Neon (fichiers hors images) : client S3 compatible, endpoint via AWS_ENDPOINT_URL_S3.
-boto3>=1.34.0,<2.0.0
-pywebpush==2.0.0
+boto3>=1.43.115,<2.0.0
+pywebpush==2.5.0
 # Cartes Open Graph dynamiques des fiches mission (og:image /jobs/:id) :
 # rendu 1200x630 côté serveur (Pillow). Wheels self-contained (PNG natif),
 # aucune lib système requise — les polices DejaVu sont installées dans le
@@ -26,18 +26,18 @@ pywebpush==2.0.0
 # job `Dépendances (avis de sécurité)` audite la version EXPÉDIÉE, pas la plage.
 Pillow>=13.0.0,<14.0.0
 # Monitoring d'erreurs production (optionnel — activé si SENTRY_DSN est défini)
-sentry-sdk>=2.0,<3.0
+sentry-sdk>=2.72.0,<3.0
 # Optionnel - rate-limiter partagé entre workers Render (multi-instance safe).
 # Sans cette dépendance, le rate-limiter retombe silencieusement sur le
 # compteur en mémoire (par process). Activer en ajoutant REDIS_URL dans
 # les variables d'environnement Render + un service Redis dans l'add-on.
-redis>=5.0.0,<6.0.0
+redis>=8.1.0,<9.0.0
 
 # --- Dev/lint/test tools (non nécessaires en production, utiles en local/CI) ---
 pytest>=9.1.1,<10.0.0
 pytest-asyncio>=1.4.0,<2.0.0
-httpx>=0.27.0,<1.0.0
-black>=26.10.0,<27.0.0
-isort>=5.13.2,<6.0.0
-flake8>=7.0.0,<8.0.0
-mypy>=1.8.0,<2.0.0
+httpx>=0.28.1,<1.0.0
+black>=26.10.1,<27.0.0
+isort>=9.0.2,<10.0.0
+flake8>=7.4.1,<8.0.0
+mypy>=2.4.0,<3.0.0
