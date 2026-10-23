@@ -231,7 +231,15 @@ export default function Navbar() {
               aria-label={isMobileMenuOpen ? t('closeMenu') : t('openMenu')}
               aria-expanded={isMobileMenuOpen}
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="min-h-[44px] min-w-[44px] text-gray-700 hover:text-orange-600 p-2 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-orange-500"
+              /* `relative z-50` : le fond de fermeture est un `fixed inset-0 z-40`
+                 monté À CÔTÉ de cette barre, donc au-dessus d'elle dans l'ordre
+                 de peinture. Sans cette élévation, le hamburger devenu CROIX
+                 était recouvert par le voile : mesuré le 23/10/2026 en
+                 production, l'élément touché à son centre était le bouton du
+                 fond, et le seul moyen de refermer le menu était de toucher une
+                 zone grise sans commande. Le bouton reste sous le tiroir
+                 (`z-50` tous les deux) : il ne passe pas devant son contenu. */
+              className="relative z-50 min-h-[44px] min-w-[44px] text-gray-700 hover:text-orange-600 p-2 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-orange-500"
             >
               {/* Le dessin vient du registre du chrome : c'est lui qui porte les
                   jointures, les bouts et `aria-hidden`. Deux tracés écrits ici
