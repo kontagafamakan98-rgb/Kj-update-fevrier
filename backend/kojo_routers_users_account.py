@@ -350,6 +350,12 @@ async def delete_my_account(current_user: User = Depends(get_current_user)):
     # la seule qui soit une garantie, et ces tickets appartiennent au même
     # utilisateur que les notifications et les propositions, déjà supprimées.
     await db.support_tickets.delete_many({"user_id": user_id})
+    # Les conversations WhatsApp RATTACHÉES au compte partent avec lui : elles
+    # portent le numéro, le nom de profil et le texte libre du contact, et le
+    # rattachement (`kojo_whatsapp.compte_du_numero`) n'existe que pour cela.
+    # Une conversation d'un numéro inconnu de Kojo n'a pas de `user_id` : elle
+    # n'appartient à aucun compte supprimable, et périme par sa règle.
+    await db.whatsapp_messages.delete_many({"user_id": user_id})
     # Les missions POSTÉES par ce client sont closes (plus de nouvelles
     # propositions, plus visibles publiquement) et perdent TOUTE coordonnée :
     # `$unset` plutôt que `None`, pour que la clé disparaisse au lieu de rester
@@ -400,6 +406,12 @@ USER_DATA_SOURCES = (
     ("push_tokens", ("user_id",)),
     ("business_events", ("user_id",)),
     ("job_alerts", ("user_id",)),
+    # Conversation WhatsApp rattachée à un compte quand le numéro du contact EST
+    # le téléphone du compte (kojo_whatsapp.compte_du_numero). Sans ce
+    # rattachement, l'export ne pourrait pas la rendre et la suppression ne
+    # pourrait pas l'effacer : elle périme par sa règle, sans que personne ne
+    # l'ait décidé pour cette personne.
+    ("whatsapp_messages", ("user_id",)),
 )
 
 # Collections qui portent des données d'un utilisateur mais SANS clé

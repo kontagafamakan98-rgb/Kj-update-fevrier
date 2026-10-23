@@ -438,11 +438,18 @@ class SupportTicketCreate(BaseModel):
     channel: str = Field(default="robot", pattern=r'^(robot|direct)$')
 
 class SupportTicket(BaseModel):
+    """Une demande de support déposée, quel que soit le canal.
+
+    `email` est FACULTATIF : le formulaire web l'exige (`SupportTicketCreate`),
+    mais un contact WhatsApp n'en donne pas — son identité, c'est son numéro.
+    Le rendre obligatoire ici obligerait à inventer une adresse, et le ticket
+    afficherait alors une coordonnée qui n'existe pas.
+    """
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     user_id: Optional[str] = None
     full_name: str
     phone: str
-    email: EmailStr
+    email: Optional[EmailStr] = None
     reason: str
     message: str
     channel: str = "robot"

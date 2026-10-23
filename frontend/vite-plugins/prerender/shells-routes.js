@@ -89,7 +89,7 @@ function boutonGoogle({ esc, label }) {
   )
 }
 
-export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pageSections, googleAuth = false }) {
+export function buildRouteShells({ esc, T, registerT, jobsT, contact, pageSections, googleAuth = false }) {
   // ── Le corps des pages de confiance est DÉCLARÉ, pas recopié ────
   // src/config/page-sections.js est lu par les pages React ET par ici :
   // la liste des promesses d'À propos, celle des sections de la page
@@ -127,7 +127,12 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">`
       + `<div>`
       + `<h1 class="${jobsPlan.titleClass}">${esc(jobsT(jobsPlan.titleKey))}</h1>`
-      + `<p class="mt-2 text-gray-600">${frDate}</p>`
+      // La DATE (« aujourd'hui ») n'est PAS publiée ici : c'est un fait du
+      // CLIENT, figé au build il mentirait dès le lendemain (voir `dateClass`
+      // dans src/config/page-sections.js). La bande est seulement RÉSERVÉE, à
+      // la hauteur que la date occupe, pour que la bascule coquille → React ne
+      // déplace rien — le texte appartient à src/pages/Jobs.js.
+      + `<p class="${jobsPlan.dateClass}"></p>`
       + `</div>`
       + basculeListeCarte({ esc, T })
       + `</div>`

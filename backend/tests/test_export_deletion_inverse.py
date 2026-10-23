@@ -86,6 +86,11 @@ SORTS = {
     # Une veille emploi porte l'adresse et les critères du compte : elle n'a
     # plus de destinataire une fois le compte supprimé, donc elle s'efface.
     ("job_alerts", "user_id"): EFFACE,
+    # Une conversation WhatsApp rattachée au compte (le numéro du contact EST le
+    # téléphone du compte) porte un numéro, un nom de profil et du texte libre :
+    # elle part avec lui. Une conversation d'un numéro inconnu n'a PAS de
+    # `user_id` et périme par sa règle — ce fichier ne mesure que le rattaché.
+    ("whatsapp_messages", "user_id"): EFFACE,
     # Journal des jalons : il décrit missions et paiements, conservés pour la
     # comptabilité. Le lien au compte suit celui du job (`jobs.client_id`).
     ("business_events", "user_id"): CONSERVE,
@@ -224,6 +229,11 @@ def _documents_a_semer(user_id: str, email: str):
         (("business_events", "user_id"), "business_events",
          {"id": "evenement-1", "user_id": user_id, "type": "mission_created",
           "cle": "mission_created:job-1", "job_id": "job-1"}),
+        (("whatsapp_messages", "user_id"), "whatsapp_messages",
+         {"id": "whatsapp-rattache", "user_id": user_id, "phone": "221771234567",
+          "conversation": "221771234567", "direction": "in",
+          "texte": "Bonjour, ma mission est bloquée",
+          "created_at": datetime.now(timezone.utc)}),
         (("email_otps", USER_DATA_BY_EMAIL_FIELD), "email_otps",
          {"id": "code-1", "email": email, "otp_hash": "condense"}),
         (("email_delivery_events", USER_DATA_BY_EMAIL_FIELD), "email_delivery_events",

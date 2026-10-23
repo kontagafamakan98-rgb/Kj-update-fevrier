@@ -1,74 +1,43 @@
 import asyncio
+import json
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from kojo_ai_budget import MOTIF_COMPTEUR, caracteres_de_prompt, reserver
 from kojo_ai_gateway import AiGatewayError, chat_completion, is_configured
 from kojo_core import db
-from kojo_email import send_email_via_active_provider
 from kojo_models import (
-    Language, NotificationType, RobotChatRequest, SupportTicket, SupportTicketCreate,
-    SupportTicketStatusUpdate,
+    RobotChatRequest, SupportTicket, SupportTicketCreate, SupportTicketStatusUpdate,
 )
 from kojo_core import (
-    resolve_owner_id,
     verify_owner_access,
 )
-from kojo_settings import AI_GATEWAY_MODEL, OWNER_EMAIL, OWNER_USER_ID, logger
-from kojo_shared import notify_user_localized
+from kojo_settings import AI_GATEWAY_MODEL, logger
 from kojo_identifiants import dump_stable, identifiant_query
+# La politique de l'assistant vit dans UN module (`kojo_support_assistant`) :
+# WhatsApp parle au même assistant, et deux copies des règles divergeraient au
+# premier correctif.
+from kojo_support_assistant import TICKET_MARKER, robot_system_prompt
+# L'ouverture d'un ticket a un propriétaire unique : le formulaire web et
+# l'escalade WhatsApp passent par lui (création + alerte propriétaire).
+from kojo_support_tickets import ouvrir_ticket
+from kojo_whatsapp import (
+    KapsoError,
+    WebhookRefuse,
+    evenement_de,
+    traiter_evenement,
+    verifier_signature,
+)
 
 router = APIRouter()
 
-
-# ── Assistant IA de /support ─────────────────────────────────────────────────
-# Marqueur que le modèle ajoute quand il estime qu'une demande doit être
-# déposée. Il voyage DANS le texte (donc un modèle qui « oublie » l'outil ne
-# casse rien) et le serveur le RETIRE avant de répondre : le navigateur ne voit
-# jamais la mécanique, seulement `ticket_suggested`. Même principe que le
-# marqueur `[KOJO_JOB:…]` des messages, retiré côté frontend.
-TICKET_MARKER = "[KOJO_TICKET]"
-
-LANGUAGE_NAMES = {
-    Language.FRENCH: "français",
-    Language.ENGLISH: "anglais",
-    Language.WOLOF: "wolof",
-    Language.BAMBARA: "bambara",
-    Language.MOORE: "mooré",
-}
-
-
-def robot_system_prompt(language: Language) -> str:
-    """Instructions de l'assistant de /support, dans la langue du visiteur.
-
-    Écrit côté SERVEUR (jamais reçu du client) : c'est la politique de
-    l'assistant — périmètre, ton, et l'interdiction d'inventer une donnée de
-    compte — donc ce qu'un visiteur ne doit pas pouvoir réécrire.
-    """
-    langue = LANGUAGE_NAMES.get(language, "français")
-    return (
-        "Tu es l'assistant support de Kojo, une plateforme ouest-africaine qui met en "
-        "relation des clients et des travailleurs (Sénégal, Mali, Côte d'Ivoire, "
-        "Burkina Faso). Tu réponds dans cette langue : " + langue + ".\n"
-        "Règles :\n"
-        "- Réponses courtes et concrètes (120 mots maximum), sans jargon.\n"
-        "- Les paiements passent par Orange Money, Wave ou carte bancaire ; Kojo "
-        "prélève une commission sur chaque mission. Ne donne JAMAIS de montant pour "
-        "un cas précis : tu n'as accès à aucun compte.\n"
-        "- Tu n'as accès à AUCUNE donnée de compte : ni solde, ni paiement, ni "
-        "mission, ni identité. Ne prétends jamais le contraire et n'invente rien.\n"
-        "- Tu ne promets ni remboursement, ni déblocage, ni délai : ce sont des "
-        "décisions humaines.\n"
-        "- Si la demande dépend d'un compte ou d'un paiement précis, ou si tu ne "
-        "sais pas, propose de déposer une demande de support et termine ta réponse "
-        "par " + TICKET_MARKER + " (seul, à la fin).\n"
-        "- Hors sujet (insultes, sujets sans rapport avec Kojo) : refuse poliment "
-        "et ramène la conversation au support Kojo."
-    )
+# Le webhook WhatsApp : public, non authentifié (comme les IPN PayDunya et le
+# webhook email). Sa seule preuve d'identité est la signature de la requête.
+CHEMIN_WHATSAPP = "/support/whatsapp/webhook"
 
 
 class SupportTicketStatusLookup(BaseModel):
@@ -189,46 +158,21 @@ async def create_support_ticket(ticket_data: SupportTicketCreate):
     """Crée un ticket de support (canal public) et notifie le propriétaire
     (in-app + email Brevo, best-effort).
 
+    La création et l'alerte vivent dans `kojo_support_tickets.ouvrir_ticket` :
+    l'escalade WhatsApp ouvre un ticket par le même chemin, donc l'alerte ne
+    peut pas exister d'un côté et manquer de l'autre.
+
     Returns:
         dict: {message, ticket_id}.
     """
-    ticket = SupportTicket(
-        full_name=ticket_data.full_name.strip(),
-        phone=ticket_data.phone.strip(),
+    ticket = await ouvrir_ticket(
+        full_name=ticket_data.full_name,
+        phone=ticket_data.phone,
         email=ticket_data.email,
-        reason=ticket_data.reason.strip(),
-        message=ticket_data.message.strip(),
+        reason=ticket_data.reason,
+        message=ticket_data.message,
         channel=ticket_data.channel,
     )
-    await db.support_tickets.insert_one(ticket.model_dump())
-
-    # Notifier le propriétaire (in-app + email, best-effort) : sans ça,
-    # aucun canal ne signalait l'arrivée d'un ticket (l'équipe devait poller).
-    if OWNER_EMAIL or OWNER_USER_ID:
-        try:
-            # Résolution du compte owner RÉEL par email (source de vérité) : en
-            # prod, l'id du compte ne correspond pas au secret OWNER_USER_ID —
-            # cibler le secret envoyait la notification à un id fantôme (perdue).
-            owner_id = await resolve_owner_id() or OWNER_USER_ID
-            if owner_id:
-                await notify_user_localized(
-                    user_id=owner_id,
-                    key="new_ticket_support",
-                    notif_type=NotificationType.GENERAL,
-                    ticket_text=f"{ticket_data.full_name} — {ticket_data.reason} : {ticket_data.message[:120]}",
-                )
-        except Exception as exc:
-            logger.warning(f"⚠️ Notification owner ticket échouée: {exc}")
-    if OWNER_EMAIL:
-        try:
-            await send_email_via_active_provider(
-                OWNER_EMAIL,
-                f"KOJO — Nouveau ticket support ({ticket_data.reason})",
-                f"De: {ticket_data.full_name}\nEmail: {ticket_data.email}\n"
-                f"Téléphone: {ticket_data.phone}\n\n{ticket_data.message}",
-            )
-        except Exception as exc:
-            logger.warning(f"⚠️ Email owner ticket échoué: {exc}")
 
     return {
         "message": "Merci, votre demande a bien été envoyée. Notre équipe vous répondra dans les meilleurs délais.",
@@ -273,3 +217,74 @@ async def update_support_ticket_status(
         raise HTTPException(status_code=404, detail="Demande de support introuvable")
     updated = await db.support_tickets.find_one({**identifiant_query(ticket_id)})
     return dump_stable(SupportTicket, updated)
+
+
+# ── Support WhatsApp (Kapso) ────────────────────────────────────────────────
+# Pourquoi public et non authentifié : c'est un WEBHOOK, comme les IPN
+# PayDunya et le webhook email. Il ne peut donc pas porter de session, et sa
+# seule preuve d'identité est la signature calculée sur le corps reçu.
+#
+# Les trois refus, nommés : secret absent → 503 (ingestion DÉSACTIVÉE, jamais
+# permissive), signature absente ou invalide → 401, charge utile illisible →
+# 400. Un événement non suivi est acquitté (200) en le nommant : refuser ce
+# qu'on ignore ferait re-livrer indéfiniment un fait qui ne nous concerne pas.
+#
+# Un envoi qui échoue répond 502 : le fournisseur re-livre, la conversation est
+# reprise, et le client finit par recevoir sa réponse. Un 200 sur un envoi raté
+# serait un acquittement mensonger — le message serait perdu en silence.
+def _refus_whatsapp(refus: WebhookRefuse) -> HTTPException:
+    """Un refus d'ingestion, publié avec son MOTIF (jamais un code seul)."""
+    logger.warning("⚠️ Webhook WhatsApp refusé : %s", refus.motif)
+    return HTTPException(
+        status_code=refus.statut,
+        detail={"status": "refuse", "motif": refus.motif},
+    )
+
+
+@router.post(CHEMIN_WHATSAPP)
+async def whatsapp_webhook(request: Request) -> Dict[str, Any]:
+    """Reçoit les messages WhatsApp relayés par Kapso et y répond.
+
+    L'assistant répond dans la langue du client (même politique et même budget
+    que `/support/robot/chat`) ; quand un humain doit reprendre, un ticket est
+    ouvert par `kojo_support_tickets` et le propriétaire est prévenu.
+
+    Les octets BRUTS sont lus avant tout parsing : la signature porte sur ce qui
+    a été reçu, donc re-sérialiser le JSON la ferait échouer sur une requête
+    légitime.
+
+    Returns:
+        dict: {status, statut, escalade, motif, ticket_id, envoi} — le bilan du
+        message, sans son texte (la réponse du webhook peut être journalisée
+        côté fournisseur).
+
+    Raises:
+        HTTPException: 503 (secret absent), 401 (signature), 400 (charge utile),
+            502 (réponse qui n'a pas pu partir).
+    """
+    corps = await request.body()
+
+    try:
+        verifier_signature(corps, request.headers)
+    except WebhookRefuse as refus:
+        raise _refus_whatsapp(refus)
+
+    try:
+        payload = json.loads(corps.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={"status": "refuse", "motif": "corps illisible (JSON attendu) : %s" % exc},
+        )
+
+    evenement = evenement_de(payload, request.headers)
+    try:
+        return await traiter_evenement(payload, evenement, entetes=request.headers)
+    except WebhookRefuse as refus:
+        raise _refus_whatsapp(refus)
+    except KapsoError as exc:
+        logger.warning("⚠️ WhatsApp : réponse non envoyée — %s", exc)
+        raise HTTPException(
+            status_code=502,
+            detail={"status": "echec", "motif": str(exc)},
+        )

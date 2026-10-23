@@ -44,5 +44,13 @@
       "kojo_core.verify_owner_access",
       "fastapi.security.http.HTTPBearer"
     ]
+  },
+  {
+    "methode": "POST",
+    "chemin": "/api/support/whatsapp/webhook",
+    "nom": "whatsapp_webhook",
+    "code": null,
+    "response_model": "typing.Dict",
+    "dependances": []
   }
 ]

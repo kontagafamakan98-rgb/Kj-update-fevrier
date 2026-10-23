@@ -77,12 +77,6 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
       // bascule est invisible (pas de flash, pas de CLS). Les classes
       // Tailwind sont déjà inlinées par inline-critical-css → le h1 est
       // stylé immédiatement.
-      const frDate = new Intl.DateTimeFormat('fr-FR', {
-        day: '2-digit',
-        month: 'long',
-        year: 'numeric',
-      }).format(new Date())
-
       // ── Données partagées avec l'application ────────────────────────
       // Contact (N.A.P.) et réseaux sociaux sont lus depuis les MÊMES
       // fichiers que le runtime React (src/config/) : le footer et le HTML
@@ -148,7 +142,7 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
       const SHELLS = {
         home: homeShell,
         ...buildRouteShells({
-          esc, T, registerT, jobsT, contact, frDate, pageSections,
+          esc, T, registerT, jobsT, contact, pageSections,
           googleAuth,
         }),
       }

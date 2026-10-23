@@ -285,6 +285,17 @@ def get_rate_limit_bucket(path: str) -> tuple[str, int, int]:
         # Envoi de messages : 60 POST/min/IP (les GET/HEAD/OPTIONS de
         # lecture/polling sont exemptés, voir RateLimitMiddleware)
         return ("messages", 60, 1)
+    if path.startswith("/api/support/whatsapp/webhook"):
+        # Webhook WhatsApp (Kapso) : anonyme par nature, et le fournisseur
+        # RE-LIVRE une requête dont il n'a pas lu la réponse, parfois GROUPÉE
+        # (enveloppe `batch`). Un bucket serré ferait perdre des messages
+        # légitimes au premier pic — et une réponse perdue ne se rejoue pas
+        # côté client, sur un canal sans historique. 120/min laisse passer une
+        # rafale groupée tout en rendant l'amplification inintéressante ; la
+        # borne de fond est ailleurs (idempotence par `provider_message_id`,
+        # signature HMAC, budget IA de la journée). Règle AVANT le préfixe
+        # `/api/support`, qui appliquerait 10/5 min.
+        return ("support-whatsapp", 120, 1)
     if path.startswith("/api/support/robot/chat"):
         # Assistant IA : un message = un appel MODÈLE payant, mais la
         # conversation a besoin d'aller vite (l'utilisateur enchaîne les tours).

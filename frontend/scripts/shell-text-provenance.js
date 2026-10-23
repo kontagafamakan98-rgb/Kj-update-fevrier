@@ -328,7 +328,7 @@ export const valeursDerivees = (frontendDir) => {
     // pas des textes nouveaux : c'est le texte du dictionnaire, coupé par la
     // MÊME fonction des deux côtés — la moitié n'est donc pas une copie
     // écrite à la main, c'est une valeur CALCULÉE, et elle se déclare ici comme
-    // les exemples de téléphone ou la date du jour.
+    // les exemples de téléphone.
     const titreDuHeros = dictionnaire[PAGE_SECTIONS['/'].titleKey];
     if (typeof titreDuHeros === 'string') {
       for (const moitie of couperLeTitre(titreDuHeros)) {
@@ -345,22 +345,16 @@ export const valeursDerivees = (frontendDir) => {
     derivees.add(normaliser(photoFormatsLine(mot)));
     derivees.add(normaliser(phoneNumberExample(mot)));
   }
-  // La date du jour : les DEUX options que le dépôt utilise réellement
-  // (`prerender-route-meta.js` et `Jobs.js` formatent « aujourd'hui » chacun de
-  // leur côté — le garde accepte la valeur publiée, il ne juge pas la double
-  // dérivation, qui est un défaut de propriétaire, pas de provenance).
-  for (const jour of ['2-digit', 'numeric']) {
-    derivees.add(
-      normaliser(
-        new Intl.DateTimeFormat('fr-FR', { day: jour, month: 'long', year: 'numeric' }).format(new Date())
-      )
-    );
-    derivees.add(
-      normaliser(
-        new Intl.DateTimeFormat('fr-FR', { day: jour, month: 'short', year: 'numeric' }).format(new Date())
-      )
-    );
-  }
+  // LA DATE DU JOUR N'EST PLUS UNE VALEUR DÉRIVÉE (23/10/2026). Elle l'a été
+  // tant que `prerender-route-meta.js` et `Jobs.js` la formataient chacun de
+  // leur côté : le garde l'acceptait, parce qu'il juge la PROVENANCE d'un texte
+  // et non la double dérivation. Mais une coquille est un document STATIQUE —
+  // la date y est figée au build, donc fausse dès le lendemain, et le jour où
+  // le build et la lecture tombent de part et d'autre de minuit, elle publie
+  // la VEILLE quand React peint le jour (mesuré en CI : « 22 octobre 2026 »
+  // contre « 23 octobre 2026 »). Le fait n'a plus qu'un propriétaire, la page :
+  // une coquille qui publierait une date est désormais REFUSÉE, comme n'importe
+  // quel texte qu'aucune source ne déclare.
   for (const valeur of Object.values(CONTACT)) {
     if (typeof valeur === 'string') derivees.add(normaliser(valeur));
     if (valeur && typeof valeur === 'object') {

@@ -729,6 +729,23 @@ export const PAGE_SECTIONS = {
     frameClass: 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 cadre-page min-h-screen',
     titleClass: 'titre-page',
     introClass: 'mb-6 max-w-3xl text-base leading-relaxed text-stone-600 min-h-[104px] md:min-h-[52px]',
+    // ── LA LIGNE DE DATE : un fait du CLIENT, pas du DOCUMENT ─────────────
+    // Sous le titre, la page affiche « aujourd'hui ». Une coquille est un
+    // document STATIQUE : la date y est figée au build, donc fausse dès le
+    // lendemain — et le jour où le build et la lecture tombent de part et
+    // d'autre de minuit, la coquille publie la VEILLE pendant que React peint
+    // le jour (mesuré en CI le 23/10/2026 : « 22 octobre 2026 » contre
+    // « 23 octobre 2026 », sonde `texte-coquille-react` rouge). Le TEXTE n'a
+    // donc qu'UN propriétaire, la page ; la coquille ne RÉSERVE que la bande
+    // pour que la bascule coquille → React ne déplace pas l'en-tête.
+    //
+    // La hauteur réservée est `1.6em` : c'est EXACTEMENT la hauteur de ligne
+    // que `p` porte (`p, label, small, li { line-height: 1.6 }`, src/index.css),
+    // lue dans l'`em` du paragraphe — donc la même dans les deux canaux quel
+    // que soit le corps de police. Mesuré le 23/10/2026 : 24 px réservés pour
+    // une ligne de 25,088 px décalaient de 1,1 px tout ce qui suit la date
+    // (« Liste », « Carte », l'intro), refusé par `geometrie-coquille-react`.
+    dateClass: 'mt-2 text-gray-600 min-h-[1.6em]',
     // L'élément élu : le PARAGRAPHE d'introduction, pas le titre animé —
     // mesuré le 20/10/2026 après l'animation de `.titre-page`.
     lcpChamp: 'introClass',
