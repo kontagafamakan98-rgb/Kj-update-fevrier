@@ -10,12 +10,42 @@
  *
  * Les pages restent sur `pack2PageI18n.js` (leurs dictionnaires sont dans des
  * chunks lazy, donc hors du chemin critique). Ce fichier ne contient QUE les
- * scopes consommés par les toasts : emailVerification et paymentVerification.
- * Le scope 'register' n'existe pas dans `pages` (il retombe déjà sur le
- * fallback global t()) — on garde ce comportement : scope inconnu → t(key).
+ * scopes consommés par les toasts : register, emailVerification et
+ * paymentVerification.
+ *
+ * ── POURQUOI `register` EST ICI (23/10/2026) ────────────────────────────────
+ * Il en était ABSENT, avec le raisonnement « scope inconnu → t(key) ». Or
+ * `duplicateEmailError` n'existe PAS dans les dictionnaires globaux
+ * (`src/i18n/*.json`) : il ne vit que dans le pack de la page
+ * (`pack2PageI18n/register.js`). Le toast d'une adresse déjà prise affichait
+ * donc la CLÉ, littéralement « duplicateEmailError », au lieu de la phrase —
+ * mesuré en production sur le parcours d'inscription. Un scope consommé par un
+ * toast doit être déclaré ICI, dans les cinq langues : une clé qui n'existe
+ * qu'à un seul endroit ne peut pas être servie par le fallback.
+ *
+ * Garde : `src/utils/__tests__/toastScopedI18n.test.js` exige que CHAQUE clé de
+ * CHAQUE scope soit servie dans les cinq langues, et que le résultat ne soit
+ * jamais la clé elle-même.
  */
 
-const toastScopes = {
+export const toastScopes = {
+  register: {
+    fr: {
+      duplicateEmailError: 'Cette adresse email est déjà utilisée',
+    },
+    en: {
+      duplicateEmailError: 'This email address is already in use',
+    },
+    wo: {
+      duplicateEmailError: 'Adresse email bii jëfandikoo nañu ko ba noppi',
+    },
+    bm: {
+      duplicateEmailError: 'Email adɛrɛsi nin bɛ baara kɛ ka bɔyen',
+    },
+    mos: {
+      duplicateEmailError: 'Email adres-kãngã yaa n beoogame',
+    },
+  },
   paymentVerification: {
     fr: {
       welcomeToast: 'Bienvenue {firstName} ! Compte vérifié avec succès',

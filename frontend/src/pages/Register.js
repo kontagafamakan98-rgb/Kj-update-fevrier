@@ -99,7 +99,13 @@ export default function Register() {
         purpose: 'signup'
       });
 
-      if (!result.available) {
+      // La route répond maintenant la VÉRITÉ (`available: true/false`) : un
+      // `null` n'est ni libre ni pris — c'est ce que renvoyait l'ancienne
+      // réponse neutre, et `!null` (donc « pris ») bloquait TOUTE inscription
+      // en annonçant « déjà utilisée » à un nouveau venu. Seul un `false`
+      // EXPLICITE refuse ; un `null` (backend plus ancien, autre origine) ne
+      // reproche rien et laisse `/auth/register-verified` trancher.
+      if (result.available === false) {
         const translatedMessage = pageT('duplicateEmailError');
         setEmailAvailability({ ...result, messageKey: 'duplicateEmailError' });
         setError(translatedMessage);
@@ -110,7 +116,8 @@ export default function Register() {
         return false;
       }
 
-      setEmailAvailability({ ...result, messageKey: 'emailAvailable' });
+      // « Je ne sais pas » ne s'affiche pas : ni coche verte, ni reproche.
+      setEmailAvailability(result.available === true ? { ...result, messageKey: 'emailAvailable' } : null);
       setError('');
       setErrorKey('');
       return true;

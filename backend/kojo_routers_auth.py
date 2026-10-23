@@ -182,22 +182,42 @@ async def _exchange_google_code(code: str, origin: Optional[str] = None) -> dict
 
 @router.post("/auth/email/check-availability")
 async def check_signup_email_availability(payload: EmailOtpRequest):
-    """Anti-énumération STRICT : réponse identique que l'email soit libre ou
-    déjà inscrit (available=None, message neutre) — on ne fait plus aucune
-    lecture en base ici. L'existence réelle d'un compte n'est révélée qu'au
-    moment où l'utilisateur finalise son inscription (register-verified, qui
-    renvoie « Cette adresse email est déjà utilisée »), ce qui ne permet pas
-    d'énumérer les emails par simple scan.
+    """Dit si l'adresse est libre, parce que le formulaire doit pouvoir le dire.
+
+    ── Ce que la réponse neutre avait cassé (23/10/2026) ──────────────────
+    La route répondait `available=None` pour TOUT LE MONDE (anti-énumération),
+    et le formulaire testait `!result.available` : n'importe quel nouveau venu
+    lisait « Cette adresse email est déjà utilisée » et ne pouvait plus créer
+    son compte. Une adresse VRAIMENT prise menait en plus à une impasse —
+    `send-otp` n'envoie aucun code à une adresse déjà inscrite (décision
+    conservée : pas de spam de boîte), donc la personne n'apprenait jamais
+    pourquoi elle ne recevait rien.
+
+    ── Le choix, et son bornage ────────────────────────────────────────────
+    On peut de nouveau demander « ce compte existe-t-il ? ». Ce n'est pas un
+    chemin de création : `/auth/register-verified` reste le SEUL propriétaire
+    de la création et refuse avec la MÊME phrase, que ce test compare. La
+    route est bornée à la fenêtre `auth-otp` de `kojo_rate_limit`
+    (12 requêtes / 5 min par IP), et `send-otp`/`resend-otp` restent
+    génériques.
 
     Returns:
-        dict: {email, available, message} — available est TOUJOURS None
-        (réponse identique que l'email soit libre ou déjà inscrit).
+        dict: {email, available: bool, message} — `available` est False quand
+        un compte porte déjà cette adresse (même règle de lecture que
+        `register-verified` : recherche par email).
     """
     clean_email = sanitize_email(payload.email)
+    existing_user = await db.users.find_one({"email": clean_email})
+    if existing_user:
+        return {
+            "email": clean_email,
+            "available": False,
+            "message": "Cette adresse email est déjà utilisée",
+        }
     return {
         "email": clean_email,
-        "available": None,
-        "message": "Vérification effectuée.",
+        "available": True,
+        "message": "Adresse email disponible",
     }
 
 def _generic_otp_response(clean_email: str) -> dict:
@@ -212,7 +232,13 @@ def _generic_otp_response(clean_email: str) -> dict:
 @router.post("/auth/email/send-otp")
 async def send_signup_email_otp(payload: EmailOtpRequest):
     """Envoie un OTP d'inscription à une adresse email (ou réponse générique
-    si un compte existe déjà — on ne révèle pas l'existence du compte).
+    si un compte existe déjà).
+
+    Ici la neutralité protège la BOÎTE du destinataire, pas l'annuaire :
+    n'importe qui peut déclencher cet envoi, donc un code réel à une adresse
+    déjà inscrite serait du spam. La disponibilité, elle, se lit sur
+    `/auth/email/check-availability` (qui répond honnêtement, cf. sa doc) et
+    le refus définitif reste `/auth/register-verified`.
 
     Returns:
         dict: {message, masked_email, expires_in_seconds, cooldown_seconds}
@@ -222,8 +248,9 @@ async def send_signup_email_otp(payload: EmailOtpRequest):
 
     existing_user = await db.users.find_one({"email": clean_email})
     if existing_user:
-        # Réponse générique sans envoi d'email : on ne révèle pas qu'un compte
-        # existe déjà, et on n'envoie pas d'OTP à une adresse déjà inscrite.
+        # Réponse générique SANS envoi : aucun code ne part vers une adresse
+        # déjà inscrite (spam de boîte). Le formulaire a déjà prévenu, en
+        # amont, par `/auth/email/check-availability`.
         return _generic_otp_response(clean_email)
 
     return await issue_email_otp(clean_email, payload.purpose)

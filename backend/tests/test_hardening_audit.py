@@ -9,7 +9,9 @@ Couvre :
 - Mot de passe : password_version incrémentée au reset → les anciens jetons
   deviennent invalides (révocation des sessions).
 - Suppression de compte (RGPD) : soft delete + cascade + 401 ensuite.
-- Anti-énumération : check-availability ne révèle plus l'existence d'un email.
+- Disponibilité d'un email : check-availability DIT la vérité (23/10/2026, la
+  réponse neutre rendait toute inscription impossible) ; send-otp et
+  resend-otp restent génériques et n'envoient rien à une adresse inscrite.
 - Support : le créateur peut suivre le statut de son ticket.
 - Wave indisponible au Mali / Burkina (validate_payment_accounts avec pays).
 """
@@ -269,8 +271,16 @@ class TestPasswordVersionRevocation:
         me = await client.get("/api/auth/me", headers={"Authorization": f"Bearer {login.json()['access_token']}"})
         assert me.status_code == 200
 
-    async def test_check_availability_is_generic(self, client: AsyncClient):
-        """Réponse identique pour un email libre et un email déjà inscrit."""
+    async def test_check_availability_dit_la_verite(self, client: AsyncClient):
+        """Le formulaire annonce ce que la création refusera.
+
+        La réponse neutre (`available=None` pour tout le monde) rendait TOUTE
+        inscription impossible : la page lisait `!null` comme « déjà prise ».
+        Ce qui est jugé ici n'est pas seulement le booléen, mais l'ACCORD avec
+        le refus réel de `/auth/register-verified` — deux phrases qui
+        divergeraient feraient promettre au formulaire autre chose que ce que
+        la création dit.
+        """
         await register_and_login(client, BASE_USER)
 
         resp_free = await client.post("/api/auth/email/check-availability", json={
@@ -279,11 +289,36 @@ class TestPasswordVersionRevocation:
         resp_used = await client.post("/api/auth/email/check-availability", json={
             "email": BASE_USER["email"], "purpose": "signup",
         })
+
         assert resp_free.status_code == 200
         assert resp_used.status_code == 200
-        assert resp_free.json()["available"] is None
-        assert resp_used.json()["available"] is None
-        assert resp_free.json()["message"] == resp_used.json()["message"]
+        assert resp_free.json()["available"] is True
+        assert resp_used.json()["available"] is False
+
+        # La phrase du formulaire EST celle du refus de création.
+        token = await issue_email_verification_token(client, BASE_USER["email"])
+        refus = await client.post("/api/auth/register-verified", json={
+            **BASE_USER, "email_verification_token": token,
+        })
+        assert refus.status_code == 400, refus.text
+        assert resp_used.json()["message"] in refus.text
+
+    async def test_send_otp_reste_generique_pour_une_adresse_inscrite(self, client: AsyncClient):
+        """La disponibilité se lit, mais on n'arrose pas une boîte existante.
+
+        Un OTP envoyé à une adresse déjà inscrite serait du spam d'inbox
+        (n'importe qui peut déclencher l'envoi) : cette route garde donc une
+        réponse neutre et n'écrit aucun code. C'est la raison pour laquelle le
+        formulaire, lui, doit répondre AVANT d'arriver ici.
+        """
+        await register_and_login(client, BASE_USER)
+        resp = await client.post("/api/auth/email/send-otp", json={
+            "email": BASE_USER["email"], "purpose": "signup",
+        })
+        assert resp.status_code == 200
+        assert "déjà utilisée" not in resp.json()["message"].lower()
+        otp = await db.email_otps.find_one({"email": BASE_USER["email"], "purpose": "signup"})
+        assert otp is None
 
 
 # Contrat RGPD, ÉCRIT ici et non lu sur l'implémentation : ces trois états
