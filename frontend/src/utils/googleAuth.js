@@ -55,6 +55,32 @@ const loadGsiScript = () => {
 };
 
 /**
+ * PRÉCHARGE le SDK Google, à appeler au MONTAGE du bouton Google.
+ *
+ * ── Pourquoi ce n'est pas un détail (23/10/2026) ────────────────────────────
+ * `requestCode()` ouvre une FENÊTRE. Un navigateur n'autorise cette ouverture
+ * que pendant l'ACTIVATION de l'utilisateur (le clic), quelques secondes au
+ * plus. Le chemin de clic faisait deux chargements réseau AVANT d'y arriver —
+ * le module `googleAuth` (import dynamique) puis `https://accounts.google.com/
+ * gsi/client` (~100 Ko) — et sur un téléphone en 3G cela dépasse la fenêtre :
+ * la fenêtre est bloquée SANS erreur visible, le bouton tourne, et l'utilisateur
+ * conclut que « ça ne marche pas ». Mesuré en production : SDK chargé (200) et
+ * aucune fenêtre ouverte.
+ *
+ * Le SDK est donc chargé quand le bouton APPARAÎT, pas quand on le presse.
+ * Le repli silencieux est volontaire : une précharge ratée ne doit rien casser,
+ * `getGoogleAuthCode` retentera et dira l'erreur à ce moment-là.
+ */
+export const preloadGoogleAuth = () => {
+  if (!isGoogleAuthEnabled()) return Promise.resolve(null);
+  return loadGsiScript().catch(() => null);
+};
+
+// Erreurs Google qui signifient « l'utilisateur a fermé/refusé » : ce ne sont
+// pas des pannes, et les afficher comme telles reprocherait un choix.
+const ANNULATIONS = new Set(['access_denied', 'popup_closed_by_user', 'user_cancel', 'cancelled']);
+
+/**
  * Ouvre la popup Google et retourne le CODE d'autorisation (ou null si
  * l'utilisateur annule). Le code est envoyé ensuite au backend.
  */
@@ -81,12 +107,23 @@ export const getGoogleAuthCode = async () => {
         settled = true;
         if (response?.code) {
           resolve(response.code);
-        } else if (response?.error) {
-          // L'utilisateur a annulé ou refusé → ce n'est pas une erreur réseau.
-          reject(new Error(response.error_description || response.error || 'Annulé'));
-        } else {
-          reject(new Error('Réponse Google invalide'));
+          return;
         }
+
+        const erreur = String(response?.error || '');
+        // Fermeture / refus : `null`, que l'appelant traite comme « annulé »
+        // (aucun message d'erreur).
+        if (ANNULATIONS.has(erreur)) {
+          resolve(null);
+          return;
+        }
+        // Fenêtre bloquée par le navigateur : c'est LE cas muet de production.
+        // On le nomme, sinon le bouton tourne et l'utilisateur n'apprend rien.
+        if (erreur === 'popup_blocked_by_browser' || erreur === 'popup_failed_to_open') {
+          reject(new Error("Votre navigateur a bloqué la fenêtre Google. Autorisez les fenêtres surgissantes pour ce site, puis réessayez."));
+          return;
+        }
+        reject(new Error(response?.error_description || erreur || 'Réponse Google invalide'));
       },
     });
 
