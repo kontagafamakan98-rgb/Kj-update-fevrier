@@ -21,7 +21,12 @@ et juge la réponse servie, pas seulement le statut :
   2. réponse non vide (et d'une longueur qui vaut une réponse) ;
   3. l'ÉTAPE attendue est citée (par exemple `/create-job` pour publier,
      « litige » pour un désaccord) — une réponse qui n'oriente vers rien ne
-     répare rien.
+     répare rien ;
+  4. le texte est FINAL : ni brouillon (« Wait, should I include ticket? »,
+     « Let me think », étiquette « Draft: »), ni répétition (la même phrase
+     servie deux fois), ni marqueur mécanique visible (`[KOJO_TICKET]`). Le
+     modèle avait rendu son raisonnement dans le champ de réponse, et le
+     client WhatsApp comme la page `/support` affichent ce champ tel quel.
 
 Trois sorties, jamais deux :
 
@@ -40,6 +45,7 @@ Usage :
 
 import argparse
 import json
+import re
 import sys
 import time
 import unicodedata
@@ -52,6 +58,40 @@ AGENT = "KojoAssistantProbe/1.0"
 # Une réponse plus courte que cela n'oriente personne : c'est le plancher qui
 # attrape une réponse vide ET un texte du genre « OK ».
 LONGUEUR_MINIMALE = 40
+
+# Ce qui trahit un texte NON FINAL. Le 23/10/2026, le modèle a écrit dans le
+# champ de réponse « Wait, should I include ticket? No… » avant de se reprendre
+# et de répéter sa réponse. Ces marques sont ANGLAISES dans une réponse
+# française : c'est ce qui les rend reconnaissables sans juger le fond. La
+# liste reste volontairement courte — un mot français courant (« attends »,
+# « en fait ») est une prose légitime, pas une fuite de raisonnement.
+MARQUEURS_BROUILLON = (
+    "wait,",
+    "wait…",
+    "wait...",
+    "hmm,",
+    "hmm…",
+    "let me think",
+    "let me check",
+    "let me reconsider",
+    "should i ",
+    "i should ",
+    "i need to ",
+    "draft:",
+    "reasoning:",
+    "thought:",
+    "final answer:",
+    "brouillon :",
+    "raisonnement :",
+    "réfléchissons",
+)
+
+# Le marqueur d'escalade est un mot du protocole avec le modèle : le serveur le
+# RETIRE avant de rendre la réponse. S'il apparaît, la mécanique est visible.
+MARQUEUR_VISIBLE = "KOJO_TICKET"
+
+# En dessous, une phrase répétée est un fragment de prose normal (« Oui. »).
+LONGUEUR_PHRASE = 30
 
 # Les trois parcours que la personne vient chercher. `attendus` est une suite de
 # GROUPES : chaque groupe doit être satisfait par au moins une de ses
@@ -132,6 +172,47 @@ def _groupes_manquants(reponse: str, attendus) -> list:
     return [groupe for groupe in attendus if not any(_sans_accent(a) in texte for a in groupe)]
 
 
+def _phrases(texte: str) -> list:
+    """Phrases comparables : minuscules, sans accents, bornes de ponctuation."""
+    morceaux = re.split(r"[.!?\n]+", _sans_accent(texte))
+    return [m.strip() for m in morceaux if len(m.strip()) >= LONGUEUR_PHRASE]
+
+
+def _phrases_repetees(texte: str) -> list:
+    """Phrases servies plus d'une fois : un doublon, pas une reprise."""
+    vues = {}
+    for phrase in _phrases(texte):
+        vues[phrase] = vues.get(phrase, 0) + 1
+    return [phrase for phrase, fois in vues.items() if fois > 1]
+
+
+def _defauts_de_forme(reponse: str) -> list:
+    """Ce qui prouve que le texte n'est pas la réponse FINALE, nommé.
+
+    Trois familles, parce que trois choses ont été servies à un visiteur : un
+    brouillon de raisonnement, la même phrase deux fois, et le marqueur
+    d'escalade que le serveur devait retirer. Chaque défaut est nommé avec sa
+    preuve (le marqueur, la phrase) : « réponse non conforme » ne dirait pas
+    quoi corriger.
+    """
+    texte = reponse or ""
+    bas = _sans_accent(texte)
+    defauts = []
+
+    for marqueur in MARQUEURS_BROUILLON:
+        if _sans_accent(marqueur) in bas:
+            defauts.append(f"brouillon (« {marqueur.strip()} »)")
+
+    if MARQUEUR_VISIBLE.lower() in bas:
+        defauts.append(f"marqueur visible ([{MARQUEUR_VISIBLE}])")
+
+    repetees = _phrases_repetees(texte)
+    if repetees:
+        defauts.append(f"repetition (« {repetees[0][:60]} »)")
+
+    return defauts
+
+
 def verifier_assistant(url: str = DEFAULT_URL, timeout: int = 90) -> int:
     """Juge l'assistant servi en production. Rend 0, 1 (refus nommé) ou 2."""
     if not (url or "").strip().lower().startswith(("http://", "https://")):
@@ -163,6 +244,14 @@ def verifier_assistant(url: str = DEFAULT_URL, timeout: int = 90) -> int:
             )
             return 2
 
+        # 502/503 = le gateway ou le modèle n'a pas produit de réponse : c'est
+        # l'indisponibilité de l'assistant, pas une forme à corriger.
+        if statut in (502, 503):
+            message = f"{cle} : assistant indisponible (HTTP {statut}) — {_detail(corps)}"
+            print(f"[ERREUR] {message}")
+            erreurs.append(message)
+            continue
+
         if statut != 200:
             cause = _detail(corps)
             message = f"{cle} : HTTP {statut} — {cause}"
@@ -180,6 +269,16 @@ def verifier_assistant(url: str = DEFAULT_URL, timeout: int = 90) -> int:
             message = (
                 f"{cle} : reponse vide ou trop courte "
                 f"({len((reponse or '').strip())} caracteres, plancher {LONGUEUR_MINIMALE})"
+            )
+            print(f"[ERREUR] {message}")
+            erreurs.append(message)
+            continue
+
+        defauts = _defauts_de_forme(reponse)
+        if defauts:
+            extrait = reponse.strip().replace("\n", " ")[:160]
+            message = (
+                f"{cle} : texte non final ({' ; '.join(defauts)}) — servi : « {extrait} »"
             )
             print(f"[ERREUR] {message}")
             erreurs.append(message)

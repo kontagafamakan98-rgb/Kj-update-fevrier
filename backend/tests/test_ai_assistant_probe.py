@@ -138,6 +138,77 @@ def test_une_reponse_sans_l_etape_attendue_est_refusee_en_la_nommant(capsys):
     assert "servi" in sortie, "un extrait de ce qui a été servi rend l'échec exploitable"
 
 
+def test_un_503_est_refuse_en_nommant_l_indisponibilite(capsys):
+    """Assistant éteint ou gateway muet : ce n'est pas une forme à corriger."""
+    sonde = _charger_sonde()
+
+    with patch(
+        "urllib.request.urlopen",
+        return_value=_reponse(503, {"detail": "L'assistant est temporairement indisponible."}),
+    ):
+        assert sonde.verifier_assistant(URL) == 1
+
+    sortie = capsys.readouterr().out
+    assert "HTTP 503" in sortie
+    assert "indisponible" in sortie
+
+
+# ---------------------------------------------------------------------------
+# Le texte doit être FINAL : brouillon, répétition, marqueur visible
+# ---------------------------------------------------------------------------
+
+
+def test_un_brouillon_de_raisonnement_est_refuse(capsys):
+    """Le modèle a rendu « Wait, should I include ticket? » avant sa réponse."""
+    sonde = _charger_sonde()
+    fuite = (
+        "Wait, should I include ticket? No, the user only asks how to publish.\n\n"
+        + REPONSE_PUBLICATION
+    )
+
+    with patch("urllib.request.urlopen", return_value=_ok(fuite)):
+        assert sonde.verifier_assistant(URL) == 1
+
+    sortie = capsys.readouterr().out
+    assert "texte non final" in sortie
+    assert "brouillon" in sortie
+    assert "Wait" in sortie, "le marqueur fautif doit être nommé pour être réparé"
+
+
+def test_une_reponse_repete_est_refusee(capsys):
+    """La même phrase servie deux fois : le doublon, pas la reprise."""
+    sonde = _charger_sonde()
+
+    with patch("urllib.request.urlopen", return_value=_ok(REPONSE_PAIEMENT + "\n\n" + REPONSE_PAIEMENT)):
+        assert sonde.verifier_assistant(URL) == 1
+
+    sortie = capsys.readouterr().out
+    assert "repetition" in sortie
+    assert REPONSE_PAIEMENT[:40] in sortie, "la phrase répétée est citée"
+
+
+def test_le_marqueur_d_escalade_visible_est_refuse(capsys):
+    """Le serveur doit RETIRER le marqueur : s'il sort, la mécanique est visible."""
+    sonde = _charger_sonde()
+
+    with patch("urllib.request.urlopen", return_value=_ok(REPONSE_LITIGE + " [KOJO_TICKET]")):
+        assert sonde.verifier_assistant(URL) == 1
+
+    sortie = capsys.readouterr().out
+    assert "marqueur visible" in sortie
+    assert "KOJO_TICKET" in sortie
+
+
+def test_une_prose_legitime_n_est_pas_un_brouillon():
+    """Un mot français courant (« attendez », « en fait ») est une prose normale."""
+    sonde = _charger_sonde()
+
+    assert sonde._defauts_de_forme(REPONSE_PAIEMENT) == []
+    assert sonde._defauts_de_forme(
+        "Attendez la validation du client. En fait, tout est automatique apres 7 jours."
+    ) == [], "juger le fond ferait rougir une réponse honnête"
+
+
 # ---------------------------------------------------------------------------
 # Trois sorties, jamais deux
 # ---------------------------------------------------------------------------

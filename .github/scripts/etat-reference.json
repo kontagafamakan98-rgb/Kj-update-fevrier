@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-23",
-    "motif": "la sonde de l'assistant support entre dans le périmètre de l'état de référence parce qu'elle est la CIBLE d'une mutation déclarée (assistant-sonde) : sans empreinte, un fichier de sonde dérivé passerait inaperçu, et c'est exactement l'état qu'une mutation interrompue laisse. Adoption d'un seul chemin via --chemin : les 104 empreintes déjà adoptées restent inchangées.",
+    "motif": "la sonde refuse désormais un texte NON FINAL (brouillon de raisonnement, phrase répétée, marqueur [KOJO_TICKET] visible) : le fichier change parce que le verdict change, et cet état-là est la référence. Même périmètre, même cible de mutation ; seules les 105 empreintes restent identiques ailleurs.",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -141,7 +141,7 @@
       "frontend/scripts/contraste-jetons.js": "f11f4eea5297e136f45449677aa2e102f43b34779669a889ad828754da52b899",
       "frontend/scripts/check-bundle-size.js": "9bfe5571d368451bb14c3f5cd0770a440f252aa134643ccf7c256541472e6690",
       ".github/scripts/check-fly-env-drift.py": "ddfa85c837d658377745fceeed157970c73d144437a718df9ba23a7d29994cbd",
-      "backend/scripts/check_ai_assistant_probe.py": "57499cda62894b038598a3c882a1eee02bf332b23681432fd619b143e4fd3647"
+      "backend/scripts/check_ai_assistant_probe.py": "2ce9e4a4acca1a3cdd2a651ee976e14cfda9db09fee76b0f5f61ecf9fd42d94d"
     }
   },
   "hors_perimetre": [
