@@ -275,7 +275,10 @@ export default function Jobs() {
           <h1 className={pagePlan.titleClass}>
             {effectiveTab === JOB_TAB_MISSIONS ? (pageT('myMissions') || 'Mes missions') : (pageT(pagePlan.titleKey) || 'Emplois disponibles')}
           </h1>
-          <p className="mt-2 text-gray-600">{new Intl.DateTimeFormat(locale, { day: '2-digit', month: 'long', year: 'numeric' }).format(new Date())}</p>
+          {/* La date du jour : le SEUL propriétaire de ce fait (une coquille est
+              statique, elle en réserve la bande sans la publier — cf.
+              `dateClass` dans src/config/page-sections.js). */}
+          <p className={pagePlan.dateClass}>{new Intl.DateTimeFormat(locale, { day: '2-digit', month: 'long', year: 'numeric' }).format(new Date())}</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {/* Sélecteur de pays — visible uniquement sur cette page, pour

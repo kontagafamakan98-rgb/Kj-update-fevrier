@@ -79,9 +79,6 @@ const COQUILLES_DE_ROUTE = buildRouteShells({
   registerT: makeRegisterTranslator('fr', T),
   jobsT: makeJobsTranslator('fr', T),
   contact: CONTACT,
-  frDate: new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' }).format(
-    new Date()
-  ),
   pageSections: PAGE_SECTIONS,
   googleAuth: Boolean(String(process.env.VITE_GOOGLE_CLIENT_ID || '').trim()),
 });

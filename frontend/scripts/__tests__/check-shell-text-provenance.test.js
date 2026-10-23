@@ -220,23 +220,28 @@ describe('shell-text-provenance — la règle de provenance', () => {
     expect(trouvees[0].fragment).toBe('Annonce réservée aux membres');
   });
 
-  it('accepte les dates que la page DÉCLARE, refuse la même précédée d’un texte non déclaré', () => {
-    // La date publiée n'est pas un texte de la page : c'est le JOUR, que
-    // `prerender-route-meta.js` et `Jobs.js` formatent chacun de leur côté. Un
-    // littéral tapé ici (« 23 septembre 2026 ») ne rendait ce cas vrai qu'un
-    // seul jour — le 24 au matin, il rougissait sans qu'aucune ligne ait bougé.
-    // Le test demande donc la date à la même source que la page : l'horloge.
+  it("refuse une DATE publiée par une coquille — « aujourd'hui » est un fait du CLIENT", () => {
+    // La date du jour a longtemps été tolérée ici, parce que
+    // `prerender-route-meta.js` et `Jobs.js` la formataient chacun de leur côté.
+    // Une coquille est un document STATIQUE : la date y est figée au build,
+    // donc fausse dès le lendemain — et le jour où le build et la lecture
+    // tombent de part et d'autre de minuit, la coquille publie la VEILLE
+    // pendant que React peint le jour (mesuré en CI le 23/10/2026 : « 22
+    // octobre 2026 » contre « 23 octobre 2026 », sonde `texte-coquille-react`
+    // rouge). Le texte n'a plus qu'un propriétaire, la page ; une coquille qui
+    // en publie une est refusée comme n'importe quel texte non déclaré.
+    // Le cas demande la date à la même source que la page : l'horloge — un
+    // littéral tapé ici (« 23 septembre 2026 ») ne serait vrai qu'un seul jour.
     const derivees = valeursDerivees(FRONTEND_DIR);
     for (const jour of ['numeric', '2-digit']) {
       for (const mois of ['long', 'short']) {
         const date = new Intl.DateTimeFormat('fr-FR', { day: jour, month: mois, year: 'numeric' }).format(
           new Date()
         );
-        expect(derivees.has(normaliser(date))).toBe(true);
-        expect(divergences(`<p>${date}</p>`, { derivees })).toEqual([]);
-        const trouvees = divergences(`<p>Le ${date}</p>`, { derivees });
+        expect(derivees.has(normaliser(date))).toBe(false);
+        const trouvees = divergences(`<p>${date}</p>`, { derivees });
         expect(trouvees).toHaveLength(1);
-        expect(trouvees[0].fragment).toBe(`Le ${date}`);
+        expect(trouvees[0].fragment).toBe(date);
       }
     }
   });
