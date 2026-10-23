@@ -48,6 +48,7 @@ from kojo_live import (
     partage_stats,
 )
 from kojo_rate_limit import rate_limit_en_redis, rate_limit_stats
+from kojo_scheduler import relance_stats
 from kojo_settings import METRICS_TOKEN
 
 # Chemin et type de contenu : ceux que Prometheus attend d'une cible HTTP.
@@ -285,6 +286,24 @@ def rendre(corpus: Optional[dict] = None) -> str:
         "kojo_revocation_dernier_echec_timestamp_seconds",
         "Dernier echec de verification de revocation (0 = aucun).",
         _epoch(revocation.get("dernier_echec")),
+    )
+
+    # ── Relance client (le compteur du process, pas son effet) ─────────────
+    # Ces deux-là disent ce que CE process a envoyé ; ils ne disent rien de ce
+    # que les relances ont PRODUIT. L'effet (missions relancées ayant reçu une
+    # candidature APRÈS la relance) se lit sur l'historique, dans
+    # `GET /owner/relances/mesures` — un compteur qui monte ne prouve pas qu'il
+    # sert, et c'est précisément la question posée à cette mesure.
+    relances = relance_stats()
+    compteur(
+        "kojo_relances_envoyees_total",
+        "Relances client envoyees par ce process (une par mission, apres le seuil).",
+        relances.get("envoyees"),
+    )
+    compteur(
+        "kojo_relances_echecs_total",
+        "Relances dont l'envoi a echoue : la mission reste a relancer au passage suivant.",
+        relances.get("echecs"),
     )
 
     # ── Corpus (lu en base par la route, jamais ici) ────────────────────────

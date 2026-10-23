@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-23",
-    "motif": "trois fichiers portent la relance client : la boucle est demarree, annulee et attendue au shutdown (server.py), la regle mission ouverte sans candidature est PARTAGEE avec l'alerte proprietaire au lieu d'etre comptee deux fois (kojo_scheduler.py), et les deux reglages sont OPTIONNELS sur Fly donc leur absence n'est pas une config incomplete (check-fly-env-drift.py)",
+    "motif": "livrer.py confirme desormais la tete de la PR (git rev-parse de la branche contre pulls/{n}.head.sha) avant d attendre les checks, et refuse en nommant les deux SHA plutot que de juger l ancien commit ; les deux autres fichiers de la reference portent la relance client, sa mesure et son compteur, inchanges depuis leur declaration",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -52,7 +52,7 @@
       ".github/scripts/check-test-existence-assertions.py": "7ec8f91c23750854f3c90749491cccdaf7f0bcaf387fc03312c1384eee6b5213",
       ".github/scripts/check-workflow-pins.py": "16b8576486a9224e6fdd7192aadda61a53f5d354e1321f50796c87bb2eeac516",
       ".github/scripts/install-gitleaks.sh": "4105763e64eaa2b1498c8e8c46913062274e67e5a31c4f108cfdc21bed3a41d1",
-      ".github/scripts/livrer.py": "c75275f97715585a7a600cc91f2e6d0f6d9082eb4cf216e3cee4f4b89049ce40",
+      ".github/scripts/livrer.py": "eab5900f7c982371d6b15226c4c874c7191674b45730c3040e8a5ca9d719b24d",
       ".github/scripts/perimetre_gate.py": "5095501bb20d63d788f4f0aa069a85e3583a9295acaaba4bacef54de2bf1179e",
       ".github/scripts/rapport-secrets.py": "231c6e9b180ac25dea480d9d56d2a8fa3cf5ddfe32e79a1b4b6be8780c51965d",
       "backend/kojo_balises.py": "3596f3a55094902f31f1327c93d744551e30c959262c97f64c9b6beb4e437f67",
@@ -63,7 +63,7 @@
       "backend/kojo_routers_jobs_tracking.py": "591a5cfc8bbca952ce99d864e07b551f8dc2b5d6b0f0755156a36b90c3fb7ca5",
       "backend/kojo_routers_users.py": "93b34ef87ebd8d4f75368fb7619d85e43e23ff891f3b03255f936a6c66d45d5f",
       "backend/kojo_routers_users_push.py": "85a2e4017a51444818caf8fd6042fa2f63b464d034fb830e22310544d73f72b7",
-      "backend/kojo_scheduler.py": "0f172d64d329c885066b6dea1b294681ab76392db5d51f6842f5f26bc2067049",
+      "backend/kojo_scheduler.py": "f530832390cefdcdbd4c88c88cac399ff3935d1f6e8bbf66d5fe943471df1a37",
       "backend/scripts/audit_docstrings.py": "fc1092b0f72619462c8d5e056dc652729f0a65e40abf171d249ed3993dc9ff39",
       "backend/scripts/audit_none_signatures.py": "2eef502b52f9c7e3482bd414ba9388105edd000be2b1a03e71195e1f4baa65d1",
       "backend/scripts/check_ai_assistant_probe.py": "2ce9e4a4acca1a3cdd2a651ee976e14cfda9db09fee76b0f5f61ecf9fd42d94d",

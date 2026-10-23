@@ -1666,15 +1666,23 @@ async def clients_sans_proposition_once(now: Optional[datetime] = None) -> dict:
             continue
 
         heures = max(1, int(round((now - publiee).total_seconds() / 3600)))
-        await notify_user_localized(
-            user_id=client,
-            key="client_mission_sans_proposition",
-            notif_type=NotificationType.GENERAL,
-            related_id=cle,
-            related_type="job",
-            job_title=str(job.get("title") or "votre mission"),
-            heures=heures,
-        )
+        # Le compteur du PROCESS dit combien de relances sont parties ; l'EFFET,
+        # lui, se mesure sur l'historique (`mesure_relances`) — un compteur n'est
+        # pas une mesure, et l'inverse n'est pas vrai non plus.
+        try:
+            await notify_user_localized(
+                user_id=client,
+                key="client_mission_sans_proposition",
+                notif_type=NotificationType.GENERAL,
+                related_id=cle,
+                related_type="job",
+                job_title=str(job.get("title") or "votre mission"),
+                heures=heures,
+            )
+        except Exception:
+            _compteurs_relance["echecs"] += 1
+            raise
+        _compteurs_relance["envoyees"] += 1
         # Le marqueur est posé APRÈS l'envoi : une notification qui échoue
         # (exception de `notify_user_localized`) laisse la mission à relancer au
         # passage suivant, plutôt que de la perdre en la marquant comme faite.
@@ -1739,3 +1747,206 @@ async def clients_sans_proposition_loop():
             break
         except Exception as exc:
             logger.warning(f"⚠️ Erreur relance client sans proposition: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# MESURE DES RELANCES — la relance a-t-elle été ENTENDUE ?
+# ---------------------------------------------------------------------------
+#
+# La relance dit au client qu'il peut corriger son prix, sa date ou son
+# quartier. Elle ne dit pas si la mission a ENSUITE reçu une candidature : le
+# passage ne compte que des envois, et un envoi n'est pas un effet. Ce chiffre
+# vit donc sur l'HISTORIQUE des missions portant le marqueur
+# `nudge_sans_proposition_at` — la même donnée que celle qui empêche une seconde
+# relance, lue pour une autre question.
+#
+# CE QUI EST COMPTÉ, ET CE QUI NE L'EST PAS :
+#   • une candidature ne compte que si elle est ARRIVÉE APRÈS la relance
+#     (`created_at` ≥ marqueur). Une candidature antérieure ne serait pas un
+#     effet de la relance, et sa présence sur une mission relancée est une
+#     CONTRADICTION : elle est publiée (`candidature_prealable`), jamais
+#     recasée en succès ;
+#   • une candidature dont la date est ILLISIBLE ne devient ni un succès ni un
+#     échec — elle est comptée à part (`propositions_date_illisible`), sinon
+#     elle gonflerait le taux surveillé dans un sens ou dans l'autre ;
+#   • un marqueur illisible, futur ou hors fenêtre est COMPTÉ et exclu, jamais
+#     recasé « maintenant » ;
+#   • la lecture est BORNÉE et le dit (`tronque`, `mesure_tronquee`) : au-delà
+#     de `MAX_RELANCEES_MESUREES` ou de `MAX_PROPOSITIONS_LUES`, on ne sait plus
+#     quelles missions ont reçu une candidature, donc AUCUN taux n'est publié.
+#
+# PLANCHER : sous `RELANCE_PLANCHER_MESURE` relances mesurées, le taux vaut
+# `None` et les COMPTES bruts restent publiés (ils sont vrais). Un pourcentage
+# sur trois envois est du bruit, pas une mesure.
+RELANCE_PLANCHER_MESURE = 10
+# Fenêtre DÉCLARÉE : une fenêtre libre rendrait deux mesures incomparables.
+# 30 jours, comme la première fenêtre de l'arbitrage.
+RELANCE_FENETRE_JOURS = 30
+# Bornes de lecture, déclarées pour la même raison que celles de la file.
+MAX_RELANCEES_MESUREES = 500
+
+# Compteurs du PROCESS (remis à zéro par un redémarrage, ce que Prometheus lit
+# avec `rate()`) : ils disent combien de relances sont parties d'ici, pas si
+# elles ont servi. L'effet est la mesure ci-dessous.
+_compteurs_relance = {"envoyees": 0, "echecs": 0}
+
+
+def relance_stats() -> dict:
+    """Compteurs du process : relances parties, et envois qui ont échoué."""
+    return dict(_compteurs_relance)
+
+
+def _delais_candidature(delais: list) -> dict:
+    """Médiane, moyenne et pire délai relance → première candidature.
+
+    Règle PROPRE à cette mesure (heures entre le marqueur et la première
+    candidature) : elle ne reprend pas celle de l'arbitrage, qui mesure un
+    autre intervalle. Une liste vide ne devient pas zéro : `n = 0` et des
+    valeurs `None` disent qu'aucun délai n'a été mesuré.
+    """
+    if not delais:
+        return {"n": 0, "mediane_heures": None, "moyenne_heures": None, "max_heures": None}
+    tries = sorted(delais)
+    milieu = len(tries) // 2
+    mediane = tries[milieu] if len(tries) % 2 else (tries[milieu - 1] + tries[milieu]) / 2
+    return {
+        "n": len(tries),
+        "mediane_heures": round(mediane / 3600.0, 1),
+        "moyenne_heures": round(sum(tries) / len(tries) / 3600.0, 1),
+        "max_heures": round(tries[-1] / 3600.0, 1),
+    }
+
+
+async def mesure_relances(
+    now: Optional[datetime] = None,
+    fenetre_jours: Optional[int] = None,
+    limite: Optional[int] = None,
+) -> dict:
+    """Les relances clients ONT-ELLES fait arriver des candidatures ?
+
+    Mesure sur les missions RELANCÉES de la fenêtre (`nudge_sans_proposition_at`
+    ≥ `now - fenetre_jours`) : combien ont reçu au moins une candidature APRÈS
+    la relance, et après combien de temps. Les dénominateurs sont publiés avec
+    le taux, le taux vaut `None` sous `RELANCE_PLANCHER_MESURE`, et une lecture
+    bornée dit qu'elle l'est.
+
+    Une lecture EN PANNE remonte l'exception : l'appelant (route propriétaire,
+    scrape) la nomme. Rendre un zéro ferait lire « aucune relance n'a servi »
+    là où on ne sait pas lire la base — exactement le silence que cette mesure
+    existe pour fermer.
+    """
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    jours = int(fenetre_jours or RELANCE_FENETRE_JOURS)
+    # La borne se lit à l'APPEL, pas à la définition : une valeur par défaut
+    # figée dans la signature ignorerait toute modification de la constante
+    # (relue par les tests et par la configuration).
+    limite = MAX_RELANCEES_MESUREES if limite is None else int(limite)
+    depuis = now - timedelta(days=jours)
+
+    filtre = {"nudge_sans_proposition_at": {"$exists": True}}
+    total = await db.jobs.count_documents(filtre)
+    missions = await db.jobs.find(filtre).to_list(limite + 1)
+    tronque = len(missions) > limite
+    missions = missions[:limite]
+
+    date_illisible = 0
+    date_future = 0
+    hors_fenetre = 0
+    mesurees = []  # [(relance_le, clés, mission)]
+    for job in missions:
+        relance_le = _parse_payment_ts(job.get("nudge_sans_proposition_at"))
+        if relance_le is None:
+            # Un marqueur illisible n'est ni ancien ni récent : compté, exclu.
+            date_illisible += 1
+            continue
+        if relance_le > now:
+            date_future += 1
+            continue
+        if relance_le < depuis:
+            hors_fenetre += 1
+            continue
+        cles = _cles_mission(job)
+        if cles:
+            mesurees.append((relance_le, cles, job))
+
+    cles_lues = set()
+    for _relance_le, cles, _job in mesurees:
+        cles_lues |= cles
+
+    propositions = []
+    propositions_tronquees = False
+    if cles_lues:
+        propositions = await db.job_proposals.find(
+            identifiants_query(sorted(cles_lues), ("job_id",))
+        ).to_list(MAX_PROPOSITIONS_LUES + 1)
+        propositions_tronquees = len(propositions) > MAX_PROPOSITIONS_LUES
+        propositions = propositions[:MAX_PROPOSITIONS_LUES]
+
+    par_mission = {}  # clé → [instant de candidature ou None]
+    for proposition in propositions:
+        instant = _parse_payment_ts(proposition.get("created_at"))
+        for valeur in (proposition.get("job_id"), proposition.get("_id")):
+            if valeur not in (None, ""):
+                par_mission.setdefault(str(valeur), []).append(instant)
+
+    avec_candidature = 0
+    sans_candidature = 0
+    candidature_prealable = 0
+    propositions_date_illisible = 0
+    delais = []
+    for relance_le, cles, _job in mesurees:
+        instants = []
+        for cle in cles:
+            instants.extend(par_mission.get(cle, []))
+        if not instants:
+            sans_candidature += 1
+            continue
+        lisibles = [instant for instant in instants if instant is not None]
+        if not lisibles:
+            # La mission a des candidatures, mais aucune date lisible : on ne
+            # peut pas dire si elles précèdent ou suivent la relance.
+            propositions_date_illisible += 1
+            continue
+        apres = [instant for instant in lisibles if instant >= relance_le]
+        if not apres:
+            # Relancée alors qu'elle avait déjà une candidature : la donnée se
+            # contredit (ou une candidature antidatée existe). Compté, jamais
+            # compté comme un succès.
+            candidature_prealable += 1
+            continue
+        avec_candidature += 1
+        delais.append((min(apres) - relance_le).total_seconds())
+
+    mesure_tronquee = tronque or propositions_tronquees
+    taux = None
+    if not mesure_tronquee and len(mesurees) >= RELANCE_PLANCHER_MESURE:
+        taux = round(avec_candidature / len(mesurees), 3)
+
+    return {
+        "mesure_le": now.isoformat(),
+        "fenetre_jours": jours,
+        "depuis": depuis.isoformat(),
+        "plancher": RELANCE_PLANCHER_MESURE,
+        "relances": {
+            "total": total,
+            "lues": len(missions),
+            "tronque": tronque,
+        },
+        "mesurees": len(mesurees),
+        "avec_candidature": avec_candidature,
+        "sans_candidature": sans_candidature,
+        "taux_candidature": taux,
+        "delai_candidature": _delais_candidature(delais),
+        "exclusions": {
+            "date_illisible": date_illisible,
+            "date_future": date_future,
+            "hors_fenetre": hors_fenetre,
+            "candidature_prealable": candidature_prealable,
+            "propositions_date_illisible": propositions_date_illisible,
+            "propositions_lues": len(propositions),
+            "propositions_tronquees": propositions_tronquees,
+            "mesure_tronquee": mesure_tronquee,
+        },
+    }
