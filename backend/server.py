@@ -62,6 +62,7 @@ from kojo_payments import (
 )
 import kojo_live
 from kojo_scheduler import (
+    clients_sans_proposition_loop,
     completion_auto_release_loop,
     compter_missions_ouvertes,
     email_provider_alert_loop,
@@ -754,6 +755,12 @@ async def lifespan(application: FastAPI):
     sans_proposition_task = asyncio.create_task(
         missions_sans_proposition_alert_loop()
     )
+    # RELANCE DU CLIENT : l'alerte propriétaire dit que la place ne se remplit
+    # pas ; celle-ci parle à la seule personne qui peut corriger SA mission —
+    # son prix, sa date, son quartier. Quelques heures, pas trois jours.
+    client_sans_proposition_task = asyncio.create_task(
+        clients_sans_proposition_loop()
+    )
     # BUS TEMPS RÉEL (Redis pub/sub) : le fan-out reste en mémoire, le bus le
     # PROLONGE aux autres workers et machines. Sans REDIS_URL, rien ne change
     # (le process publie et sert ses propres flux) — et `start_bus` DIT la perte
@@ -777,6 +784,7 @@ async def lifespan(application: FastAPI):
     litige_alerte_task.cancel()
     marche_task.cancel()
     sans_proposition_task.cancel()
+    client_sans_proposition_task.cancel()
     try:
         await asyncio.gather(
             rate_limit_task,
@@ -788,6 +796,7 @@ async def lifespan(application: FastAPI):
             litige_task,
             marche_task,
             sans_proposition_task,
+            client_sans_proposition_task,
             litige_alerte_task,
         )
     except asyncio.CancelledError:

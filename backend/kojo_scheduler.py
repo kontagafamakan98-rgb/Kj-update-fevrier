@@ -40,7 +40,7 @@ from kojo_models import NotificationType
 # chaque règle son filtre (kojo_retention), qui porte aussi l'index TTL.
 from kojo_retention import RETENTION_RULES
 from kojo_job_alerts import passage_digest
-from kojo_identifiants import identifiants_query
+from kojo_identifiants import identifiant_job_query, identifiants_query
 from kojo_job_completion import passage_liberations_auto
 from kojo_job_disputes import (
     PLANCHER_MESURE,
@@ -48,6 +48,8 @@ from kojo_job_disputes import (
     passage_litiges_expires,
 )
 from kojo_settings import (
+    CLIENT_SANS_PROPOSITION_HEURES,
+    CLIENT_SANS_PROPOSITION_INTERVALLE_MINUTES,
     COMPLETION_SWEEP_INTERVAL_MINUTES,
     EMAIL_HEALTH_ALERT_INTERVAL_MINUTES,
     JOB_ALERT_DIGEST_INTERVAL_MINUTES,
@@ -1249,6 +1251,100 @@ def _cles_mission(job: dict) -> set:
     }
 
 
+class LectureImpossible(Exception):
+    """Une lecture en panne, avec le CODE qui dit laquelle.
+
+    Une panne n'est pas un verdict : l'appelant l'écrit et n'envoie rien. Le
+    code distingue les deux causes (missions illisibles, propositions
+    illisibles), qui n'ont pas le même remède.
+    """
+
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+
+async def _missions_en_attente(seuil: timedelta, now: datetime) -> dict:
+    """Missions ouvertes plus vieilles que `seuil` ET sans aucune proposition.
+
+    LA RÈGLE VIT ICI, une fois. Deux alertes la lisent avec deux échelles : le
+    propriétaire à l'échelle des JOURS (la place ne se remplit pas), le client à
+    l'échelle des HEURES (sa mission ne reçoit rien). Deux comptages écrits
+    séparément finiraient par ne plus compter la même chose — et l'un relancerait
+    des clients pendant que l'autre dirait que la file est saine.
+
+    Lève `LectureImpossible` quand une des deux lectures échoue : rendre un zéro
+    par défaut ferait relancer des clients sur une panne de la base.
+    """
+    try:
+        missions = await db.jobs.find(
+            {"status": "open", "deleted": {"$ne": True}}
+        ).to_list(MAX_MISSIONS_MESUREES + 1)
+    except Exception as exc:
+        raise LectureImpossible("lecture_erreur", str(exc)[:_EMAIL_ALERT_DETAIL_MAX])
+
+    tronque = len(missions) > MAX_MISSIONS_MESUREES
+    missions = missions[:MAX_MISSIONS_MESUREES]
+
+    anciennes = []  # [(publiée_le, clé, mission)]
+    date_illisible = 0
+    for job in missions:
+        publiee = _parse_payment_ts(job.get("posted_at")) or _parse_payment_ts(
+            job.get("created_at")
+        )
+        cle = str(job.get("id") or job.get("job_id") or job.get("_id") or "")
+        if publiee is None:
+            # Une date illisible n'est PAS « très ancienne » (elle alerterait sur
+            # une donnée qu'on ne sait pas lire) ni « récente » en silence : elle
+            # est comptée, et elle sort de la mesure.
+            date_illisible += 1
+            continue
+        if cle and now - publiee >= seuil:
+            anciennes.append((publiee, cle, job))
+
+    cles = set()
+    for _publiee, cle, job in anciennes:
+        cles |= _cles_mission(job)
+    avec_proposition = set()
+    propositions_tronquees = False
+    if cles:
+        try:
+            propositions = await db.job_proposals.find(
+                identifiants_query(sorted(cles), ("job_id",))
+            ).to_list(MAX_PROPOSITIONS_LUES + 1)
+        except Exception as exc:
+            raise LectureImpossible(
+                "propositions_lecture_erreur", str(exc)[:_EMAIL_ALERT_DETAIL_MAX]
+            )
+        propositions_tronquees = len(propositions) > MAX_PROPOSITIONS_LUES
+        # La mission peut être désignée par `job_id` (usage de l'app) ou par `_id`
+        # (jeu IMPORTÉ) — et c'est précisément l'une de ces deux formes que la
+        # requête ci-dessus a appariée. Ne garder que `job_id` rendrait invisibles
+        # les lignes importées qu'on vient de lire : la mission compterait comme
+        # « sans candidature » alors que sa proposition est sous nos yeux.
+        for proposition in propositions:
+            for valeur in (proposition.get("job_id"), proposition.get("_id")):
+                if valeur not in (None, ""):
+                    avec_proposition.add(str(valeur))
+
+    sans = sorted(
+        (
+            (publiee, cle, job)
+            for publiee, cle, job in anciennes
+            if not (_cles_mission(job) & avec_proposition)
+        ),
+        key=lambda element: element[0],
+    )
+    return {
+        "missions_ouvertes": len(missions),
+        "sans": sans,
+        "date_illisible": date_illisible,
+        "tronque": tronque,
+        "propositions_tronquees": propositions_tronquees,
+    }
+
+
 async def missions_sans_proposition_alert_once(now: Optional[datetime] = None) -> dict:
     """Un passage : compte les missions anciennes sans aucune proposition.
 
@@ -1288,75 +1384,28 @@ async def missions_sans_proposition_alert_once(now: Optional[datetime] = None) -
         )
         return resume
 
-    # ── 1. Les missions ouvertes ────────────────────────────────────────────
+    # ── 1-2. La mesure (une seule règle, partagée avec la relance client) ──
     try:
-        missions = await db.jobs.find(
-            {"status": "open", "deleted": {"$ne": True}}
-        ).to_list(MAX_MISSIONS_MESUREES + 1)
-    except Exception as exc:
-        return await _premisse("lecture_erreur", str(exc)[:_EMAIL_ALERT_DETAIL_MAX])
-
-    tronque = len(missions) > MAX_MISSIONS_MESUREES
-    missions = missions[:MAX_MISSIONS_MESUREES]
-    resume["missions_ouvertes"] = len(missions)
-
-    seuil = timedelta(days=MISSIONS_SANS_PROPOSITION_JOURS)
-    anciennes = []  # [(publiée_le, clé, mission)]
-    date_illisible = 0
-    for job in missions:
-        publiee = _parse_payment_ts(job.get("posted_at")) or _parse_payment_ts(
-            job.get("created_at")
+        mesure = await _missions_en_attente(
+            timedelta(days=MISSIONS_SANS_PROPOSITION_JOURS), now
         )
-        cle = str(job.get("id") or job.get("job_id") or job.get("_id") or "")
-        if publiee is None:
-            # Une date illisible n'est PAS « très ancienne » (elle alerterait sur
-            # une donnée qu'on ne sait pas lire) ni « récente » en silence : elle
-            # est comptée, et elle sort de la mesure.
-            date_illisible += 1
-            continue
-        if cle and now - publiee >= seuil:
-            anciennes.append((publiee, cle, job))
+    except LectureImpossible as exc:
+        return await _premisse(exc.code, exc.message)
 
+    resume["missions_ouvertes"] = mesure["missions_ouvertes"]
     commun = {
         "signature": signature,
         "jours": MISSIONS_SANS_PROPOSITION_JOURS,
-        "missions_ouvertes": len(missions),
+        "missions_ouvertes": mesure["missions_ouvertes"],
         "derniere_mesure_at": now,
         "lecture_erreur": "",
         "propositions_lecture_erreur": "",
-        "date_illisible": date_illisible,
-        "tronque": tronque,
+        "date_illisible": mesure["date_illisible"],
+        "tronque": mesure["tronque"],
     }
 
-    # ── 2. Les propositions de ces missions (UNE requête, bornée) ──────────
-    cles = set()
-    for _publiee, cle, job in anciennes:
-        cles |= _cles_mission(job)
-    avec_proposition = set()
-    propositions_tronquees = False
-    if cles:
-        try:
-            propositions = await db.job_proposals.find(
-                identifiants_query(sorted(cles), ("job_id",))
-            ).to_list(MAX_PROPOSITIONS_LUES + 1)
-        except Exception as exc:
-            return await _premisse(
-                "propositions_lecture_erreur", str(exc)[:_EMAIL_ALERT_DETAIL_MAX]
-            )
-        propositions_tronquees = len(propositions) > MAX_PROPOSITIONS_LUES
-        # La mission peut être désignée par `job_id` (usage de l'app) ou par `_id`
-        # (jeu IMPORTÉ) — et c'est précisément l'une de ces deux formes que la
-        # requête ci-dessus a appariée. Ne garder que `job_id` rendrait invisibles
-        # les lignes importées qu'on vient de lire : la mission compterait comme
-        # « sans candidature » alors que sa proposition est sous nos yeux.
-        avec_proposition = set()
-        for proposition in propositions:
-            for valeur in (proposition.get("job_id"), proposition.get("_id")):
-                if valeur not in (None, ""):
-                    avec_proposition.add(str(valeur))
-
     # ── 3. Ce qu'on ne sait pas conclure ──────────────────────────────────
-    if propositions_tronquees:
+    if mesure["propositions_tronquees"]:
         await collection.update_one(
             {"_id": _MISSIONS_SANS_PROPOSITION_SUBJECT},
             {"$set": dict(commun, propositions_tronquees=True)},
@@ -1371,14 +1420,7 @@ async def missions_sans_proposition_alert_once(now: Optional[datetime] = None) -
         )
         return resume
 
-    sans = sorted(
-        (
-            (publiee, cle, job)
-            for publiee, cle, job in anciennes
-            if not (_cles_mission(job) & avec_proposition)
-        ),
-        key=lambda element: element[0],
-    )
+    sans = mesure["sans"]
     resume["sans_proposition"] = len(sans)
     plus_ancienne = (
         round((now - sans[0][0]).total_seconds() / 86400, 1) if sans else None
@@ -1435,7 +1477,7 @@ async def missions_sans_proposition_alert_once(now: Optional[datetime] = None) -
         related_type="marche",
         count=len(sans),
         jours=MISSIONS_SANS_PROPOSITION_JOURS,
-        total=len(missions),
+        total=mesure["missions_ouvertes"],
         plus_ancienne=plus_ancienne,
     )
 
@@ -1456,7 +1498,12 @@ async def missions_sans_proposition_alert_once(now: Optional[datetime] = None) -
                 "Le RETOUR de la file à zéro, ou une proposition reçue faisant "
                 "BAISSER le compte, ne déclenche aucun email ; une mission de plus "
                 "qui vieillit fait grandir la file et rouvre donc une alerte.\n"
-                % (len(sans), len(missions), MISSIONS_SANS_PROPOSITION_JOURS, plus_ancienne),
+                % (
+                    len(sans),
+                    mesure["missions_ouvertes"],
+                    MISSIONS_SANS_PROPOSITION_JOURS,
+                    plus_ancienne,
+                ),
             )
             alerte_envoyee = True
         except Exception as exc:
@@ -1506,3 +1553,189 @@ async def missions_sans_proposition_alert_loop():
             break
         except Exception as exc:
             logger.warning(f"⚠️ Erreur alerte missions sans proposition: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# RELANCE DU CLIENT — « votre mission n'a reçu aucune candidature »
+# ---------------------------------------------------------------------------
+#
+# L'alerte « missions sans proposition » prévient le PROPRIÉTAIRE au bout de
+# trois jours : elle dit que la place ne se remplit pas. Elle ne dit rien à la
+# seule personne qui peut changer quelque chose à CETTE mission — son client,
+# qui a fixé un prix, une date et une ville, et qui n'ouvre pas la file
+# d'arbitrage. Une mission à 5 000 FCFA pour une plomberie à Dakar ne reçoit
+# personne : le client, lui, peut corriger le prix, la date ou le quartier.
+#
+# POURQUOI QUELQUES HEURES ET PAS TROIS JOURS : passé une nuit sans candidature,
+# le client doit pouvoir corriger pendant que sa mission est encore visible dans
+# les listes. À trois jours, la relance arrive quand l'annonce est déjà morte.
+#
+# CE QUI EST BORNÉ ET DIT : une relance PAR MISSION (marqueur
+# `nudge_sans_proposition_at` sur le document de la mission — jamais un compteur
+# en mémoire, qui se perdrait au redémarrage), un plafond par passage
+# (`MAX_CLIENTS_RELANCEES`), et une mission sans client lisible est COMPTÉE
+# (`sans_client`) au lieu d'être notifiée à personne. Une lecture en panne n'est
+# pas « zéro mission à relancer » : elle est écrite et ne relance rien.
+
+CLIENT_SANS_PROPOSITION_COLLECTION = "scheduler_alerts"
+_CLIENT_SANS_PROPOSITION_SUBJECT = "client_sans_proposition"
+# Plafond de relances par passage : une rafale de notifications est le meilleur
+# moyen de faire désinstaller l'application. Le reste part au passage suivant.
+MAX_CLIENTS_RELANCEES = 25
+
+
+def _signature_client_sans_proposition(heures: int) -> str:
+    """L'identité de la règle appliquée (elle change le sens d'une relance)."""
+    return "client_sans_proposition:heures=%s" % heures
+
+
+async def clients_sans_proposition_once(now: Optional[datetime] = None) -> dict:
+    """Un passage : relance les clients dont la mission n'a reçu aucune candidature.
+
+    Retourne un résumé testable {etat, missions_ouvertes, sans_proposition,
+    relances, deja_relancees, sans_client, plafond_atteint, lecture_erreur}.
+    """
+    now = now or datetime.now(timezone.utc)
+    collection = db[CLIENT_SANS_PROPOSITION_COLLECTION]
+    signature = _signature_client_sans_proposition(CLIENT_SANS_PROPOSITION_HEURES)
+    resume = {
+        "etat": "inconnu",
+        "missions_ouvertes": None,
+        "sans_proposition": None,
+        "relances": 0,
+        "deja_relancees": 0,
+        "sans_client": 0,
+        "plafond_atteint": 0,
+        "lecture_erreur": "",
+    }
+
+    try:
+        mesure = await _missions_en_attente(
+            timedelta(hours=CLIENT_SANS_PROPOSITION_HEURES), now
+        )
+    except LectureImpossible as exc:
+        await collection.update_one(
+            {"_id": _CLIENT_SANS_PROPOSITION_SUBJECT},
+            {"$set": {exc.code: exc.message, "derniere_mesure_at": now}},
+            upsert=True,
+        )
+        resume["etat"] = "lecture_impossible"
+        resume["lecture_erreur"] = exc.message
+        logger.warning(
+            "⚠️ Relance client : lecture impossible (%s) — personne n'est "
+            "relancé sur une mesure qu'on ne sait pas lire." % exc.message
+        )
+        return resume
+
+    resume["missions_ouvertes"] = mesure["missions_ouvertes"]
+    resume["sans_proposition"] = len(mesure["sans"])
+    if mesure["propositions_tronquees"]:
+        # On ne sait pas quelles missions ont reçu une candidature : relancer
+        # sur cette base enverrait des reproches faux à des clients servis.
+        await collection.update_one(
+            {"_id": _CLIENT_SANS_PROPOSITION_SUBJECT},
+            {
+                "$set": {
+                    "signature": signature,
+                    "missions_ouvertes": mesure["missions_ouvertes"],
+                    "derniere_mesure_at": now,
+                    "mesure_tronquee": True,
+                }
+            },
+            upsert=True,
+        )
+        resume["etat"] = "mesure_tronquee"
+        logger.warning(
+            "⚠️ Relance client : %s propositions lues, plafond atteint — aucune "
+            "relance (on ne sait pas qui a déjà reçu une candidature)."
+            % MAX_PROPOSITIONS_LUES
+        )
+        return resume
+
+    for publiee, cle, job in mesure["sans"]:
+        if resume["relances"] >= MAX_CLIENTS_RELANCEES:
+            resume["plafond_atteint"] = 1
+            break
+        client = str(job.get("client_id") or "").strip()
+        if not client:
+            resume["sans_client"] += 1
+            continue
+        if job.get("nudge_sans_proposition_at"):
+            # Déjà relancé : une seconde relance pour la même mission est du bruit.
+            resume["deja_relancees"] += 1
+            continue
+
+        heures = max(1, int(round((now - publiee).total_seconds() / 3600)))
+        await notify_user_localized(
+            user_id=client,
+            key="client_mission_sans_proposition",
+            notif_type=NotificationType.GENERAL,
+            related_id=cle,
+            related_type="job",
+            job_title=str(job.get("title") or "votre mission"),
+            heures=heures,
+        )
+        # Le marqueur est posé APRÈS l'envoi : une notification qui échoue
+        # (exception de `notify_user_localized`) laisse la mission à relancer au
+        # passage suivant, plutôt que de la perdre en la marquant comme faite.
+        await db.jobs.update_one(
+            identifiant_job_query(cle),
+            {
+                "$set": {
+                    "nudge_sans_proposition_at": now,
+                    "nudge_sans_proposition_heures": heures,
+                }
+            },
+        )
+        resume["relances"] += 1
+
+    await collection.update_one(
+        {"_id": _CLIENT_SANS_PROPOSITION_SUBJECT},
+        {
+            "$set": {
+                "signature": signature,
+                "heures": CLIENT_SANS_PROPOSITION_HEURES,
+                "missions_ouvertes": mesure["missions_ouvertes"],
+                "sans_proposition": len(mesure["sans"]),
+                "date_illisible": mesure["date_illisible"],
+                "tronque": mesure["tronque"],
+                "plafond_atteint": bool(resume["plafond_atteint"]),
+                "derniere_mesure_at": now,
+                "derniere_relance_at": now if resume["relances"] else None,
+                "lecture_erreur": "",
+                "propositions_lecture_erreur": "",
+                "mesure_tronquee": False,
+            }
+        },
+        upsert=True,
+    )
+    resume["etat"] = "relancee" if resume["relances"] else "saine"
+    if resume["relances"]:
+        logger.info(
+            "📩 %s client(s) relancé(s) : mission publiée depuis plus de %s h "
+            "sans aucune proposition." % (resume["relances"], CLIENT_SANS_PROPOSITION_HEURES)
+        )
+    return resume
+
+
+async def clients_sans_proposition_loop():
+    """Tâche de fond : relance les clients des missions qui ne reçoivent rien.
+
+    Même modèle que les autres boucles : sommeil d'abord (aucune rafale de
+    relances à chaque redéploiement), annulable au shutdown, erreurs isolées
+    par itération, et un BAIL par passage (N machines ne relancent pas N fois).
+    Le travail vit dans `clients_sans_proposition_once`, appelable avec une
+    horloge par les tests.
+    """
+    while True:
+        try:
+            await asyncio.sleep(CLIENT_SANS_PROPOSITION_INTERVALLE_MINUTES * 60)
+            await executer_si_bail(
+                "client_sans_proposition",
+                timedelta(minutes=CLIENT_SANS_PROPOSITION_INTERVALLE_MINUTES),
+                clients_sans_proposition_once,
+            )
+        except asyncio.CancelledError:
+            break
+        except Exception as exc:
+            logger.warning(f"⚠️ Erreur relance client sans proposition: {exc}")

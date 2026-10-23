@@ -426,6 +426,36 @@ if not 1 <= MISSIONS_SANS_PROPOSITION_INTERVALLE_MINUTES <= 1440:
         "tourner au moins une fois par jour (1..1440 minutes)."
     )
 
+# --- Relance du CLIENT dont la mission ne reçoit aucune candidature ---
+# L'alerte propriétaire dit que la place ne se remplit pas ; celle-ci parle à la
+# seule personne qui peut corriger CETTE mission : son client (prix, date,
+# quartier). Quelques HEURES, pas trois jours : passé une nuit sans candidature,
+# la mission est encore visible et corrigeable ; à trois jours, la relance
+# arrive sur une annonce morte. Une relance par mission, marquée sur la mission.
+# 1..168 heures (une semaine).
+CLIENT_SANS_PROPOSITION_HEURES = int(
+    os.environ.get('CLIENT_SANS_PROPOSITION_HEURES', '6')
+)
+# Cadence du jugement (minutes) : toutes les heures, une mission peut franchir
+# le seuil à tout moment et le client doit l'apprendre le jour même.
+CLIENT_SANS_PROPOSITION_INTERVALLE_MINUTES = int(
+    os.environ.get('CLIENT_SANS_PROPOSITION_INTERVALLE_MINUTES', '60')
+)
+
+if not 1 <= CLIENT_SANS_PROPOSITION_HEURES <= 168:
+    raise RuntimeError(
+        f"CLIENT_SANS_PROPOSITION_HEURES={CLIENT_SANS_PROPOSITION_HEURES} : le "
+        "seuil doit couvrir au moins une heure et au plus une semaine "
+        "(1..168). À 0, toute mission publiée à l'instant relancerait son "
+        "client."
+    )
+if not 1 <= CLIENT_SANS_PROPOSITION_INTERVALLE_MINUTES <= 1440:
+    raise RuntimeError(
+        f"CLIENT_SANS_PROPOSITION_INTERVALLE_MINUTES="
+        f"{CLIENT_SANS_PROPOSITION_INTERVALLE_MINUTES} : le jugement doit "
+        "tourner au moins une fois par jour (1..1440 minutes)."
+    )
+
 # Récompense de parrainage (FCFA) créditée quand le filleul termine sa
 # PREMIÈRE mission : une part au parrain, une part au filleul.
 REFERRAL_SPONSOR_REWARD = float(os.environ.get('REFERRAL_SPONSOR_REWARD', '500'))

@@ -334,6 +334,10 @@ _NOTIF_MSG: Dict[str, Dict[str, Dict[str, str]]] = {
         # Même raison pour le fr/en seulement : la phrase nomme un seuil de jours
         # et une route, et `_get_notif_msgs` sert déjà le repli français.
         "owner_missions_sans_proposition": {"title": "📭 Missions sans aucune proposition", "body": "{count} mission(s) ouverte(s) sur {total} attendent depuis plus de {jours} jour(s) sans AUCUNE proposition — la plus ancienne depuis {plus_ancienne} jour(s). L'offre existe et personne ne postule : vérifier le prix demandé, la ville et la catégorie (un métier sans travailleur inscrit dans cette ville ne recevra jamais de candidature). Liste : GET /api/jobs?status=open."},
+        # Relance du CLIENT — traduite dans SA langue comme les autres
+        # notifications utilisateur : elle lui parle de SA mission, et le
+        # propriétaire n'a pas à la recevoir.
+        "client_mission_sans_proposition": {"title": "👀 Votre mission n'a reçu aucune candidature", "body": "« {job_title} » est publiée depuis {heures} h et n'a encore reçu AUCUNE proposition. Trois leviers, dans l'ordre : le prix (comparez à des missions similaires), la date, et le quartier précis. Une mission sans candidature remonte moins dans les listes que les travailleurs consultent."},
     },
     "en": {
         "dispute_opened_client": {"title": "⚖️ Dispute opened", "body": "The worker opened a dispute on « {job_title} ». The payment is frozen: the owner must decide before {date}."},
@@ -382,6 +386,7 @@ _NOTIF_MSG: Dict[str, Dict[str, Dict[str, str]]] = {
         "owner_litiges_sans_reponse": {"title": "⚖️ Disputes decided without a reply", "body": "{sans_reponse} of the {tranches} disputes decided in the last {jours} days were decided WITHOUT any reply from the other party ({part} %, above the {seuil} % threshold). The arbitrator decided on a single version. Arbitration queue: GET /owner/litiges, measures: GET /owner/litiges/mesures."},
         "owner_marche_vide": {"title": "🚨 Empty marketplace", "body": "No OPEN job in the database for {duree} h (threshold {heures} h). Workers have nothing to apply to, no page is indexable and revenue is zero. Check publishing (GET /api/jobs?status=open) and the kojo_missions_ouvertes gauge (/metrics)."},
         "owner_missions_sans_proposition": {"title": "📭 Jobs with no proposal at all", "body": "{count} of {total} open job(s) have waited more than {jours} day(s) with NO proposal at all — the oldest for {plus_ancienne} day(s). The offer exists and nobody applies: check the asking price, the city and the category (a trade with no registered worker in that city will never receive a proposal). Listing: GET /api/jobs?status=open."},
+        "client_mission_sans_proposition": {"title": "👀 Your job has received no proposal yet", "body": "« {job_title} » has been published for {heures} h with no proposal at all. Three levers, in order: the price (compare with similar jobs), the date, and the exact neighbourhood. A job with no proposal ranks lower in the lists workers browse."},
     },
     "wo": {
         "dispute_opened_client": {"title": "⚖️ Litige ubbeeku na", "body": "Liggéeykat bi ubbeeku na litige ci « {job_title} ». Fey bi ñu ko taxawal : propriétaire bi wara ko tëg ba {date}."},

@@ -240,6 +240,11 @@ OPTIONAL_KEYS = {
     # incomplete.
     "MISSIONS_SANS_PROPOSITION_JOURS",
     "MISSIONS_SANS_PROPOSITION_INTERVALLE_MINUTES",
+    # Relance du CLIENT : l'anciennete et la cadence ont un defaut dans
+    # `kojo_settings` (6 h ; 60 min), borne au demarrage. Absence sur Fly =
+    # reglage laisse au defaut, pas une config incomplete.
+    "CLIENT_SANS_PROPOSITION_HEURES",
+    "CLIENT_SANS_PROPOSITION_INTERVALLE_MINUTES",
 }
 
 # Keys connues mais NON sensibles (valeur vérifiable côté doc). Leur digest
