@@ -270,7 +270,12 @@ class TestCorpus:
         async def _panne(*args, **kwargs):
             raise RuntimeError("base injoignable")
 
-        monkeypatch.setattr(serveur.db.jobs, "count_documents", _panne)
+        # On remplace la FONCTION que la route appelle, pas `db.jobs.count_documents` :
+        # sous motor, `db.jobs` rend un objet collection NEUF à chaque accès, donc
+        # `setattr` visait un objet que personne n'utilise — le test ne simulait
+        # aucune panne en CI (vrai Mongo) et laissait publier la valeur réelle.
+        # Mesuré le 23/10/2026 : la jauge sortait à 0 sur une base injoignable.
+        monkeypatch.setattr(serveur, "compter_missions_ouvertes", _panne)
 
         texte = await _lire(client, ENTETE)
 

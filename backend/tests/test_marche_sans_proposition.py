@@ -114,6 +114,63 @@ def _canaux(email_side_effect=None):
         yield notif, email
 
 
+class _CollectionEnPanne:
+    """Une collection dont toute lecture LÈVE, comme une base injoignable.
+
+    On ne patche PAS `db.jobs.find` : sous motor, `db.jobs` rend un objet
+    COLLECTION neuf à chaque accès, donc le patch viserait un objet que le code
+    n'utilise jamais. Sous FakeDB il fonctionnait — la collection y est mise en
+    cache —, si bien que le test mesurait la panne en local et le chemin normal
+    en CI, sur un vrai Mongo. Mesuré le 23/10/2026 : trois cas verts en local,
+    trois rouges dans le job « Backend tests ».
+    """
+
+    def __init__(self, motif: str):
+        self._motif = motif
+
+    # Ces trois méthodes LÈVENT SYNCHRONEMENT, comme un client qui n'atteint
+    # pas la base. Rendues `async`, elles échouaient dès l'appel avec
+    # « 'coroutine' object has no attribute 'to_list' » : le test mesurait alors
+    # la mauvaise panne, et son motif n'arrivait plus dans `lecture_erreur`.
+    def find(self, *args, **kwargs):
+        raise RuntimeError(self._motif)
+
+    def find_one(self, *args, **kwargs):
+        raise RuntimeError(self._motif)
+
+    def count_documents(self, *args, **kwargs):
+        raise RuntimeError(self._motif)
+
+
+class _DbEnPanne:
+    """La base RÉELLE, avec telles collections rendues illisibles.
+
+    Les autres collections (l'état de l'alerte) restent réelles : le test juge
+    ce qui a été ÉCRIT après la panne, pas seulement le résumé rendu.
+    """
+
+    def __init__(self, reel, en_panne: dict):
+        self._reel = reel
+        self._en_panne = en_panne
+
+    def __getattr__(self, nom):
+        if nom in self._en_panne:
+            return _CollectionEnPanne(self._en_panne[nom])
+        return getattr(self._reel, nom)
+
+    def __getitem__(self, nom):
+        if nom in self._en_panne:
+            return _CollectionEnPanne(self._en_panne[nom])
+        return self._reel[nom]
+
+
+@contextmanager
+def _lecture_en_panne(**collections):
+    """Rend ces collections illisibles pour la durée du bloc (`jobs`, `job_proposals`)."""
+    with patch.object(kojo_scheduler, "db", _DbEnPanne(kojo_scheduler.db, collections)):
+        yield
+
+
 # ───────────────────────── la MESURE de la file d'attente ──────────────────
 
 
@@ -445,10 +502,8 @@ class TestUneAlerteParCroissance:
 class TestPremissesEtCanaux:
     async def test_la_lecture_des_missions_en_panne_n_alerte_pas(self):
         await db_insert("jobs", _job())
-        with _seuil(), _canaux() as (notif, email), patch.object(
-            kojo_scheduler.db.jobs,
-            "find",
-            side_effect=RuntimeError("base injoignable"),
+        with _seuil(), _canaux() as (notif, email), _lecture_en_panne(
+            jobs="base injoignable"
         ):
             resume = await kojo_scheduler.missions_sans_proposition_alert_once(
                 now=MAINTENANT
@@ -466,10 +521,8 @@ class TestPremissesEtCanaux:
         await db_insert("jobs", _job())
         await _proposition("job-1")
 
-        with _seuil(), _canaux() as (notif, email), patch.object(
-            kojo_scheduler.db.job_proposals,
-            "find",
-            side_effect=RuntimeError("collection illisible"),
+        with _seuil(), _canaux() as (notif, email), _lecture_en_panne(
+            job_proposals="collection illisible"
         ):
             resume = await kojo_scheduler.missions_sans_proposition_alert_once(
                 now=MAINTENANT
@@ -490,9 +543,7 @@ class TestPremissesEtCanaux:
         with _seuil(), _canaux():
             await kojo_scheduler.missions_sans_proposition_alert_once(now=MAINTENANT)
 
-        with _seuil(), _canaux() as (notif, _email), patch.object(
-            kojo_scheduler.db.jobs, "find", side_effect=RuntimeError("panne")
-        ):
+        with _seuil(), _canaux() as (notif, _email), _lecture_en_panne(jobs="panne"):
             panne = await kojo_scheduler.missions_sans_proposition_alert_once(
                 now=MAINTENANT + timedelta(hours=6)
             )
