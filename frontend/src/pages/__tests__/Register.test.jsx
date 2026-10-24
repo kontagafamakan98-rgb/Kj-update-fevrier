@@ -160,4 +160,38 @@ describe('/register — disponibilité de l’adresse', () => {
     expect((await screen.findAllByText('Cette adresse email est déjà utilisée')).length).toBeGreaterThan(0);
     expect(screen.queryByText('duplicateEmailError')).toBeNull();
   });
+
+  /**
+   * MESURÉ EN PRODUCTION LE 24/10/2026 : la phrase était JUSTE et localisée,
+   * mais sans ISSUE. On apprenait que l'adresse est prise sans lire nulle part
+   * quoi faire — le seul recours était le lien « Se connecter » du bas de
+   * page, à l'autre bout du formulaire. Le message porte donc ses deux issues,
+   * et elles doivent être de VRAIS liens (une phrase qui dit « connectez-vous »
+   * sans mener à la connexion est un conseil, pas une action).
+   */
+  it('« available: false » dit aussi quoi faire ensuite, avec les deux liens réels', async () => {
+    etat.reponse = { available: false, email: 'pris@exemple.com', message: 'Cette adresse email est déjà utilisée' };
+    monter();
+    await saisirEmail('pris@exemple.com');
+
+    expect(await screen.findByText(/Pour continuer :/)).toBeTruthy();
+
+    const connexion = screen.getByRole('link', { name: /connectez-vous avec cette adresse/i });
+    expect(connexion.getAttribute('href')).toBe('/login');
+
+    const motDePasse = screen.getByRole('link', { name: /réinitialisez votre mot de passe/i });
+    expect(motDePasse.getAttribute('href')).toBe('/forgot-password');
+
+    // Et aucune clé de traduction ne fuit à l'écran.
+    expect(screen.queryByText(/duplicateEmail(NextStep|SignIn|Or|ResetPassword)/)).toBeNull();
+  });
+
+  it('« available: true » ne propose AUCUNE issue : il n\'y a rien à corriger', async () => {
+    etat.reponse = { available: true, email: 'libre@exemple.com', message: 'Adresse email disponible' };
+    monter();
+    await saisirEmail('libre@exemple.com');
+
+    expect(await screen.findByText('Adresse email disponible')).toBeTruthy();
+    expect(screen.queryByText(/Pour continuer :/)).toBeNull();
+  });
 });
