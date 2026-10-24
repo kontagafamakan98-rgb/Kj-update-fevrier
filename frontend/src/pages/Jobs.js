@@ -641,7 +641,7 @@ export default function Jobs() {
         null
       ) : filteredJobs.length === 0 ? (
         !user && effectiveTab === JOB_TAB_DISCOVER && !filtresActifs ? (
-          <PremiersArrivants t={t} />
+          <PremiersArrivants t={pageT} />
         ) : (
           <div className="rounded-lg border border-dashed border-stone-300 fond-sable p-10 text-center text-stone-500">
             {/* Un état vide a besoin d'un VISAGE avant d'avoir une phrase :

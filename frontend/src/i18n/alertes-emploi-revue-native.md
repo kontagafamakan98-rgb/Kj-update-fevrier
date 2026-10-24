@@ -198,6 +198,12 @@ remplacées par trois clés nouvelles — `premierArrivantsLead`,
 `premierArrivantsWatch`, `premierArrivantsWhatsApp` — et le titre réutilise
 `noJobsAvailableNow`, déjà traduit dans les cinq langues.
 
+Ces trois clés vivent dans le dictionnaire de PAGE (`utils/pack2PageI18n/jobs.js`),
+avec une valeur propre pour `wo`, `bm` et `mos` : ce sont les seules chaînes du
+site qui ne servent qu'à `/jobs`, et le dictionnaire global part dans le bundle
+initial (mesuré : 131,0 Ko gzip sur un budget de 131,0 — la version globale
+faisait déborder de 29 octets, d'où le déplacement).
+
 Doutes, à trancher par un locuteur :
 
 19. **`wo`, « tambaliku »** pour « démarre » : forgé sur « tambali »

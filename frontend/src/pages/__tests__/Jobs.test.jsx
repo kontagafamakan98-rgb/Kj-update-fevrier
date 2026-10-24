@@ -247,16 +247,20 @@ describe('Jobs — une panne se répare, une liste vide se dit', () => {
     jobsAPI.getAll.mockResolvedValue([]);
     render(<Jobs />);
 
+    // Les trois textes viennent du SCOPE `jobs` (chargé avec la page), pas du
+    // dictionnaire global : c'est ce qui les garde hors du bundle initial.
+    const pageFr = makeJobsTranslator('fr', (key) => fr[key] || key);
+
     expect(await screen.findByText(VIDE)).toBeTruthy();
-    expect(screen.getByText(fr.premierArrivantsLead)).toBeTruthy();
+    expect(screen.getByText(pageFr('premierArrivantsLead'))).toBeTruthy();
     // Les deux liens internes passent par `LienVue` (transition de vue native) :
     // rendus HORS routeur, ils n'ont pas de `href` à lire — c'est leur TEXTE
     // qui prouve l'issue. Le lien WhatsApp est une vraie `<a>` : sa destination
     // se vérie, et c'est la source unique `contact.json` qui la fournit.
     expect(screen.getByText(fr.postJob)).toBeTruthy();
-    expect(screen.getByText(fr.premierArrivantsWatch)).toBeTruthy();
+    expect(screen.getByText(pageFr('premierArrivantsWatch'))).toBeTruthy();
     expect(
-      screen.getByRole('link', { name: fr.premierArrivantsWhatsApp }).getAttribute('href')
+      screen.getByRole('link', { name: pageFr('premierArrivantsWhatsApp') }).getAttribute('href')
     ).toBe(CONTACT.whatsappUrl);
 
     // Aucune annonce : ni carte de mission, ni pastille d'exemple, et surtout
