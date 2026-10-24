@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-24",
-    "motif": "le titre de la fiche est ATTENDU avant d'etre juge (24/10/2026) : la sonde jugeait un instant, et refusait une fiche saine alors que l'attente de l'action n'est pas une preuve que le bloc est peint",
+    "motif": "Le garde exige les trois en-têtes statiques du site (X-Content-Type-Options, Referrer-Policy, Permissions-Policy) sur la règle /(.*) : mesuré le 24/10/2026 en production, le HTML servi ne les portait pas alors que l'API les porte depuis longtemps.",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -118,7 +118,6 @@
       "frontend/scripts/check-session-reload-production.js": "80247fa35e7b1467b3c0a9f4c66f1ff994dbcfd857795c2b6f74f2d78fd484ca",
       "frontend/scripts/check-shell-remote-resources.js": "892f772d7c2ab1a41b03b0dc05d29b470d7c0c9bc6ce0355599b5a8c020d2822",
       "frontend/scripts/check-shell-text-provenance.js": "eedaecfb08a9586588fa1bbf94285b807898ca49e2f98c3090dcaed921747fc6",
-      "frontend/scripts/check-spa-routes.js": "397f7d342211ae8db2623e4b36eb37f7059bae134ccc981452f222765ed14114",
       "frontend/scripts/check-sse-proxy-production.js": "132d0b00aaf5726b81261da5a449021e4e1a007469077535e20021a8af84ba9b",
       "frontend/scripts/check-test-environment.js": "7a3610e18bfe6b6eb63e26b6fe5031b50cf7fda606aa944faedfe69e89e1310c",
       "frontend/scripts/check-token-exposure-production.js": "5699ab222fbe1bcba3a06cbc59cdeb676435d4e020e7ada9a9078a4f06c806e8",
@@ -141,7 +140,8 @@
       "frontend/scripts/validate-vercel-json.mjs": "16a56835e1fb299821c3a1dd7fa4d0957982a970a493e98ed8855d06fc563518",
       "frontend/scripts/verre-contraste.js": "0304f01ae4ccd2fea6db62cff8badcb4085d3a34622f49416ed8944c377c688c",
       "backend/kojo_routers_jobs_tracking.py": "56a4e7b533ee853075047639a2917f969ee25c34cc31afebc9f7c7f3884f08dd",
-      "frontend/scripts/check-job-interactive-production.js": "5993af00403cb45bfaca0bc6ccd6c7f0263d459d0e87a4c369896c26e1b695c4"
+      "frontend/scripts/check-job-interactive-production.js": "5993af00403cb45bfaca0bc6ccd6c7f0263d459d0e87a4c369896c26e1b695c4",
+      "frontend/scripts/check-spa-routes.js": "c7f9e1020e818509f95927809195d1f996c5dac45518574ba97009d8b932804f"
     }
   },
   "hors_perimetre": [
