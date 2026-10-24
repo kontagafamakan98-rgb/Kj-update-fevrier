@@ -65,7 +65,7 @@ import { jobsAPI } from '../../services/apiEndpoints';
 // et au scope de la page — les réécrire laisse le test affirmer l'ancien mot.
 import fr from '../../i18n/fr.json';
 import { makeScopedTranslator as makeJobsTranslator } from '../../utils/pack2PageI18n/jobs.js';
-import { DEMO_JOBS } from '../../config/demoJobs.js';
+import { CONTACT } from '../../config/contact.js';
 
 const jobsT = makeJobsTranslator('fr', (cle) => fr[cle]);
 
@@ -238,17 +238,33 @@ describe('Jobs — une panne se répare, une liste vide se dit', () => {
     expect(jobsAPI.getAll).toHaveBeenCalledTimes(2);
   });
 
-  it('une liste vide publique montre des exemples crédibles et une invitation structurée', async () => {
+  it('une liste vide publique dit le vide et propose TROIS issues réelles, sans annonce inventée', async () => {
+    // Le témoin de la mesure du 24/10/2026 : `/api/jobs?status=open` rendait
+    // `[]` et la page affichait pourtant trois annonces « Exemple », avec
+    // budget, ville et durée — un inventaire inventé sur la page de première
+    // impression. Ce cas refuse donc à la fois le FAUX (aucune carte, aucun
+    // badge « Exemple ») et le MUET (le vide est dit, et il dit quoi faire).
     jobsAPI.getAll.mockResolvedValue([]);
     render(<Jobs />);
 
-    expect(await screen.findByText('Découvrez le type de missions publiées sur Kojo')).toBeTruthy();
-    for (const mission of DEMO_JOBS) {
-      expect(screen.getByText(mission.title)).toBeTruthy();
-    }
-    expect(screen.getByText('Commencer maintenant')).toBeTruthy();
+    expect(await screen.findByText(VIDE)).toBeTruthy();
+    expect(screen.getByText(fr.premierArrivantsLead)).toBeTruthy();
+    // Les deux liens internes passent par `LienVue` (transition de vue native) :
+    // rendus HORS routeur, ils n'ont pas de `href` à lire — c'est leur TEXTE
+    // qui prouve l'issue. Le lien WhatsApp est une vraie `<a>` : sa destination
+    // se vérie, et c'est la source unique `contact.json` qui la fournit.
+    expect(screen.getByText(fr.postJob)).toBeTruthy();
+    expect(screen.getByText(fr.premierArrivantsWatch)).toBeTruthy();
+    expect(
+      screen.getByRole('link', { name: fr.premierArrivantsWhatsApp }).getAttribute('href')
+    ).toBe(CONTACT.whatsappUrl);
+
+    // Aucune annonce : ni carte de mission, ni pastille d'exemple, et surtout
+    // aucun littéral français hors des dictionnaires.
+    expect(screen.queryByText('Exemple')).toBeNull();
+    expect(screen.queryByText('Commencer maintenant')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Réessayer' })).toBeNull();
-    expect(screen.queryByText(VIDE)).toBeNull();
+    expect(document.body.textContent).not.toMatch(/d[ée]couvrez le type de missions/i);
   });
 
   it('conserve l’état vide guidant pour une recherche filtrée', async () => {

@@ -189,6 +189,32 @@ Doutes, à trancher par un locuteur :
     assumé faute d'un mot local établi — et c'est le terme que le doute 16 de
     la relecture devra confirmer.
 
+## État vide de `/jobs` (24/10/2026)
+
+Les trois cartes « Exemple » (`DEMO_JOBS`, français codé en dur) sont
+supprimées : elles affichaient un inventaire qui n'existait pas devant tout
+visiteur anonyme, alors que `/api/jobs?status=open` rendait `[]`. Elles sont
+remplacées par trois clés nouvelles — `premierArrivantsLead`,
+`premierArrivantsWatch`, `premierArrivantsWhatsApp` — et le titre réutilise
+`noJobsAvailableNow`, déjà traduit dans les cinq langues.
+
+Doutes, à trancher par un locuteur :
+
+19. **`wo`, « tambaliku »** pour « démarre » : forgé sur « tambali »
+    (`getStarted` = « Tambali leegi »). Le verbe pronominal est-il juste pour
+    une plateforme qui ouvre, ou dit-il seulement « commencer une action » ?
+20. **`bm`, « baara dɔ kɔ baara dɔ »** (« une mission après une autre ») rend
+    « mission par mission ». La formule dit-elle la progression, ou seulement
+    la répétition ?
+21. **`mos`, « tʋʋm a ye poor tʋʋm a ye »** : même question, et l'élision
+    « a ye » est peut-être à contracter à l'oral.
+22. **`bm`/`mos`, « konto »** pour « compte » (emprunt, comme `konto` déjà
+    employé en `bm` dans `noJobsForAccount`). À confirmer avec le reste de la
+    famille « compte » (doute 17 de la section précédente parle d'un autre
+    « konto »).
+23. **Les trois langues emploient « email » et « WhatsApp » tels quels** : ce
+    sont des noms de service, donc l'emprunt est assumé.
+
 ## Comment contresigner
 
 Corriger directement les trois dictionnaires, puis remplacer le statut ci-dessus
