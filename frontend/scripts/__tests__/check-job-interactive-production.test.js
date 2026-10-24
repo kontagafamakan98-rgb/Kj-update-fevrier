@@ -28,7 +28,9 @@ import {
   MONTAGE_TIMEOUT_MS,
   SELECTEUR_ACTION,
   SELECTEUR_MONTAGE,
+  SELECTEUR_TITRE,
   TITRE_ERREUR,
+  TITRE_TIMEOUT_MS,
   contextOptions,
   eprouverLeGeste,
   libelleSonde,
@@ -62,6 +64,7 @@ const releve = (modifications = {}) => ({
  * @param {object} [scenario]
  * @param {Array} [scenario.etats] Valeurs rendues par les `evaluate` successifs.
  * @param {string} [scenario.montage] `timeout` : le châssis n'apparaît pas.
+ * @param {string} [scenario.titre] `timeout` : le titre de la fiche n'est jamais peint.
  * @param {string} [scenario.action] `timeout` : aucune action de carte.
  * @param {string} [scenario.clic] `timeout` : le clic lui-même échoue.
  * @param {string} [scenario.navigation] `timeout` : l'adresse attendue n'arrive pas.
@@ -73,6 +76,7 @@ const releve = (modifications = {}) => ({
 function navigateur({
   etats = [releve(), undefined, { marqueur: true, chassis: true }],
   montage = 'ok',
+  titre = 'ok',
   action = 'ok',
   clic = 'ok',
   navigation = 'ok',
@@ -103,7 +107,10 @@ function navigateur({
       if (selecteur === SELECTEUR_MONTAGE && montage === 'timeout') {
         throw new Error('Timeout 30000ms exceeded.');
       }
-      if (selecteur !== SELECTEUR_MONTAGE && action === 'timeout') {
+      if (selecteur === SELECTEUR_TITRE && titre === 'timeout') {
+        throw new Error('Timeout 15000ms exceeded.');
+      }
+      if (selecteur !== SELECTEUR_MONTAGE && selecteur !== SELECTEUR_TITRE && action === 'timeout') {
         throw new Error('Timeout 15000ms exceeded.');
       }
       return {};
@@ -171,7 +178,11 @@ describe('check-job-interactive-production — montage réel', () => {
     // reste un châssis monté.
     expect(journal.attentes[0]).toEqual({ state: 'attached', timeout: MONTAGE_TIMEOUT_MS });
     expect(journal.waitForSelector[0]).toBe(SELECTEUR_MONTAGE);
-    expect(journal.waitForSelector[1]).toBe(SELECTEUR_ACTION);
+    // LE TITRE EST ATTENDU AVANT D'ÊTRE JUGÉ : c'est l'ordre qui distingue
+    // « la fiche ne peint pas de titre » de « la sonde a lu trop tôt ».
+    expect(journal.waitForSelector[1]).toBe(SELECTEUR_TITRE);
+    expect(journal.attentes[1]).toEqual({ state: 'attached', timeout: TITRE_TIMEOUT_MS });
+    expect(journal.waitForSelector[2]).toBe(SELECTEUR_ACTION);
     expect(journal.click).toEqual([ANCRE_POSTULER]);
     expect(journal.waitForURL).toBe(1);
     expect(journal.closed).toBe(true);
@@ -180,6 +191,23 @@ describe('check-job-interactive-production — montage réel', () => {
     expect(publie).toContain('montage réel');
     expect(publie).toContain('#root');
     expect(publie).toContain('sans rechargement');
+  });
+
+  it('attend le titre avant de juger, et refuse quand il ne vient jamais', async () => {
+    // Le rouge du 24/10/2026 : la fiche avait monté, l'action était là, et le
+    // bloc n'était pas encore peint — la sonde jugeait un INSTANT. Elle attend
+    // désormais le fait qu'elle juge ; ce scénario prouve que le refus n'a pas
+    // été supprimé en même temps que la course.
+    const { promesse, journal } = sonder({
+      titre: 'timeout',
+      etats: [releve({ titre: '', blocLisible: false, statut: '' }), undefined, { marqueur: true, chassis: true }],
+    });
+
+    const result = await promesse;
+
+    expect(result.ok).toBe(false);
+    expect(journal.waitForSelector).toContain(SELECTEUR_TITRE);
+    expect(result.errors.join('\n')).toContain('ne peint AUCUN titre dans #root');
   });
 
   it('éprouve le lien de confiance quand la mission n’est plus ouverte', async () => {

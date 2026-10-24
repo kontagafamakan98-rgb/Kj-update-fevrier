@@ -17,6 +17,9 @@ import { ESPION_CLS, clsDesDecalages, decrireDecalage } from './helpers/cls.js';
 // LE DÉLAI EST CELUI DU COMPOSANT, LU DANS SON DOMICILE : la sonde attend
 // l'intervalle que la page applique, elle ne recopie pas 15 000 ms.
 import { PHOTOS_HEROS, PHOTO_HEROS_DELAI_MS } from '../src/config/photos-heros.js';
+// La règle d'avance est PARTAGÉE avec son test : elle est pure, donc elle se
+// prouve sur le journal d'un rouge réel sans monter une page.
+import { ecartsSousLIntervalle } from './helpers/rotation.js';
 
 /**
  * LA ROTATION DU HÉROS, PROUVÉE SUR PLUSIEURS CRANS (08/10/2026).
@@ -86,8 +89,36 @@ export const CRANS = 3;
 
 /** Marge d'AVANCE : 0,4 s sous l'intervalle déclaré. Un minuteur qui avance plus
  *  vite que ce qu'il annonce est le défaut visé (deux minuteurs, un pas plus
- *  court) ; une marge serrée ne le laisserait pas passer. */
+ *  court) ; une marge serrée ne le laisserait pas passer.
+ *
+ *  Elle ne s'applique qu'aux écarts entre DEUX changements observés : le
+ *  premier écart, lui, part de l'ANCRE (le montage), et il est mesuré avec
+ *  `TOLERANCE_ANCRE_MS`. */
 export const MARGE_INTERVALLE_MS = 400;
+
+/**
+ * TOLÉRANCE D'AVANCE DU PREMIER ÉCART — celle qui suit la machine, et qui a
+ * coûté un rouge le 24/10/2026 (run 400639740, « la rotation a avancé PLUS VITE
+ * que l'intervalle déclaré — écarts mesurés [14524,3 ; 14999,2 ; 15000] »).
+ *
+ * Le défaut n'est pas dans la rotation : les écarts INTERNES valaient 14999,2 et
+ * 15000 ms, soit l'intervalle exact. Le premier seul était court de 475,7 ms, et
+ * il est le seul à partir d'un instant qui n'est pas un changement observé —
+ * l'ancre. Or un `MutationObserver` date ses enregistrements à l'instant où son
+ * RAPPEL s'exécute, jamais à celui de la mutation : sur un runner chargé, le
+ * rappel du montage arrive après l'armement du minuteur, l'ancre est donc trop
+ * TARD, et l'écart se raccourcit d'autant. L'erreur ne peut aller que dans ce
+ * sens (un rappel ne devance pas sa mutation), ce qui rend la borne haute
+ * (RETARD_MAX_MS) suffisante pour le retard, et demande ici une borne d'avance
+ * propre à l'ancre.
+ *
+ * 1000 ms = la latence mesurée (476 ms) avec deux fois sa marge. Ce que ça
+ * laisse passer : une panne de 4 % sur le seul premier tour — rien. Ce que ça
+ * refuse toujours : un second minuteur ou un pas plus court, qui déplacent TOUS
+ * les écarts (mesurés ici à 15000 ms pile), et un premier tour qui partirait
+ * plus de 1 s avant l'heure.
+ */
+export const TOLERANCE_ANCRE_MS = 1000;
 
 /** Plafond de RETARD. Être en retard ne contredit pas « un cran par
  *  intervalle » — un onglet occupé décale le réveil du minuteur — et un plafond
@@ -329,12 +360,23 @@ test.describe('la rotation du héros, cran par cran', () => {
         // la rotation — un rouge d'hôte.
         const instants = [ancre === null ? depart.lecture.t : ancre, ...crans.map((c) => c.t)];
         const ecarts = instants.slice(1).map((t, i) => +(t - instants[i]).toFixed(1));
-        const sousMinimal = ecarts.map((e, i) => ({ e, i })).filter(({ e }) => e < PHOTO_HEROS_DELAI_MS - MARGE_INTERVALLE_MS);
+        // LE PREMIER ÉCART N'EST PAS MESURÉ COMME LES AUTRES : il part de
+        // l'ancre, un instant LU PAR UN RAPPEL d'observateur, donc en retard de
+        // la latence du runner sur celui du minuteur (cf. TOLERANCE_ANCRE_MS).
+        // Les suivants séparent deux mutations observées par le même rappel :
+        // leur latence se compense, et ils gardent la marge serrée.
+        const sousMinimal = ecartsSousLIntervalle({
+          ecarts,
+          delai: PHOTO_HEROS_DELAI_MS,
+          margeEntreCrans: MARGE_INTERVALLE_MS,
+          toleranceAncre: TOLERANCE_ANCRE_MS,
+        });
         const auDelaDuRetard = ecarts.map((e, i) => ({ e, i })).filter(({ e }) => e > PHOTO_HEROS_DELAI_MS + RETARD_MAX_MS);
         expect(
-          sousMinimal.map(({ e, i }) => `cran ${i + 1} : ${e} ms`),
+          sousMinimal.map(({ e, i, marge }) => `cran ${i + 1} : ${e} ms (marge ${marge} ms)`),
           `« / » (${taille}) : la rotation a avancé PLUS VITE que l'intervalle déclaré ` +
-            `(${PHOTO_HEROS_DELAI_MS} ms, marge ${MARGE_INTERVALLE_MS} ms) — écarts mesurés ` +
+            `(${PHOTO_HEROS_DELAI_MS} ms, marge ${MARGE_INTERVALLE_MS} ms entre crans, ` +
+            `${TOLERANCE_ANCRE_MS} ms pour le premier écart ancré au montage) — écarts mesurés ` +
             `${JSON.stringify(ecarts)}. Un second minuteur, ou un pas plus court, se voit ici.`
         ).toEqual([]);
         expect(

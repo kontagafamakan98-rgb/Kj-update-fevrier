@@ -103,6 +103,17 @@ export const LIEN_CONFIANCE = 'a[href="/how-it-works"]';
 /** Les deux actions possibles, pour l'attente bornée qui suit le montage. */
 export const SELECTEUR_ACTION = `${ANCRE_POSTULER}, #root ${LIEN_CONFIANCE}`;
 
+/**
+ * LE TITRE DE LA FICHE, DANS LA RACINE — le fait que cette sonde JUGE.
+ *
+ * Il est attendu comme une CONDITION avant d'être jugé (cf. l'étape « 2 bis ») :
+ * `#root h1` n'existe qu'une fois le bloc rendu, et c'est exactement ce que la
+ * sonde doit constater. Un rouge du 24/10/2026 (run 40092039045) a refusé
+ * `/jobs/:id` pour « aucun titre peint » alors que la même fiche, ouverte à la
+ * main, peignait son `<h1>` : la sonde avait lu un INSTANT, pas le fait.
+ */
+export const SELECTEUR_TITRE = '#root h1';
+
 /** Les chemins atteints par chaque action — lus dans le routeur, pas devinés. */
 export const CHEMIN_CONNEXION = '/login';
 export const CHEMIN_CONFIANCE = '/how-it-works';
@@ -115,6 +126,7 @@ export const CHEMIN_CONFIANCE = '/how-it-works';
  * 30 s absorbent cette fenêtre sans transformer une panne réelle en vert.
  */
 export const MONTAGE_TIMEOUT_MS = 30000;
+export const TITRE_TIMEOUT_MS = 15000;
 export const ACTION_TIMEOUT_MS = 15000;
 export const NAVIGATION_TIMEOUT_MS = 15000;
 
@@ -374,6 +386,7 @@ export async function eprouverLeGeste({ page, cible, base, timeoutMs = NAVIGATIO
  * @param {Function} [options.fetchImpl] `fetch` injectable (tests).
  * @param {boolean} [options.quiet] Tait la progression.
  * @param {number} [options.montageTimeoutMs] Borne du montage.
+ * @param {number} [options.titreTimeoutMs] Borne du titre peint dans `#root`.
  * @param {number} [options.actionTimeoutMs] Borne de l'action de carte.
  * @param {number} [options.navigationTimeoutMs] Borne de la navigation.
  * @returns {Promise<{ok: boolean, premisse: boolean, errors: string[], notices: string[],
@@ -387,6 +400,7 @@ export async function runJobInteractiveProbe({
   fetchImpl = fetch,
   quiet = false,
   montageTimeoutMs = MONTAGE_TIMEOUT_MS,
+  titreTimeoutMs = TITRE_TIMEOUT_MS,
   actionTimeoutMs = ACTION_TIMEOUT_MS,
   navigationTimeoutMs = NAVIGATION_TIMEOUT_MS,
 } = {}) {
@@ -473,6 +487,26 @@ export async function runJobInteractiveProbe({
       const etat = await etatDeLaFiche(page).catch(() => null);
       errors.push(refusDeMontage({ url, etat, timeoutMs: montageTimeoutMs }));
       return result;
+    }
+
+    // ── 2 bis. LE TITRE PEINT, ATTENDU AVANT D'ÊTRE JUGÉ ─────────────────
+    // Le montage prouve que l'application tourne ; il ne prouve pas que le BLOC
+    // est peint. L'attente de l'action ne le prouve pas davantage : elle peut
+    // être satisfaite par un lien du bandeau, avant que la fiche n'ait relu
+    // l'API. Lire juste après elle, c'est lire un INSTANT — et c'est ce qui a
+    // refusé une fiche parfaitement servie le 24/10/2026 (run 40092039045 :
+    // « a monté mais ne peint AUCUN titre », alors que la même adresse, ouverte
+    // à la main, peignait son `<h1>`). La sonde attend donc le FAIT qu'elle
+    // juge, comme elle attend déjà le montage et l'action. Le refus existe
+    // toujours : il tombe quand le titre manque encore au bout de la borne.
+    try {
+      await page.waitForSelector(SELECTEUR_TITRE, {
+        state: 'attached',
+        timeout: titreTimeoutMs,
+      });
+    } catch (_erreur) {
+      // Fiche montée sans titre : le relevé plus bas le dit, avec le statut lu
+      // et les ancres vues — pas de message séparé qui n'ajouterait rien.
     }
 
     // ── 3. L'ACTION DE CARTE ──────────────────────────────────────────────

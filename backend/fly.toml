@@ -31,6 +31,17 @@ primary_region = 'fra'
   # TRUSTED_HOSTS : le trafic public (Vercel, moniteurs UptimeRobot/Render)
   # arrive via le proxy Fly avec Host *.fly.dev → servi normalement.
   TRUSTED_HOSTS = '*.internal,*.flycast.internal,kojo-backend.fly.dev,api.kojoforafrica.cc.cd'
+  # IDENTIFIANT DE MESURE GA4, PUBLIÉ DANS LA CSP DES FICHES `/jobs/:id` et
+  # `/workers/:id` (`kojo_csp.py`). Il doit être la MÊME valeur que
+  # `VITE_GA_MEASUREMENT_ID` du build Vercel : la sonde
+  # `csp-documents-production-probe.yml` compare la politique du SITE à celle de
+  # chaque document, et une valeur absente d'un côté produit deux politiques
+  # concurrentes. Mesuré le 24/10/2026, ce réglage manquait : l'accueil
+  # autorisait `www.googletagmanager.com`, `www.google-analytics.com` et
+  # `region1.google-analytics.com`, les fiches ne les autorisaient pas — un
+  # visiteur arrivé par un lien partagé n'avait donc pas l'analytique du site.
+  # Ce n'est pas un secret : la valeur est publique dans chaque page servie.
+  GA_MEASUREMENT_ID = 'G-4HTDD40F4T'
 
 # Syntaxe complète [[services]] (et non [http_service]) : le raccourci
 # [http_service] ne sait exprimer QUE des checks HTTP (protocol http/https),
