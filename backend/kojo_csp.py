@@ -97,9 +97,16 @@ def construire_csp(api_origin="", plausible_domain="", ga_measurement_id="") -> 
         connect_src.append(origine)
     connect_src.append("https://accounts.google.com")
     if ga_actif:
+        # `www.google.com` : MESURÉ, pas supposé (24/10/2026, console de
+        # production). gtag émet une partie de ses balises vers
+        # `https://www.google.com/g/collect`, et NOTRE politique la refusait
+        # (« Refused to connect because it violates the document's Content
+        # Security Policy »). Le contrat hors ligne ne pouvait pas le voir :
+        # les deux copies étaient d'accord pour bloquer la même origine.
         connect_src += [
             "https://www.google-analytics.com",
             "https://region1.google-analytics.com",
+            "https://www.google.com",
         ]
 
     img_src = [

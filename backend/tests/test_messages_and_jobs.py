@@ -59,6 +59,79 @@ class TestMessageAccess:
         resp = await client.get(f"/api/messages/{fake_id}", headers=headers_a)
         assert resp.status_code == 403
 
+    async def test_un_fragment_d_identifiant_ne_donne_pas_acces_a_un_fil_rempli(self, client: AsyncClient):
+        """Un identifiant qui n'apparaît dans le fil qu'en FRAGMENT est refusé.
+
+        Le découpage sur « _ » rendait « abc » participant d'un fil entre
+        « abc_def » et « ghi ». C'est exactement le sens inverse du défaut
+        ci-dessous : un compte hérité doit pouvoir LIRE son fil, un homonyme de
+        fragment ne doit pas pouvoir lire celui des autres.
+        """
+        intrus = await register_and_login(client, {**BASE_USER, "email": "intrus@kojo.sn"})
+        intrus_id = intrus["user"]["id"]
+
+        await db_insert("messages", {
+            "id": str(uuid.uuid4()),
+            "conversation_id": f"{intrus_id}_def_ghi",
+            "sender_id": "def_intrus_legitime",
+            "receiver_id": "ghi",
+            "content": "Message entre deux autres comptes",
+            "job_id": None,
+            "read": False,
+            "timestamp": datetime.now(timezone.utc),
+        })
+
+        headers = {"Authorization": f"Bearer {intrus['access_token']}"}
+        resp = await client.get(f"/api/messages/{intrus_id}_def_ghi", headers=headers)
+        assert resp.status_code == 403, (
+            "un fragment d'identifiant ne fait pas un participant : "
+            f"{resp.status_code} {resp.text}"
+        )
+
+    async def test_un_compte_herite_a_identifiant_souligne_lit_sa_propre_conversation(self, client: AsyncClient):
+        """Un identifiant qui contient « _ » ne perd pas l'accès à ses messages.
+
+        Mesuré en production le 24/10/2026 : la conversation existait, le compte
+        y avait écrit, et `GET /messages/{id}` répondait 403 parce que le
+        découpage sur « _ » séparait son identifiant en morceaux. La fiche
+        affichait « Error loading messages: Access denied » dans la console.
+        """
+        auteur = await register_and_login(client, BASE_USER)
+        legacy_id = "compte_herite_2024"
+
+        # Le compte hérité n'a pas d'inscription à rejouer : il est copié d'un
+        # compte valide (même empreinte de mot de passe), comme un compte
+        # importé. C'est sa FORME d'identifiant qui est l'objet du test.
+        source = await db_find_one("users", {"email": BASE_USER["email"]})
+        assert source, "le compte de référence doit exister après l'inscription"
+        await db_insert("users", {
+            **{k: v for k, v in source.items() if k != "_id"},
+            "id": legacy_id,
+            "email": "herite@kojo.sn",
+        })
+        connexion = await client.post(
+            "/api/auth/login",
+            json={"email": "herite@kojo.sn", "password": BASE_USER["password"]},
+        )
+        assert connexion.status_code == 200, connexion.text
+        headers_legacy = {"Authorization": f"Bearer {connexion.json()['access_token']}"}
+
+        conversation_id = f"{auteur['user']['id']}_{legacy_id}"
+        await db_insert("messages", {
+            "id": str(uuid.uuid4()),
+            "conversation_id": conversation_id,
+            "sender_id": auteur["user"]["id"],
+            "receiver_id": legacy_id,
+            "content": "Bonjour, la fuite est réparée ?",
+            "job_id": None,
+            "read": False,
+            "timestamp": datetime.now(timezone.utc),
+        })
+
+        resp = await client.get(f"/api/messages/{conversation_id}", headers=headers_legacy)
+        assert resp.status_code == 200, resp.text
+        assert [m["content"] for m in resp.json()] == ["Bonjour, la fuite est réparée ?"]
+
 
 @pytest.mark.asyncio
 class TestSendMessage:

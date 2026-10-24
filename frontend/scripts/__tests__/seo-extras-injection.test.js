@@ -249,6 +249,12 @@ describe('inject-production-csp — les domaines tiers suivent la configuration'
     expect(cspDirective(csp, 'connect-src')).toContain('https://www.google-analytics.com');
     expect(cspDirective(csp, 'connect-src')).toContain('https://region1.google-analytics.com');
     expect(cspDirective(csp, 'img-src')).toContain('https://www.google-analytics.com');
+    // `www.google.com` : mesuré en console de production le 24/10/2026 — gtag
+    // émet une partie de ses balises vers `https://www.google.com/g/collect`,
+    // et la politique la refusait (« Refused to connect because it violates
+    // the document's Content Security Policy »). Une collecte refusée est un
+    // identifiant qu'on croit suivi et qui ne l'est pas.
+    expect(cspDirective(csp, 'connect-src')).toContain('https://www.google.com');
   });
 
   it('un identifiant invalide ne relâche PAS la CSP', async () => {
