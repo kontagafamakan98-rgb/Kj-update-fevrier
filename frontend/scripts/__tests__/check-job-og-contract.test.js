@@ -119,11 +119,15 @@ describe.skipIf(!hasPrerender)('check-job-og-contract — ce qui doit échouer',
   });
 
   it('détecte une description coupée à un autre endroit', () => {
-    // La coupe à 150 points de code + « … » est une règle des DEUX côtés : une
-    // différence d'un seul caractère doit être visible, pas arrondie.
+    // La coupe (150 points de code, puis recul au dernier espace) est une règle
+    // des DEUX côtés : une différence d'un seul caractère doit être visible, pas
+    // arrondie. Les longueurs sont LUES, jamais recopiées : la règle de l'espace
+    // rend la longueur variable (la tranche recule), donc un nombre écrit ici
+    // deviendrait faux au premier texte de référence retouché.
+    const points = Array.from(app.description).length;
     const errors = compareJobOg({ app: { ...app, description: `${app.description}x` }, html: realHtml, base: BASE });
-    expect(errors.join('\n')).toMatch(
-      /description : le pré-rendu annonce 151 points de code, l'application 152/
+    expect(errors.join('\n')).toContain(
+      `description : le pré-rendu annonce ${points} points de code, l'application ${points + 1}`
     );
   });
 
@@ -253,35 +257,60 @@ describe.skipIf(!hasPrerender)('check-job-og-contract — le jeu de référence 
     expect(hasLoneSurrogate('😀')).toBe(false);
     expect(hasLoneSurrogate('Réfection à Ouagadougou')).toBe(false);
 
-    const case_ = referenceCases.find(({ job }) => job.label === 'astral à la frontière');
+    const frontiere = referenceCases.find(({ job }) => job.label === 'astral à la frontière');
+    const avant = referenceCases.find(({ job }) => job.label === 'astral avant la frontière');
 
-    expect(case_.app.description).toContain('😀');
-    expect(hasLoneSurrogate(case_.app.description)).toBe(false);
-    // 150 points de code + le « … » de la coupe.
-    expect(Array.from(case_.app.description)).toHaveLength(DESCRIPTION_LIMIT + 1);
-    expect(case_.app.description.endsWith('…')).toBe(true);
+    // Un astral PILE sur la coupe n'est pas publié du tout : la tranche recule au
+    // dernier espace, donc le caractère tombe avec la fin du mot — mieux qu'un
+    // demi-caractère, et c'est ce que la règle des 150 laissait passer.
+    expect(frontiere.app.description).not.toContain('😀');
+    // Un astral DANS la tranche retenue est publié entier.
+    expect(avant.app.description).toContain('🚚');
+
+    for (const { job, app: announce } of referenceCases) {
+      expect(hasLoneSurrogate(announce.description), job.label).toBe(false);
+      // Au plus 150 points de code, plus le « … » de la coupe.
+      expect(Array.from(announce.description).length, job.label).toBeLessThanOrEqual(
+        DESCRIPTION_LIMIT + 1
+      );
+      expect(announce.description.endsWith('…'), job.label).toBe(true);
+      // La coupe tombe sur une FRONTIÈRE DE MOT : le caractère suivant dans la
+      // source est un espace (ou la coupe était dure, faute d'espace).
+      const garde = Array.from(announce.description.slice(0, -1)).length;
+      const suivant = Array.from(job.description)[garde];
+      expect(suivant === ' ' || garde === DESCRIPTION_LIMIT, `${job.label} : « ${suivant} »`).toBe(
+        true
+      );
+    }
   });
 
   it('détecte la règle d’AVANT (unités UTF-16), qui coupait la paire en deux', () => {
     for (const { job, html, app: announce } of referenceCases) {
-      // Ce que `slice(0, 150)` + `length` produisaient avant le correctif.
-      const utf16 = `${job.description.slice(0, DESCRIPTION_LIMIT)}${
+      // Ce que la règle d'avant produisait : `slice(0, 150)` + `length`, en
+      // UNITÉS UTF-16. La coupe sur l'espace est volontairement ABSENTE des deux
+      // côtés, pour que ce cas ne juge que le COMPTAGE.
+      const points = Array.from(job.description);
+      const tranchePoints = `${points.slice(0, DESCRIPTION_LIMIT).join('')}${
+        points.length > DESCRIPTION_LIMIT ? '…' : ''
+      }`;
+      const trancheUtf16 = `${job.description.slice(0, DESCRIPTION_LIMIT)}${
         job.description.length > DESCRIPTION_LIMIT ? '…' : ''
       }`;
       const hasAstral = /[\u{10000}-\u{10FFFF}]/u.test(job.description);
 
-      // Les textes du plan de base (accents compris) ne divergent PAS : c'est
+      // Les deux COMPTAGES ne divergent que sur un caractère astral : les textes
+      // du plan de base (accents compris) donnent la même tranche, et c'est
       // exactement pourquoi la règle d'avant passait inaperçue.
-      expect(utf16 !== announce.description, job.label).toBe(hasAstral);
+      expect(trancheUtf16 !== tranchePoints, job.label).toBe(hasAstral);
       if (!hasAstral) continue;
 
-      const errors = compareJobOg({ app: { ...announce, description: utf16 }, html, base: BASE });
+      const errors = compareJobOg({ app: { ...announce, description: trancheUtf16 }, html, base: BASE });
       expect(errors.join('\n'), job.label).toMatch(
         /description : le pré-rendu annonce \d+ points de code, l'application \d+/
       );
       // Quand la coupe est tombée DANS la paire, le message nomme la cause —
       // c'est le cas où les deux textes ont la même longueur en points de code.
-      if (hasLoneSurrogate(utf16)) {
+      if (hasLoneSurrogate(trancheUtf16)) {
         expect(errors.join('\n'), job.label).toMatch(/DEMI-CARACTÈRE/);
       }
     }
