@@ -203,8 +203,30 @@ describe('Tableau de bord — les GAINS du propriétaire, sans parcours client',
     // Et aucun rappel de compte de paiement : l'argent part sur PayDunya.
     expect(screen.queryByText(/compte de paiement/i)).not.toBeInTheDocument();
     // Ses actions : ses gains et le support, pas « publier une mission ».
-    expect(screen.getByRole('link', { name: /Commission Dashboard/ })).toBeInTheDocument();
+    // Deux liens portent ce libellé : l'action principale du bandeau et la
+    // tuile des actions rapides — les deux mènent à ses gains.
+    const liensGains = screen.getAllByRole('link', { name: /Commission Dashboard/i });
+    expect(liensGains.length).toBeGreaterThan(0);
+    expect(liensGains.every((lien) => lien.getAttribute('href') === '/commission-dashboard')).toBe(true);
     expect(screen.queryByRole('link', { name: /Publier/ })).not.toBeInTheDocument();
+
+    // ── MESURÉ EN PRODUCTION LE 24/10/2026 ───────────────────────────────
+    // Le corps de la page était bien passé à la branche propriétaire, mais le
+    // BANDEAU, lui, gardait ses deux branches : l'étiquette annonçait
+    // « TRAVAILLEUR », la phrase de tête « découvrez de nouvelles
+    // opportunités de travail », et le bouton principal « Chercher Emplois »
+    // (→ /jobs). L'écran se contredisait d'une ligne à l'autre.
+    expect(screen.getByText('Propriétaire')).toBeInTheDocument();
+    expect(screen.queryByText('Travailleur')).not.toBeInTheDocument();
+    expect(
+      screen.getByText('Ce que la plateforme a encaissé')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/opportunités de travail/i)
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Chercher Emplois/i })).not.toBeInTheDocument();
+    // Et aucune étiquette de moyens de paiement : il n'en a pas besoin.
+    expect(screen.queryByText('Moyens de paiement renseignés')).not.toBeInTheDocument();
   });
 
   it('une lecture des gains en panne écrit « — », jamais « 0 FCFA »', async () => {
