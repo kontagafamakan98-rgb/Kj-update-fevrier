@@ -103,6 +103,8 @@
   "ownerEarnings": "Earnings collected",
   "ownerEarningsMonth": "This month",
   "ownerEarningsToday": "Today",
+  "ownerRole": "Owner",
+  "ownerDashboardIntro": "What the platform has collected",
   "noAccount": "No account?",
   "personalInformation": "Personal Information",
   "paymentAccounts": "Payment Accounts",

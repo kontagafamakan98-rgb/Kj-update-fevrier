@@ -116,6 +116,8 @@
   "ownerEarnings": "Gains encaissés",
   "ownerEarningsMonth": "Ce mois-ci",
   "ownerEarningsToday": "Aujourd’hui",
+  "ownerRole": "Propriétaire",
+  "ownerDashboardIntro": "Ce que la plateforme a encaissé",
   "noAccount": "Pas de compte ?",
   "preferredLanguage": "Langue préférée",
   "selectLanguageLabel": "Choisir une langue",

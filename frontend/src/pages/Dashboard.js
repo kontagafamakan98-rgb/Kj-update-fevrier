@@ -271,7 +271,11 @@ export default function Dashboard() {
               plus petit sur téléphone la ramène sur une ligne, et la mesure du
               bandeau d'aire reste donc celle du titre. */}
           <p className="mt-2 text-sm text-stone-600 sm:max-w-2xl sm:text-base">
-            {user?.user_type === 'client' ? t('manageProjectsClient') : t('discoverOpportunitiesWorker')}
+            {user?.is_owner
+              ? t('ownerDashboardIntro')
+              : user?.user_type === 'client'
+              ? t('manageProjectsClient')
+              : t('discoverOpportunitiesWorker')}
           </p>
 
           <div className="mt-5 flex flex-wrap items-center gap-2">
@@ -279,7 +283,11 @@ export default function Dashboard() {
                 mission (c'est `.pastille-statut[data-statut]`, un seul
                 propriétaire). */}
             <span className="etiquette-app etiquette-app-orange">
-              {user?.user_type === 'client' ? t('client') : t('worker')}
+              {user?.is_owner
+                ? t('ownerRole')
+                : user?.user_type === 'client'
+                ? t('client')
+                : t('worker')}
             </span>
             {/* CE QUE L'ÉTIQUETTE DIT, ET SEULEMENT ÇA : `is_verified` est posé
                 par l'ajout des comptes de paiement (`kojo_validation.py`), pas
@@ -287,7 +295,11 @@ export default function Dashboard() {
                 `email_verified`. Un bouclier coché disait « identité
                 vérifiée » à la place, et c'était faux (audit du 20/10/2026,
                 prop. 6). La carte de paiement dit ce qui est mesuré. */}
-            {user?.is_verified && (
+            {/* Un propriétaire n'a AUCUN moyen de paiement à renseigner : son
+                argent part directement sur son compte PayDunya. L'étiquette
+                « moyens de paiement renseignés » lui annoncerait une condition
+                qu'il n'a pas à remplir. */}
+            {user?.is_verified && !user?.is_owner && (
               <span className="etiquette-app etiquette-app-vert">
                 <CreditCard className="h-3.5 w-3.5" aria-hidden="true" />
                 {t('paymentMethodsOnFile')}
@@ -302,11 +314,25 @@ export default function Dashboard() {
           </div>
 
           <div className="mt-6 flex flex-wrap gap-3">
+            {/* L'action principale DIT le rôle : un propriétaire n'a rien à
+                chercher ni à publier, il ouvre ses gains. L'ancien
+                `user_type === 'client' ? … : /jobs` l'envoyait parcourir le
+                marché — le parcours d'un travailleur. */}
             <Link
-              to={user?.user_type === 'client' ? '/create-job' : '/jobs'}
+              to={
+                user?.is_owner
+                  ? '/commission-dashboard'
+                  : user?.user_type === 'client'
+                  ? '/create-job'
+                  : '/jobs'
+              }
               className="bouton bouton-encre"
             >
-              {user?.user_type === 'client' ? t('postJob') : `${t('searchJobs')} ${t('jobs')}`}
+              {user?.is_owner
+                ? t('commissionDashboard')
+                : user?.user_type === 'client'
+                ? t('postJob')
+                : `${t('searchJobs')} ${t('jobs')}`}
             </Link>
             <Link to="/messages" className="bouton bouton-clair">
               <MessageSquare className="h-4 w-4" aria-hidden="true" />
