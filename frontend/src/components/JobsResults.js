@@ -86,7 +86,11 @@ const IconeEtiquette = () => (
 // La hauteur est réservée (`min-h`) comme le squelette de liste qu'elle
 // remplace : sans elle, le pied de page ancré remontait au swap (même défaut
 // anti-CLS que `JobCardSkeleton`).
-export function PremiersArrivants({ t }) {
+export function PremiersArrivants({ t, textes }) {
+  // Le composant ne TRADUIT pas ses trois phrases : la page les lui donne
+  // (`textes`), parce qu'elles vivent dans le dictionnaire du scope `jobs`,
+  // différé avec la page — le dictionnaire global, lui, part dans le bundle
+  // INITIAL (mesuré le 24/10/2026 : 131,0 Ko gzip sur un budget de 131,0).
   return (
     <section
       className="carte-editoriale flex min-h-[22rem] flex-col justify-center p-6 sm:p-8"
@@ -95,7 +99,7 @@ export function PremiersArrivants({ t }) {
       <h2 id="premiers-arrivants-titre" className="text-xl font-semibold text-stone-900">
         {t('noJobsAvailableNow')}
       </h2>
-      <p className="mt-2 max-w-2xl text-sm text-stone-600">{t('premierArrivantsLead')}</p>
+      <p className="mt-2 max-w-2xl text-sm text-stone-600">{textes.lead}</p>
       <div className="mt-6 flex flex-wrap gap-3">
         <Link
           to="/create-job"
@@ -107,7 +111,7 @@ export function PremiersArrivants({ t }) {
           to="/register"
           className="inline-flex items-center rounded-lg border border-stone-300 fond-papier px-4 py-2 text-sm font-semibold text-stone-700 transition-colors hover:border-orange-500 hover:text-orange-700"
         >
-          {t('premierArrivantsWatch')}
+          {textes.watch}
         </Link>
         <a
           href={CONTACT.whatsappUrl}
@@ -115,7 +119,7 @@ export function PremiersArrivants({ t }) {
           rel="noopener noreferrer"
           className="inline-flex items-center rounded-lg border border-stone-300 fond-papier px-4 py-2 text-sm font-semibold text-stone-700 transition-colors hover:border-orange-500 hover:text-orange-700"
         >
-          {t('premierArrivantsWhatsApp')}
+          {textes.whatsapp}
         </a>
       </div>
     </section>
