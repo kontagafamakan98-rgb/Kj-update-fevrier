@@ -74,7 +74,7 @@
     "postcss": "^8.4.49",
     "tailwindcss": "^4.3.3",
     "vite": "^7.3.6",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.12"
   },
   "pnpm": {
     "overrides": {
@@ -86,6 +86,7 @@
   },
   "overrides": {
     "esbuild": "^0.25.3",
+    "fast-uri": "^3.1.9",
     "basic-ftp": "^6.2.3",
     "tmp": "^0.2.7",
     "@puppeteer/browsers": "^3.2.4",
