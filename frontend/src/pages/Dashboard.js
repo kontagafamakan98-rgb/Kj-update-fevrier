@@ -27,7 +27,8 @@ import {
   Wallet,
   Banknote,
   CalendarDays,
-  UserPlus
+  UserPlus,
+  ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -205,6 +206,11 @@ export default function Dashboard() {
     // de travailleur — deux gestes qui ne lui appartiennent pas.
     if (user?.is_owner) {
       return [
+        // L'ADMINISTRATION EN PREMIER : le propriétaire se plaignait de n'avoir
+        // « aucun contrôle » alors que les gains étaient la seule tuile en
+        // tête. Les comptes, les sanctions et les messages sont ce qu'il
+        // ouvre en arrivant ; les gains restent juste derrière.
+        { to: '/administration', label: t('administration'), icon: ShieldCheck },
         { to: '/commission-dashboard', label: t('commissionDashboard'), icon: Monitor },
         { to: '/support-admin', label: t('supportRequestsTitle'), icon: LifeBuoy },
         { to: '/support-admin', label: t('supportTeamTitle'), subtitle: t('supportTeamIntro'), icon: UserPlus }
@@ -479,6 +485,9 @@ export default function Dashboard() {
             )}
             <Link to="/commission-dashboard" className="bouton bouton-clair">
               <Briefcase className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {t('commissionDashboard')}
+            </Link>
+            <Link to="/administration" className="bouton bouton-clair">
+              <ShieldCheck className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {t('administration')}
             </Link>
           </div>
 

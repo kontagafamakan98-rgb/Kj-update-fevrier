@@ -114,10 +114,26 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 // seul `Home` porte la règle. Le plafond passe donc à 131 Ko, avec 0,9 Ko de
 // marge : un relèvement de 1 Ko pour 56 o mesurés laisserait sinon le prochain
 // hachage de build décider à la place du développeur.
+// ── 24/10/2026 : 131 → 132 Ko et 5,50 → 5,55 Mo, POUR LA MODÉRATION ───────
+// `/administration` donne au propriétaire le répertoire des comptes, leur état
+// (restreint/banni) et la lecture des fils : c'est une PAGE, et elle est
+// paresseuse — son chunk (`Administration`, 26 642 o bruts) n'est PAS dans le
+// premier écran. Le premier écran n'a pourtant pas rien payé : `index` passe de
+// 193 279 à 194 883 o bruts (61 718 → 62 041 o gzip), soit 323 o gzip pour la
+// route et son garde, et les six `vendor*` sont INCHANGÉS (react-dom 41 673,
+// router 13 756, lucide 7 468, react 2 868 o gzip) : ce n'est donc pas un
+// import repassé en statique. Mesure du jour : 131,3 Ko gzip (134 491 o des
+// sept chunks référencés) et 5,51 Mo (5 779 379 o des 148 fichiers) ; la veille
+// au matin, 130,9 Ko et 5,48 Mo. Le total suit le CONTENU : la page, le
+// dictionnaire de son scope dans les cinq langues et le graphe de préchargement
+// des quatorze gabarits. Les plafonds passent à 132 Ko et 5,55 Mo, avec 0,7 Ko
+// et 40 Ko de marge, pour la même raison qu'au 22/10 : laisser le prochain
+// hachage de build fixer le seuil, c'est laisser un hash décider à la place du
+// développeur.
 export const BUDGETS = {
-  initialGzip: 131 * 1024, // JS initial (chunks référencés par index.html), gzip
+  initialGzip: 132 * 1024, // JS initial (chunks référencés par index.html), gzip
   largestChunkGzip: 200 * 1024, // plus gros chunk JS, gzip
-  totalRaw: 5.5 * 1024 * 1024, // build/ entier, brut (voir les deux mesures ci-dessus)
+  totalRaw: 5.55 * 1024 * 1024, // build/ entier, brut (voir les deux mesures ci-dessus)
 };
 
 const ko = (bytes) => `${(bytes / 1024).toFixed(1)} Ko`;

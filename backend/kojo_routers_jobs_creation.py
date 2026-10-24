@@ -13,6 +13,7 @@ from pydantic import ValidationError
 
 import kojo_job_effects as effets
 from kojo_business_events import enregistrer_evenement
+from kojo_auth_core import exiger_compte_actif
 from kojo_core import db, get_current_user
 from kojo_job_alerts import comptes_couverts
 from kojo_job_categories import _CATEGORY_GROUPS, _normalize_job_category
@@ -116,7 +117,11 @@ async def _notify_matching_workers(job: Job):
 @router.post("/jobs", response_model=Job)
 async def create_job(
     job_data: dict,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    # Publier est une ÉCRITURE : un compte restreint (lecture seule) la perd.
+    # Consulter, terminer une mission en cours et payer restent ouverts — ce
+    # qu'on ferme ici engage la plateforme, pas une mission déjà séquestrée.
+    _actif: User = Depends(exiger_compte_actif),
 ):
     """Crée une mission (réservé au rôle CLIENT). Normalise la description,
     valide les montants et renvoie le job complet.

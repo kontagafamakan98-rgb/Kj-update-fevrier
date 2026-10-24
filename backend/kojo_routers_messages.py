@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 import kojo_live
+from kojo_auth_core import exiger_compte_actif
 from kojo_core import db
 from kojo_models import (
     Message, MessageCreate, User,
@@ -22,7 +23,10 @@ router = APIRouter()
 @router.post("/messages")
 async def send_message(
     message_data: MessageCreate,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    # Écrire est une ÉCRITURE : un compte restreint (lecture seule) la perd.
+    # La lecture des fils existants, elle, reste ouverte.
+    _actif: User = Depends(exiger_compte_actif),
 ):
     """Envoie un message privé (l'expéditeur doit exister et différer du
     destinataire ; la conversation est dérivée des deux ids triés).

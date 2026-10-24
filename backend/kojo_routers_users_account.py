@@ -116,6 +116,16 @@ ANONYMISATION_CHAMPS = {
     # une donnée de profil, et une personne partie ne doit plus lire les
     # demandes des clients.
     "support_role": None,
+    # Modération (kojo_comptes_admin) : le MOTIF et l'HISTORIQUE sont du texte
+    # libre écrit par le propriétaire — il peut y nommer la personne ou citer
+    # un contenu —, donc ils ne survivent pas à l'anonymisation. L'état lui-même
+    # revient à `actif` : un compte supprimé n'a plus d'accès à rouvrir, et
+    # garder « banni » sur une ligne anonymisée ne protégerait rien de plus.
+    "account_state": "actif",
+    "account_state_reason": None,
+    "account_state_at": None,
+    "account_state_by": None,
+    "account_state_history": [],
 }
 
 # Champs CONSERVÉS dans le document anonymisé, avec la raison — c'est la
@@ -145,7 +155,16 @@ CHAMPS_CONSERVES = {
 # directement en base, par le dépôt ou par l'endpoint). Déclarés pour que
 # l'union ci-dessus puisse être une ÉGALITÉ : un champ hors modèle non déclaré
 # ici, ou une faute de frappe dans l'une des deux tables, fait échouer le test.
-CHAMPS_HORS_MODELE = frozenset({"permissions", "deleted", "deleted_at", "purge_at", "_id"})
+# Champs de MODÉRATION : écrits par `kojo_comptes_admin.changer_etat` sur le
+# document, jamais par le modèle `User` (le compte n'a pas à porter sa propre
+# sanction dans la forme qu'il publie, et `get_current_user` la lit sur le
+# document relu). Déclarés ici pour que l'union « effacé ∪ conservé » couvre
+# exactement les champs du compte : un champ de modération oublié rougirait ici.
+CHAMPS_HORS_MODELE = frozenset({
+    "permissions", "deleted", "deleted_at", "purge_at", "_id",
+    "account_state", "account_state_reason", "account_state_at",
+    "account_state_by", "account_state_history",
+})
 
 @router.delete("/users/account")
 async def delete_my_account(current_user: User = Depends(get_current_user)):
