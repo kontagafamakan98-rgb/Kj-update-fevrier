@@ -9,7 +9,7 @@
 import Link from './LienVue';
 import { formatBudgetRange, formatJobDate, formatJobStatus } from '../utils/jobPageSafeHelpers';
 import { getRememberedApplication } from '../utils/jobProposalWorkflow';
-import { DEMO_JOBS } from '../config/demoJobs';
+import { CONTACT } from '../config/contact';
 
 // ── LA DESCRIPTION D'UNE CARTE EST BORNÉE, ET C'EST UNE MESURE DE LCP ──────
 //
@@ -65,48 +65,62 @@ const IconeEtiquette = () => (
   </svg>
 );
 
-export function DemoJobsEmptyState({ t }) {
+// ── LA LISTE VIDE PUBLIQUE NE MONTRE PLUS D'ANNONCES QUI N'EXISTENT PAS ────
+//
+// `DemoJobsEmptyState` montait trois missions « Exemple » en français codé en
+// dur (`DEMO_JOBS`) devant tout visiteur anonyme sans filtre. Mesuré le
+// 24/10/2026 : `/api/jobs?status=open` rendait `[]` et `/jobs` affichait
+// pourtant trois annonces avec un budget, une ville et une durée — un
+// inventaire INVENTÉ, dans une seule langue, sur la page qui sert de première
+// impression. Un visiteur qui cherche du travail y lisait trois offres à
+// prendre, et aucune n'existait.
+//
+// Ce qui reste est la VÉRITÉ (`noJobsAvailableNow` : aucune mission ouverte) et
+// trois issues RÉELLES, qui n'inventent rien et ne promettent aucun volume :
+// publier une mission (`/create-job`), préparer son compte travailleur pour
+// recevoir les missions par email (`/register` — la veille `AlerteEmploi`
+// n'est montée que pour un travailleur CONNECTÉ, donc un lien vers elle ne
+// mènerait nulle part ici), ou écrire sur WhatsApp (la source unique
+// `contact.json`).
+//
+// La hauteur est réservée (`min-h`) comme le squelette de liste qu'elle
+// remplace : sans elle, le pied de page ancré remontait au swap (même défaut
+// anti-CLS que `JobCardSkeleton`).
+export function PremiersArrivants({ t, textes }) {
+  // Le composant ne TRADUIT pas ses trois phrases : la page les lui donne
+  // (`textes`), parce qu'elles vivent dans le dictionnaire du scope `jobs`,
+  // différé avec la page — le dictionnaire global, lui, part dans le bundle
+  // INITIAL (mesuré le 24/10/2026 : 131,0 Ko gzip sur un budget de 131,0).
   return (
-    <section className="space-y-5" aria-labelledby="demo-jobs-title">
-      <div className="rounded-2xl border border-blue-100 bg-blue-50 p-6">
-        <div className="flex items-start gap-4">
-          <span className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white sm:flex" aria-hidden="true">
-            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16M4 12h10M4 17h7" />
-            </svg>
-          </span>
-          <div>
-            <h2 id="demo-jobs-title" className="text-xl font-semibold text-gray-900">Découvrez le type de missions publiées sur Kojo</h2>
-            <p className="mt-2 max-w-2xl text-sm text-gray-600">Ces exemples montrent le fonctionnement de la plateforme. Créez un compte pour consulter les missions actuellement disponibles et proposer vos services.</p>
-            <Link to="/register" className="mt-4 inline-flex rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-orange-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2">
-              {t('getStarted')}
-            </Link>
-          </div>
-        </div>
-      </div>
-      <div className="grid grid-cols-1 gap-4">
-        {DEMO_JOBS.map((job) => (
-          <article key={job.id} className="block rounded-2xl border border-gray-100 bg-white p-6 shadow-xs">
-            <div className="flex flex-wrap items-start justify-between gap-6">
-              <div className="min-w-[240px] flex-1">
-                <div className="mb-2 flex flex-wrap items-center gap-3">
-                  <h3 className="text-lg font-semibold text-gray-900">{job.title}</h3>
-                  <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-xs text-blue-700">Exemple</span>
-                </div>
-                <p className="mb-4 line-clamp-2 max-w-2xl text-gray-600">{job.description}</p>
-                <div className="flex flex-wrap gap-4 text-sm text-gray-500">
-                  <span className="inline-flex items-center gap-1.5"><IconeEpingle />{job.location_text}</span>
-                  <span className="inline-flex items-center gap-1.5"><IconeEtiquette />{job.category}</span>
-                  <span className="inline-flex items-center gap-1.5"><IconeCalendrier />{job.estimated_duration}</span>
-                </div>
-              </div>
-              <div className="ml-0 min-w-[170px] text-right md:ml-6">
-                <div className="text-2xl font-bold text-orange-600">{formatBudgetRange(job.budget_min, job.budget_max)}</div>
-                <div className="mt-2 text-xs text-gray-500">{formatJobStatus(job.status, t)}</div>
-              </div>
-            </div>
-          </article>
-        ))}
+    <section
+      className="carte-editoriale flex min-h-[22rem] flex-col justify-center p-6 sm:p-8"
+      aria-labelledby="premiers-arrivants-titre"
+    >
+      <h2 id="premiers-arrivants-titre" className="text-xl font-semibold text-stone-900">
+        {t('noJobsAvailableNow')}
+      </h2>
+      <p className="mt-2 max-w-2xl text-sm text-stone-600">{textes.lead}</p>
+      <div className="mt-6 flex flex-wrap gap-3">
+        <Link
+          to="/create-job"
+          className="inline-flex items-center rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-700"
+        >
+          {t('postJob')}
+        </Link>
+        <Link
+          to="/register"
+          className="inline-flex items-center rounded-lg border border-stone-300 fond-papier px-4 py-2 text-sm font-semibold text-stone-700 transition-colors hover:border-orange-500 hover:text-orange-700"
+        >
+          {textes.watch}
+        </Link>
+        <a
+          href={CONTACT.whatsappUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center rounded-lg border border-stone-300 fond-papier px-4 py-2 text-sm font-semibold text-stone-700 transition-colors hover:border-orange-500 hover:text-orange-700"
+        >
+          {textes.whatsapp}
+        </a>
       </div>
     </section>
   );
