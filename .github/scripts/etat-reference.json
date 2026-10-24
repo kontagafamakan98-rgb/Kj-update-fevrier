@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-24",
-    "motif": "La LECTURE des candidatures accepte le propriétaire de la plateforme, comme l'acceptation le faisait déjà ; un 403 faisait afficher « Aucune proposition » et remplissait la console.",
+    "motif": "le titre de la fiche est ATTENDU avant d'etre juge (24/10/2026) : la sonde jugeait un instant, et refusait une fiche saine alors que l'attente de l'action n'est pas une preuve que le bloc est peint",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -96,7 +96,6 @@
       "frontend/scripts/check-hero-images.js": "c6f263a3744dde61ca954a943cca3b0f0253ff52d918618d1aac915c90512a2e",
       "frontend/scripts/check-home-shell.js": "d146088dc555deda0993924a4b4f5d7697d3c05a4107a7d9575cee6fd37ce080",
       "frontend/scripts/check-job-form-canari.js": "569dc5b9b68b04b615b014b4be72929cd15d78535044dbaa2a8fab84f5b589ce",
-      "frontend/scripts/check-job-interactive-production.js": "26e4a55a43356ef6afac94d2088ebb8dbd311dd7edba31c8325ab505880cdcfb",
       "frontend/scripts/check-job-og-contract.js": "bec9168aefab3df99cd1b0a4d7f0d7728955f664cdb0b30226504f179f36fcef",
       "frontend/scripts/check-job-page-production.js": "16ad834863993defedda19d5c4a7e32da32e575a0cbe340fae22cb1462b3f314",
       "frontend/scripts/check-juges-de-temps.js": "e2c9ed5ebf6a91146acfa0b8c5788a08d38e6ef536060d4ec3018115d58fcbba",
@@ -141,7 +140,8 @@
       "frontend/scripts/style-layout-budgets.cjs": "db93353a147d9be6e84999ea065d3b3df5d08871a62fe943f3346bc80d68ede9",
       "frontend/scripts/validate-vercel-json.mjs": "16a56835e1fb299821c3a1dd7fa4d0957982a970a493e98ed8855d06fc563518",
       "frontend/scripts/verre-contraste.js": "0304f01ae4ccd2fea6db62cff8badcb4085d3a34622f49416ed8944c377c688c",
-      "backend/kojo_routers_jobs_tracking.py": "56a4e7b533ee853075047639a2917f969ee25c34cc31afebc9f7c7f3884f08dd"
+      "backend/kojo_routers_jobs_tracking.py": "56a4e7b533ee853075047639a2917f969ee25c34cc31afebc9f7c7f3884f08dd",
+      "frontend/scripts/check-job-interactive-production.js": "5993af00403cb45bfaca0bc6ccd6c7f0263d459d0e87a4c369896c26e1b695c4"
     }
   },
   "hors_perimetre": [
