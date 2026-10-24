@@ -108,6 +108,30 @@ export default function MobileBottomNav() {
     }
   ];
 
+  // ── L'ÉQUIPE SUPPORT NE VA PAS AU MARCHÉ (24/10/2026) ─────────────────────
+  // Une personne ajoutée au service clientèle tombait sur la barre du client :
+  // quatre cases, dont « Emplois », pour un rôle dont le travail est la file
+  // des demandes. Sa case « Emplois » cède donc la place aux demandes de
+  // support. On REMPLACE, jamais on n'ajoute : la grille est à `grid-cols-5`
+  // cloche comprise, et une sixième case ferait grandir la barre — sa hauteur
+  // est une contrainte de CLS mesurée (cf. plus bas). Le propriétaire, lui,
+  // garde son marché : il le surveille, il ne le parcourt pas.
+  if (user && !user.is_owner && user.support_role === 'agent') {
+    const rang = navItems.findIndex((item) => item.path === '/jobs');
+    if (rang !== -1) {
+      navItems[rang] = {
+        path: '/support-admin',
+        icon: (active) => (
+          <Icone
+            nom="casque"
+            classe={`w-6 h-6 ${active ? 'text-orange-600' : 'text-gray-400'}`}
+          />
+        ),
+        label: t('support'),
+      };
+    }
+  }
+
   // ── LES DEUX MENUS NE PARTAGENT PAS LEURS NŒUDS, ET C'EST UNE MESURE ──────
   //
   // La disposition DÉCOUVERTE (4 items) et la disposition APPLICATION (4 items

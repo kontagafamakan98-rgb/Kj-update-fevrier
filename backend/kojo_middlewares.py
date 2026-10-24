@@ -135,7 +135,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # lecture seule et peu coûteuses : on ne les compte PAS dans le bucket
         # général pour éviter de faux 429 massifs. Les buckets critiques
         # (auth, owner) continuent de compter TOUTES les méthodes.
-        if bucket_name in ("general-api", "messages") and request.method in {"GET", "HEAD", "OPTIONS"}:
+        # `support` et `support-desk` rejoignent la liste (24/10/2026) : relire la
+        # file des demandes n'est pas créer une demande. Ce qui reste compté sur
+        # ces deux buckets, ce sont les ÉCRITURES (ouverture d'un ticket,
+        # changement de statut), et le guichet a son propre plafond
+        # (`support-desk`, 120/min) parce que plusieurs personnes travaillent
+        # depuis la même IP de bureau.
+        if bucket_name in ("general-api", "messages", "support", "support-desk") and request.method in {"GET", "HEAD", "OPTIONS"}:
             return await call_next(request)
 
         client_ip = get_client_ip(request)

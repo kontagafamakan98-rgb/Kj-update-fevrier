@@ -580,3 +580,52 @@ describe("centre de notifications — le sens d'ouverture est déclaré par la c
     expect(panneau().classList.contains('bottom-full')).toBe(true);
   });
 });
+
+/**
+ * LA CLOCHE A UNE TAILLE, MÊME QUAND LA BARRE N'EN DÉCLARE AUCUNE.
+ *
+ * ── Le défaut mesuré en production (24/10/2026) ─────────────────────────────
+ * La barre du haut (disposition desktop) monte `<NotificationBell />` sans
+ * `iconClassName`. Le composant valait `''` par défaut et transmettait cette
+ * chaîne VIDE à `<Icone classe={…} />`, écrasant le `w-6 h-6` par défaut du
+ * registre : le `<svg>` mesurait **0 × 0** (bouton 44 × 48, icône invisible),
+ * et seule la pastille rouge du compteur, positionnée en absolu, restait à
+ * l'écran. La personne voyait « 3 » sans cloche — la barre de notifications
+ * avait disparu.
+ *
+ * ── Ce que ce cas juge ──────────────────────────────────────────────────────
+ * La CLASSE de taille portée par le `<svg>` de la cloche, dans les deux bars :
+ * un défaut non vide, ou l'habit explicite de la barre du bas. jsdom ne calcule
+ * aucune mise en page (un `0 × 0` ne s'y voit pas), donc la seule chose
+ * vérifiable ici est la valeur qui l'a produit — et c'est elle qu'on fixe.
+ */
+describe('la cloche est DESSINÉE : une taille est toujours portée par le tracé', () => {
+  const classeDeLIcone = (bouton) => bouton.querySelector('svg')?.getAttribute('class') || '';
+
+  it("sans `iconClassName`, la barre du haut garde la taille par défaut (w-6 h-6)", async () => {
+    rendu();
+    await waitFor(() => expect(getAll).toHaveBeenCalled());
+
+    const classe = classeDeLIcone(cloches()[0]);
+    expect(classe.trim()).not.toBe('');
+    expect(classe).toContain('w-6');
+    expect(classe).toContain('h-6');
+  });
+
+  it('la barre du bas impose la sienne (w-6 h-6) et l’icône la porte', async () => {
+    render(
+      <MemoryRouter>
+        <NotificationProvider>
+          <MobileBottomNav />
+          <NotificationPanel />
+        </NotificationProvider>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(getAll).toHaveBeenCalled());
+
+    const cloche = screen.getByRole('button', { name: /notificationsTitle/ });
+    const classe = classeDeLIcone(cloche);
+    expect(classe).toContain('w-6');
+    expect(classe).toContain('h-6');
+  });
+});

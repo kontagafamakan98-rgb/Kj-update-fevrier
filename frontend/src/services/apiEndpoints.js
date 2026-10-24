@@ -320,6 +320,15 @@ export const supportAPI = {
   listTickets: (statusFilter) => api.get('/support/tickets', { params: statusFilter ? { status_filter: statusFilter } : {} }),
   /** @returns {Promise<object>} {ticket} statut mis à jour. */
   updateTicketStatus: (ticketId, status) => api.patch(`/support/tickets/${ticketId}/status`, { status }),
+  // L'ÉQUIPE SUPPORT : le propriétaire seul compose l'équipe (`/support/team`
+  // est jugé par `verify_owner_access`), mais TOUS ses membres lisent les
+  // tickets par les deux routes ci-dessus.
+  /** @returns {Promise<Array<object>>} membres de l'équipe support. */
+  listTeam: () => api.get('/support/team'),
+  /** @returns {Promise<object>} {agent, message} membre ajouté. */
+  addAgent: (email) => api.post('/support/team', { email }),
+  /** @returns {Promise<object>} {agent, message} accès retiré. */
+  removeAgent: (userId) => api.delete(`/support/team/${userId}`),
 };
 export const messageAPI = {
   /** @returns {Promise<Array<object>>} messages normalisés. */

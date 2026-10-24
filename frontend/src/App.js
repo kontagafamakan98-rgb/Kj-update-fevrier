@@ -175,6 +175,28 @@ function OwnerOnlyRoute({ children }) {
   return children;
 }
 
+/**
+ * /support-admin : le PROPRIÉTAIRE (qui compose l'équipe) et les personnes qu'il
+ * a ajoutées au service clientèle. Deux rôles, une seule page, et rien d'autre
+ * n'est ouvert par ce second rôle (cf. OwnerService.canManageSupport).
+ *
+ * Un refus renvoie au tableau de bord plutôt qu'à un écran blanc : sans droit,
+ * la page de support n'a rien à montrer et ses appels ne rendraient que 403.
+ */
+function SupportDeskRoute({ children }) {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return null;
+  }
+
+  if (!user || !OwnerService.canManageSupport(user)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
+}
+
 // Mobile-optimized loading component
 function MobileLoader() {
   const { t } = useLanguage();
@@ -550,9 +572,9 @@ function AppRoutes() {
             <Route path="/support" element={<Support />} />
             <Route path="/support-admin" element={
               <ProtectedRoute>
-                <OwnerOnlyRoute>
+                <SupportDeskRoute>
                   <SupportAdmin />
-                </OwnerOnlyRoute>
+                </SupportDeskRoute>
               </ProtectedRoute>
             } />
             {/* Attrape-tout : EN DERNIER, sinon il masquerait les routes qui le

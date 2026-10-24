@@ -15,7 +15,12 @@ import { api, hasSessionTrace } from './api';
 // partagé `api` (credentials: 'include' + en-tête X-CSRFToken sur les
 // mutations) — plus aucun fetch manuel.
 class OwnerService {
-  /** @returns {object|null} Utilisateur stocké en localStorage, ou null. */
+  /** @returns {object|null} Profil stocké en localStorage, ou null.
+   *
+   *  Sur le WEB ce profil a été supprimé (20/10/2026, donnée personnelle au
+   *  repos) : cette lecture rend `null` et ne doit jamais être la SEULE source
+   *  d'un contrôle d'accès — le profil de session (`useAuth().user`) est la
+   *  source vivante, le stockage ne sert plus qu'au shell natif. */
   getStoredUser() {
     try {
       const rawUser = localStorage.getItem('user');
@@ -33,6 +38,27 @@ class OwnerService {
       || userCandidate?.is_owner === true
       || (Array.isArray(userCandidate?.permissions) && userCandidate.permissions.includes('admin_access'))
     );
+  }
+
+  /** @returns {boolean} true si le profil porte le rôle du SERVICE CLIENTÈLE.
+   *
+   *  `support_role` est posé par le propriétaire (`/support/team`) et publié par
+   *  `/auth/me` : l'écran ne devine pas un droit, il lit un fait. Ce rôle
+   *  n'ouvre RIEN d'autre que les demandes de support — aucun écran de gains,
+   *  d'arbitrage ou de commission ne le reconnaît. */
+  isSupportAgent(userCandidate = null) {
+    return userCandidate?.support_role === 'agent';
+  }
+
+  /** @returns {boolean} true si ce compte peut ouvrir /support-admin.
+   *
+   *  Deux rôles, une page : le propriétaire (qui gère l'équipe) et les
+   *  personnes qu'il a ajoutées (qui traitent les demandes). La session doit
+   *  être active : sans elle, les routes de support répondraient 401/403 et
+   *  l'écran serait un cadre vide. */
+  canManageSupport(userCandidate = null) {
+    if (!hasSessionTrace()) return false;
+    return this.isOwnerUser(userCandidate) || this.isSupportAgent(userCandidate);
   }
 
   /** @returns {boolean} true si profil owner ET session active (trace de session). */
@@ -213,7 +239,15 @@ class OwnerService {
     }
   }
 
-  /** @returns {boolean} true si la session owner est valide (compat). */
+  /** @returns {boolean} true si la session owner est valide (compat).
+   *
+   *  ⚠️ PASSER LE PROFIL DE SESSION (`useAuth().user`). Depuis le 20/10/2026 le
+   *  web n'écrit plus le profil dans `localStorage` (il ne vit qu'en mémoire,
+   *  cf. `AuthContext.purgerProfilWebPersistant`) : un appel SANS argument
+   *  relisait donc `getStoredUser()` — toujours `null` sur le web — et rendait
+   *  faux pour tout le monde, propriétaire compris (constaté en production le
+   *  24/10/2026 sur `/commission-dashboard`). Le repli stockage ne vaut plus
+   *  que pour le shell natif, qui garde son profil. */
   isFamakanLoggedIn(userCandidate = null) {
     return this.isOwnerSessionValid(userCandidate || this.getStoredUser());
   }

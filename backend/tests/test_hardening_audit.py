@@ -597,6 +597,11 @@ class TestAccountDeletion:
             "referral_reward_balance": 5000.0,
             "referral_rewards": [{"id": "r-1", "amount": 5000}],
             "permissions": ["admin_access"],
+            # Rôle de l'ÉQUIPE SUPPORT (24/10/2026) : c'est un ACCÈS, pas une
+            # donnée de profil — un compte supprimé ne doit plus lire les
+            # demandes des clients. Rempli ici pour que l'effacement soit
+            # PROUVÉ, et non vrai sur un champ que le compte n'a jamais porté.
+            "support_role": "agent",
             "bio": "Je suis Kofi, joignable au +221771234567",
             "skills": ["plomberie", "soudure"],
         }})

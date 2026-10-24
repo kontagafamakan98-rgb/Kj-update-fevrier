@@ -302,8 +302,24 @@ def get_rate_limit_bucket(path: str) -> tuple[str, int, int]:
         # 20 POST/5min/IP est le plafond de coût ; la règle est testée AVANT le
         # préfixe /api/support, qui refuserait 10 messages en 5 minutes.
         return ("support-robot", 20, 5)
+    # LE GUICHET (24/10/2026) : la file de demandes est un ÉCRAN DE TRAVAIL, pas
+    # un formulaire public. Agents et propriétaire partagent souvent la même IP
+    # de bureau : à 10 requêtes / 5 min, dix changements de statut fermaient la
+    # file pour tout le monde, et l'équipe venait d'être créée précisément pour
+    # la traiter à plusieurs. Règle AVANT le préfixe `/api/support`, et bornée au
+    # CHEMIN EXACT de la mutation (`…/tickets/<id>/status`) et aux routes
+    # d'équipe : `POST /support/tickets` garde ses 10 / 5 min, et la recherche
+    # publique de statut (`…/tickets/status`, sans identifiant) ne remonte pas
+    # dans ce bucket.
+    segments = [morceau for morceau in path.strip("/").split("/") if morceau]
+    if (len(segments) == 5 and segments[:3] == ["api", "support", "tickets"] and segments[4] == "status") \
+            or segments[:3] == ["api", "support", "team"]:
+        return ("support-desk", 120, 1)
     if path.startswith("/api/support"):
-        # Tickets support (création publique) : 10 POST/5min/IP
+        # Tickets support (création publique) : 10 POST/5min/IP. Les GET/HEAD sont
+        # EXEMPTÉS par le middleware (cf. RateLimitMiddleware) : relire la file
+        # ne crée aucune demande, et la limiter à 10 lectures rendait la file
+        # inutilisable — c'est ce qu'on venait d'ouvrir à plusieurs.
         return ("support", 10, 5)
     if path.startswith("/api/owner"):
         return ("owner", 30, 1)
