@@ -30,6 +30,18 @@
  * celle que le crawler retient comme la bonne, donc elle divergerait du HTML
  * servi exactement de la même façon qu'un titre.
  *
+ * ── Ce que le document doit AUSSI porter (24/10/2026) ────────────────
+ * Le `<h1>` statique annonçait le titre de PAGE (« … — Kojo ») quand React rend
+ * le titre SEUL (`<h1>{job.title}</h1>`) : deux titres principaux pour une même
+ * mission selon qu'on lit avec ou sans JavaScript (mesuré en production). Il
+ * porte désormais `job.title`, et le contrat le compare des deux côtés.
+ *
+ * Le bloc `JobPosting` (Google Jobs) est jugé contre la DONNÉE : présent et
+ * exact sur une offre (titre, description, identifiant, localisation, dates),
+ * ABSENT sur une mission `in_progress` — une mission pourvue n'est pas une
+ * annonce. `baseSalary` et `directApply` sont REFUSÉS : un budget n'est pas un
+ * salaire, et la candidature exige un compte.
+ *
  * ── Le jeu de référence, et pourquoi il existe ─────────────────────────────
  * L'UNITÉ de la coupe à 150 est ce qui a motivé le jeu : JavaScript compte des
  * unités UTF-16, Python des points de code, et les deux comptes coïncident tant
@@ -113,6 +125,13 @@ export const CONTRACT_JOBS = [
     label: 'apostrophe et « & »',
     covers: 'texte échappé dans le HTML, description de plus de 150 points de code',
     id: '11111111-1111-4111-8111-111111111111',
+    // Les champs du bloc `JobPosting` : une mission de référence est une OFFRE
+    // (statut `open`), datée et localisée — sans ces trois champs, la moitié
+    // JSON-LD du contrat ne serait jamais jugée sur une valeur réelle.
+    status: 'open',
+    posted_at: '2026-10-20T09:00:00+00:00',
+    location_text: 'Bamako, Mali',
+    country: 'ML',
     title: "Réparation d'une fuite & rebouchage du plafond",
     description:
       "Fuite lente au plafond du salon, sous la salle de bain : tache qui s'agrandit " +
@@ -123,6 +142,13 @@ export const CONTRACT_JOBS = [
     label: 'accents à la frontière',
     covers: 'le 150e point de code est un accent, avec des accents avant et après la coupe',
     id: '22222222-2222-4222-8222-222222222222',
+    status: 'open',
+    posted_at: '2026-10-18T07:30:00+00:00',
+    // Une ÉCHÉANCE déclarée : `validThrough` la lit au lieu de retomber sur la
+    // validité par défaut (les deux branches sont donc éprouvées).
+    deadline: '2026-11-15T00:00:00+00:00',
+    location_text: 'Ouagadougou, Burkina Faso',
+    country: 'BF',
     title: "Réfection d'une toiture en tôle ondulée — étage",
     description: ACCENTED_DESCRIPTION,
   },
@@ -130,6 +156,10 @@ export const CONTRACT_JOBS = [
     label: 'emoji BMP à la frontière',
     covers: 'emoji du plan de base (1 unité UTF-16) au 150e point de code : les comptes coïncident',
     id: '33333333-3333-4333-8333-333333333333',
+    status: 'open',
+    posted_at: '2026-10-10T12:00:00Z',
+    location_text: 'Dakar, Sénégal',
+    country: 'SN',
     title: 'Tri des cartons ☕ après déménagement',
     description: insertAtCodePoint(ACCENTED_DESCRIPTION, DESCRIPTION_LIMIT - 1, '☕'),
   },
@@ -137,6 +167,10 @@ export const CONTRACT_JOBS = [
     label: 'astral à la frontière',
     covers: 'caractère astral (2 unités UTF-16) au 150e point de code : la paire tombe sur la coupe',
     id: '44444444-4444-4444-8444-444444444444',
+    status: 'open',
+    posted_at: '2026-09-30T08:15:00+00:00',
+    location_text: 'Bobo-Dioulasso, Burkina Faso',
+    country: 'BF',
     title: 'Nettoyage de fin de chantier 😀 à Ouagadougou',
     description: insertAtCodePoint(ACCENTED_DESCRIPTION, DESCRIPTION_LIMIT - 1, '😀'),
   },
@@ -144,6 +178,10 @@ export const CONTRACT_JOBS = [
     label: 'astral avant la frontière',
     covers: 'caractère astral AVANT la coupe : le décompte UTF-16 décale la frontière d’un caractère',
     id: '55555555-5555-4555-8555-555555555555',
+    status: 'open',
+    posted_at: '2026-10-22T16:45:00+00:00',
+    location_text: 'Abidjan, Côte d’Ivoire',
+    country: 'CI',
     title: 'Évacuation des gravats 🚚 et remise en état',
     description: insertAtCodePoint(ACCENTED_DESCRIPTION, 99, '🚚'),
   },
@@ -286,6 +324,193 @@ export const hasLoneSurrogate = (value) => {
 export const htmlTitle = (html) => decodeEntities((/<title>([^<]*)<\/title>/i.exec(String(html)) || [])[1]);
 
 /**
+ * Texte du PREMIER `<h1>` du document, décodé et normalisé.
+ *
+ * Le `<h1>` statique est ce qu'un crawler sans JavaScript lit comme titre
+ * principal ; React rend le sien (`<h1>{job.title}</h1>`, `JobDetails.js`).
+ */
+export const h1Statique = (html) => {
+  const trouve = /<h1\b[^>]*>([\s\S]*?)<\/h1>/i.exec(String(html));
+  return decodeEntities((trouve && trouve[1]) || '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+/** Les contenus des blocs `application/ld+json`, dans l'ordre du document. */
+export const blocsJsonLd = (html) =>
+  [
+    ...String(html).matchAll(
+      /<script\b[^>]*\btype="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi
+    ),
+  ].map((trouve) => trouve[1]);
+
+/**
+ * La localité d'une mission, lue de la MÊME facon que `_localisation_texte`
+ * (backend/kojo_job_og.py) : `location_text` à plat, sinon l'objet `location`.
+ */
+const localiteDe = (job) => {
+  const texte = String((job && job.location_text) || '').trim();
+  if (texte) return texte;
+  const lieu = job && job.location && typeof job.location === 'object' ? job.location : {};
+  for (const cle of ['fullAddress', 'address', 'text', 'city']) {
+    const valeur = String(lieu[cle] || '').trim();
+    if (valeur) return valeur;
+  }
+  return '';
+};
+
+/**
+ * La validité par défaut d'une annonce (jours) — `VALIDITE_JOURS` de
+ * backend/kojo_job_og.py. Deux copies, et c'est voulu : le jour où l'une bouge,
+ * ce contrat rougit et le relecteur voit les deux.
+ */
+export const VALIDITE_JOURS = 30;
+
+/**
+ * Confronte le bloc `JobPosting` à la DONNÉE de la mission.
+ *
+ * POURQUOI : mesuré le 24/10/2026 en production, `JobPosting` → 0 occurrence,
+ * `application/ld+json` → 0. La fiche était invisible pour Google Jobs alors
+ * que tout ce qu'il demande était déjà publié.
+ *
+ * Ce qui est jugé, et ce qui ne l'est PAS : les champs SONT comparés à la
+ * donnée (titre, description, identifiant, localisation, dates), et le bloc est
+ * refusé pour une mission qui n'est pas une offre. Les champs INTERDITS le sont
+ * pour une raison de fond, pas de forme : `baseSalary` (un budget de mission
+ * n'est pas un salaire) et `directApply` (la candidature exige un compte) sont
+ * des affirmations fausses, donc leur présence est un échec.
+ *
+ * @param {{app: object, html: string, base: string, vue: object}} options
+ * @returns {string[]} Problèmes trouvés (vide = contrat tenu).
+ */
+export const compareJobPosting = ({ app, html, base, vue }) => {
+  const errors = [];
+  const blocs = blocsJsonLd(html);
+  const ouvert = String((vue && vue.status) || '').toLowerCase() === 'open';
+
+  if (!ouvert) {
+    if (blocs.length) {
+      errors.push(
+        `une mission « ${vue.status} » porte ${blocs.length} bloc(s) JSON-LD : elle n'est PAS une offre, ` +
+          'donc elle ne s’annonce pas comme telle à Google Jobs'
+      );
+    }
+    return errors;
+  }
+  if (blocs.length !== 1) {
+    errors.push(
+      blocs.length
+        ? `${blocs.length} blocs JSON-LD dans la fiche (attendu 1) : un seul décrit la page`
+        : 'AUCUN bloc JSON-LD : la fiche reste invisible pour Google Jobs (`JobPosting` absent)'
+    );
+    return errors;
+  }
+
+  let bloc;
+  try {
+    bloc = JSON.parse(blocs[0]);
+  } catch (error) {
+    return [`le bloc JSON-LD n'est pas du JSON lisible (${error.message})`];
+  }
+
+  const orgAttendue = `${base}/icons/icon-512x512.png`;
+  for (const [cle, attendu] of Object.entries({
+    '@context': 'https://schema.org',
+    '@type': 'JobPosting',
+    title: vue.title,
+    // La description PUBLIÉE (coupée sur le dernier espace), la même que la balise.
+    description: app.description,
+    employmentType: 'CONTRACTOR',
+    // Le canonical, déjà confronté à celui de l'application plus haut.
+    url: `${base}${app.canonicalPath}`,
+  })) {
+    if (bloc[cle] !== attendu) {
+      errors.push(`JSON-LD « ${cle} » : « ${String(bloc[cle])} » au lieu de « ${attendu} »`);
+    }
+  }
+
+  const identifiant = bloc.identifier || {};
+  if (identifiant['@type'] !== 'PropertyValue' || String(identifiant.value) !== String(vue.id)) {
+    errors.push(
+      `JSON-LD identifier : « ${JSON.stringify(identifiant)} » ne désigne pas la mission « ${vue.id} »`
+    );
+  }
+  const organisation = bloc.hiringOrganization || {};
+  if (organisation['@type'] !== 'Organization' || organisation.name !== 'Kojo') {
+    errors.push(`JSON-LD hiringOrganization : « ${JSON.stringify(organisation)} » n'identifie pas Kojo`);
+  }
+  if (organisation.url !== base) {
+    errors.push(`JSON-LD hiringOrganization.url : « ${organisation.url || '(absente)'} » au lieu de « ${base} »`);
+  }
+  if (organisation.logo !== orgAttendue) {
+    errors.push(`JSON-LD hiringOrganization.logo : « ${organisation.logo || '(absent)'} » au lieu de « ${orgAttendue} »`);
+  }
+
+  const lieu = bloc.jobLocation || {};
+  const adresse = lieu.address || {};
+  if (lieu['@type'] !== 'Place' || adresse['@type'] !== 'PostalAddress') {
+    errors.push(`JSON-LD jobLocation : « ${JSON.stringify(lieu)} » n'est pas un Place/PostalAddress`);
+  }
+  const localite = localiteDe(vue);
+  if (localite && adresse.addressLocality !== localite) {
+    errors.push(
+      `JSON-LD addressLocality : « ${adresse.addressLocality || '(absente)'} » au lieu de « ${localite} »`
+    );
+  }
+  if (!localite && adresse.addressLocality !== undefined) {
+    errors.push(`JSON-LD addressLocality : la mission n'en déclare AUCUNE, le bloc en invente une`);
+  }
+  if (vue.country && adresse.addressCountry !== vue.country) {
+    errors.push(
+      `JSON-LD addressCountry : « ${adresse.addressCountry || '(absent)'} » au lieu de « ${vue.country} »`
+    );
+  }
+  if (!vue.country && adresse.addressCountry !== undefined) {
+    errors.push(`JSON-LD addressCountry : la mission n'en déclare AUCUN, le bloc en invente un`);
+  }
+
+  // Les dates se comparent en INSTANTS : deux écritures ISO du même moment
+  // (`Z` ou `+00:00`) sont la même date, et comparer les chaînes refuserait un
+  // document correct.
+  const publiee = Date.parse((vue && vue.posted_at) || '');
+  if (Number.isFinite(publiee)) {
+    if (!Number.isFinite(Date.parse(bloc.datePosted || '')) || Date.parse(bloc.datePosted) !== publiee) {
+      errors.push(
+        `JSON-LD datePosted : « ${bloc.datePosted || '(absente)'} » ne reprend pas la date de publication « ${vue.posted_at} »`
+      );
+    }
+    const echeance = vue.deadline
+      ? Date.parse(vue.deadline)
+      : publiee + VALIDITE_JOURS * 86400000;
+    const declaree = Date.parse(bloc.validThrough || '');
+    if (declaree !== echeance) {
+      errors.push(
+        `JSON-LD validThrough : « ${bloc.validThrough || '(absente)'} » au lieu de ` +
+          `${vue.deadline ? `l'échéance déclarée « ${vue.deadline} »` : `${VALIDITE_JOURS} jours après la publication`}`
+      );
+    }
+  } else if (bloc.datePosted !== undefined || bloc.validThrough !== undefined) {
+    errors.push(
+      'JSON-LD : la mission ne porte pas de date lisible, donc le bloc ne doit en publier AUCUNE ' +
+        '(une date inventée ferait dater ou expirer l’annonce au mauvais moment)'
+    );
+  }
+
+  for (const interdit of ['baseSalary', 'directApply']) {
+    if (Object.hasOwn(bloc, interdit)) {
+      errors.push(
+        `JSON-LD « ${interdit} » : jamais publié — ` +
+          (interdit === 'baseSalary'
+            ? 'un budget de mission n’est pas un salaire'
+            : 'la candidature exige un compte Kojo, donc l’affirmer serait faux')
+      );
+    }
+  }
+  return errors;
+};
+
+/**
  * Confronte ce que l'application annonce à ce que le pré-rendu publie.
  *
  * PUR (aucune exécution, aucun accès disque) : c'est ce qui permet de prouver
@@ -386,6 +611,33 @@ export const compareJobOg = ({ app, html, base, vue = null }) => {
       errors.push(problem);
     }
   }
+
+  // Le TITRE PRINCIPAL n'est pas le titre de PAGE. React rend
+  // `<h1>{job.title}</h1>` (JobDetails.js) ; le H1 statique, lui, publiait le
+  // suffixe « — Kojo » du `<title>` (mesuré le 24/10/2026 : « Fuite sous
+  // l’évier … — Kojo » contre « Fuite sous l’évier … »). Le suffixe est retiré
+  // de l'annonce quand la mission n'est pas fournie, et lu sur elle quand elle
+  // l'est — jamais recopié.
+  const titreSeul = vue && typeof vue.title === 'string'
+    ? vue.title
+    : String(app.title || '').replace(/\s—\sKojo$/, '');
+  if (titreSeul) {
+    const h1 = h1Statique(html);
+    if (h1 !== titreSeul) {
+      errors.push(
+        `<h1> : le pré-rendu annonce « ${h1 || '(absent)'} », la mission s'appelle « ${titreSeul} » — ` +
+          'le titre principal porte le TITRE SEUL, le suffixe « — Kojo » n’appartient qu’au <title>'
+      );
+    }
+  }
+
+  // La moitié JSON-LD n'est jugée qu'avec la MISSION : sans son statut, le garde
+  // ne saurait pas si elle est une offre (une mission pourvue n'en est pas une).
+  if (vue) {
+    for (const problem of compareJobPosting({ app, html, base, vue })) {
+      errors.push(problem);
+    }
+  }
   return errors;
 };
 
@@ -435,10 +687,33 @@ export const runJobOgContractCheck = (opts = {}) => {
       errors.push(`[${job.label}] ${problem}`);
     }
     checked.push(
-      `  ✓ ${job.label} : « ${app.title} » — description ${Array.from(app.description).length} ` +
-        `points de code (source ${Array.from(job.description).length}), carte wide + carrée ` +
-        `-square.png, canonical/og:url, point d'entrée + bloc « ${POINT_ENTREE_MISSION.seedId} » ` +
-        `(${job.covers})`
+      `  ✓ ${job.label} : « ${app.title} » — <h1> « ${job.title} », description ` +
+        `${Array.from(app.description).length} points de code (source ` +
+        `${Array.from(job.description).length}), carte wide + carrée -square.png, canonical/og:url, ` +
+        `point d'entrée + bloc « ${POINT_ENTREE_MISSION.seedId} », JobPosting ` +
+        `« ${job.title} » (${job.covers})`
+    );
+  }
+
+  // Une mission qui n'est PAS une offre ne s'annonce pas comme telle : le même
+  // module est rejoué avec un statut `in_progress`, et le document ne doit porter
+  // AUCUN bloc JSON-LD. Sans ce cas, la règle « seulement si open » ne serait
+  // prouvée par rien (le jeu de référence n'est fait que d'offres).
+  const fermee = { ...CONTRACT_JOBS[0], status: 'in_progress' };
+  const renduFerme = renderPrerenderedPage({ python, job: fermee, base, root });
+  if (renduFerme.error) {
+    errors.push(`[mission in_progress] ${renduFerme.error}`);
+  } else {
+    for (const problem of compareJobPosting({
+      app: jobSeo(fermee),
+      html: renduFerme.html,
+      base,
+      vue: fermee,
+    })) {
+      errors.push(`[mission in_progress] ${problem}`);
+    }
+    checked.push(
+      '  ✓ mission in_progress : aucun bloc JSON-LD (une mission pourvue n’est pas une offre)'
     );
   }
 
@@ -456,10 +731,12 @@ export const runJobOgContractCheck = (opts = {}) => {
   log(checked.join('\n'));
   log(
     `✅ Contrat /jobs/:id tenu hors ligne sur ${CONTRACT_JOBS.length} missions de référence : ` +
-      'titre, description (coupe en points de code), carte, canonical et og:url identiques entre ' +
-      "l'application et le pré-rendu, et le document charge la feuille et le point d'entrée " +
-      `« ${POINT_ENTREE_MISSION.script} » en portant la vue publique dans son bloc de données ` +
-      '(aucun serveur, aucune base de données).'
+      'titre, description (coupe en points de code, sur le dernier ESPACE), carte, canonical et ' +
+      "og:url identiques entre l'application et le pré-rendu, `<h1>` = titre de la mission (sans " +
+      'le suffixe du `<title>`), bloc `JobPosting` présent et égal à la donnée sur une offre — ' +
+      'ABSENT sur une mission `in_progress` —, et le document charge la feuille et le point ' +
+      `d'entrée « ${POINT_ENTREE_MISSION.script} » en portant la vue publique dans son bloc de ` +
+      'données (aucun serveur, aucune base de données).'
   );
   return { ok: true, errors, notices, checked, python };
 };

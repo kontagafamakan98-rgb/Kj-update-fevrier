@@ -44,26 +44,46 @@
 
 /**
  * La coupe de la description, en POINTS DE CODE. La même valeur vit dans
- * backend/kojo_job_og.py (`raw_desc[:150]`) : deux langages, deux déploiements,
+ * backend/kojo_job_og.py (`DESCRIPTION_LIMIT`) : deux langages, deux déploiements,
  * et c'est la paire que scripts/check-job-og-contract.js compare sur un jeu de
  * missions de référence — donc aucune des deux copies ne peut bouger seule.
  */
 export const DESCRIPTION_LIMIT = 150;
 
+/**
+ * La description PUBLIÉE : coupée sur le dernier ESPACE de la tranche.
+ *
+ * MESURÉ le 24/10/2026 sur /jobs/c7b740c2-1be5-40c8-a1f3-f2fec7c807aa : la
+ * balise annonçait « … Il faut localiser la fuite, remplacer le. » — les 150
+ * premiers points de code, donc un mot tranché et une phrase finissant sur un
+ * article. Un moteur qui cite cette phrase la cite telle quelle.
+ *
+ * La règle est écrite à l'IDENTIQUE dans `couper_description`
+ * (backend/kojo_job_og.py) : 150 POINTS DE CODE, puis recul jusqu'au dernier
+ * espace — coupe dure seulement s'il n'y en a aucun, et un espace en PREMIÈRE
+ * position ne compte pas (reculer à zéro ne publierait que « … »). Un texte
+ * plus court que la limite est rendu tel quel, sans « … ».
+ */
+export const couperDescription = (description) => {
+  const texte = description || '';
+  const points = Array.from(texte);
+  if (points.length <= DESCRIPTION_LIMIT) return texte;
+  let tranche = points.slice(0, DESCRIPTION_LIMIT).join('');
+  const espace = tranche.lastIndexOf(' ');
+  if (espace > 0) tranche = tranche.slice(0, espace);
+  return `${tranche}…`;
+};
+
 export const jobSeo = (job) => {
   const title = (job && job.title) || '';
   const description = (job && job.description) || '';
-  // Coupe identique côté pré-rendu (kojo_job_og.py) : 150 POINTS DE CODE suivis de
-  // « … » si la description est plus longue (le titre réel d'une mission n'est pas
-  // borné, sa description l'est — un crawler tronque sinon au milieu d'une
-  // phrase). `Array.from` énumère les points de code : c'est ce qui rend le compte
-  // comparable au `[:150]` de Python (cf. l'en-tête de ce fichier).
-  const points = Array.from(description);
-  const cut = points.slice(0, DESCRIPTION_LIMIT).join('');
-  const truncated = points.length > DESCRIPTION_LIMIT;
+  // Coupe identique côté pré-rendu (`couper_description`, kojo_job_og.py), qui
+  // coupe AUSSI sur le dernier espace (cf. `couperDescription` ci-dessus) :
+  // `Array.from` énumère les POINTS DE CODE, ce qui rend le compte comparable
+  // au `list(texte)` de Python — un emoji hors BMP vaut deux unités UTF-16.
   return {
     title: title ? `${title} — Kojo` : '',
-    description: points.length ? `${cut}${truncated ? '…' : ''}` : '',
+    description: couperDescription(description),
     card: job && job.id ? `/api/og/jobs/${job.id}.png` : '',
     // L'URL canonique de la fiche — la même pour le pré-rendu (kojo_job_og.py)
     // et pour le contrat hors ligne (scripts/check-job-og-contract.js). Elle ne

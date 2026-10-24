@@ -414,8 +414,12 @@ export function jugerDemarrage({ html, id }) {
     }
     const titre = String(bloc.donnees.title ?? '').trim();
     if (titre) {
+      // Le `<h1>` porte le TITRE SEUL : le suffixe « — Kojo » du `<title>` n'a
+      // jamais été le titre principal de la fiche (corrigé le 24/10/2026, mesuré
+      // sur /jobs/c7b740c2-… : le document annonçait « … — Kojo » quand React
+      // peignait `<h1>{job.title}</h1>`).
       const h1 = h1De(html);
-      const attendu = `${titre} — Kojo`;
+      const attendu = titre;
       if (h1 !== attendu) {
         erreurs.push(
           `<h1> « ${h1 || 'absent'} » ne correspond pas au bloc (« ${attendu} ») : le document et ` +

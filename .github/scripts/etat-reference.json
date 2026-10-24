@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-24",
-    "motif": "Le garde exige les trois en-têtes statiques du site (X-Content-Type-Options, Referrer-Policy, Permissions-Policy) sur la règle /(.*) : mesuré le 24/10/2026 en production, le HTML servi ne les portait pas alors que l'API les porte depuis longtemps.",
+    "motif": "La sonde emprunte l'extrait de description a jobSeo.couperDescription au lieu de recopier une coupe dure : sa mission de controle faisait rougir une fiche conforme (24/10/2026)",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -95,9 +95,6 @@
       "frontend/scripts/check-git-branches.js": "ca59cb244f206e5461769d290c3d10165a34d025a05b47d8463cb30a4accbc87",
       "frontend/scripts/check-hero-images.js": "c6f263a3744dde61ca954a943cca3b0f0253ff52d918618d1aac915c90512a2e",
       "frontend/scripts/check-home-shell.js": "d146088dc555deda0993924a4b4f5d7697d3c05a4107a7d9575cee6fd37ce080",
-      "frontend/scripts/check-job-form-canari.js": "569dc5b9b68b04b615b014b4be72929cd15d78535044dbaa2a8fab84f5b589ce",
-      "frontend/scripts/check-job-og-contract.js": "bec9168aefab3df99cd1b0a4d7f0d7728955f664cdb0b30226504f179f36fcef",
-      "frontend/scripts/check-job-page-production.js": "16ad834863993defedda19d5c4a7e32da32e575a0cbe340fae22cb1462b3f314",
       "frontend/scripts/check-juges-de-temps.js": "e2c9ed5ebf6a91146acfa0b8c5788a08d38e6ef536060d4ec3018115d58fcbba",
       "frontend/scripts/check-keyframes-animations.js": "10cbadf91ef3be8854e0ff1fb2d4e7d4fba2ca617f8e20b1c99a17dc73dc5a72",
       "frontend/scripts/check-marque-kojo.js": "d2b503a37ba35ee0edcbd3445062498887efc1274636861b2353930d5e479c68",
@@ -141,7 +138,10 @@
       "frontend/scripts/verre-contraste.js": "0304f01ae4ccd2fea6db62cff8badcb4085d3a34622f49416ed8944c377c688c",
       "backend/kojo_routers_jobs_tracking.py": "56a4e7b533ee853075047639a2917f969ee25c34cc31afebc9f7c7f3884f08dd",
       "frontend/scripts/check-job-interactive-production.js": "5993af00403cb45bfaca0bc6ccd6c7f0263d459d0e87a4c369896c26e1b695c4",
-      "frontend/scripts/check-spa-routes.js": "c7f9e1020e818509f95927809195d1f996c5dac45518574ba97009d8b932804f"
+      "frontend/scripts/check-spa-routes.js": "c7f9e1020e818509f95927809195d1f996c5dac45518574ba97009d8b932804f",
+      "frontend/scripts/check-job-og-contract.js": "bc54348347ebef1363feb71a89f4c23eba3d88852fd6fa1f41cb754656a24571",
+      "frontend/scripts/check-job-page-production.js": "bb458b61d1fe9ad0ee7a3d14651cb3dbbfb3d44e071cfd7622381e2e55ea225e",
+      "frontend/scripts/check-job-form-canari.js": "806fdaed94c92d1e1f2fc8040a4db9dba5f49b78006a1b5f81a0358cee25c797"
     }
   },
   "hors_perimetre": [
