@@ -18,6 +18,10 @@ from kojo_settings import (
     logger,
 )
 import kojo_job_disputes as litiges
+# Modération des comptes : le répertoire, les états et la lecture des fils.
+# La logique vit dans `kojo_comptes_admin` (une seule définition de « banni ») ;
+# ce routeur ne fait que l'exposer au propriétaire.
+import kojo_comptes_admin as comptes
 from kojo_core import (
     is_database_available, verify_owner_access,
 )
@@ -489,6 +493,19 @@ _CHAMPS_LITIGE = (
 )
 
 
+class ChangementEtatCompte(BaseModel):
+    """Corps de `POST /owner/accounts/{id}/state`.
+
+    Trois états, pas quatre : `actif` réactive, `restreint` ferme les écritures,
+    `banni` ferme l'accès. Le motif est FACULTATIF dans le modèle parce que la
+    réactivation n'a rien à justifier ; il est EXIGÉ pour les deux autres par
+    `kojo_comptes_admin.changer_etat`, qui rend un 400 nommant la longueur
+    minimale au lieu de réparer une sanction muette.
+    """
+    etat: Literal["actif", "restreint", "banni"]
+    motif: Optional[str] = Field(default=None, max_length=500)
+
+
 class OwnerDisputeDecision(BaseModel):
     """Corps de `POST /owner/missions/{job_id}/litige/decision`.
 
@@ -775,3 +792,168 @@ async def lever_email_suppression(
     if levee:
         logger.info("✅ Adresse email rendue joignable par le propriétaire : %s", adresse)
     return {"email": adresse, "levee": levee}
+
+
+# ══ MODÉRATION DES COMPTES ══════════════════════════════════════════════════
+#
+# Ce que le propriétaire ne pouvait pas faire : VOIR ses comptes, et ARRÊTER un
+# compte. Il avait des tuiles de gains, une file de litiges et des paliers — des
+# chiffres sur la place de marché, pas un seul nom. Un compte qui arnaque ne se
+# corrige pas depuis une courbe. Les cinq routes ci-dessous ouvrent le
+# répertoire, trois états de compte et la lecture des conversations, et rien de
+# plus : ni suppression, ni mot de passe, ni changement de rôle.
+
+
+@router.get("/owner/accounts")
+async def list_owner_accounts(
+    recherche: Optional[str] = Query(None, max_length=80),
+    role: Optional[str] = Query(None, pattern="^(client|worker|owner|support)$"),
+    etat: Optional[str] = Query(None, pattern="^(actif|restreint|banni)$"),
+    pays: Optional[str] = Query(None, max_length=40),
+    limite: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    owner_user = Depends(verify_owner_access),
+):
+    """Le répertoire des comptes Kojo — PROPRIÉTAIRE UNIQUEMENT.
+
+    Recherche (nom, email, téléphone, identifiant, code de parrainage), rôle
+    (`client`, `worker`, `owner`, `support`), état (`actif`, `restreint`,
+    `banni`) et pays. Les comptes SUPPRIMÉS sont exclus de la liste (ils sont
+    anonymisés, et un compte supprimé n'a plus d'accès à fermer) mais leur
+    nombre reste publié dans `mesures.supprimes`.
+
+    `mesures` porte les totaux lus, pas une seconde vérité : le compte des
+    bannis et la liste filtrée viennent de la MÊME lecture, donc une puce
+    « bannis (3) » ne peut pas désigner une liste vide.
+
+    Returns:
+        dict: {count, total, offset, limite, tronque, comptes, mesures}.
+        Le drapeau de troncature (tronque) dit que la lecture bornée a coupé la
+        vue — un répertoire incomplet qui se tait ferait croire qu'il n'y a que
+        ces comptes.
+    """
+    return await comptes.lister_comptes(
+        recherche=comptes.normaliser_recherche(recherche),
+        role=role,
+        etat=etat,
+        pays=pays,
+        limite=limite,
+        offset=offset,
+    )
+
+
+@router.get("/owner/accounts/{user_id}")
+async def get_owner_account(user_id: str, owner_user = Depends(verify_owner_access)):
+    """Un compte, son activité COMPTÉE et l'historique de ses décisions.
+
+    PROPRIÉTAIRE UNIQUEMENT. Les quatre compteurs de `activite` sont calculés
+    sur les collections qui les possèdent (missions, propositions, messages,
+    avis) : l'écran ne déduit pas « ce compte est actif » d'une date de
+    création.
+
+    Returns:
+        dict: le document de la route est celui de
+        `kojo_comptes_admin.detail_compte` : le compte (allowlist), son activité
+        comptée (activite) et l'historique de ses décisions (historique).
+    """
+    compte = await db.users.find_one(
+        {**identifiant_query(user_id)}, {"password_hash": 0}
+    )
+    if not compte:
+        raise HTTPException(status_code=404, detail="Compte introuvable")
+    return await comptes.detail_compte(compte)
+
+
+@router.post("/owner/accounts/{user_id}/state")
+async def set_owner_account_state(
+    user_id: str,
+    payload: ChangementEtatCompte,
+    owner_user = Depends(verify_owner_access),
+):
+    """Restreindre, bannir ou réactiver un compte — PROPRIÉTAIRE UNIQUEMENT.
+
+    Le refus est NOMMÉ et ne répare rien :
+      * 400 — motif absent ou trop court pour restreindre/bannir ;
+      * 409 — compte propriétaire (il ne se modère pas lui-même) ou compte
+              supprimé (il n'a plus d'accès à fermer) ;
+      * 404 — identifiant inconnu.
+
+    L'état est relu APRÈS écriture et rendu tel qu'il est en base : une réponse
+    qui recopierait la demande ferait croire à une décision appliquée alors
+    qu'une écriture peut échouer sans lever.
+
+    Returns:
+        dict: {message, compte} — `compte` est le document RÉELLEMENT relu
+        (account_state, motif, date, historique).
+    """
+    compte = await db.users.find_one(
+        {**identifiant_query(user_id)}, {"password_hash": 0}
+    )
+    if not compte:
+        raise HTTPException(status_code=404, detail="Compte introuvable")
+
+    decision = await comptes.changer_etat(
+        compte,
+        etat=payload.etat,
+        motif=payload.motif,
+        auteur=owner_user,
+    )
+    logger.info(
+        "🛡️ Compte %s → %s par le propriétaire (motif : %s)",
+        decision["id"], decision["etat"], decision["motif"],
+    )
+
+    relu = await db.users.find_one({**identifiant_query(user_id)}, {"password_hash": 0})
+    return {
+        "message": {
+            "actif": "Compte réactivé.",
+            "restreint": "Compte restreint : les écritures sont fermées.",
+            "banni": "Compte banni : l'accès est fermé.",
+        }[decision["etat"]],
+        "compte": await comptes.detail_compte(relu or compte),
+    }
+
+
+@router.get("/owner/conversations")
+async def list_owner_conversations(
+    recherche: Optional[str] = Query(None, max_length=80),
+    owner_user = Depends(verify_owner_access),
+):
+    """Les conversations de la plateforme — PROPRIÉTAIRE UNIQUEMENT, lecture.
+
+    Chaque entrée nomme ses DEUX participants (nom, email, rôle) : une
+    conversation sans nom ne se modère pas. `dernier_message` est l'aperçu de
+    ce qui s'y dit, pas le fil entier — le fil s'ouvre à la demande.
+
+    Returns:
+        dict: {total, count, tronque, conversations}.
+    """
+    return await comptes.lister_conversations(comptes.normaliser_recherche(recherche))
+
+
+@router.get("/owner/conversations/{conversation_id}")
+async def get_owner_conversation(
+    conversation_id: str,
+    owner_user = Depends(verify_owner_access),
+):
+    """Le fil d'une conversation — PROPRIÉTAIRE UNIQUEMENT, LECTURE SEULE.
+
+    Cette route ne pose JAMAIS `read` : ouvrir un fil en modération ne doit pas
+    effacer l'indicateur de non-lus des participants. `lu_marque: false` est
+    publié pour que l'écran puisse l'affirmer au lieu de le laisser croire.
+
+    La lecture est journalisée (identifiant du fil et identifiant du
+    propriétaire, jamais le contenu) : un accès à la vie privée des gens doit
+    laisser une trace exploitable, et le contenu d'un message n'a rien à faire
+    dans un journal d'exploitation.
+
+    Returns:
+        dict: {conversation_id, participants, count, messages, lecture,
+        lu_marque}.
+    """
+    fil = await comptes.fil_de_conversation(conversation_id)
+    logger.info(
+        "👁️ Lecture de modération du fil %s par le propriétaire %s (%d message(s))",
+        conversation_id, owner_user.get("id"), fil["count"],
+    )
+    return fil

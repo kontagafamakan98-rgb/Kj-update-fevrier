@@ -22,6 +22,11 @@ import jwt
 import secrets
 import uuid
 from kojo_db import db
+# La modération des comptes ne connaît NI ce module NI la façade : elle ne lit
+# que des documents et lève des HTTPException. L'importer ici est donc sans
+# cycle, et c'est la seule façon d'appliquer un bannissement sur TOUTE requête
+# authentifiée — une garde posée sur quelques routes laisserait les autres.
+from kojo_comptes_admin import refuser_si_banni, refuser_si_restreint
 
 security = HTTPBearer(auto_error=False)
 # --- Authentification dual-mode : Authorization: Bearer OU cookie httpOnly ---
@@ -252,6 +257,17 @@ async def get_current_user(
                 detail="Session expirée : votre mot de passe a changé, reconnectez-vous."
             )
 
+        # ── MODÉRATION : UN COMPTE BANNI N'EXISTE PLUS POUR L'API ────────────
+        # Le bannissement est jugé ICI, sur le document relu à chaque requête :
+        # il vaut donc dès la requête suivante, sans révocation de jeton à
+        # propager (et un jeton volé ne survit pas à la décision). Le refus est
+        # un 403 NOMMÉ, motif compris — un refus muet se relit comme une panne.
+        refuser_si_banni(user)
+        # Le document est posé sur la requête : la restriction d'écriture
+        # (`exiger_compte_actif`) le lit sans relire la base, et une route qui
+        # veut savoir ce qui est fermé n'a pas à réimplémenter la règle.
+        request.state.compte = user
+
         try:
             return User(**user)
         except ValidationError as exc:
@@ -271,6 +287,26 @@ async def get_current_user(
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
+async def exiger_compte_actif(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """Dépendance des routes d'ÉCRITURE : refuse un compte restreint.
+
+    Le bannissement, lui, est déjà refusé par `get_current_user` (il ferme
+    TOUT). La restriction ne ferme que ce qui engage la plateforme : publier,
+    postuler, écrire. Consulter, terminer une mission déjà acceptée et payer
+    restent ouverts — fermer le paiement d'une mission en cours bloquerait un
+    argent séquestré, ce qui n'est pas une sanction mais une panne.
+
+    Le document du compte est celui que `get_current_user` vient de relire
+    (`request.state.compte`) : aucune requête en base de plus, et la décision
+    lue est exactement celle qui a servi à ouvrir la session.
+    """
+    refuser_si_restreint(getattr(request.state, "compte", None) or {})
+    return current_user
+
+
 async def get_current_user_optional(
     request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),

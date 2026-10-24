@@ -602,6 +602,22 @@ class TestAccountDeletion:
             # demandes des clients. Rempli ici pour que l'effacement soit
             # PROUVÉ, et non vrai sur un champ que le compte n'a jamais porté.
             "support_role": "agent",
+            # Modération : MOTIF et HISTORIQUE portent du texte libre (et un
+            # identifiant d'auteur), donc ils doivent disparaître avec le
+            # compte. Portés ici pour que l'effacement soit PROUVÉ.
+            # `restreint`, pas `banni` : un compte banni est refusé par
+            # `get_current_user` AVANT d'atteindre la suppression (403), et ce
+            # test doit prouver l'EFFACEMENT, pas la porte de modération.
+            "account_state": "restreint",
+            "account_state_reason": "Spam répété sur plusieurs missions",
+            "account_state_at": "2026-10-24T10:00:00+00:00",
+            "account_state_by": "owner-moderation-test",
+            "account_state_history": [{
+                "etat": "banni",
+                "motif": "Spam répété sur plusieurs missions",
+                "at": "2026-10-24T10:00:00+00:00",
+                "by": "owner-moderation-test",
+            }],
             "bio": "Je suis Kofi, joignable au +221771234567",
             "skills": ["plomberie", "soudure"],
         }})

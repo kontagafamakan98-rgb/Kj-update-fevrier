@@ -99,6 +99,10 @@ const CommissionDashboard = lazy(() => import('./pages/CommissionDashboard'));
 const ToastContainer = lazy(() => import('./components/ToastContainer'));
 const Support = lazy(() => import('./pages/Support'));
 const SupportAdmin = lazy(() => import('./pages/SupportAdmin'));
+// MODÉRATION DES COMPTES (24/10/2026) : le répertoire, les deux sanctions et
+// la lecture des fils, sous garde propriétaire. Lazy comme tous les écrans
+// d'administration : son chunk n'a rien à faire dans l'entrée du site public.
+const Administration = lazy(() => import('./pages/Administration'));
 
 // Note: Axios configuration moved to /services/api.js for centralized management
 
@@ -566,6 +570,17 @@ function AppRoutes() {
               <ProtectedRoute>
                 <OwnerOnlyRoute>
                   <CommissionDashboard />
+                </OwnerOnlyRoute>
+              </ProtectedRoute>
+            } />
+            {/* /administration : le propriétaire voit TOUS les comptes, les
+                restreint ou les bannit, et lit les conversations en cas de
+                désaccord. Garde propriétaire : ces routes refusent tout autre
+                compte côté serveur, la garde évite seulement un écran vide. */}
+            <Route path="/administration" element={
+              <ProtectedRoute>
+                <OwnerOnlyRoute>
+                  <Administration />
                 </OwnerOnlyRoute>
               </ProtectedRoute>
             } />

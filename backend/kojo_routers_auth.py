@@ -62,6 +62,10 @@ from kojo_email import (
     verify_email_verification_token, mask_email_address,
 )
 from kojo_identifiants import dump_stable, identifiant_query
+# La connexion est la PREMIÈRE porte d'un compte banni : refuser ici donne un
+# motif à la personne, là où laisser passer produirait un jeton qui échouerait
+# sur la requête suivante (une session qui « marche » et un écran vide).
+from kojo_comptes_admin import refuser_si_banni
 
 router = APIRouter()
 
@@ -856,6 +860,13 @@ async def login_user(credentials: UserLogin, response: Response, request: Reques
     # souvient de son mot de passe n'attend pas la fin du délai.
     await oublier_echecs(user["id"])
 
+    # ── MODÉRATION ───────────────────────────────────────────────────────
+    # Jugé APRÈS le mot de passe, jamais avant : répondre « ce compte est
+    # suspendu » à qui n'a pas le mot de passe ferait du bannissement un
+    # annuaire des comptes existants. Le refus est un 403 qui porte le motif,
+    # donc la personne sait à qui s'adresser au lieu de relire un 401 générique.
+    refuser_si_banni(user)
+
     access_token = create_access_token(data={
         "sub": user["id"],
         "email": user["email"],
@@ -907,6 +918,9 @@ async def google_auth(payload: GoogleAuthRequest, response: Response, request: R
     # 1. Compte déjà lié à ce sub Google → connexion directe
     existing = await db.users.find_one({"google_sub": sub})
     if existing:
+        # Un compte suspendu ne retrouve pas l'accès par la porte Google : la
+        # décision vaut pour le COMPTE, pas pour un mode de connexion.
+        refuser_si_banni(existing)
         access_token = create_access_token(data={
             "sub": existing["id"],
             "email": existing["email"],
