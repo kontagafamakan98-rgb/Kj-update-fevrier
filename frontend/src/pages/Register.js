@@ -725,8 +725,37 @@ export default function Register() {
               {emailChecking && (
                 <p className="mt-1 text-sm text-orange-600">{pageT('checkingEmail')}</p>
               )}
+              {/* ── CE QUE LA PERSONNE FAIT ENSUITE (24/10/2026) ────────────
+                  La phrase de refus était JUSTE, localisée, et sans issue :
+                  constaté en production, on apprenait que l'adresse est prise
+                  sans lire nulle part quoi faire — le seul recours était le
+                  lien « Se connecter » du bas de page, à l'autre bout du
+                  formulaire. Le message porte donc ses deux issues : se
+                  connecter avec cette adresse, ou réinitialiser le mot de
+                  passe. Les deux liens sont RÉELS (/login, /forgot-password),
+                  et les mots viennent du dictionnaire de la page, donc de la
+                  langue choisie. */}
               {!emailChecking && emailAvailability?.available === false && (
-                <p className="mt-1 text-sm text-red-600">{displayedEmailAvailabilityMessage || pageT('duplicateEmailError')}</p>
+                <div className="mt-1 space-y-1">
+                  <p className="text-sm text-red-600">{displayedEmailAvailabilityMessage || pageT('duplicateEmailError')}</p>
+                  <p className="text-sm text-stone-700">
+                    {pageT('duplicateEmailNextStep')}{' '}
+                    <Link
+                      to="/login"
+                      className="font-semibold text-orange-700 underline underline-offset-2 hover:text-orange-600 transition-colors"
+                    >
+                      {pageT('duplicateEmailSignIn')}
+                    </Link>
+                    {', '}
+                    {pageT('duplicateEmailOr')}{' '}
+                    <Link
+                      to="/forgot-password"
+                      className="font-semibold text-orange-700 underline underline-offset-2 hover:text-orange-600 transition-colors"
+                    >
+                      {pageT('duplicateEmailResetPassword')}
+                    </Link>
+                  </p>
+                </div>
               )}
               {!emailChecking && emailAvailability?.available === true && formData.email?.trim() && (
                 <p className="mt-1 text-sm text-green-600">{pageT('emailAvailable')}</p>
