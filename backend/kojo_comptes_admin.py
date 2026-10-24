@@ -41,7 +41,7 @@ from fastapi import HTTPException
 import kojo_settings
 
 from kojo_db import db
-from kojo_identifiants import identifiant_query, identifiants_query
+from kojo_identifiants import identifiants_query
 
 ETAT_ACTIF = "actif"
 ETAT_RESTREINT = "restreint"
@@ -423,7 +423,11 @@ async def lister_conversations(recherche: Optional[str] = None) -> dict:
             for identifiant in sorted(entree["participants"])
         ]
         if aiguille:
-            textes = [participant["nom"] or "", participant["email"] or "", entree["dernier_message"] or ""]
+            textes = [
+                *(participant["nom"] or "" for participant in participants),
+                *(participant["email"] or "" for participant in participants),
+                entree["dernier_message"] or "",
+            ]
             if not any(aiguille in str(texte).lower() for texte in textes):
                 continue
         rendues.append({

@@ -828,8 +828,9 @@ async def list_owner_accounts(
 
     Returns:
         dict: {count, total, offset, limite, tronque, comptes, mesures}.
-        `tronque` dit que la lecture bornée a coupé la vue — un répertoire
-        incomplet qui se tait ferait croire qu'il n'y a que ces comptes.
+        Le drapeau de troncature (tronque) dit que la lecture bornée a coupé la
+        vue — un répertoire incomplet qui se tait ferait croire qu'il n'y a que
+        ces comptes.
     """
     return await comptes.lister_comptes(
         recherche=comptes.normaliser_recherche(recherche),
@@ -851,7 +852,9 @@ async def get_owner_account(user_id: str, owner_user = Depends(verify_owner_acce
     création.
 
     Returns:
-        dict: le compte (allowlist) + `activite` + `historique`.
+        dict: le document de la route est celui de
+        `kojo_comptes_admin.detail_compte` : le compte (allowlist), son activité
+        comptée (activite) et l'historique de ses décisions (historique).
     """
     compte = await db.users.find_one(
         {**identifiant_query(user_id)}, {"password_hash": 0}
@@ -881,7 +884,7 @@ async def set_owner_account_state(
 
     Returns:
         dict: {message, compte} — `compte` est le document RÉELLEMENT relu
-        (`account_state`, motif, date, historique).
+        (account_state, motif, date, historique).
     """
     compte = await db.users.find_one(
         {**identifiant_query(user_id)}, {"password_hash": 0}

@@ -417,6 +417,37 @@ class TestLectureDesConversations:
         stocke = await db_find_one("messages", {"id": message["id"]})
         assert stocke.get("read") in (None, False)
 
+    async def test_la_recherche_porte_sur_le_nom_l_email_et_le_dernier_message(self, client: AsyncClient):
+        """Filtrer les fils ne casse pas le filtre.
+
+        Le filtre lisait une variable `participant` restée hors de sa portée :
+        le répertoire des fils répondait 500 dès qu'une recherche était
+        saisie, et aucune lecture SANS filtre ne pouvait le voir. Les trois
+        colonnes jugées sont éprouvées une par une.
+        """
+        owner = await _proprietaire_connecte(client)
+        client_session = await _client_connecte(client)
+        travailleur = await _travailleur_connecte(client)
+        await self._echange(client, client_session, travailleur)
+
+        with _proprietaire():
+            par_message = await client.get(
+                "/api/owner/conversations", params={"recherche": "fuite"}, headers=_entetes(owner)
+            )
+            par_email = await client.get(
+                "/api/owner/conversations", params={"recherche": "ouvrier-admin"}, headers=_entetes(owner)
+            )
+            sans_echo = await client.get(
+                "/api/owner/conversations", params={"recherche": "zebre-introuvable"}, headers=_entetes(owner)
+            )
+
+        assert par_message.status_code == 200, par_message.text
+        assert par_message.json()["count"] == 1, "le dernier message est une colonne du filtre"
+        assert par_email.status_code == 200, par_email.text
+        assert par_email.json()["count"] == 1, "l'email d'un participant est une colonne du filtre"
+        assert sans_echo.status_code == 200, sans_echo.text
+        assert sans_echo.json()["count"] == 0, "un filtre qui ne trouve rien ne rend pas tout"
+
     async def test_un_fil_inconnu_est_un_404_nomme(self, client: AsyncClient):
         owner = await _proprietaire_connecte(client)
 
