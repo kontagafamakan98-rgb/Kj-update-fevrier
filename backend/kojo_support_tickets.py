@@ -20,6 +20,7 @@ from typing import Optional
 
 from kojo_core import db, resolve_owner_id
 from kojo_email import send_email_via_active_provider
+from kojo_equipe_support import MAX_AGENTS, ROLE_AGENT
 from kojo_models import NotificationType, SupportTicket
 from kojo_settings import OWNER_EMAIL, OWNER_USER_ID, logger
 from kojo_shared import notify_user_localized
@@ -92,5 +93,33 @@ async def ouvrir_ticket(
             )
         except Exception as exc:
             logger.warning(f"⚠️ Email owner ticket échoué: {exc}")
+
+    # L'ÉQUIPE SUPPORT reçoit la MÊME alerte que le propriétaire (24/10/2026) :
+    # le propriétaire peut désormais ajouter des personnes au service clientèle,
+    # et une demande qui n'arrive que dans SA boîte ne serait pas traitée —
+    # l'équipe devrait deviner qu'un ticket est arrivé en ouvrant la page. Une
+    # personne injoignable n'empêche pas les autres d'être prévenues, et un
+    # échec de lecture est écrit plutôt que tu.
+    try:
+        agents = await db.users.find(
+            {"support_role": ROLE_AGENT, "deleted": {"$ne": True}}, {"id": 1}
+        ).limit(MAX_AGENTS).to_list(length=MAX_AGENTS)
+    except Exception as exc:
+        agents = []
+        logger.warning(f"⚠️ Équipe support non lue pour l'alerte ticket: {exc}")
+
+    for agent in agents:
+        agent_id = agent.get("id")
+        if not agent_id or agent_id == (OWNER_USER_ID or None):
+            continue
+        try:
+            await notify_user_localized(
+                user_id=agent_id,
+                key="new_ticket_support",
+                notif_type=NotificationType.GENERAL,
+                ticket_text=f"{ticket.full_name} — {ticket.reason} : {ticket.message[:120]}",
+            )
+        except Exception as exc:
+            logger.warning(f"⚠️ Notification équipe support échouée ({agent_id}): {exc}")
 
     return ticket

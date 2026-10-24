@@ -50,7 +50,15 @@ export default function NotificationBell({
   sens = VERS_LE_BAS,
   className = '',
   buttonClassName = '',
-  iconClassName = '',
+  // LA TAILLE DE L'ICÔNE A UN DÉFAUT, ET CE DÉFAUT EST CELUI D'`Icone`
+  // (24/10/2026). Ce paramètre valait `''` et était transmis TEL QUEL à
+  // `<Icone classe={iconClassName} />`, donc il ÉCRASAIT le `w-6 h-6` par
+  // défaut du composant : dans la barre du haut (disposition desktop), qui ne
+  // passe pas d'`iconClassName`, le `<svg>` avait `class=""` et mesurait
+  // **0 × 0** — la cloche était peinte sans taille, invisible, et seule la
+  // pastille rouge du compteur (positionnée en absolu) restait visible. Mesuré
+  // en production le 24/10/2026 : bouton 44 × 48, `<svg>` 0 × 0.
+  iconClassName = 'w-6 h-6',
   label = null,
 }) {
   const { unreadCount, isOpen, togglePanel } = useNotifications();

@@ -122,6 +122,13 @@ class User(BaseModel):
     
     is_owner: bool = False
 
+    # Rôle dans l'ÉQUIPE SUPPORT (`kojo_equipe_support`) : `None` pour un compte
+    # ordinaire, `"agent"` pour une personne que le propriétaire a ajoutée au
+    # service clientèle. Ce champ est publié par /auth/me (le frontend en a
+    # besoin pour n'ouvrir que cet écran), et il n'ouvre AUCUN droit
+    # propriétaire : `verify_owner_access` juge l'email, pas ce rôle.
+    support_role: Optional[str] = Field(default=None, max_length=20)
+
     @model_validator(mode='after')
     def compute_is_owner(self):
         """

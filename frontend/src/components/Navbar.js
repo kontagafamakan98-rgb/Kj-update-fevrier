@@ -92,6 +92,14 @@ export default function Navbar() {
   // retapé ici.
   const navbarClass = isPWA() ? `${NAV_CLASS} ${NAV_PWA_SUFFIXE}` : NAV_CLASS;
 
+  // ── « SUPPORT » MÈNE AUX DEMANDES POUR QUI LES TRAITE (24/10/2026) ────────
+  // Le propriétaire et l'équipe support voyaient le formulaire client, donc le
+  // guichet où l'on dépose une demande — jamais la file où on la traite. Leur
+  // entrée pointe désormais sur /support-admin ; tous les autres gardent le
+  // formulaire. Le fait est lu sur le profil de session (is_owner,
+  // support_role), jamais deviné.
+  const versSupport = user?.is_owner || user?.support_role === 'agent' ? '/support-admin' : '/support';
+
   // L'entrée de menu est SOULIGNÉE quand on est déjà dessus : sans ce repère, un
   // visiteur qui navigue ne sait pas où il se trouve. Le soulignement reprend la
   // règle de survol des liens (même épaisseur, même couleur).
@@ -163,7 +171,7 @@ export default function Navbar() {
                 <Link to="/messages" className={lienDesktop('/messages')}>
                   {t('messages')}
                 </Link>
-                <Link to="/support" className={lienDesktop('/support')}>
+                <Link to={versSupport} className={lienDesktop('/support')}>
                   {t('support')}
                 </Link>
               </>
@@ -289,7 +297,7 @@ export default function Navbar() {
                   <Link to="/profile" className="block rounded-xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('profile')}
                   </Link>
-                  <Link to="/support" className="block rounded-xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to={versSupport} className="block rounded-xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('support')}
                   </Link>
                   <div className="pt-2">

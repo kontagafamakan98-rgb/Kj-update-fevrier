@@ -27,17 +27,31 @@ const CommissionDashboard = () => {
   const [transactions, setTransactions] = useState([]);
   const [ownerAccounts, setOwnerAccounts] = useState(() => ({}));
   const [editingAccounts, setEditingAccounts] = useState(false);
-  const [isOwner, setIsOwner] = useState(false);
+  // `null` = pas encore jugé (le profil de session n'est pas chargé). L'écran
+  // affiche alors la vérification d'accès, jamais un refus : un refus rendu
+  // avant d'avoir lu le profil est un refus qui n'a rien mesuré.
+  const [isOwner, setIsOwner] = useState(null);
   const [loading, setLoading] = useState(true);
   const [serverStats, setServerStats] = useState(null);
 
+  // LE PROPRIÉTAIRE SE JUGE SUR LE PROFIL VIVANT, PAS SUR LE STOCKAGE
+  // (24/10/2026). `localStorage['user']` n'existe PLUS sur le web depuis le
+  // 20/10/2026 : le profil ne vit qu'en mémoire (cf.
+  // `AuthContext.purgerProfilWebPersistant`) pour ne pas laisser de données
+  // personnelles au repos. Juger `OwnerService.isFamakanLoggedIn()` sans
+  // argument relisait donc ce stockage disparu, rendait TOUJOURS faux côté
+  // web, et le propriétaire — dont `/auth/me` répond pourtant `is_owner:true`,
+  // `user_type:'owner'` — lisait « Accès réservé » sur sa propre page. Le
+  // profil de session est passé explicitement, et on attend qu'il soit là.
   useEffect(() => {
+    if (!user) return;
     checkOwnerAccessAndLoadData();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const checkOwnerAccessAndLoadData = async () => {
     setLoading(true);
-    const famakanAccess = OwnerService.isFamakanLoggedIn();
+    const famakanAccess = OwnerService.isOwnerSessionValid(user);
     setIsOwner(famakanAccess);
 
     if (famakanAccess) {
@@ -126,7 +140,7 @@ const CommissionDashboard = () => {
 
   const displayStats = serverStats || stats;
 
-  if (loading) {
+  if (loading || isOwner === null) {
     return (
       <div className="min-h-full cadre-page flex items-center justify-center">
         <div className="text-center">

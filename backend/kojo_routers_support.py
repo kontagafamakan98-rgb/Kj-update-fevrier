@@ -5,6 +5,7 @@ from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 
 from kojo_ai_budget import MOTIF_COMPTEUR, caracteres_de_prompt, reserver
@@ -14,7 +15,19 @@ from kojo_models import (
     RobotChatRequest, SupportTicket, SupportTicketCreate, SupportTicketStatusUpdate,
 )
 from kojo_core import (
+    get_current_user,
+    security,
     verify_owner_access,
+)
+# L'ÉQUIPE SUPPORT : le propriétaire ajoute des personnes au service clientèle,
+# et elles ne peuvent rien d'autre. Le rôle et ses refus vivent dans UN module
+# (`kojo_equipe_support`), lu aussi par l'alerte de nouveau ticket.
+from kojo_equipe_support import (
+    EquipeSupportRefus,
+    ajouter_agent,
+    est_agent_support,
+    lister_agents,
+    retirer_agent,
 )
 from kojo_settings import AI_GATEWAY_MODEL, logger
 from kojo_identifiants import dump_stable, identifiant_query
@@ -38,6 +51,51 @@ router = APIRouter()
 # Le webhook WhatsApp : public, non authentifié (comme les IPN PayDunya et le
 # webhook email). Sa seule preuve d'identité est la signature de la requête.
 CHEMIN_WHATSAPP = "/support/whatsapp/webhook"
+
+
+class SupportAgentCreate(BaseModel):
+    """Ajout d'un membre de l'équipe support, par l'adresse de SON compte.
+
+    L'adresse est bornée ici (forme de saisie) et résolue dans
+    `kojo_equipe_support.ajouter_agent` : aucun mot de passe ne transite, la
+    personne se connecte avec ses propres identifiants.
+    """
+    email: str = Field(min_length=3, max_length=254)
+
+
+async def verify_support_access(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+):
+    """Ouvre le SERVICE CLIENTÈLE : le propriétaire, ou un agent qu'il a ajouté.
+
+    Deux règles composées, jamais fondues : le propriétaire garde SA règle
+    (`verify_owner_access`, jugée sur l'email), et l'agent est jugé sur le rôle
+    porté par son compte. Ce qui est accordé ici est étroit — lire et faire
+    avancer les tickets —, et rien d'autre : `/owner/*` n'appelle pas cette
+    dépendance et reste fermé à l'équipe.
+
+    Un refus est NOMMÉ (403 + motif), jamais rendu comme un vide : un écran qui
+    n'aurait pas le droit de lire des tickets doit le dire.
+    """
+    try:
+        return await verify_owner_access(request, credentials)
+    except HTTPException as refus:
+        if refus.status_code != 403:
+            # 401 (jeton), 404 (propriétaire introuvable) : la cause est déjà
+            # nommée et ne doit pas être masquée par le repli ci-dessous.
+            raise
+
+    compte = await get_current_user(request, credentials)
+    if not est_agent_support(compte):
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Accès réservé au service clientèle : demandez au propriétaire "
+                "de vous ajouter à l'équipe support."
+            ),
+        )
+    return compte
 
 
 class SupportTicketStatusLookup(BaseModel):
@@ -182,9 +240,9 @@ async def create_support_ticket(ticket_data: SupportTicketCreate):
 @router.get("/support/tickets")
 async def list_support_tickets(
     status_filter: Optional[str] = None,
-    owner_user = Depends(verify_owner_access)
+    owner_user = Depends(verify_support_access)
 ):
-    """Liste les tickets de support (accès owner), filtrables par statut.
+    """Liste les tickets de support (propriétaire OU équipe support), filtrables par statut.
 
     Returns:
         list[dict]: tickets sérialisés (SupportTicket.model_dump).
@@ -199,9 +257,9 @@ async def list_support_tickets(
 async def update_support_ticket_status(
     ticket_id: str,
     status_update: SupportTicketStatusUpdate,
-    owner_user = Depends(verify_owner_access)
+    owner_user = Depends(verify_support_access)
 ):
-    """Change le statut d'un ticket (accès owner).
+    """Change le statut d'un ticket (propriétaire OU équipe support).
 
     Returns:
         dict: ticket mis à jour (SupportTicket.model_dump).
@@ -217,6 +275,76 @@ async def update_support_ticket_status(
         raise HTTPException(status_code=404, detail="Demande de support introuvable")
     updated = await db.support_tickets.find_one({**identifiant_query(ticket_id)})
     return dump_stable(SupportTicket, updated)
+
+
+# ── L'ÉQUIPE SUPPORT (propriétaire seulement) ───────────────────────────────
+# Ces trois routes composent le droit de l'équipe : SEUL le propriétaire peut
+# l'accorder ou le retirer (un agent ne recrute pas d'agent). Le motif d'un
+# refus est déjà rédigé par `kojo_equipe_support` : il est rendu tel quel, avec
+# son code, plutôt que retroduit en un message générique.
+def _refus_equipe(refus: EquipeSupportRefus) -> HTTPException:
+    return HTTPException(status_code=refus.statut, detail=refus.motif)
+
+
+@router.get("/support/team")
+async def get_support_team(owner_user = Depends(verify_owner_access)):
+    """Les membres de l'équipe support (propriétaire uniquement).
+
+    Returns:
+        dict: {agents: [{id, email, first_name, last_name, user_type}]}.
+    """
+    return {"agents": await lister_agents()}
+
+
+@router.post("/support/team", status_code=201)
+async def add_support_agent(
+    payload: SupportAgentCreate,
+    owner_user = Depends(verify_owner_access),
+):
+    """Ajoute une personne au service clientèle, par l'adresse de son COMPTE.
+
+    Aucun mot de passe n'est créé ni envoyé : la personne continue de se
+    connecter avec ses propres identifiants, et n'obtient que l'accès aux
+    demandes de support.
+
+    Returns:
+        dict: {agent, deja_membre, message}.
+
+    Raises:
+        HTTPException: 400 (adresse inutilisable), 404 (aucun compte), 409
+            (compte supprimé ou propriétaire).
+    """
+    try:
+        resultat = await ajouter_agent(payload.email)
+    except EquipeSupportRefus as refus:
+        raise _refus_equipe(refus)
+    message = (
+        f"{resultat['agent'].get('first_name') or resultat['agent'].get('email')} "
+        "fait déjà partie de l'équipe support."
+        if resultat["deja_membre"]
+        else f"{resultat['agent'].get('first_name') or resultat['agent'].get('email')} "
+        "fait désormais partie de l'équipe support : cette personne peut traiter "
+        "les demandes clients."
+    )
+    return {**resultat, "message": message}
+
+
+@router.delete("/support/team/{user_id}")
+async def remove_support_agent(user_id: str, owner_user = Depends(verify_owner_access)):
+    """Retire l'accès au service clientèle (le compte reste intact).
+
+    Returns:
+        dict: {agent, message}.
+
+    Raises:
+        HTTPException: 404 (compte inconnu), 409 (pas membre de l'équipe).
+    """
+    try:
+        resultat = await retirer_agent(user_id)
+    except EquipeSupportRefus as refus:
+        raise _refus_equipe(refus)
+    nom = resultat["agent"].get("first_name") or resultat["agent"].get("email")
+    return {**resultat, "message": f"{nom} ne fait plus partie de l'équipe support."}
 
 
 # ── Support WhatsApp (Kapso) ────────────────────────────────────────────────

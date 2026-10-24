@@ -111,6 +111,11 @@ ANONYMISATION_CHAMPS = {
     # kojo_core.ensure_owner_exists et lues par /owner/monitor. Un compte
     # supprimé ne peut garder aucun accès élevé.
     "permissions": [],
+    # Rôle dans l'équipe support (kojo_equipe_support) : un compte supprimé ne
+    # peut pas rester membre du service clientèle — le rôle est un ACCÈS, pas
+    # une donnée de profil, et une personne partie ne doit plus lire les
+    # demandes des clients.
+    "support_role": None,
 }
 
 # Champs CONSERVÉS dans le document anonymisé, avec la raison — c'est la

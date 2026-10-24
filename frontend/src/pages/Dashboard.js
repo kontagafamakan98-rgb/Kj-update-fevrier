@@ -26,7 +26,8 @@ import {
   CreditCard,
   Wallet,
   Banknote,
-  CalendarDays
+  CalendarDays,
+  UserPlus
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -75,6 +76,16 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { t, currentLanguage } = useLanguage();
   const pageT = makeScopedTranslator(currentLanguage, t);
+
+  // ── L'ÉQUIPE SUPPORT A SON PROPRE ÉCRAN (24/10/2026) ─────────────────────
+  // Une personne ajoutée au service clientèle n'est ni cliente ni travailleuse :
+  // la page tombait dans la branche travailleur et lui proposait de parcourir
+  // le marché, de remplir un profil et de publier une mission — trois gestes
+  // qui ne lui appartiennent pas. Son périmètre tient en une phrase : les
+  // demandes des clients. Ce drapeau juge un FAIT publié par /auth/me
+  // (`support_role`), jamais une déduction. Le propriétaire n'est pas concerné :
+  // il a ses gains, et il compose l'équipe depuis /support-admin.
+  const estEquipeSupport = !user?.is_owner && user?.support_role === 'agent';
 
   useEffect(() => {
     loadDashboardData();
@@ -163,7 +174,12 @@ export default function Dashboard() {
     if (ownerEarnings === null) return '…';
     return `${Math.round(Number(valeur) || 0).toLocaleString('fr-FR')} FCFA`;
   };
-  const statCards = user?.is_owner
+  // Aucune tuile pour l'équipe support : les compteurs de cette page sont ceux
+  // des missions (client / travailleur) ou des gains (propriétaire). Un chiffre
+  // inventé vaudrait moins que pas de tuile — la grille disparaît donc.
+  const statCards = estEquipeSupport
+    ? []
+    : user?.is_owner
     ? [
         { label: t('ownerEarnings'), value: montant(ownerEarnings?.total_commission_earned), icon: Wallet },
         { label: t('ownerEarningsMonth'), value: montant(ownerEarnings?.monthly_commission), icon: Banknote },
@@ -190,7 +206,17 @@ export default function Dashboard() {
     if (user?.is_owner) {
       return [
         { to: '/commission-dashboard', label: t('commissionDashboard'), icon: Monitor },
-        { to: '/support-admin', label: t('supportRequestsTitle'), icon: LifeBuoy }
+        { to: '/support-admin', label: t('supportRequestsTitle'), icon: LifeBuoy },
+        { to: '/support-admin', label: t('supportTeamTitle'), subtitle: t('supportTeamIntro'), icon: UserPlus }
+      ];
+    }
+    // L'équipe support ne fait qu'une chose : répondre aux clients. Lui donner
+    // les tuiles du marché ou du profil travailleur reviendrait à lui proposer
+    // des écrans que son rôle n'ouvre pas.
+    if (estEquipeSupport) {
+      return [
+        { to: '/support-admin', label: t('supportRequestsTitle'), icon: LifeBuoy },
+        { to: '/messages', label: t('messages'), icon: MessageSquare }
       ];
     }
     const baseActions = user?.user_type === 'client'
@@ -271,7 +297,9 @@ export default function Dashboard() {
               plus petit sur téléphone la ramène sur une ligne, et la mesure du
               bandeau d'aire reste donc celle du titre. */}
           <p className="mt-2 text-sm text-stone-600 sm:max-w-2xl sm:text-base">
-            {user?.is_owner
+            {estEquipeSupport
+              ? t('supportAgentDashboardIntro')
+              : user?.is_owner
               ? t('ownerDashboardIntro')
               : user?.user_type === 'client'
               ? t('manageProjectsClient')
@@ -283,7 +311,9 @@ export default function Dashboard() {
                 mission (c'est `.pastille-statut[data-statut]`, un seul
                 propriétaire). */}
             <span className="etiquette-app etiquette-app-orange">
-              {user?.is_owner
+              {estEquipeSupport
+                ? t('supportTeamTitle')
+                : user?.is_owner
                 ? t('ownerRole')
                 : user?.user_type === 'client'
                 ? t('client')
@@ -299,7 +329,7 @@ export default function Dashboard() {
                 argent part directement sur son compte PayDunya. L'étiquette
                 « moyens de paiement renseignés » lui annoncerait une condition
                 qu'il n'a pas à remplir. */}
-            {user?.is_verified && !user?.is_owner && (
+            {user?.is_verified && !user?.is_owner && !estEquipeSupport && (
               <span className="etiquette-app etiquette-app-vert">
                 <CreditCard className="h-3.5 w-3.5" aria-hidden="true" />
                 {t('paymentMethodsOnFile')}
@@ -320,7 +350,9 @@ export default function Dashboard() {
                 marché — le parcours d'un travailleur. */}
             <Link
               to={
-                user?.is_owner
+                estEquipeSupport
+                  ? '/support-admin'
+                  : user?.is_owner
                   ? '/commission-dashboard'
                   : user?.user_type === 'client'
                   ? '/create-job'
@@ -328,7 +360,9 @@ export default function Dashboard() {
               }
               className="bouton bouton-encre"
             >
-              {user?.is_owner
+              {estEquipeSupport
+                ? t('supportRequestsTitle')
+                : user?.is_owner
                 ? t('commissionDashboard')
                 : user?.user_type === 'client'
                 ? t('postJob')
@@ -366,7 +400,7 @@ export default function Dashboard() {
           c'est une occasion à saisir quand elle servira. Il disparaît dès le
           premier compte ajouté (`is_verified`), et la contrainte d'argent
           reste où elle vit : le backend refuse un décaissement sans compte. */}
-      {user && !user.is_verified && !user.is_owner && (
+      {user && !user.is_verified && !user.is_owner && !estEquipeSupport && (
         <div className="carte-editoriale bloc-app flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-stone-700">
             <CreditCard className="inline h-4 w-4 mr-1 align-[-0.15em] text-orange-700" aria-hidden="true" />
@@ -383,6 +417,7 @@ export default function Dashboard() {
           d'autre. Le glyphe du bloc au-dessus rappelle à quoi la mesure se
           rapporte, il ne décore pas le chiffre. Le nombre de colonnes suit le
           nombre de tuiles (trois, ou une seule pour un travailleur). */}
+      {statCards.length > 0 && (
       <div
         className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${statCards.length >= 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} bloc-app`}
       >
@@ -401,6 +436,7 @@ export default function Dashboard() {
           );
         })}
       </div>
+      )}
 
       {/* L'ENCART du site (filet gauche orange, fond sable) à la place du
           dégradé orange → ROUGE : c'était le dernier dégradé vers le rouge du
@@ -493,7 +529,7 @@ export default function Dashboard() {
           devant le mot — c'est ce qui rend la rangée balayable sans la lire.
           Masquées chez le propriétaire : son écran dit ce qu'il a GAGNÉ, il
           ne l'invite pas à parcourir le marché. */}
-      {!user?.is_owner && (
+      {!user?.is_owner && !estEquipeSupport && (
       <section className="bloc-app">
         <div className="mb-4">
           <h2 className="titre-carte-app">{t('popularCategories')}</h2>
@@ -522,7 +558,7 @@ export default function Dashboard() {
           donc les trois gouttières différentes du même écran disparaissent. */}
       {/* Pas de carte « missions » sur une lecture échouée : sa liste vide
           dirait « aucune mission », exactement le mensonge du bandeau. */}
-      {!loadError && !user?.is_owner && (
+      {!loadError && !user?.is_owner && !estEquipeSupport && (
       <div className="carte-editoriale overflow-hidden">
         <div className="carte-cotes border-b border-stone-200 py-4">
           <h2 className="titre-carte-app">

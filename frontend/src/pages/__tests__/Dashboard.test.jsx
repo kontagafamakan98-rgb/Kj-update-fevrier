@@ -242,3 +242,44 @@ describe('Tableau de bord — les GAINS du propriétaire, sans parcours client',
     expect(tuiles.join(' ')).not.toContain('FCFA');
   });
 });
+
+/**
+ * L'ÉQUIPE SUPPORT N'EST NI CLIENTE NI TRAVAILLEUSE (24/10/2026).
+ *
+ * Le propriétaire peut ajouter des personnes au service clientèle ; sans
+ * branche propre, elles tombaient sur le tableau de bord d'un client ou d'un
+ * travailleur — marché à parcourir, profil à remplir, mission à publier — alors
+ * que leur seul travail est la file des demandes. Ce qui est mesuré : aucune
+ * mesure de missions, aucune catégorie, et une action principale qui mène aux
+ * demandes.
+ */
+describe('Tableau de bord — l’équipe support ne voit que le service clientèle', () => {
+  afterEach(() => {
+    etat.session = { id: 'client-1', user_type: 'client', first_name: 'Awa', is_verified: true };
+  });
+
+  it('n’affiche ni tuile de missions ni marché, et mène aux demandes', async () => {
+    etat.session = { id: 'agent-1', user_type: 'client', first_name: 'Awa', is_verified: true, support_role: 'agent' };
+    jobsAPI.getAll.mockResolvedValueOnce([MISSION]);
+
+    rendre();
+
+    expect(await screen.findByText('Équipe support')).toBeInTheDocument();
+    // Le bandeau dit le périmètre, et ne promet aucun parcours de travail.
+    expect(screen.getByText(/Votre accès se limite au service clientèle/)).toBeInTheDocument();
+    expect(screen.queryByText(/opportunités de travail/i)).not.toBeInTheDocument();
+
+    // Aucune mesure : les compteurs de cette page sont ceux des missions.
+    expect(document.querySelectorAll('.tuile-mesure')).toHaveLength(0);
+
+    // Ni catégories du marché, ni liste de missions.
+    expect(screen.queryByText('Catégories populaires')).not.toBeInTheDocument();
+    expect(screen.queryByText('Réparer une pompe')).not.toBeInTheDocument();
+
+    // L'action principale mène à la file des demandes.
+    const liens = screen.getAllByRole('link', { name: /Demandes de support/i });
+    expect(liens.length).toBeGreaterThan(0);
+    expect(liens.every((lien) => lien.getAttribute('href') === '/support-admin')).toBe(true);
+    expect(screen.queryByRole('link', { name: /Publier/ })).not.toBeInTheDocument();
+  });
+});
