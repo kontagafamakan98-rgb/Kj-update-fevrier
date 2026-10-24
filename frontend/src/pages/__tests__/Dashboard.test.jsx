@@ -53,6 +53,14 @@ vi.mock('../../services/apiEndpoints', async (importOriginal) => {
   return { ...actual, jobsAPI: { ...actual.jobsAPI, getAll: vi.fn() } };
 });
 
+// Les GAINS du propriétaire viennent de SA route : elle est simulée ici, sinon
+// la page appellerait le vrai client et le cas ne jugerait qu'une panne.
+const ownerApi = vi.hoisted(() => ({
+  getCommissionStats: vi.fn(),
+  isOwnerSessionValid: vi.fn(() => false),
+}));
+vi.mock('../../services/ownerService', () => ({ default: ownerApi }));
+
 const { default: Dashboard } = await import('../Dashboard.js');
 const { jobsAPI } = await import('../../services/apiEndpoints');
 
@@ -151,5 +159,64 @@ describe('Tableau de bord — les comptes de paiement se RAPPELLENT, sans bloque
 
     await waitFor(() => expect(jobsAPI.getAll).toHaveBeenCalled());
     expect(screen.queryByText(/Tu n’as pas encore de compte de paiement/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * LE PROPRIÉTAIRE N'EST NI UN CLIENT NI UN TRAVAILLEUR (23/10/2026).
+ *
+ * Mesuré en production : son tableau de bord tombait dans la branche
+ * travailleur (il comptait les offres du marché), il lui proposait de publier
+ * une mission et de remplir un profil de travailleur, et l'application le
+ * jugeait « client inachevé » (mur de paiement). Son écran doit dire ce qu'il a
+ * GAGNÉ, et rien de plus.
+ */
+describe('Tableau de bord — les GAINS du propriétaire, sans parcours client', () => {
+  afterEach(() => {
+    etat.session = { id: 'client-1', user_type: 'client', first_name: 'Awa', is_verified: true };
+  });
+
+  it('affiche les gains encaissés, du mois et du jour, et aucune tuile de missions', async () => {
+    etat.session = {
+      id: 'owner-1',
+      user_type: 'owner',
+      is_owner: true,
+      first_name: 'Famakan',
+      is_verified: true,
+      email_verified: false,
+    };
+    jobsAPI.getAll.mockResolvedValueOnce([]);
+    ownerApi.getCommissionStats.mockResolvedValueOnce({
+      stats: { total_commission_earned: 12500, monthly_commission: 5000, daily_commission: 0 },
+    });
+
+    rendre();
+
+    expect(await screen.findByText('12 500 FCFA')).toBeInTheDocument();
+    expect(screen.getByText('5 000 FCFA')).toBeInTheDocument();
+    expect(screen.getByText('0 FCFA')).toBeInTheDocument();
+    expect(screen.getByText('Gains encaissés')).toBeInTheDocument();
+
+    // Aucune mesure de client ni de travailleur sur cet écran.
+    expect(screen.queryByText('Emplois disponibles')).not.toBeInTheDocument();
+    expect(screen.queryByText('Jobs actifs')).not.toBeInTheDocument();
+    // Et aucun rappel de compte de paiement : l'argent part sur PayDunya.
+    expect(screen.queryByText(/compte de paiement/i)).not.toBeInTheDocument();
+    // Ses actions : ses gains et le support, pas « publier une mission ».
+    expect(screen.getByRole('link', { name: /Commission Dashboard/ })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Publier/ })).not.toBeInTheDocument();
+  });
+
+  it('une lecture des gains en panne écrit « — », jamais « 0 FCFA »', async () => {
+    etat.session = { id: 'owner-1', user_type: 'owner', is_owner: true, first_name: 'Famakan', is_verified: true };
+    jobsAPI.getAll.mockResolvedValueOnce([]);
+    ownerApi.getCommissionStats.mockRejectedValueOnce(new Error('403'));
+
+    rendre();
+
+    await waitFor(() => expect(ownerApi.getCommissionStats).toHaveBeenCalled());
+    const tuiles = [...document.querySelectorAll('.tuile-mesure-chiffre')].map((n) => n.textContent);
+    expect(tuiles).toEqual(['—', '—', '—']);
+    expect(tuiles.join(' ')).not.toContain('FCFA');
   });
 });

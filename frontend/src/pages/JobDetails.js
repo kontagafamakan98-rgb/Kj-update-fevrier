@@ -172,6 +172,12 @@ export default function JobDetails() {
   const [apercu] = useState(() => lireApercuMission(id));
   const [job, setJob] = useState(() => (apercu ? normalizeJobRecord(apercu) : null));
   const [proposals, setProposals] = useState([]);
+  // Un échec de LECTURE des candidatures n'est pas « aucune candidature » :
+  // mesuré en production le 23/10/2026, le compte propriétaire recevait 403 sur
+  // `/jobs/{id}/proposals`, la fiche affichait « Aucune proposition pour le
+  // moment » et la console se remplissait de « Access denied » — un vide qui
+  // n'avait rien mesuré. Cet état porte la vérité jusqu'à l'écran.
+  const [proposalsError, setProposalsError] = useState('');
   const [loading, setLoading] = useState(!apercu);
   const [showProposalModal, setShowProposalModal] = useState(false);
   const [error, setError] = useState('');
@@ -390,6 +396,7 @@ export default function JobDetails() {
       setJob(jobData);
 
       const shouldTryLoadingProposals = Boolean(user) && (isOwnedByCurrentUser(jobData, user) || user?.user_type === 'worker');
+      setProposalsError('');
       if (shouldTryLoadingProposals) {
         try {
           const proposalsResponse = await (jobsAPI.getProposals ? jobsAPI.getProposals(id) : jobsAPI.getApplications(id));
@@ -407,6 +414,10 @@ export default function JobDetails() {
         } catch (proposalError) {
           safeLog?.error?.('Error loading proposals:', proposalError);
           setProposals([]);
+          // La phrase est LOCALISÉE et générique : le détail brut du serveur
+          // (« Access denied ») n'apprend rien à un client, et un refus
+          // d'autorisation n'est pas une réponse à lui montrer.
+          setProposalsError(t('jobUiProposalsLoadError'));
         }
       } else {
         setProposals([]);
@@ -992,7 +1003,18 @@ export default function JobDetails() {
           {isJobOwner && (
             <div className="carte-editoriale carte-publique">
               <h2 className="titre-carte-app mb-4">{t('jobUiReceivedProposals')}</h2>
-              {proposals.length === 0 ? (
+              {proposalsError ? (
+                <div role="alert" className="space-y-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-6 text-sm text-amber-900">
+                  <p>{proposalsError}</p>
+                  <button
+                    type="button"
+                    onClick={() => loadJobDetails()}
+                    className="rounded-lg border border-amber-400 bg-white px-4 py-2 font-medium text-amber-900 hover:bg-amber-100"
+                  >
+                    {t('retry')}
+                  </button>
+                </div>
+              ) : proposals.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-stone-300 px-4 py-6 text-sm text-stone-500">
                   {t('jobUiNoProposals')}
                 </div>

@@ -146,7 +146,15 @@ function ProtectedRoute({ children }) {
   // `is_verified` (qui dit « minimum de comptes atteint ») est faux pour un
   // compte parfaitement valide. Juger sur lui renvoyait ces gens vers un
   // écran de paiement à chaque route protégée.
-  if (!user.email_verified) {
+  // ── LE PROPRIÉTAIRE N'A RIEN À « TERMINER » (23/10/2026) ────────────────
+  // Son compte est créé par le serveur : il n'a jamais eu d'inscription à
+  // vérifier, donc `email_verified` peut manquer, et l'envoyer sur
+  // /payment-verification lui demandait de « lier au moins 1 moyen de paiement
+  // en tant que client » — alors que l'argent de la plateforme part directement
+  // sur son compte PayDunya. `is_owner` est calculé côté backend par email,
+  // jamais par le client ; il n'ouvre d'ailleurs aucun droit ici, il évite
+  // seulement un écran qui ne le concerne pas.
+  if (!user.email_verified && !user.is_owner) {
     return <Navigate to="/payment-verification" replace state={{ resumeAfterLogin: true, userData: user }} />;
   }
   

@@ -23,7 +23,10 @@ import {
   Smartphone,
   Rocket,
   Camera,
-  CreditCard
+  CreditCard,
+  Wallet,
+  Banknote,
+  CalendarDays
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -60,6 +63,14 @@ export default function Dashboard() {
   // Ce que la page sait des OFFRES reçues (le travailleur n'a pas de compteur
   // de missions dans cette réponse : afficher 0 pour lui était un mensonge).
   const [availableCount, setAvailableCount] = useState(0);
+  // ── CE QUE LE PROPRIÉTAIRE GAGNE, ET RIEN D'AUTRE (23/10/2026) ───────────
+  // Le compte owner n'est pas un client ni un travailleur : ses tuiles de
+  // missions n'avaient aucun sens (elles tombaient dans la branche travailleur
+  // et comptaient les offres du marché). Sa seule mesure est ce qu'il a encaissé
+  // en commissions, lue à sa propre route (`/owner/commission-stats`).
+  // `null` = pas encore lu, `Number` = mesure, `NaN` refusé par le rendu.
+  const [ownerEarnings, setOwnerEarnings] = useState(null);
+  const [ownerEarningsError, setOwnerEarningsError] = useState(false);
 
   const { user } = useAuth();
   const { t, currentLanguage } = useLanguage();
@@ -75,6 +86,26 @@ export default function Dashboard() {
   useEffect(() => {
     setIsFamakan(OwnerService.isOwnerSessionValid(user));
   }, [user]);
+
+  useEffect(() => {
+    if (!user?.is_owner) {
+      setOwnerEarnings(null);
+      setOwnerEarningsError(false);
+      return;
+    }
+    let annule = false;
+    setOwnerEarningsError(false);
+    OwnerService.getCommissionStats()
+      .then((reponse) => {
+        if (!annule) setOwnerEarnings(reponse?.stats || {});
+      })
+      .catch(() => {
+        if (!annule) setOwnerEarningsError(true);
+      });
+    return () => {
+      annule = true;
+    };
+  }, [user?.is_owner, reloadToken]);
 
   const loadDashboardData = async () => {
     try {
@@ -125,7 +156,20 @@ export default function Dashboard() {
   // d'offres reçues. La tuile « gains » a disparu pour tout le monde : aucun
   // de ces chiffres n'était alimenté, et un « 0 XOF » se lit comme un revenu.
   const masquer = (valeur) => (loadError ? '—' : valeur);
-  const statCards = user?.user_type === 'client'
+  // Gains du propriétaire : un montant en FCFA, lu sur SA route. Une lecture
+  // en panne affiche « — » (je ne sais pas), jamais 0 FCFA (je n'ai rien gagné).
+  const montant = (valeur) => {
+    if (ownerEarningsError) return '—';
+    if (ownerEarnings === null) return '…';
+    return `${Math.round(Number(valeur) || 0).toLocaleString('fr-FR')} FCFA`;
+  };
+  const statCards = user?.is_owner
+    ? [
+        { label: t('ownerEarnings'), value: montant(ownerEarnings?.total_commission_earned), icon: Wallet },
+        { label: t('ownerEarningsMonth'), value: montant(ownerEarnings?.monthly_commission), icon: Banknote },
+        { label: t('ownerEarningsToday'), value: montant(ownerEarnings?.daily_commission), icon: CalendarDays }
+      ]
+    : user?.user_type === 'client'
     ? [
         { label: t('activeJobs'), value: masquer(stats.activeJobs), icon: ClipboardList },
         { label: t('completedJobs'), value: masquer(stats.completedJobs), icon: Sparkles },
@@ -139,6 +183,16 @@ export default function Dashboard() {
   // (src/index.css) : ces objets ne portent donc plus de teinte ni de classe,
   // seulement ce qu'ils DÉSIGNENT. La première entrée est l'action principale.
   const quickActions = (() => {
+    // Le propriétaire n'a rien à « chercher » ni à « postuler » : ses seules
+    // actions sont ses gains et le support. Y laisser les tuiles client ou
+    // travailleur lui proposait de publier une mission et de remplir un profil
+    // de travailleur — deux gestes qui ne lui appartiennent pas.
+    if (user?.is_owner) {
+      return [
+        { to: '/commission-dashboard', label: t('commissionDashboard'), icon: Monitor },
+        { to: '/support-admin', label: t('supportRequestsTitle'), icon: LifeBuoy }
+      ];
+    }
     const baseActions = user?.user_type === 'client'
       ? [
           { to: '/create-job', label: t('postJob'), icon: PlusCircle },
@@ -286,7 +340,7 @@ export default function Dashboard() {
           c'est une occasion à saisir quand elle servira. Il disparaît dès le
           premier compte ajouté (`is_verified`), et la contrainte d'argent
           reste où elle vit : le backend refuse un décaissement sans compte. */}
-      {user && !user.is_verified && (
+      {user && !user.is_verified && !user.is_owner && (
         <div className="carte-editoriale bloc-app flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-stone-700">
             <CreditCard className="inline h-4 w-4 mr-1 align-[-0.15em] text-orange-700" aria-hidden="true" />
@@ -410,7 +464,10 @@ export default function Dashboard() {
 
       {/* LES CATÉGORIES : les puces de FILTRE du site (`./jobs?category=…`),
           donc le même contrôle que la page qu'elles ouvrent. Le glyphe reste
-          devant le mot — c'est ce qui rend la rangée balayable sans la lire. */}
+          devant le mot — c'est ce qui rend la rangée balayable sans la lire.
+          Masquées chez le propriétaire : son écran dit ce qu'il a GAGNÉ, il
+          ne l'invite pas à parcourir le marché. */}
+      {!user?.is_owner && (
       <section className="bloc-app">
         <div className="mb-4">
           <h2 className="titre-carte-app">{t('popularCategories')}</h2>
@@ -431,6 +488,7 @@ export default function Dashboard() {
           })}
         </div>
       </section>
+      )}
 
       {/* LES MISSIONS RÉCENTES : une liste qui se lit ligne à ligne, dans la
           carte à filet du site. La gouttière de chaque ligne est portée par
@@ -438,7 +496,7 @@ export default function Dashboard() {
           donc les trois gouttières différentes du même écran disparaissent. */}
       {/* Pas de carte « missions » sur une lecture échouée : sa liste vide
           dirait « aucune mission », exactement le mensonge du bandeau. */}
-      {!loadError && (
+      {!loadError && !user?.is_owner && (
       <div className="carte-editoriale overflow-hidden">
         <div className="carte-cotes border-b border-stone-200 py-4">
           <h2 className="titre-carte-app">

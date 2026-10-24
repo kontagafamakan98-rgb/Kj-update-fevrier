@@ -47,15 +47,27 @@ async def get_job_proposals(
     job_id: str,
     current_user: User = Depends(get_current_user)
 ):
-    """Liste des propositions d'un job (réservé à la cliente du job).
+    """Liste des propositions d'un job (réservée à la cliente du job ET au
+    propriétaire, qui peut déjà en accepter une).
 
     Returns:
         list[dict]: propositions enrichies du nom/photo/notation du
         travailleur (worker_name, worker_photo, rating…).
     """
-    # Check if user is the job owner
-    job = await db.jobs.find_one({**identifiant_job_query(job_id), "client_id": current_user.id})
-    if not job:
+    # ── Le PROPRIÉTAIRE lit aussi, parce qu'il peut déjà ACCEPTER ───────────
+    # `POST /jobs/{id}/proposals/{pid}/accept` teste `is_owner_user` : le
+    # propriétaire pouvait donc trancher sur une candidature qu'il lui était
+    # interdit de LIRE. Mesuré en production le 23/10/2026 sur le compte owner :
+    # `/jobs/{id}/proposals` répondait 403 « Access denied », la fiche affichait
+    # « Aucune proposition pour le moment » (un vide qui n'avait rien mesuré) et
+    # la console se remplissait d'erreurs. Le refus reste le même pour tout
+    # autre compte, et pour une mission inexistante (pas de fuite d'existence).
+    job = await db.jobs.find_one(
+        {**identifiant_job_query(job_id), "deleted": {"$ne": True}},
+        {"_id": 0, "client_id": 1},
+    )
+    is_owner_user = bool(OWNER_EMAIL) and str(current_user.email).strip().lower() == OWNER_EMAIL.strip().lower()
+    if not job or (job.get("client_id") != current_user.id and not is_owner_user):
         raise HTTPException(status_code=403, detail="Access denied")
     
     proposals = await db.job_proposals.find({"job_id": job_id}).to_list(100)

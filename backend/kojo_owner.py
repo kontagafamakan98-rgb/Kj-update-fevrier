@@ -123,6 +123,44 @@ async def verify_owner_access(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token invalide"
         )
+async def _reparer_compte_owner(owner: dict) -> None:
+    """Rétablit les marqueurs du compte PROPRIÉTAIRE (jamais son id).
+
+    ── Pourquoi (23/10/2026) ────────────────────────────────────────────────
+    Le compte existe en production sans `email_verified`. Or la porte des
+    routes protégées juge l'EMAIL VÉRIFIÉ (`App.js`) : le propriétaire se
+    retrouvait donc sur `/payment-verification` — « En tant que client, vous
+    devez lier au moins 1 moyen de paiement » — un écran d'INSCRIPTION pour un
+    compte qui n'a jamais eu d'inscription à vérifier, et dont l'argent part
+    directement sur le compte PayDunya de la plateforme.
+
+    Le propriétaire n'est pas un client : il n'a ni email à confirmer (le
+    compte est créé par le serveur), ni compte de paiement à déclarer. Ces
+    marqueurs sont donc posés ici, idempotemment, pour l'existant comme pour
+    les créations futures. Ils n'ouvrent AUCUN droit : l'accès propriétaire
+    reste jugé par l'email (`verify_owner_access`), et une réparation ne vise
+    que le compte dont l'email est `OWNER_EMAIL`.
+    """
+    attendu = {
+        "email_verified": True,
+        "is_verified": True,
+        "user_type": "owner",
+        "is_owner": True,
+    }
+    a_corriger = {cle: valeur for cle, valeur in attendu.items() if owner.get(cle) != valeur}
+    if not a_corriger:
+        return
+    a_corriger["updated_at"] = datetime.now(timezone.utc).isoformat()
+    try:
+        await db.users.update_one({"email": OWNER_EMAIL}, {"$set": a_corriger})
+        logger.warning(
+            f"⚠️ Compte propriétaire réparé ({OWNER_EMAIL}) : "
+            f"{', '.join(sorted(a_corriger))} — le compte owner n'est pas un client, "
+            "il n'a ni inscription à vérifier ni moyen de paiement à déclarer."
+        )
+    except Exception as exc:
+        logger.error(f"⚠️ Réparation du compte propriétaire ignorée: {exc}")
+
 async def ensure_owner_exists():
     """Crée le compte propriétaire s'il n'existe pas déjà et si les secrets requis sont fournis."""
     if not await is_database_available():
@@ -154,6 +192,8 @@ async def ensure_owner_exists():
                 f"source de vérité (get_owner_account) — notifications et accès "
                 f"/api/owner/* ciblent le compte réel."
             )
+        if existing_owner.get("email") == OWNER_EMAIL:
+            await _reparer_compte_owner(existing_owner)
         logger.info(f"✅ Compte owner existe déjà: {OWNER_EMAIL}")
         return
 
@@ -178,6 +218,11 @@ async def ensure_owner_exists():
         "country": "mali",
         "preferred_language": "fr",
         "profile_photo": None,
+        # Le propriétaire n'a pas d'inscription à vérifier : son compte est créé
+        # ici, par le serveur, avec un email connu de lui seul. Laisser
+        # `email_verified` absent le faisait passer pour un client inachevé et
+        # l'envoyait sur /payment-verification à chaque connexion.
+        "email_verified": True,
         "is_verified": True,
         "rating": 0.0,
         "total_reviews": 0,
