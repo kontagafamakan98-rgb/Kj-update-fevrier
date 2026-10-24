@@ -34,7 +34,10 @@ vi.mock('../../contexts/LanguageContext', async (importOriginal) => {
 
 // Le visiteur à froid est ANONYME : c'est la vue publique que le document
 // porte, et c'est cette identité-là que la page doit servir sans attendre.
-vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: null }) }));
+// L'état est MUTABLE pour le cas du propriétaire (voir plus bas) : figer
+// `user: null` rendrait ce cas inécrivable.
+const etatUtilisateur = vi.hoisted(() => ({ user: null }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: etatUtilisateur.user }) }));
 vi.mock('../../contexts/ToastContext', () => ({
   useToast: () => ({ success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() }),
 }));
@@ -42,9 +45,9 @@ vi.mock('../../contexts/ToastContext', () => ({
 // qu'ajouter des requêtes à simuler pour un état de page que le cas ne juge pas.
 vi.mock('../../components/JobReviews', () => ({ default: () => null }));
 
-const { getById } = vi.hoisted(() => ({ getById: vi.fn() }));
+const { getById, getProposals } = vi.hoisted(() => ({ getById: vi.fn(), getProposals: vi.fn() }));
 vi.mock('../../services/apiEndpoints', () => ({
-  jobsAPI: { getById },
+  jobsAPI: { getById, getProposals },
   reviewAPI: { getJobReviews: vi.fn().mockResolvedValue([]) },
 }));
 
@@ -97,6 +100,7 @@ const reponse = (corps, statut = 200) => ({
 
 beforeEach(() => {
   getById.mockReset();
+  getProposals.mockReset();
 });
 
 afterEach(() => {
@@ -175,5 +179,56 @@ describe('Fiche mission pré-rendue', () => {
     await waitFor(() => expect(getById).toHaveBeenCalledTimes(1));
     expect(screen.getByRole('heading', { name: MISSION.title })).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * LES CANDIDATURES NE SE TAISENT PAS QUAND ELLES N'ONT PAS ÉTÉ LUES.
+ *
+ * Mesuré en production le 23/10/2026 sur le compte propriétaire : la route
+ * répondait 403, la fiche affichait « Aucune proposition pour le moment » — un
+ * vide qui n'avait rien mesuré — et la console se remplissait d'« Access
+ * denied ». Le premier cas ferme ce mensonge ; le second prouve le chemin
+ * normal, pour qu'une correction de l'erreur ne fige pas l'écran sur elle.
+ */
+describe('Fiche mission — les candidatures lues, ou l’échec DIT', () => {
+  const CANDIDATURE = {
+    id: 'p-1',
+    job_id: 'j-1',
+    worker_id: 'w-1',
+    proposed_amount: 25000,
+    estimated_completion_time: '2 jours',
+    message: 'Je peux intervenir dès demain matin.',
+    worker_name: 'Kojo Plomberie',
+    status: 'pending',
+  };
+
+  afterEach(() => {
+    etatUtilisateur.user = null;
+  });
+
+  it('une lecture refusée affiche l’échec et la relance, jamais « aucune proposition »', async () => {
+    etatUtilisateur.user = { id: 'owner-1', is_owner: true, user_type: 'owner', first_name: 'Famakan' };
+    getById.mockResolvedValueOnce(reponse({ ...MISSION, client_id: 'client-1' }));
+    getProposals.mockRejectedValueOnce(Object.assign(new Error('Access denied'), { response: { status: 403 } }));
+
+    rendre();
+
+    const alerte = await screen.findByRole('alert');
+    expect(alerte).toHaveTextContent('Les candidatures n’ont pas pu être chargées');
+    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeInTheDocument();
+    expect(screen.queryByText('Aucune proposition pour le moment')).not.toBeInTheDocument();
+  });
+
+  it('un propriétaire lit les candidatures que le serveur lui rend', async () => {
+    etatUtilisateur.user = { id: 'owner-1', is_owner: true, user_type: 'owner', first_name: 'Famakan' };
+    getById.mockResolvedValueOnce(reponse({ ...MISSION, client_id: 'client-1' }));
+    getProposals.mockResolvedValueOnce(reponse([CANDIDATURE]));
+
+    rendre();
+
+    expect(await screen.findByText('Kojo Plomberie')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByText('Aucune proposition pour le moment')).not.toBeInTheDocument();
   });
 });

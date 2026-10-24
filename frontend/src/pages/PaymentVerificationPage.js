@@ -47,6 +47,19 @@ const PaymentVerificationPage = () => {
   const isRegistrationFlow = Boolean(emailVerificationToken);
   const isAccountCompletionMode = !isRegistrationFlow && Boolean(authUser?.id);
 
+  // ── LE PROPRIÉTAIRE N'A PAS DE COMPTE DE PAIEMENT À DÉCLARER ────────────
+  // Cette page demande « en tant que CLIENT, liez au moins 1 moyen de
+  // paiement ». Le propriétaire n'est pas un client : l'argent de la plateforme
+  // part directement sur son compte PayDunya, et son compte est créé par le
+  // serveur (donc sans inscription à terminer). Mesuré le 23/10/2026 : il
+  // atterrissait ici à chaque connexion. Un accès direct à l'URL ne doit pas
+  // lui montrer ce formulaire non plus.
+  useEffect(() => {
+    if (authUser?.is_owner) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [authUser?.is_owner, navigate]);
+
   useEffect(() => {
     if (!effectiveUser) {
       navigate('/register');

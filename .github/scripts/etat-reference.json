@@ -34,8 +34,8 @@
     "Preuve : backend/tests/test_etat_reference.py"
   ],
   "reference": {
-    "etablie_le": "2026-10-23",
-    "motif": "livrer.py confirme desormais la tete de la PR (git rev-parse de la branche contre pulls/{n}.head.sha) avant d attendre les checks, et refuse en nommant les deux SHA plutot que de juger l ancien commit ; les deux autres fichiers de la reference portent la relance client, sa mesure et son compteur, inchanges depuis leur declaration",
+    "etablie_le": "2026-10-24",
+    "motif": "La LECTURE des candidatures accepte le propriétaire de la plateforme, comme l'acceptation le faisait déjà ; un 403 faisait afficher « Aucune proposition » et remplissait la console.",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -60,7 +60,6 @@
       "backend/kojo_identifiants.py": "83911ed4c8f53d1b1e74133045bcf6db9647fe0888299180ad7781147b3b7cf6",
       "backend/kojo_routers_jobs.py": "12d708991877f307f60af638cdce0ec7d2d3a3b7cf529611b662cb65cc5088ad",
       "backend/kojo_routers_jobs_proposals.py": "2c591eb0afb8323aee005542f3e40553a55ded783ea8cfee58535e4835525893",
-      "backend/kojo_routers_jobs_tracking.py": "591a5cfc8bbca952ce99d864e07b551f8dc2b5d6b0f0755156a36b90c3fb7ca5",
       "backend/kojo_routers_users.py": "93b34ef87ebd8d4f75368fb7619d85e43e23ff891f3b03255f936a6c66d45d5f",
       "backend/kojo_routers_users_push.py": "85a2e4017a51444818caf8fd6042fa2f63b464d034fb830e22310544d73f72b7",
       "backend/kojo_scheduler.py": "f530832390cefdcdbd4c88c88cac399ff3935d1f6e8bbf66d5fe943471df1a37",
@@ -141,7 +140,8 @@
       "frontend/scripts/retard-main.js": "eef5724dae66bc8e17fbb50e0be1c426b9eba4ceb24c04808c8fdb0f8dacad37",
       "frontend/scripts/style-layout-budgets.cjs": "db93353a147d9be6e84999ea065d3b3df5d08871a62fe943f3346bc80d68ede9",
       "frontend/scripts/validate-vercel-json.mjs": "16a56835e1fb299821c3a1dd7fa4d0957982a970a493e98ed8855d06fc563518",
-      "frontend/scripts/verre-contraste.js": "0304f01ae4ccd2fea6db62cff8badcb4085d3a34622f49416ed8944c377c688c"
+      "frontend/scripts/verre-contraste.js": "0304f01ae4ccd2fea6db62cff8badcb4085d3a34622f49416ed8944c377c688c",
+      "backend/kojo_routers_jobs_tracking.py": "56a4e7b533ee853075047639a2917f969ee25c34cc31afebc9f7c7f3884f08dd"
     }
   },
   "hors_perimetre": [
