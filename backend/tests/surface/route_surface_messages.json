@@ -7,6 +7,9 @@
     "response_model": null,
     "dependances": [
       "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer",
+      "kojo_auth_core.exiger_compte_actif",
+      "kojo_core.get_current_user",
       "fastapi.security.http.HTTPBearer"
     ]
   },

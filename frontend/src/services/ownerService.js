@@ -215,6 +215,78 @@ class OwnerService {
     }
   }
 
+  /** Le message du serveur quand il en donne un, sinon la traduction habituelle.
+   *
+   *  Les routes de modération refusent en NOMMANT la cause (motif trop court,
+   *  compte propriétaire, compte supprimé) : remplacer ce détail par « Accès
+   *  interdit » effacerait le seul élément qui dit quoi corriger. */
+  _erreurNommee(error, fallback) {
+    const detail = error?.response?.data?.detail;
+    if (typeof detail === 'string' && detail.trim()) return new Error(detail.trim());
+    return this._translateOwnerError(error, fallback);
+  }
+
+  /** Répertoire des comptes (propriétaire) : recherche, rôle, état, pays.
+   *  @returns {Promise<object>} {count, total, tronque, comptes, mesures}. */
+  async getAccounts(params = {}) {
+    try {
+      return await api.get('/owner/accounts', { params });
+    } catch (error) {
+      safeLog.error('❌ Erreur répertoire des comptes:', error);
+      throw this._erreurNommee(error, `Erreur serveur: ${error?.response?.status || 'inconnu'}`);
+    }
+  }
+
+  /** Un compte : profil, activité comptée, historique des décisions.
+   *  @returns {Promise<object>} compte + {activite, historique}. */
+  async getAccount(userId) {
+    try {
+      return await api.get(`/owner/accounts/${encodeURIComponent(userId)}`);
+    } catch (error) {
+      safeLog.error('❌ Erreur détail du compte:', error);
+      throw this._erreurNommee(error, `Erreur serveur: ${error?.response?.status || 'inconnu'}`);
+    }
+  }
+
+  /** Restreint (`restreint`), bannit (`banni`) ou réactive (`actif`) un compte.
+   *  Le motif est exigé par le serveur pour les deux sanctions.
+   *  @returns {Promise<object>} {message, compte} — le compte RÉELLEMENT relu. */
+  async setAccountState(userId, { etat, motif }) {
+    try {
+      return await api.post(`/owner/accounts/${encodeURIComponent(userId)}/state`, {
+        etat,
+        ...(motif ? { motif } : {}),
+      });
+    } catch (error) {
+      safeLog.error('❌ Erreur changement d’état du compte:', error);
+      throw this._erreurNommee(error, `Erreur serveur: ${error?.response?.status || 'inconnu'}`);
+    }
+  }
+
+  /** Conversations de la plateforme, en LECTURE SEULE (propriétaire).
+   *  @returns {Promise<object>} {total, count, tronque, conversations}. */
+  async getConversations(recherche = '') {
+    try {
+      return await api.get('/owner/conversations', {
+        params: recherche ? { recherche } : undefined,
+      });
+    } catch (error) {
+      safeLog.error('❌ Erreur conversations (modération):', error);
+      throw this._erreurNommee(error, `Erreur serveur: ${error?.response?.status || 'inconnu'}`);
+    }
+  }
+
+  /** Le fil d'une conversation, en LECTURE SEULE (aucun `read` posé).
+   *  @returns {Promise<object>} {conversation_id, participants, messages, lu_marque}. */
+  async getConversation(conversationId) {
+    try {
+      return await api.get(`/owner/conversations/${encodeURIComponent(conversationId)}`);
+    } catch (error) {
+      safeLog.error('❌ Erreur fil de conversation (modération):', error);
+      throw this._erreurNommee(error, `Erreur serveur: ${error?.response?.status || 'inconnu'}`);
+    }
+  }
+
   /** @returns {Promise<object>} Paramètres de commission mis à jour. */
   async updateCommissionSettings(settings) {
     try {

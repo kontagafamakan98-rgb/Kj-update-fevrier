@@ -178,6 +178,20 @@ temporaire du système, déplaçable ou désactivable par `KOJO_LOG_FILE`
 fichier est désactivée, donc une exécution de la suite ne laisse rien derrière
 elle ; `.gitignore` (`*.log.*`) reste le filet contre un `git add -A` distrait.
 
+### Accès de modération du propriétaire (`backend/kojo_comptes_admin.py`)
+
+Les messages privés ne sont pas lus par défaut : la route qui les rend exige le
+compte propriétaire, et elle est en **lecture seule** — elle ne marque aucun
+message comme lu, donc ouvrir un fil en modération ne change rien du côté des
+participants. Chaque ouverture écrit une ligne de journal (identifiant du fil et
+identifiant du propriétaire, **jamais le contenu**).
+
+Le propriétaire peut également poser un **état** sur un compte : `restreint`
+(lecture seule : plus publier, postuler ni écrire) ou `banni` (connexion et API
+refusées, motif rendu à la personne). Aucune donnée n'est supprimée par une
+sanction, la décision est réversible, et son motif est enregistré sur le compte
+(l'historique et le motif sont effacés à la suppression du compte, section 3).
+
 ## 6. Ce que cette politique ne couvre pas
 
 - Elle décrit le **dépôt**, pas la configuration déployée : les variables

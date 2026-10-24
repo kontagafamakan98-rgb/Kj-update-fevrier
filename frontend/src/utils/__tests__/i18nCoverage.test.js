@@ -10,6 +10,7 @@ import mos from '../../i18n/mos.json';
 // Depuis le découpage par scope (pack2PageI18n/), chaque page importe le
 // module de SON scope : on importe statiquement tous les modules pour
 // résoudre les clés pageT() comme le fait le code réel.
+import { makeScopedTranslator as administrationT } from '../pack2PageI18n/administration';
 import { makeScopedTranslator as commissionDashboardT } from '../pack2PageI18n/commissionDashboard';
 import { makeScopedTranslator as dashboardT } from '../pack2PageI18n/dashboard';
 import { makeScopedTranslator as emailVerificationT } from '../pack2PageI18n/emailVerification';
@@ -25,6 +26,7 @@ import { makeScopedTranslator as registerT } from '../pack2PageI18n/register';
 
 // Map scope → makeScopedTranslator du module correspondant.
 const SCOPE_MODULES = {
+  administration: administrationT,
   commissionDashboard: commissionDashboardT,
   dashboard: dashboardT,
   emailVerification: emailVerificationT,

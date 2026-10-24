@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import CommissionService from '../services/commissionService';
 import OwnerService from '../services/ownerService';
+import Link from '../components/LienVue';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
@@ -191,6 +192,11 @@ const CommissionDashboard = () => {
         <section className="bande-app" data-section="bande-commissions">
           <h1 className="titre-page">{pageT('title')}</h1>
           <p className="mt-2 text-sm text-stone-600 sm:max-w-2xl sm:text-base">{pageT('subtitle')}</p>
+          {/* La modération n'est pas de l'argent : elle a son écran, et ce
+              lien l'ouvre depuis celui où le propriétaire travaille déjà. */}
+          <Link to="/administration" className="bouton bouton-clair mt-4">
+            {t('administration')}
+          </Link>
         </section>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
