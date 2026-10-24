@@ -93,7 +93,9 @@ const documentFiche = ({ remplacements = {}, donnees = vuePublique() } = {}) => 
     ].join(''),
     feuille: `<link rel="stylesheet" href="${POINT_ENTREE_MISSION.style}" />`,
     pointEntree: `<script type="module" src="${POINT_ENTREE_MISSION.script}"></script>`,
-    h1: `<h1 class="text-3xl font-bold text-gray-900 mb-2">${TITRE} — Kojo</h1>`,
+    // Le titre PRINCIPAL, sans le suffixe du <title> (corrigé le 24/10/2026 : le
+    // H1 statique publiait « … — Kojo » alors que React rend `job.title`).
+    h1: `<h1 class="text-3xl font-bold text-gray-900 mb-2">${TITRE}</h1>`,
     bloc: `<script type="application/json" id="${POINT_ENTREE_MISSION.seedId}">${JSON.stringify(
       donnees
     )}</script>`,

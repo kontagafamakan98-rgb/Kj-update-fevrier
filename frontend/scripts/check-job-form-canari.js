@@ -95,12 +95,15 @@ export const DEFAULT_BASE = SITE_ORIGIN;
 // DEFAULT_BACKEND de check-og-images.js et check-og-job-200.js).
 export const DEFAULT_BACKEND = API_ORIGIN;
 // Le mandat d'écriture : la variable qui autorise une écriture HORS loopback.
+import { couperDescription } from '../src/utils/jobSeo.js';
+
 // Son nom est public (elle est citée dans le registre, la CI et la doc) : une
 // autorisation qui ne se lit que dans un fichier oublié n'est pas une décision.
 export const MANDAT_ECRITURE_ENV = 'KOJO_CANARI_ALLOW_WRITE';
-// Longueur de l'extrait de description publié par la fiche — la règle appartient
-// à backend/kojo_job_og.py (`raw_desc[:150]`), et elle est CONFRONTÉE ici, pas
-// recopiée dans une assertion qui dériverait sans qu'on le voie.
+// Longueur de l'extrait de description publié par la fiche — la règle vit dans
+// `src/utils/jobSeo.js` (`DESCRIPTION_LIMIT`, app) ET `backend/kojo_job_og.py`
+// (pré-rendu) : cette constante ne la REDÉFINIT pas, elle dit à quoi la fiche
+// servie est comparée.
 export const DESCRIPTION_EXCERPT = 150;
 // Étiquette du verrou d'après-suppression (le libellé appartient au verrou).
 const TIMEOUT_MS = 20000;
@@ -158,13 +161,21 @@ export function decoderEntites(valeur) {
 }
 
 /**
- * L'extrait de description qu'une fiche publie pour une mission donnée —
- * `raw_desc[:150]` + « … » si la description est plus longue (kojo_job_og.py).
+ * L'extrait de description qu'une fiche publie pour une mission donnée — la
+ * règle de l'application (`src/utils/jobSeo.js`, `couperDescription`), DÉLÉGUÉE
+ * et non recopiée.
+ *
+ * Ce n'était pas le cas, et ça s'est vu : le 24/10/2026 la copie locale disait
+ * encore `raw_desc[:150]` (coupe dure) alors que l'application et le pré-rendu
+ * reculaient au dernier espace — la mission de contrôle, dont la description
+ * dépasse 150 caractères, a donc fait rougir `Workflow lint` sur une fiche
+ * PARFAITEMENT conforme. Deux règles pour un seul extrait finissent toujours par
+ * se contredire ; celle qui reste est celle du produit, pas celle de la sonde.
+ *
  * Exporté pour que la sonde et sa preuve partagent la MÊME règle.
  */
-export function extraitDeDescription(description, longueur = DESCRIPTION_EXCERPT) {
-  const texte = String(description || '');
-  return texte.slice(0, longueur) + (texte.length > longueur ? '…' : '');
+export function extraitDeDescription(description) {
+  return couperDescription(String(description || ''));
 }
 
 /**

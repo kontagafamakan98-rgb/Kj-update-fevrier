@@ -34,7 +34,7 @@ qu'il n'a jamais reçus, et la carte de partage ne grave pas ce que l'API cache.
 """
 
 import json
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 
 # LA CSP DU SITE, pour les documents que ce module écrit (22/10/2026).
 #
@@ -55,6 +55,53 @@ from kojo_csp import balise_csp
 # dans `frontend/src/utils/jobSeo.js` (`DESCRIPTION_LIMIT`) et les deux sont
 # confrontées par les gardes de contrat hors ligne.
 DESCRIPTION_LIMIT = 150
+
+
+def couper_description(texte: str) -> str:
+    """La description PUBLIÉE d'une fiche : coupée sur le dernier ESPACE.
+
+    MESURÉ le 24/10/2026 sur /jobs/c7b740c2-1be5-40c8-a1f3-f2fec7c807aa : la
+    balise annonçait « … Il faut localiser la fuite, remplacer le. » — les 150
+    premiers points de code, donc un mot tranché en deux et une phrase qui finit
+    sur un article. Un moteur qui affiche cette phrase la cite telle quelle.
+
+    La règle, écrite à l'IDENTIQUE dans `frontend/src/utils/jobSeo.js` : prendre
+    les `DESCRIPTION_LIMIT` premiers POINTS DE CODE (pas des unités UTF-16 : un
+    emoji hors BMP en vaut deux en JavaScript), puis RECULER jusqu'au dernier
+    espace de cette tranche — coupe dure seulement s'il n'y en a aucun, et sur
+    le PREMIER caractère l'espace ne compte pas (reculer à zéro publierait le
+    seul « … »). Un texte plus court que la limite est rendu tel quel, sans « … ».
+    """
+    points = list(texte)
+    if len(points) <= DESCRIPTION_LIMIT:
+        return texte
+    tranche = "".join(points[:DESCRIPTION_LIMIT])
+    espace = tranche.rfind(" ")
+    if espace > 0:
+        tranche = tranche[:espace]
+    return tranche + "…"
+
+
+# ── Le bloc `JobPosting`, pour Google Jobs (24/10/2026) ──────────────────────
+# MESURÉ le 24/10/2026 sur la fiche ci-dessus : `JobPosting` → 0 occurrence,
+# `application/ld+json` → 0. La fiche était donc invisible pour Google Jobs —
+# le canal d'acquisition gratuit le plus direct d'une place de marché —, alors
+# que tout ce qu'il demande est déjà dans le document.
+#
+# ICI ET NULLE PART AILLEURS : ce document est le seul qu'un crawler lit SANS
+# exécuter JavaScript. Un JSON-LD injecté par React n'existerait que pour un
+# moteur qui exécute le JS — c'est-à-dire pas celui qui décide de l'indexation.
+#
+# CE QUI N'Y ENTRE PAS, ET POURQUOI : `baseSalary` (un budget de mission n'est
+# pas un salaire — l'inventer serait publier une donnée fausse), `directApply`
+# (la candidature exige un compte, donc l'affirmer serait faux), et aucun champ
+# qui ne soit pas déjà dans la vue publique `JobPublic`.
+IDENTIFIANT_ORGANISATION = "Kojo"
+LOGO_ORGANISATION = "/icons/icon-512x512.png"
+# Durée de validité par DÉFAUT quand la mission n'a pas d'échéance : la même
+# pour toutes, pour qu'un moteur ne voie pas deux annonces identiques expirer à
+# deux dates. Une échéance déclarée par le client l'emporte toujours.
+VALIDITE_JOURS = 30
 
 
 # ── Le point d'entrée STABLE du document, et son bloc de données ────────────
@@ -152,6 +199,107 @@ def balise_seed(seed_id: str, donnees) -> str:
     )
 
 
+def _localisation_texte(job: dict) -> str:
+    """Le texte d'adresse d'une mission — la même source que la carte de partage.
+
+    Le document porte `location_text` à plat (écrit par l'application) et
+    `location` en objet (adresse, et éventuellement une position, que la vue
+    publique retire). Un document importé peut n'avoir que le second : on lit
+    l'un puis l'autre, jamais un champ construit pour l'occasion.
+    """
+    texte = str(job.get("location_text") or "").strip()
+    if texte:
+        return texte
+    lieu = job.get("location")
+    if isinstance(lieu, dict):
+        for cle in ("fullAddress", "address", "text", "city"):
+            valeur = str(lieu.get(cle) or "").strip()
+            if valeur:
+                return valeur
+    return ""
+
+
+def _date_objet(valeur):
+    """Une date du document en `datetime`, ou None si elle n'est pas LISIBLE.
+
+    Trois formes existent en base : `datetime` (écrit par l'application), `date`,
+    et chaîne ISO (document importé). Une date illisible rend None, et le champ
+    correspondant n'est alors PAS publié : une date inventée ferait dater ou
+    expirer l'annonce au mauvais moment, ce qui est pire qu'un champ absent.
+    """
+    if isinstance(valeur, datetime):
+        return valeur
+    if isinstance(valeur, date):
+        return datetime(valeur.year, valeur.month, valeur.day, tzinfo=timezone.utc)
+    texte = str(valeur or "").strip()
+    if not texte:
+        return None
+    try:
+        return datetime.fromisoformat(texte.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def job_posting(job: dict, *, base: str, url: str, description: str, job_id: str):
+    """Le bloc `JobPosting` d'une mission OUVERTE — ou `None`.
+
+    Une mission `in_progress`, `completed` ou annulée n'est PAS une offre, et un
+    document sans statut n'affirme pas être ouvert : aucun des deux ne publie le
+    bloc (annoncer à Google Jobs un emploi déjà pourvu ferait indexer une offre
+    morte).
+
+    `description` est le TEXTE de la mission (déjà coupé), jamais sa version
+    échappée pour le HTML : le bloc est du JSON, et y recopier les entités
+    publierait « &amp; » au lieu de « & » — le moteur citerait l'entité. Le
+    `</script>` ne peut pas refermer la balise pour autant : `seed_json` échappe
+    `<`, `>` et `&` en échappements Unicode.
+
+    Chaque champ vient de la DONNÉE (`JobPublic` ou le document lui-même) : rien
+    n'est déduit, aucun prix n'est présenté comme un salaire.
+    """
+    if str(job.get("status") or "").strip().lower() != "open":
+        return None
+
+    adresse = {"@type": "PostalAddress"}
+    localite = _localisation_texte(job)
+    if localite:
+        adresse["addressLocality"] = localite
+    pays = str(job.get("country") or "").strip()
+    if pays:
+        adresse["addressCountry"] = pays
+
+    bloc = {
+        "@context": "https://schema.org",
+        "@type": "JobPosting",
+        "title": str(job.get("title") or ""),
+        "description": description,
+        "employmentType": "CONTRACTOR",
+        "identifier": {
+            "@type": "PropertyValue",
+            "name": IDENTIFIANT_ORGANISATION,
+            "value": job_id,
+        },
+        "url": url,
+        "hiringOrganization": {
+            "@type": "Organization",
+            "name": IDENTIFIANT_ORGANISATION,
+            "url": base,
+            "logo": f"{base}{LOGO_ORGANISATION}",
+        },
+        "jobLocation": {"@type": "Place", "address": adresse},
+    }
+
+    publiee = _date_objet(job.get("posted_at"))
+    if publiee is not None:
+        bloc["datePosted"] = publiee.isoformat()
+    echeance = _date_objet(job.get("deadline"))
+    if echeance is None and publiee is not None:
+        echeance = publiee + timedelta(days=VALIDITE_JOURS)
+    if echeance is not None:
+        bloc["validThrough"] = echeance.isoformat()
+    return bloc
+
+
 def job_og_html(job: dict, base: str, vue_publique=None) -> str:
     """HTML pré-rendu (crawlers sans JS) d'une fiche mission /jobs/:id.
 
@@ -177,13 +325,24 @@ def job_og_html(job: dict, base: str, vue_publique=None) -> str:
     job_id = str(job.get("id") or "")
     raw_title = str(job.get("title") or "")
     title = f"{raw_title} — Kojo" if raw_title else "Mission — Kojo"
-    raw_desc = str(job.get("description") or "")
-    desc = raw_desc[:DESCRIPTION_LIMIT] + ("…" if len(raw_desc) > DESCRIPTION_LIMIT else "")
+    desc = couper_description(str(job.get("description") or ""))
     url = f"{base}/jobs/{escape_xml(job_id)}"
     wide = f"{base}/api/og/jobs/{escape_xml(job_id)}.png"
     square = f"{base}/api/og/jobs/{escape_xml(job_id)}-square.png"
     t = escape_xml(title)
+    # Le TITRE de la page porte « — Kojo », le TITRE PRINCIPAL non : React rend
+    # `<h1>{job.title}</h1>` (`JobDetails`), et le H1 statique diffusait donc le
+    # suffixe du `<title>` dans le titre principal du document — mesuré le
+    # 24/10/2026 : statique « Fuite sous l'évier … — Kojo » contre React
+    # « Fuite sous l'évier … ». Deux H1 pour une même mission selon qu'on lit
+    # avec ou sans JavaScript.
+    h1 = escape_xml(raw_title) if raw_title else escape_xml("Mission")
     d = escape_xml(desc)
+    # Le JSON-LD ne part que pour une VRAIE offre. Une mission `in_progress`,
+    # `completed` ou annulée n'est pas une offre : l'annoncer à Google Jobs
+    # ferait indexer un emploi qui n'existe plus. Un document SANS statut
+    # n'affirme pas être ouvert, donc n'en porte pas non plus.
+    json_ld = job_posting(job, base=base, url=url, description=desc, job_id=job_id)
     return (
         "<!DOCTYPE html>\n<html lang=\"fr\">\n<head>\n"
         "<meta charset=\"utf-8\" />\n"
@@ -213,6 +372,14 @@ def job_og_html(job: dict, base: str, vue_publique=None) -> str:
         f"<meta name=\"twitter:title\" content=\"{t}\" />\n"
         f"<meta name=\"twitter:description\" content=\"{d}\" />\n"
         f"<meta name=\"twitter:image\" content=\"{wide}\" />\n"
+        # Le bloc `JobPosting` prend sa place dans la TÊTE, avant le point d'entrée :
+        # il décrit la page, il ne la fait pas démarrer. Absent pour une mission
+        # qui n'est pas une offre (`json_ld` vaut alors None).
+        + (
+            f'<script type="application/ld+json">{seed_json(json_ld)}</script>\n'
+            if json_ld
+            else ""
+        )
         # Le CSS d'abord : il bloque le premier rendu, donc la fiche n'est
         # jamais peinte ni nue ni « habillée après coup ». Le module est différé.
         + point_entree_balises()
@@ -220,7 +387,7 @@ def job_og_html(job: dict, base: str, vue_publique=None) -> str:
         "<div id=\"root\">\n"
         "<div class=\"h-16 bg-white border-b border-gray-200\"></div>\n"
         "<div class=\"max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8\">\n"
-        f"<h1 class=\"text-3xl font-bold text-gray-900 mb-2\">{t}</h1>\n"
+        f"<h1 class=\"text-3xl font-bold text-gray-900 mb-2\">{h1}</h1>\n"
         # `</div>` ferme le conteneur, le second ferme `#root` : le bloc de
         # données vient APRÈS les deux, sinon React l'effacerait au montage
         # avant que la page ne l'ait lu.
