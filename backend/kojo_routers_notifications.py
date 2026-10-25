@@ -19,7 +19,12 @@ router = APIRouter()
 # Réponse d'un flux refusé : le client lit `Retry-After` et retombe sur son
 # sondage dégradé au lieu de marteler la route. Un flux accepté puis muet
 # serait indiscernable d'une absence d'événements (voir kojo_live).
-STREAM_REFUSED = {"Retry-After": "60"}
+#
+# La VALEUR vient de `kojo_live` (un seul propriétaire) : la recopier ici ferait
+# deux consignes à garder d'accord avec le plancher du client.
+STREAM_REFUSED = {
+    "Retry-After": str(kojo_live.STREAM_REFUSED_RETRY_AFTER_SECONDS)
+}
 
 @router.get("/notifications/vapid-public-key")
 async def get_vapid_public_key():

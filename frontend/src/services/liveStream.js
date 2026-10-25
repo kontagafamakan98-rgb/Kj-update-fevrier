@@ -19,6 +19,10 @@
  *   • un flux qui tombe est ROUVERT, avec un recul exponentiel plafonné et un
  *     peu d'aléa (sans aléa, tous les onglets d'un incident reviennent à la
  *     même milliseconde) ;
+ *   • un REFUS DE CAPACITÉ (503) est espacé PLUS largement qu'une panne
+ *     ordinaire, même quand la consigne du serveur n'est pas lisible : c'est
+ *     ce qui empêche un onglet de saturer son propre plafond (`CAPACITY_FLOOR_MS`,
+ *     qui suit le bail des places refusées) ;
  *   • l'état est PUBLIÉ (`connecting` / `open` / `down` / `closed`) : c'est ce
  *     qui permet à l'appelant de retomber sur un sondage dégradé au lieu de
  *     rester muet. Un flux qu'on croit vivant est le pire des deux mondes ;
@@ -49,6 +53,35 @@ const defaultSchedule = (run, delay) => setTimeout(run, delay);
 /** Borne d'une consigne `Retry-After` : un serveur qui demanderait une heure
  *  laisserait le compte sans temps réel une heure. */
 export const MAX_RETRY_AFTER_MS = 120000;
+
+/**
+ * Plancher de retour après un REFUS DE CAPACITÉ (503), quand le serveur ne dit
+ * rien d'exploitable (`Retry-After` absent, masqué par un intermédiaire, ou
+ * illisible).
+ *
+ * ── Le défaut, mesuré le 25/10/2026 ─────────────────────────────────────────
+ * Le serveur refuse au plafond du compte (503 + `Retry-After: 60`) et rend la
+ * place d'un flux abandonné à l'expiration du BAIL, 60 s plus tard
+ * (`PARTAGE_LEASE_SECONDS`, calculé depuis le battement dans `kojo_live.py`).
+ * Le client, lui, ne POSAIT aucun plancher : sans consigne lisible il revenait
+ * à 1 s, 2 s, 4 s, 8 s, 16 s, 30 s — six tentatives dans la première minute,
+ * toutes refusées, chacune pouvant laisser une place comptée en attendant son
+ * bail. Un onglet pouvait donc saturer son propre plafond et s'y maintenir :
+ * plus il retentait, moins il avait de chances de repasser.
+ *
+ * ── Pourquoi la valeur est écrite ICI ──────
+ * Le client ne peut pas lire les constantes Python. 60 s est donc le miroir de
+ * `kojo_live.STREAM_REFUSED_RETRY_AFTER_SECONDS`, et la relation est JUGÉE, pas
+ * supposée : `frontend/scripts/__tests__/battement-coeur-aligne.test.js` lit la
+ * constante Python et refuse un plancher client qui serait plus court qu'elle.
+ *
+ * ── Ce que ce plancher n'est pas ───────────────────────────────────────────
+ * Il ne remplace pas la consigne du serveur : `Retry-After` reste un plancher
+ * aussi, et le plus GRAND des deux gagne (`Math.max(recul, consigne, plancher)`).
+ * Il ne s'excuse pas non plus d'être long : pendant l'attente, l'appelant a son
+ * repli (`FALLBACK_POLL_MS`, 60 s), donc l'utilisateur n'est jamais muet.
+ */
+export const CAPACITY_FLOOR_MS = 60000;
 
 /**
  * Le délai que le serveur DEMANDE avant de revenir (`Retry-After`, en secondes).
@@ -176,6 +209,11 @@ export function openLiveStream(
   let cancelRetry = null;
   let chienDeGarde = null;
   let attempt = 0;
+  // Refus de capacité consécutifs DEPUIS le dernier flux réellement ouvert.
+  // Il ne retombe pas sur une panne réseau : une erreur de transport au milieu
+  // d'une série de 503 ne dit rien du plafond, et repartir à 1 s parce que le
+  // réseau a hoqueté rendrait le plancher décoratif.
+  let refusCapacite = 0;
   let dernierStatut = null;
 
   const annoncer = (statut) => {
@@ -189,6 +227,24 @@ export function openLiveStream(
     // ±20 % : sans aléa, tous les onglets reviennent au même instant après une
     // coupure serveur, et la reconnexion devient une rafale.
     return Math.round(base * (0.8 + random() * 0.4));
+  };
+
+  /**
+   * Recul après un refus de capacité : un plancher qui GRANDIT, et une gigue
+   * POSITIVE seulement.
+   *
+   * La gigue est positive parce qu'un plancher ne se franchit pas vers le bas :
+   * le serveur a dit « pas avant », et revenir plus tôt est exactement la
+   * rafale qu'on supprime. Elle existe quand même — sans elle, tous les onglets
+   * réveillés par le même incident reviennent à la même seconde et reforment la
+   * rafale qu'ils viennent d'éviter.
+   */
+  const delaiApresRefus = () => {
+    const plancher = Math.min(
+      MAX_RETRY_AFTER_MS,
+      CAPACITY_FLOOR_MS * 2 ** Math.min(Math.max(refusCapacite - 1, 0), 1),
+    );
+    return Math.min(MAX_RETRY_AFTER_MS, Math.round(plancher * (1 + random() * 0.2)));
   };
 
   const attendre = (delay) => new Promise((resolve) => {
@@ -250,6 +306,7 @@ export function openLiveStream(
         }
 
         attempt = 0;
+        refusCapacite = 0;
         annoncer(STREAM_STATUS.OPEN);
         await readFrames(response.body, (event, data) => {
           if (!closed) onEvent(event, data);
@@ -264,6 +321,9 @@ export function openLiveStream(
           annoncer(STREAM_STATUS.DOWN);
           break;
         }
+        // 503 : le produit se protège (plafond du compte ou du process), ce
+        // n'est pas une panne réseau — d'où un compteur à part.
+        if (statutHttp === 503) refusCapacite += 1;
       } finally {
         desarmerChienDeGarde();
       }
@@ -272,7 +332,13 @@ export function openLiveStream(
       annoncer(STREAM_STATUS.DOWN);
       // Le recul se calcule sur l'essai EN COURS (le premier vaut
       // `initialDelayMs`), puis grandit : 1 s, 2 s, 4 s…
-      const delai = Math.max(recul(), consigne);
+      //
+      // Un refus de capacité impose EN PLUS son propre plancher, qui ne dépend
+      // pas de ce que le serveur a pu faire passer : c'est lui qui empêche un
+      // onglet de revenir six fois dans la minute contre un plafond qui ne
+      // libère ses places qu'au bout du bail.
+      const delaiAvantRefus = refusCapacite > 0 ? delaiApresRefus() : 0;
+      const delai = Math.max(recul(), consigne, delaiAvantRefus);
       attempt += 1;
       await attendre(delai);
       cancelRetry = null;

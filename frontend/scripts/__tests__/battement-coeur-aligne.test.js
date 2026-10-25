@@ -49,6 +49,7 @@ import {
   SILENCE_TIMEOUT_MAX_MS,
   SILENCE_TIMEOUT_MS,
 } from '../../src/config/flux-temps-reel.js';
+import { CAPACITY_FLOOR_MS, MAX_RETRY_AFTER_MS } from '../../src/services/liveStream.js';
 
 const ICI = path.dirname(fileURLToPath(import.meta.url));
 // Les chemins sont écrits depuis la RACINE DU DÉPÔT : ils se lisent comme des
@@ -82,6 +83,28 @@ export function battementServeurPython(texte) {
       "le défaut de `HEARTBEAT_SECONDS` n'a pas été trouvé dans backend/kojo_live.py : " +
         'le motif a bougé, donc ce garde ne lit plus son sujet — corriger le motif, ' +
         'pas le verdict.'
+    );
+  }
+  return Number(trouve[1]);
+}
+
+/**
+ * La consigne de retour d'un flux REFUSÉ, en secondes, lue dans `kojo_live.py`.
+ *
+ * Un seul propriétaire côté serveur : les deux routes de flux la lisent, et le
+ * client s'y range. Le jour où quelqu'un allonge la consigne sans toucher au
+ * plancher du client, ce garde doit rougir — sinon le client revient plus tôt
+ * que le serveur ne l'autorise, ce qui est la rafale de 503 mesurée le
+ * 25/10/2026.
+ */
+export function consigneRefusPython(texte) {
+  const motif = /STREAM_REFUSED_RETRY_AFTER_SECONDS\s*=\s*(\d+(?:\.\d+)?)/;
+  const trouve = texte.match(motif);
+  if (!trouve) {
+    throw new Error(
+      "la consigne `STREAM_REFUSED_RETRY_AFTER_SECONDS` n'a pas été trouvée dans " +
+        'backend/kojo_live.py : le motif a bougé, donc ce garde ne lit plus son ' +
+        'sujet — corriger le motif, pas le verdict.'
     );
   }
   return Number(trouve[1]);
@@ -153,5 +176,69 @@ describe('battement du serveur et fenêtre de silence du client — la MÊME hor
     expect(sonde).toMatch(/from '\.\.\/src\/config\/flux-temps-reel\.js'/);
     expect(sonde).not.toMatch(/FENETRE_CLIENT_MS\s*=\s*\d/);
     expect(sonde).not.toMatch(/BATTEMENT_DEFAUT_MS\s*=\s*\d/);
+  });
+});
+
+/**
+ * GARDE : LE PLANCHER DU CLIENT APRÈS UN 503 NE PEUT PAS ÊTRE PLUS COURT QUE LA
+ * CONSIGNE DU SERVEUR — et cette consigne n'a qu'un propriétaire.
+ *
+ * ── Le fait mesuré, et pourquoi deux moitiés ────────────────────────────────
+ * Au plafond du compte, le flux répond 503 + `Retry-After`. Mais le client ne
+ * lit cette consigne que si l'en-tête lui est visible : en origine croisée (le
+ * shell natif Capacitor, le mode direct `VITE_USE_SAME_ORIGIN_API=false`), il
+ * n'arrive que si `server.py` l'EXPOSE. Sans exposition, `headers.get` rend
+ * `null`, et le client revenait à 1 s, 2 s, 4 s… six fois dans la minute —
+ * contre un plafond qui ne rend ses places qu'au bout du bail (60 s). Un onglet
+ * saturait ainsi son propre plafond et s'y maintenait.
+ *
+ * D'où les quatre exigences ci-dessous : une consigne serveur écrite UNE fois,
+ * lue par les DEUX routes ; un en-tête EXPOSÉ (sinon il n'existe pas pour le
+ * JavaScript) ; un plancher client qui ne descend jamais sous cette consigne ;
+ * et un plancher réellement CONSOMMÉ par le calcul du délai, pas seulement
+ * déclaré.
+ */
+describe('refus de capacité — le plancher du client suit la consigne du serveur', () => {
+  const kojoLive = lire('backend/kojo_live.py');
+  const server = lire('backend/server.py');
+  const notifications = lire('backend/kojo_routers_notifications.py');
+  const messages = lire('backend/kojo_routers_messages.py');
+  const lecteur = lire('frontend/src/services/liveStream.js');
+
+  it('la consigne du serveur est écrite UNE seule fois, et les deux routes la lisent', () => {
+    const secondes = consigneRefusPython(kojoLive);
+    expect(secondes).toBeGreaterThan(0);
+
+    // Les deux routes de flux refusent le même plafond : deux littéraux
+    // finiraient par diverger, et le client suivrait celui qu'il a reçu.
+    for (const texte of [notifications, messages]) {
+      expect(texte).toMatch(/kojo_live\.STREAM_REFUSED_RETRY_AFTER_SECONDS/);
+      expect(texte).not.toMatch(/"Retry-After"\s*:\s*"\d+"/);
+    }
+  });
+
+  it("l'en-tête est EXPOSÉ (un Retry-After non exposé est illisible en origine croisée)", () => {
+    const ligne = server.match(/expose_headers\s*=\s*\[([^\]]*)\]/);
+    expect(ligne).not.toBeNull();
+    expect(ligne[1]).toMatch(/"Retry-After"/);
+  });
+
+  it('le plancher du client ne descend pas sous la consigne du serveur', () => {
+    const secondes = consigneRefusPython(kojoLive);
+    expect(CAPACITY_FLOOR_MS).toBeGreaterThanOrEqual(secondes * 1000);
+  });
+
+  it('le plancher reste BORNÉ (un flux ne reste pas muet une heure)', () => {
+    expect(CAPACITY_FLOOR_MS).toBeGreaterThan(0);
+    expect(CAPACITY_FLOOR_MS).toBeLessThanOrEqual(MAX_RETRY_AFTER_MS);
+    expect(MAX_RETRY_AFTER_MS).toBeLessThanOrEqual(120_000);
+  });
+
+  it('le plancher est CONSOMMÉ par le calcul du délai, pas seulement déclaré', () => {
+    // Une constante exportée mais jamais utilisée passerait tous les cas
+    // ci-dessus en ne changeant RIEN au comportement.
+    expect(lecteur).toMatch(/const delai = Math\.max\(recul\(\), consigne, delaiAvantRefus\)/);
+    expect(lecteur).toMatch(/CAPACITY_FLOOR_MS/);
+    expect(lecteur).toMatch(/if \(statutHttp === 503\) refusCapacite \+= 1/);
   });
 });
