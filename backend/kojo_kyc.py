@@ -157,7 +157,13 @@ def empreinte(compte: Optional[dict]) -> str:
     décision manuelle ne s'applique plus : elle portait sur l'ancien couple.
     """
     _methode, numero = numero_du_wallet(compte)
-    matiere = f"{normaliser_nom(nom_du_titulaire(compte))}|{re.sub(r'\\D', '', numero or '')}"
+    # Les chiffres sont extraits AVANT l'interpolation : une barre oblique
+    # inverse dans une expression d'accolade n'est légale qu'à partir de
+    # Python 3.12, et le backend tourne en 3.11 — pyflakes y voyait une erreur
+    # de syntaxe (CI du 25/10/2026), alors qu'un interpréteur 3.14 local
+    # l'acceptait sans rien dire.
+    chiffres = re.sub(r"\D", "", numero or "")
+    matiere = f"{normaliser_nom(nom_du_titulaire(compte))}|{chiffres}"
     return hashlib.sha256(matiere.encode("utf-8")).hexdigest()[:20]
 
 
