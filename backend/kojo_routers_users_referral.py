@@ -31,6 +31,7 @@ from kojo_settings import (
 )
 
 from kojo_core import get_current_user
+import kojo_kyc
 
 from kojo_shared import apply_referral_payout_confirmed, notify_user_localized
 
@@ -260,6 +261,17 @@ async def withdraw_referral_rewards(current_user: User = Depends(get_current_use
     )
     if lock.matched_count == 0:
         raise HTTPException(status_code=409, detail="Un retrait de récompenses est déjà en cours, réessayez dans un instant")
+
+    # LA MÊME PORTE QUE LE VERSEMENT (kojo_kyc) : la récompense de parrainage
+    # sort par le même canal mobile money, donc un wallet au nom d'un tiers ne
+    # la reçoit pas non plus. Le verrou posé juste au-dessus est RELÂCHÉ avant
+    # le refus, sinon un compte non vérifié garderait un retrait "en cours"
+    # éternel et ne pourrait plus jamais réessayer.
+    try:
+        kojo_kyc.exiger_wallet_verifie(user)
+    except HTTPException:
+        await _release_referral_withdraw_lock(current_user.id)
+        raise
 
     withdraw_method, withdraw_phone = get_mobile_money_account((user or {}).get("payment_accounts"))
     if not withdraw_method or not withdraw_phone:

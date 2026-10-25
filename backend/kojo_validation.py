@@ -68,6 +68,26 @@ def validate_payment_accounts(
             raise HTTPException(status_code=400, detail="Informations de compte bancaire invalides")
         linked_accounts += 1
         account_details['bank_account'] = mask_bank_account_info(payment_accounts.bank_account)
+
+    # Le NOM DU TITULAIRE du wallet : la seule chose qui rend le décaissement
+    # vérifiable (`kojo_kyc`). Il n'est pas exigé ici — un compte peut exister
+    # sans, et c'est alors l'état `non_declare` qui bloque le VERSEMENT, pas
+    # l'enregistrement des moyens de paiement (même arbitrage que le 22/10/2026
+    # sur les comptes de paiement facultatifs à l'inscription).
+    if payment_accounts.holder_name is not None:
+        titulaire = " ".join(str(payment_accounts.holder_name).split())
+        if titulaire:
+            if len(titulaire) < 3:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Nom du titulaire trop court : saisissez le nom complet tel qu'il apparaît sur le compte mobile money.",
+                )
+            if any(caractere.isdigit() for caractere in titulaire):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Le nom du titulaire ne peut pas contenir de chiffres : c'est un nom de personne, pas un numéro.",
+                )
+        account_details['holder_name'] = titulaire
     
     # Le MINIMUM dépend du type de compte.
     minimum = 1 if user_type == "client" else 2 if user_type == "worker" else 0

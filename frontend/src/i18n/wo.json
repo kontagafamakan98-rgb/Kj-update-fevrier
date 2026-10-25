@@ -961,5 +961,15 @@
   "commissionTierLancement": "Komisio amul ci sa liggéey yi njëkk (offre u njëkk).",
   "commissionTierRecurrent": "Komisio bi wàññi na: tarif fidélité bi ñu koy jefandikoo.",
   "workerDisputesLabel": "Xeex",
-  "workerDisputesLost": "ci bi {count} ci client bi"
+  "workerDisputesLost": "ci bi {count} ci client bi",
+  "tabRequests": "Kañkañal",
+  "tabWallets": "Kont yi",
+  "walletHolderTitle": "Boroom kont bi (Orange Money/Wave)",
+  "walletHolderLabel": "Tur boroom kont bi",
+  "walletHolderHelp": "Ni mu mel ci kont Orange Money walla Wave. Sa xaalis du baye ba tur bi doon sa tur; su dee beneen tur la, ñi Kojo di ko xool balaa bay.",
+  "walletHolderPlaceholder": "Tur ak sant boroom kont bi",
+  "walletStateVerified": "Peye ubbeeku na: tur bi ne sa kont.",
+  "walletStatePending": "Peye tëj na: tur bi du sa tur. Ñi Kojo war nañu ko nangu.",
+  "walletStateNotDeclared": "Peye tëj na: bindal tur boroom sa kont mobile money.",
+  "walletStateRefused": "Peye tëj na: ñu bàyyi kont mobile money bi. Bindal kont bu sa tur."
 }

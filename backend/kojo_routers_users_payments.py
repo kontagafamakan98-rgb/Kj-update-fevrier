@@ -15,6 +15,7 @@ from kojo_models import PaymentAccount, User
 
 from kojo_core import get_current_user, validate_payment_accounts
 from kojo_identifiants import identifiant_query
+import kojo_kyc
 
 router = APIRouter()
 
@@ -39,7 +40,10 @@ async def get_user_payment_accounts(current_user: User = Depends(get_current_use
         "payment_accounts": user_data.get("payment_accounts", {}),
         "payment_accounts_count": user_data.get("payment_accounts_count", 0),
         "is_verified": user_data.get("is_verified", False),
-        "minimum_required": 2 if user_data["user_type"] == "worker" else 1
+        "minimum_required": 2 if user_data["user_type"] == "worker" else 1,
+        # L'ÉTAT du titulaire du wallet, calculé par `kojo_kyc` : l'écran affiche
+        # un fait, il ne devine pas si un versement est possible.
+        "wallet_verification": kojo_kyc.etat_du_document(user_data),
     }
 
 @router.put("/users/payment-accounts")
@@ -68,6 +72,17 @@ async def update_user_payment_accounts(
     except HTTPException as e:
         raise e
     
+    # L'état du titulaire est RECALCULÉ après l'écriture, sur le document
+    # RÉSULTANT : un nom qui correspond donne `verifie`, un nom différent donne
+    # `en_attente` (revue propriétaire), et une décision manuelle déjà posée
+    # reste valable TANT QUE le couple (nom, numéro) est inchangé. Un
+    # enregistrement de compte ne doit pas rouvrir un dossier tranché.
+    document_apres_ecriture = {
+        **user_data,
+        "payment_accounts": payment_validation["account_details"],
+    }
+    verification = kojo_kyc.verification_apres_ecriture(document_apres_ecriture)
+
     # Mettre à jour en base de données
     await db.users.update_one(
         {**identifiant_query(current_user.id)},
@@ -76,6 +91,7 @@ async def update_user_payment_accounts(
                 "payment_accounts": payment_validation["account_details"],
                 "payment_accounts_count": payment_validation["linked_accounts_count"],
                 "is_verified": payment_validation["is_verified"],
+                "wallet_verification": verification,
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }
         }
@@ -88,7 +104,8 @@ async def update_user_payment_accounts(
             "required_minimum": 2 if user_data["user_type"] == "worker" else 1,
             "is_verified": payment_validation["is_verified"],
             "accounts": payment_validation["account_details"]
-        }
+        },
+        "wallet_verification": verification,
     }
 
 @router.post("/users/verify-payment-access")

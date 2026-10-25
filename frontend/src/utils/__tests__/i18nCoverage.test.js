@@ -21,6 +21,7 @@ import { makeScopedTranslator as messagesT } from '../pack2PageI18n/messages';
 import { makeScopedTranslator as mobileTestT } from '../pack2PageI18n/mobileTest';
 import { makeScopedTranslator as paymentVerificationT } from '../pack2PageI18n/paymentVerification';
 import { makeScopedTranslator as photoTestT } from '../pack2PageI18n/photoTest';
+import { makeScopedTranslator as portefeuillesT } from '../pack2PageI18n/portefeuilles';
 import { makeScopedTranslator as profileT } from '../pack2PageI18n/profile';
 import { makeScopedTranslator as registerT } from '../pack2PageI18n/register';
 
@@ -37,6 +38,7 @@ const SCOPE_MODULES = {
   mobileTest: mobileTestT,
   paymentVerification: paymentVerificationT,
   photoTest: photoTestT,
+  portefeuilles: portefeuillesT,
   profile: profileT,
   register: registerT,
 };

@@ -618,6 +618,23 @@ class TestAccountDeletion:
                 "at": "2026-10-24T10:00:00+00:00",
                 "by": "owner-moderation-test",
             }],
+            # Vérification du TITULAIRE du wallet (`kojo_kyc`) : la décision
+            # nomme le titulaire d'un compte mobile money d'un tiers, qui est
+            # une donnée de paiement — elle doit disparaître avec le compte.
+            # Portée ici pour que l'effacement soit PROUVÉ, et non vrai sur un
+            # champ que ce compte n'a jamais eu.
+            "wallet_verification": {
+                "etat": "verifie",
+                "methode": "manuel",
+                "motif": "valide_par_le_proprietaire",
+                "empreinte": "empreinte-wallet-0000abcd",
+                "nom_declare": "Fatoumata Diop",
+                "nom_compte": "Kojo Test",
+                "decide_le": "2026-10-23T08:30:00+00:00",
+                "decide_par": "owner-moderation-test",
+                "note": "Titulaire proche, identite verifiee au guichet",
+                "historique": [],
+            },
             "bio": "Je suis Kofi, joignable au +221771234567",
             "skills": ["plomberie", "soudure"],
         }})
@@ -670,9 +687,18 @@ class TestAccountDeletion:
                 return [s for v in valeur.values() for s in _chaines(v)]
             if isinstance(valeur, (list, tuple)):
                 return [s for v in valeur for s in _chaines(v)]
+            # Un nombre n'est pas une chaîne recopiée : le convertir rendrait
+            # n'importe quel « 1 » présent dans une date un faux survivant.
             return []
 
-        document = json.dumps(stored, default=str)
+        # Les VALEURS seulement, jamais les NOMS de champ : chercher dans le
+        # JSON entier rendait un faux positif mesuré le 25/10/2026 — la valeur
+        # `verifie` de `wallet_verification` (kojo_kyc) se retrouvait dans le
+        # nom des clés `is_verified`/`email_verified`, qui n'ont pourtant rien
+        # recopié. Le balayage garde sa portée (une valeur recopiée à
+        # l'intérieur d'une autre chaîne est vue) sans confondre un nom avec
+        # une donnée.
+        document = "\n".join(_chaines(stored))
         recopies = sorted({
             chaine
             for champ in ANONYMISATION_CHAMPS

@@ -446,6 +446,14 @@
   "positionNotDetected": "Position non détectée - Utilisation des paramètres par défaut",
   "personalInformation": "Informations personnelles",
   "paymentAccounts": "Comptes de paiement",
+  "walletHolderTitle": "Titulaire du compte mobile money",
+  "walletHolderLabel": "Nom du titulaire",
+  "walletHolderHelp": "Tel qu'il apparaît sur le compte Orange Money ou Wave. Vos gains ne sont versés que si ce nom est le vôtre ; sinon l'équipe Kojo l'étudie avant tout paiement.",
+  "walletHolderPlaceholder": "Prénom et nom du titulaire",
+  "walletStateVerified": "Versements ouverts : le titulaire correspond à votre compte.",
+  "walletStatePending": "Versements retenus : ce nom n'est pas celui de votre compte. L'équipe Kojo doit le valider.",
+  "walletStateNotDeclared": "Versements retenus : indiquez le nom du titulaire de votre compte mobile money.",
+  "walletStateRefused": "Versements retenus : ce compte mobile money a été refusé. Enregistrez un compte à votre nom.",
   "nextStepWorker": "Prochaine étape : Vous devrez lier au minimum 2 moyens de paiement (Orange Money, Wave, compte bancaire)",
   "nextStepClient": "Prochaine étape : Vous devrez lier au moins 1 moyen de paiement (Orange Money, Wave, compte bancaire)",
   "continueToPaymentVerification": "Continuer vers la vérification des comptes",
@@ -961,5 +969,7 @@
   "commissionTierLancement": "Commission offerte : offre de lancement sur vos premières missions.",
   "commissionTierRecurrent": "Tarif fidélité appliqué : votre commission est réduite.",
   "workerDisputesLabel": "Litiges",
-  "workerDisputesLost": "dont {count} en faveur du client"
+  "workerDisputesLost": "dont {count} en faveur du client",
+  "tabRequests": "Demandes",
+  "tabWallets": "Portefeuilles"
 }

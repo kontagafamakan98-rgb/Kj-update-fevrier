@@ -361,7 +361,7 @@ class TestLiberationAutomatique:
         # `frozen` compte les missions qu'un litige OUVERT a gelées : 0 ici, et
         # c'est un compteur distinct d'un échec — le journal doit pouvoir dire
         # « gelé par contestation » sans le confondre avec « libération ratée ».
-        assert resume == {"due": 1, "released": 1, "blocked": 0, "skipped": 0, "frozen": 0}
+        assert resume == {"due": 1, "released": 1, "blocked": 0, "skipped": 0, "frozen": 0, "wallet_hold": 0}
         stocke = await db_find_one("jobs", {"id": job["id"]})
         assert stocke["status"] == "completed"
         assert stocke["completion"]["state"] == completion.AUTO_RELEASED
@@ -434,7 +434,7 @@ class TestLiberationAutomatique:
 
         # Aucun second versement, et la déclaration cesse d'être « en attente ».
         submit.assert_not_called()
-        assert premier == {"due": 1, "released": 0, "blocked": 0, "skipped": 1, "frozen": 0}
+        assert premier == {"due": 1, "released": 0, "blocked": 0, "skipped": 1, "frozen": 0, "wallet_hold": 0}
         assert second["due"] == 0
 
         stocke = await db_find_one("jobs", {"id": job["id"]})
@@ -465,7 +465,7 @@ class TestLiberationAutomatique:
             await asyncio.sleep(0)
             second = await completion.passage_liberations_auto()
 
-        assert premier == {"due": 1, "released": 0, "blocked": 1, "skipped": 0, "frozen": 0}
+        assert premier == {"due": 1, "released": 0, "blocked": 1, "skipped": 0, "frozen": 0, "wallet_hold": 0}
         assert second["due"] == 0
 
         stocke = await db_find_one("jobs", {"id": job["id"]})

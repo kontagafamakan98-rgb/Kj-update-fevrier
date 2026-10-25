@@ -549,8 +549,15 @@ class UserRegister(BaseModel):
 
 class PaymentAccount(BaseModel):
     orange_money: Optional[str] = None     # Numéro de téléphone Orange Money
-    wave: Optional[str] = None            # Numéro de téléphone Wave  
+    wave: Optional[str] = None            # Numéro de téléphone Wave
     bank_account: Optional[dict] = None   # Informations complètes de compte bancaire
+    # NOM DU TITULAIRE du wallet (25/10/2026) : c'est LUI qui rend le décaissement
+    # vérifiable. `get_mobile_money_account` exigeait déjà un compte, mais rien ne
+    # prouvait que ce compte appartenait au titulaire du compte Kojo — un
+    # travailleur pouvait déclarer le wallet d'un tiers et être payé dessus.
+    # Déclaré ici (et non hors modèle) pour qu'il suive l'export RGPD et la
+    # suppression de compte comme le reste des moyens de paiement.
+    holder_name: Optional[str] = Field(None, max_length=80)
 
 class UserWithPayment(BaseModel):
     email: EmailStr

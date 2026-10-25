@@ -1,6 +1,11 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { MessageSquareText, RefreshCcw, Phone, Mail, UserPlus, X } from 'lucide-react';
+import { MessageSquareText, RefreshCcw, Phone, Mail, UserPlus, Wallet, X } from 'lucide-react';
 import { supportAPI } from '../services/apiEndpoints';
+// Le TITULAIRE des comptes mobile money : une file du service clientèle, donc
+// au même endroit que les demandes — et ouverte aux agents comme au
+// propriétaire, parce qu'une file qu'une seule personne peut vider est un
+// goulot d'étranglement.
+import PortefeuillesPanel from '../components/PortefeuillesMobileMoney';
 import { handleApiError } from '../services/api';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -57,6 +62,11 @@ const SupportAdmin = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  // Deux métiers, deux onglets : les demandes clients, et les titulaires de
+  // wallets à trancher. Séparés parce qu'ils ne se lisent pas ensemble — on
+  // travaille une file à la fois, et tout empiler sur une seule page rendait
+  // la seconde invisible sous la première.
+  const [onglet, setOnglet] = useState('demandes');
   const [updatingId, setUpdatingId] = useState(null);
   // Une requête partie avant le démontage ne doit plus écrire d'état : c'est
   // ce qui faisait remonter « window is not defined » (React lit `window`
@@ -202,6 +212,33 @@ const SupportAdmin = () => {
         </button>
       </div>
 
+      <div role="tablist" aria-label={t('supportRequestsTitle')} className="mb-6 flex flex-wrap gap-2">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={onglet === 'demandes'}
+          onClick={() => setOnglet('demandes')}
+          className={`bouton ${onglet === 'demandes' ? 'bouton-encre' : 'bouton-clair'}`}
+        >
+          <MessageSquareText className="h-4 w-4" aria-hidden="true" />
+          {t('tabRequests')}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={onglet === 'portefeuilles'}
+          onClick={() => setOnglet('portefeuilles')}
+          className={`bouton ${onglet === 'portefeuilles' ? 'bouton-encre' : 'bouton-clair'}`}
+        >
+          <Wallet className="h-4 w-4" aria-hidden="true" />
+          {t('tabWallets')}
+        </button>
+      </div>
+
+      {onglet === 'portefeuilles' && <PortefeuillesPanel />}
+
+      {onglet === 'demandes' && (
+        <>
       {/* ── L'ÉQUIPE SUPPORT : le propriétaire seul la compose ───────────────
           Le service clientèle était un goulot d'étranglement à une personne :
           ajouter quelqu'un demandait d'ouvrir la base. Ici, il donne un accès
@@ -369,6 +406,8 @@ const SupportAdmin = () => {
             </div>
           ))}
         </div>
+      )}
+        </>
       )}
     </div>
   );

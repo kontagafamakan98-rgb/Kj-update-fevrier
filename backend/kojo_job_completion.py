@@ -43,6 +43,7 @@ from typing import Optional
 from fastapi import HTTPException
 
 import kojo_job_effects as effets
+import kojo_kyc
 from kojo_business_events import enregistrer_evenement
 from kojo_core import db
 from kojo_identifiants import dump_stable, identifiant_job_query, identifiant_query
@@ -230,6 +231,23 @@ async def liberer_sequestre(job: dict, *, acteur_id: str) -> dict:
     if current_payout_status == "releasing":
         raise HTTPException(status_code=409, detail="Un versement est déjà en cours pour ce paiement, réessayez dans un instant")
 
+    worker = await db.users.find_one({**identifiant_query(worker_id)})
+    if not worker:
+        raise HTTPException(
+            status_code=400,
+            detail="Travailleur introuvable : le séquestre ne peut pas être versé à un compte absent.",
+        )
+
+    # ⚠️ LA PORTE DU TITULAIRE, AVANT TOUTE ÉCRITURE. Un compte mobile money
+    # déclaré au nom d'un tiers ne reçoit pas d'argent : `kojo_kyc` compare le
+    # titulaire déclaré au nom du compte (ou lit la décision du propriétaire) et
+    # lève un 403 NOMMÉ. Placer ce contrôle ici — et pas après le verrou CAS —
+    # garantit qu'un versement retenu ne laisse ni séquestre en "releasing" ni
+    # mission close : l'argent reste `held`, et il repart dès que la
+    # vérification est faite. C'est aussi ce qui fait passer la libération
+    # AUTOMATIQUE en `auto_release_blocked` avec son motif (chemin déjà écrit).
+    kojo_kyc.exiger_wallet_verifie(worker)
+
     # Verrou : marquer "releasing" seulement si toujours "held", pour eviter
     # un double-versement en cas de double-clic/appel concurrent.
     lock_result = await db.payments.update_one(
@@ -239,8 +257,7 @@ async def liberer_sequestre(job: dict, *, acteur_id: str) -> dict:
     if lock_result.matched_count == 0:
         raise HTTPException(status_code=409, detail="Un versement est déjà en cours pour ce paiement, réessayez dans un instant")
 
-    worker = await db.users.find_one({**identifiant_query(worker_id)})
-    worker_payment_accounts = (worker or {}).get("payment_accounts") or {}
+    worker_payment_accounts = worker.get("payment_accounts") or {}
     worker_amount = payment_record.get("worker_amount") or 0
 
     # On choisit Orange Money en priorite, sinon Wave (le compte bancaire
@@ -585,6 +602,13 @@ async def liberer_automatiquement(job: dict) -> dict:
         return {"payout_status": "blocked_by_dispute"}
     try:
         resultat = await liberer_sequestre(job, acteur_id=job.get("client_id"))
+    except kojo_kyc.WalletNonVerifie:
+        # Le wallet attend une vérification de titulaire : ce n'est PAS un échec
+        # de libération, donc rien n'est écrit et la déclaration reste `marked`.
+        # Le passage suivant repart tout seul dès que le wallet est vérifié —
+        # écrire `auto_release_blocked` ici figerait la mission pour de bon, et
+        # la décision du propriétaire n'aurait servi à rien.
+        return {"payout_status": "blocked_by_wallet"}
     except HTTPException as exc:
         if exc.status_code == 409:
             if job.get("status") == JobStatus.COMPLETED.value:
@@ -673,7 +697,10 @@ async def passage_liberations_auto(now: Optional[datetime] = None) -> dict:
         "deleted": {"$ne": True},
     }).to_list(MAX_LIBERATIONS_PAR_PASSAGE)
 
-    resume = {"due": len(en_attente), "released": 0, "blocked": 0, "skipped": 0, "frozen": 0}
+    resume = {
+        "due": len(en_attente), "released": 0, "blocked": 0,
+        "skipped": 0, "frozen": 0, "wallet_hold": 0,
+    }
     for job in en_attente:
         try:
             issue = await liberer_automatiquement(job)
@@ -688,6 +715,10 @@ async def passage_liberations_auto(now: Optional[datetime] = None) -> dict:
             # Compté, pas confondu avec un échec : un litige gelé n'est pas une
             # libération ratée, et le journal doit pouvoir les distinguer.
             resume["frozen"] += 1
+        elif issue.get("payout_status") == "blocked_by_wallet":
+            # Même distinction pour l'attente de vérification du TITULAIRE :
+            # gelé jusqu'à la décision, puis libéré par un passage normal.
+            resume["wallet_hold"] += 1
         elif issue.get("payout_status") in ("already_in_progress", "already_completed"):
             resume["skipped"] += 1
         else:

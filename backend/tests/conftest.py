@@ -960,10 +960,15 @@ WORKER_USER = {
     **BASE_USER,
     "email": "worker@kojo.sn",
     "user_type": "worker",
-    # Un travailleur doit lier au moins 2 moyens de paiement.
+    # Un travailleur doit lier au moins 2 moyens de paiement, et déclarer le
+    # TITULAIRE du wallet (`holder_name`) : depuis le 25/10/2026 le versement
+    # est retenu tant que ce nom n'est pas celui du compte (`kojo_kyc`). Ici il
+    # correspond (prénom + nom de BASE_USER), donc les bancs de paiement
+    # mesurent la règle qu'ils visent et non cette vérification.
     "payment_accounts": {
         "orange_money": "+221771234567",
         "wave": "+221771234568",
+        "holder_name": "Kojo Test",
     },
 }
 

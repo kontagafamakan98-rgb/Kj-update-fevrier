@@ -323,6 +323,20 @@ export const supportAPI = {
   // L'ÉQUIPE SUPPORT : le propriétaire seul compose l'équipe (`/support/team`
   // est jugé par `verify_owner_access`), mais TOUS ses membres lisent les
   // tickets par les deux routes ci-dessus.
+  // TITULAIRE DES WALLETS (kojo_kyc) : le décaissement vers un travailleur est
+  // retenu tant que le compte mobile money n'est pas à son nom. La décision est
+  // du SERVICE CLIENTÈLE — propriétaire ET agents —, pas du seul propriétaire :
+  // `/support/wallets` passe par `verify_support_access`, contrairement à
+  // `/owner/*` qui reste fermé à l'équipe.
+  /** @returns {Promise<object>} {total, count, tronque, portefeuilles}. */
+  listWallets: (etat) => api.get('/support/wallets', {
+    params: (etat || undefined) ? { etat } : undefined,
+  }),
+  /** @returns {Promise<object>} {message, compte_id, etat, decision, historique}. */
+  decideWallet: (userId, { decision, note }) => api.post(
+    `/support/wallets/${userId}/decision`,
+    { decision, note },
+  ),
   /** @returns {Promise<Array<object>>} membres de l'équipe support. */
   listTeam: () => api.get('/support/team'),
   /** @returns {Promise<object>} {agent, message} membre ajouté. */

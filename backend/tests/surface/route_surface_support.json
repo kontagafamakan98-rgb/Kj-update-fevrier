@@ -47,6 +47,28 @@
   },
   {
     "methode": "GET",
+    "chemin": "/api/support/wallets",
+    "nom": "list_support_wallets",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_routers_support.verify_support_access",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "POST",
+    "chemin": "/api/support/wallets/{user_id}/decision",
+    "nom": "decide_support_wallet",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_routers_support.verify_support_access",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "GET",
     "chemin": "/api/support/team",
     "nom": "get_support_team",
     "code": null,
