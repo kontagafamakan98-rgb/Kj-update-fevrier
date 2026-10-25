@@ -262,17 +262,10 @@ async def withdraw_referral_rewards(current_user: User = Depends(get_current_use
     if lock.matched_count == 0:
         raise HTTPException(status_code=409, detail="Un retrait de récompenses est déjà en cours, réessayez dans un instant")
 
-    # LA MÊME PORTE QUE LE VERSEMENT (kojo_kyc) : la récompense de parrainage
-    # sort par le même canal mobile money, donc un wallet au nom d'un tiers ne
-    # la reçoit pas non plus. Le verrou posé juste au-dessus est RELÂCHÉ avant
-    # le refus, sinon un compte non vérifié garderait un retrait "en cours"
-    # éternel et ne pourrait plus jamais réessayer.
-    try:
-        kojo_kyc.exiger_wallet_verifie(user)
-    except HTTPException:
-        await _release_referral_withdraw_lock(current_user.id)
-        raise
-
+    # D'ABORD le compte lui-même : sans wallet déclaré, le refus utile est
+    # « ajoutez un moyen de paiement » (400) et non « ce wallet n'est pas
+    # vérifié » (403) — un 403 enverrait chercher une décision humaine là où
+    # il n'y a rien à décider (mesuré le 25/10/2026 : 403 au lieu de 400).
     withdraw_method, withdraw_phone = get_mobile_money_account((user or {}).get("payment_accounts"))
     if not withdraw_method or not withdraw_phone:
         await _release_referral_withdraw_lock(current_user.id)
@@ -280,6 +273,17 @@ async def withdraw_referral_rewards(current_user: User = Depends(get_current_use
             status_code=400,
             detail="Aucun compte Orange Money ou Wave configuré : ajoutez un moyen de paiement pour retirer vos récompenses",
         )
+
+    # LA MÊME PORTE QUE LE VERSEMENT (kojo_kyc) : la récompense de parrainage
+    # sort par le même canal mobile money, donc un wallet au nom d'un tiers ne
+    # la reçoit pas non plus. Le verrou posé au-dessus est RELÂCHÉ avant le
+    # refus, sinon un compte non vérifié garderait un retrait "en cours"
+    # éternel et ne pourrait plus jamais réessayer.
+    try:
+        kojo_kyc.exiger_wallet_verifie(user)
+    except HTTPException:
+        await _release_referral_withdraw_lock(current_user.id)
+        raise
 
     now_iso = datetime.now(timezone.utc).isoformat()
     payment_id = str(uuid.uuid4())
