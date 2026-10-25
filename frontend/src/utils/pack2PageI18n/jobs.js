@@ -41,7 +41,16 @@ fr: {
   sortBudget: 'Budget le plus élevé',
   // L'ordre ne s'applique qu'après la géolocalisation : le libellé le dit
   // (« au plus proche »), et le refus de position laisse l'ordre précédent.
-  sortDistance: 'Au plus proche'
+  sortDistance: 'Au plus proche',
+  // L'ÉTAT VIDE PUBLIC (24/10/2026) : ces trois clés vivent ICI et pas dans
+  // `src/i18n/*.json` — elles ne servent qu'à cette page, et le dictionnaire
+  // global part dans le bundle INITIAL (mesuré : 131,0 Ko gzip sur un budget
+  // de 131,0, la version globale faisait déborder de 29 octets). Le scope de
+  // page est chargé avec la page, qui est déjà différée.
+  premierArrivantsLead:
+    'Publiez la vôtre, recevez les nouvelles missions par email, ou écrivez-nous sur WhatsApp.',
+  premierArrivantsWatch: 'Recevoir les missions par email',
+  premierArrivantsWhatsApp: 'Écrire sur WhatsApp'
 },
 en: {
   searchPlaceholder: 'Title or description...',
@@ -68,14 +77,27 @@ en: {
   sortLabel: 'Sort by',
   sortRecent: 'Most recent',
   sortBudget: 'Highest budget',
-  sortDistance: 'Closest first'
+  sortDistance: 'Closest first',
+  premierArrivantsLead:
+    'Post yours, get new ones by email, or message us on WhatsApp.',
+  premierArrivantsWatch: 'Get missions by email',
+  premierArrivantsWhatsApp: 'Message us on WhatsApp'
 }
 };
-dict.wo = withBase(dict.fr, {  searchPlaceholder: 'Tur walla melokaan...'
+dict.wo = withBase(dict.fr, {  searchPlaceholder: 'Tur walla melokaan...',
+  premierArrivantsLead: 'Feesal sa liggéey, jot yu bees ci email, walla bind nu ci WhatsApp.',
+  premierArrivantsWatch: 'Jot liggéey yi ci email',
+  premierArrivantsWhatsApp: 'Bind ci WhatsApp'
 });
-dict.bm = withBase(dict.fr, {  searchPlaceholder: 'Tɔgɔ walima fɔli...'
+dict.bm = withBase(dict.fr, {  searchPlaceholder: 'Tɔgɔ walima fɔli...',
+  premierArrivantsLead: 'Baara bila, baara kuraw sɔrɔ email la, walima sɛbɛn an ma WhatsApp kan.',
+  premierArrivantsWatch: 'Baara sɔrɔ email la',
+  premierArrivantsWhatsApp: 'Sɛbɛn WhatsApp kan'
 });
-dict.mos = withBase(dict.fr, {  searchPlaceholder: 'Yʋʋr bɩ goama...'
+dict.mos = withBase(dict.fr, {  searchPlaceholder: 'Yʋʋr bɩ goama...',
+  premierArrivantsLead: 'Ning-y yãmb tʋʋmã, paam-y tʋʋm paal email la, walla gʋls-y tõnd WhatsApp zugu.',
+  premierArrivantsWatch: 'Paam tʋʋm email la',
+  premierArrivantsWhatsApp: 'Gʋls WhatsApp zugu'
 });
 
 export const makeScopedTranslator = (currentLanguage, fallbackT) =>

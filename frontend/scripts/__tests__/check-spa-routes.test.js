@@ -108,7 +108,16 @@ const CONFORMING_REWRITES = [
 ];
 
 /** En-têtes de référence : les routes privées ne sont pas indexables. */
+// Les trois en-têtes statiques du site (frontend/vercel.json, règle « /(.*) »),
+// ajoutés le 24/10/2026 : le HTML de production portait la CSP et HSTS, pas ceux-ci.
+const CONFORMING_SECURITY_HEADERS = [
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  { key: 'Permissions-Policy', value: 'geolocation=(self), microphone=(), camera=()' },
+];
+
 const CONFORMING_HEADERS = [
+  { source: '/(.*)', headers: CONFORMING_SECURITY_HEADERS },
   { source: '/dashboard', headers: [{ key: 'X-Robots-Tag', value: 'noindex, follow' }] },
   { source: '/profile', headers: [{ key: 'X-Robots-Tag', value: 'noindex, follow' }] },
   { source: '/photo-debug', headers: [{ key: 'X-Robots-Tag', value: 'noindex, follow' }] },
@@ -234,6 +243,59 @@ describe('check-spa-routes — routage conforme', () => {
 
   // Le dépôt réel n'est pas rejoué ici : l'étape « Check SPA routing » de la CI
   // l'examine sur le runner, réécritures de vercel.json et route inconnue comprises.
+});
+
+describe('check-spa-routes — en-têtes statiques de sécurité', () => {
+  // MESURÉ le 24/10/2026 sur https://kojoforafrica.cc.cd/ : le HTML ne portait
+  // que `Content-Security-Policy: frame-ancestors 'none'` et HSTS. Ces trois cas
+  // défendent la ligne qui manquait — sans quoi le fichier pourrait la perdre
+  // dans une réécriture, et personne ne le verrait avant un audit.
+  it('refuse un site qui ne les publie pas', () => {
+    const project = makeProject({
+      headers: CONFORMING_HEADERS.filter((entry) => entry.source !== '/(.*)'),
+    });
+    const result = run(project);
+    expect(result.ok).toBe(false);
+    const messages = result.errors.join('\n');
+    for (const cle of ['X-Content-Type-Options', 'Referrer-Policy', 'Permissions-Policy']) {
+      expect(messages).toContain(cle);
+    }
+  });
+
+  it('refuse un en-tête posé sur une seule route', () => {
+    // Une règle plus étroite (ici « /jobs ») ne protège que cette route : le
+    // reste du site reste sans en-tête, et le garde ne doit pas s'en contenter.
+    const project = makeProject({
+      headers: CONFORMING_HEADERS.map((entry) =>
+        entry.source === '/(.*)' ? { source: '/jobs', headers: entry.headers } : entry
+      ),
+    });
+    const result = run(project);
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toContain('ABSENT de la règle « /(.*) »');
+  });
+
+  it('refuse une valeur plus stricte que ce que la page supporte', () => {
+    // `geolocation=()` est « plus sûr » sur le papier et casse le tri par
+    // distance de /jobs : la valeur est donc comparée à l'identique.
+    const project = makeProject({
+      headers: CONFORMING_HEADERS.map((entry) =>
+        entry.source === '/(.*)'
+          ? {
+              source: entry.source,
+              headers: entry.headers.map((header) =>
+                header.key === 'Permissions-Policy'
+                  ? { ...header, value: 'geolocation=(), microphone=(), camera=()' }
+                  : header
+              ),
+            }
+          : entry
+      ),
+    });
+    const result = run(project);
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toMatch(/Permissions-Policy .*geolocation=\(\)/);
+  });
 });
 
 describe('check-spa-routes — sémantique 404 (pas de catch-all)', () => {

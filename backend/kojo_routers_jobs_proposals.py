@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 import kojo_job_effects as effets
 from kojo_business_events import enregistrer_evenement
+from kojo_auth_core import exiger_compte_actif
 from kojo_core import db, get_current_user
 from kojo_models import (
     Job, JobProposal, JobStatus, Message, NotificationType, ProposalCreate, User, UserType,
@@ -28,7 +29,9 @@ router = APIRouter()
 async def create_proposal(
     job_id: str,
     proposal_data: ProposalCreate,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    # Postuler est une ÉCRITURE : un compte restreint (lecture seule) la perd.
+    _actif: User = Depends(exiger_compte_actif),
 ):
     """Soumet une proposition de travailleur sur un job ouvert (une seule par
     travailleur et par job ; cohérence pays vérifiée).

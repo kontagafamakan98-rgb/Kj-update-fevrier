@@ -81,6 +81,8 @@
     { "source": "/payment-verification/", "destination": "/app.html" },
     { "source": "/commission-dashboard", "destination": "/app.html" },
     { "source": "/commission-dashboard/", "destination": "/app.html" },
+    { "source": "/administration", "destination": "/app.html" },
+    { "source": "/administration/", "destination": "/app.html" },
     { "source": "/support", "destination": "/support.html" },
     { "source": "/support/", "destination": "/support.html" },
     { "source": "/support-admin", "destination": "/app.html" },
@@ -94,6 +96,18 @@
         {
           "key": "Content-Security-Policy",
           "value": "frame-ancestors 'none'"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "geolocation=(self), microphone=(), camera=()"
         }
       ]
     },
@@ -154,6 +168,10 @@
     },
     {
       "source": "/commission-dashboard",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }]
+    },
+    {
+      "source": "/administration",
       "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }]
     },
     {

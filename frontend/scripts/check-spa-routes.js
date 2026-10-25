@@ -671,6 +671,57 @@ export function runSpaRoutesCheck(options = {}) {
     }
   }
 
+  // ── 6quater. Les en-têtes STATIQUES que le site publie ────────────────────
+  // MESURÉ le 24/10/2026 sur https://kojoforafrica.cc.cd/ : `Content-Security-
+  // Policy: frame-ancestors 'none'` et `Strict-Transport-Security` seulement.
+  // `X-Content-Type-Options`, `Referrer-Policy` et `Permissions-Policy` étaient
+  // ABSENTS du HTML servi, alors que l'API les porte depuis longtemps : un
+  // navigateur restait donc libre d'interpréter un type MIME, d'envoyer l'URL
+  // complète de la page à un tiers, et d'ouvrir micro et caméra à un script
+  // injecté. Ces trois-là ne dépendent d'AUCUNE donnée : ils se déclarent ici et
+  // se vérifient hors ligne, puis en production par un `curl -sI`.
+  //
+  // Les valeurs sont EXACTES, pas un motif : `geolocation=(self)` est CONSERVÉ
+  // parce que le tri par distance de /jobs en dépend, tandis que `camera=()` et
+  // `microphone=()` ne coûtent rien — mesuré le 24/10/2026, aucune occurrence de
+  // `getUserMedia` ni de `@capacitor/camera` dans src/. Une valeur « plus
+  // stricte » écrite un jour sans relire la page casserait la découverte.
+  const ENTETES_STATIQUES = [
+    ['X-Content-Type-Options', 'nosniff'],
+    ['Referrer-Policy', 'strict-origin-when-cross-origin'],
+    ['Permissions-Policy', 'geolocation=(self), microphone=(), camera=()'],
+  ];
+  // Les formes qui couvrent TOUT le site. Un en-tête posé sur une route
+  // seulement ne protège pas les autres : il ne compte donc pas ici.
+  const SOURCES_GLOBALES = ['/(.*)', '(.*)', '/:path*'];
+  const enteteGlobal = (cle) => {
+    for (const entry of headerRules) {
+      if (!entry || !Array.isArray(entry.headers)) continue;
+      if (!SOURCES_GLOBALES.includes(String(entry.source || ''))) continue;
+      const found = entry.headers.find(
+        (h) => h && String(h.key).toLowerCase() === String(cle).toLowerCase()
+      );
+      if (found) return String(found.value || '');
+    }
+    return null;
+  };
+  for (const [cle, attendu] of ENTETES_STATIQUES) {
+    const valeur = enteteGlobal(cle);
+    if (valeur === null) {
+      errors.push(
+        `vercel.json : l'en-tête « ${cle}: ${attendu} » est ABSENT de la règle « /(.*) » — ` +
+          'le HTML de production ne le porte donc pas (mesuré le 24/10/2026). ' +
+          'L’ajouter à la règle qui couvre tout le site, pas à une route.'
+      );
+    } else if (valeur !== attendu) {
+      errors.push(
+        `vercel.json : « ${cle} » vaut « ${valeur} » au lieu de « ${attendu} » — une valeur ` +
+          'plus stricte que la page ne le supporte casserait une fonction (le tri par distance ' +
+          'de /jobs dépend de geolocation=(self)).'
+      );
+    }
+  }
+
   // ── 7. La page 404 existe réellement dans le build et n'est pas indexable ─
   const notFoundPath = path.join(buildDir, '404.html');
   if (existsSync(buildDir)) {
@@ -832,6 +883,10 @@ export function runSpaRoutesCheck(options = {}) {
       `${privateRoutes.length} route(s) privée(s) dérivée(s) du routage : X-Robots-Tag dans ` +
         `vercel.json, meta de build/app.html et Disallow de build/${ROBOTS_TXT} — trois surfaces, ` +
         'une seule liste'
+    );
+    notices.push(
+      `${ENTETES_STATIQUES.length} en-têtes statiques sur « /(.*) » : ` +
+        ENTETES_STATIQUES.map(([cle, valeur]) => `${cle}: ${valeur}`).join(' ; ')
     );
   }
 

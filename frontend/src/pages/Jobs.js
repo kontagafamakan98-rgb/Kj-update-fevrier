@@ -15,7 +15,7 @@ import { makeScopedTranslator } from '../utils/pack2PageI18n/jobs';
 import { PAGE_SECTIONS } from '../config/page-sections';
 import { getJobUiLabel } from '../utils/jobUiLocale';
 import { safeLog } from '../utils/env';
-import { DemoJobsEmptyState, JobCard } from '../components/JobsResults';
+import { PremiersArrivants, JobCard } from '../components/JobsResults';
 import { normalizeJobList } from '../utils/jobDisplayBridge';
 import CountrySelector from '../components/CountrySelector';
 import CountryDisplay, { getCountry } from '../components/CountryDisplay';
@@ -641,7 +641,19 @@ export default function Jobs() {
         null
       ) : filteredJobs.length === 0 ? (
         !user && effectiveTab === JOB_TAB_DISCOVER && !filtresActifs ? (
-          <DemoJobsEmptyState t={t} />
+          <PremiersArrivants
+            t={t}
+            // Les trois textes de l'état vide viennent du dictionnaire du SCOPE
+            // `jobs` : ils sont appelés ICI, par la page qui importe ce scope, et
+            // passés au composant — un composant qui prendrait `pageT` sans
+            // importer le scope laisserait ses clés invisibles du garde
+            // d'hygiène, qui ne cherche les consommateurs que par import.
+            textes={{
+              lead: pageT('premierArrivantsLead'),
+              watch: pageT('premierArrivantsWatch'),
+              whatsapp: pageT('premierArrivantsWhatsApp'),
+            }}
+          />
         ) : (
           <div className="rounded-lg border border-dashed border-stone-300 fond-sable p-10 text-center text-stone-500">
             {/* Un état vide a besoin d'un VISAGE avant d'avoir une phrase :
