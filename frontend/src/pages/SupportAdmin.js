@@ -3,8 +3,8 @@ import { MessageSquareText, RefreshCcw, Phone, Mail, UserPlus, Wallet, X } from 
 import { supportAPI } from '../services/apiEndpoints';
 // Le TITULAIRE des comptes mobile money : une file du service clientèle, donc
 // au même endroit que les demandes — et ouverte aux agents comme au
-// propriétaire, parce qu'une file qu'une seule personne peut vider est un
-// goulot d'étranglement.
+// propriétaire, parce qu’une file qu’une seule personne peut vider est un
+// goulot d’étranglement.
 import PortefeuillesPanel from '../components/PortefeuillesMobileMoney';
 import { handleApiError } from '../services/api';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -63,7 +63,7 @@ const SupportAdmin = () => {
   const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   // Deux métiers, deux onglets : les demandes clients, et les titulaires de
-  // wallets à trancher. Séparés parce qu'ils ne se lisent pas ensemble — on
+  // wallets à trancher. Séparés parce qu’ils ne se lisent pas ensemble — on
   // travaille une file à la fois, et tout empiler sur une seule page rendait
   // la seconde invisible sous la première.
   const [onglet, setOnglet] = useState('demandes');

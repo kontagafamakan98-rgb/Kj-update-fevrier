@@ -17,7 +17,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
     wave: '',
     // NOM DU TITULAIRE du wallet (25/10/2026) : sans lui, rien ne prouve que le
     // numéro déclaré est celui de la personne — un versement pouvait partir sur
-    // le compte d'un tiers. Il vit à côté des numéros, et il est OBLIGATOIRE
+    // le compte d’un tiers. Il vit à côté des numéros, et il est OBLIGATOIRE
     // pour que le décaissement soit vérifiable (`kojo_kyc`).
     holder_name: '',
     bank_account: {
@@ -38,7 +38,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
   const [detectedCountry, setDetectedCountry] = useState(null);
   const [phoneExample, setPhoneExample] = useState('+221 70 12 34 56');
   const [popularBanks, setPopularBanks] = useState([]);
-  // L'ÉTAT du titulaire, calculé par le serveur (`kojo_kyc`) : l'écran affiche
+  // L’ÉTAT du titulaire, calculé par le serveur (`kojo_kyc`) : l’écran affiche
   // un fait — il ne devine pas si un versement est possible.
   const [walletVerification, setWalletVerification] = useState(null);
   const supportedOrangeMoneyCountries = [t('mali'), t('senegal'), t('burkina_faso'), t('ivory_coast')].join(', ');
@@ -161,7 +161,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
     return number;
   };
 
-  // Un état, une phrase : l'écran dit ce qui est BLOQUÉ et par qui ça se
+  // Un état, une phrase : l’écran dit ce qui est BLOQUÉ et par qui ça se
   // débloque, au lieu de laisser la personne découvrir le refus au moment du
   // versement.
   const walletStateLabel = (etat) => {

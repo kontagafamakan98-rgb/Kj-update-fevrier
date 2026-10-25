@@ -8,16 +8,16 @@ import { CHAMP } from '../config/classes-champ';
 
 // ── LA FILE DES TITULAIRES DE COMPTES MOBILE MONEY ──────────────────────────
 //
-// Le défaut fermé ici : un travailleur pouvait déclarer le wallet d'un TIERS et
+// Le défaut fermé ici : un travailleur pouvait déclarer le wallet d’un TIERS et
 // être payé dessus. Le serveur compare maintenant le titulaire déclaré au nom
-// du compte Kojo ; quand les deux correspondent, l'argent part sans que
-// personne n'intervienne. Ce panneau ne montre donc que les EXCEPTIONS — payer
+// du compte Kojo ; quand les deux correspondent, l’argent part sans que
+// personne n’intervienne. Ce panneau ne montre donc que les EXCEPTIONS — payer
 // un proche est fréquent et parfois légitime — et une décision vaut pour le
 // couple (nom, numéro) validé, jamais pour une transaction.
 //
-// Il vit dans /support-admin, ouvert au propriétaire ET à l'équipe support :
-// une file qu'une seule personne peut vider est un goulot d'étranglement, et
-// c'est le bureau qui reçoit l'appel du travailleur qui attend son argent.
+// Il vit dans /support-admin, ouvert au propriétaire ET à l’équipe support :
+// une file qu’une seule personne peut vider est un goulot d’étranglement, et
+// c’est le bureau qui reçoit l’appel du travailleur qui attend son argent.
 // Il ne modifie ni le nom ni le numéro : il autorise, ou il ferme.
 
 const ETATS = ['en_attente', 'verifie', 'non_declare', 'refuse'];
@@ -71,8 +71,8 @@ const PortefeuillesPanel = () => {
       const reponse = await supportAPI.listWallets(etat || undefined);
       if (!vivant.current) return;
       // Une forme INATTENDUE est une erreur NOMMÉE, jamais une file vide : un
-      // « rien à vérifier » qui n'a rien mesuré ferait croire que l'argent
-      // part, alors qu'un wallet retenu attend une décision.
+      // « rien à vérifier » qui n’a rien mesuré ferait croire que l’argent
+      // part, alors qu’un wallet retenu attend une décision.
       if (!reponse || !Array.isArray(reponse.portefeuilles)) {
         throw new Error(pageT('loadError'));
       }
@@ -87,7 +87,7 @@ const PortefeuillesPanel = () => {
       if (vivant.current) setChargement(false);
     }
     // `pageT` est recréée à chaque rendu (même choix que les autres écrans) :
-    // l'ajouter ici relancerait la lecture à l'infini.
+    // l’ajouter ici relancerait la lecture à l’infini.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [etat]);
 

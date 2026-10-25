@@ -1,8 +1,8 @@
 // Dictionnaire du scope 'portefeuilles' — la file des TITULAIRES de comptes
-// mobile money, tenue par le propriétaire OU l'équipe support (kojo_kyc).
-// Comme les autres scopes, il n'est importé que par son composant : les deux
+// mobile money, tenue par le propriétaire OU l’équipe support (kojo_kyc).
+// Comme les autres scopes, il n’est importé que par son composant : les deux
 // langues complètes tiennent ici, et wo/bm/mos héritent du français via
-// `withBase` avec les quelques phrases qu'on sait vraiment écrire — même
+// `withBase` avec les quelques phrases qu’on sait vraiment écrire — même
 // convention que `administration`, dont ce panneau est le voisin.
 import { createScopedTranslator } from './core.js';
 const withBase = (base, overrides) => ({ ...base, ...overrides });
