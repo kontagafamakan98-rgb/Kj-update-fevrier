@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { notifierTitreDePage } from './analytics';
 import { ogCardFor } from '../config/og-cards';
 import { pageMetaKeys } from '../config/page-meta';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -51,6 +52,11 @@ export const usePageTitle = (title, { description, canonicalPath } = {}) => {
     if (!title) return undefined;
     const previous = document.title;
     document.title = title;
+    // La page vue GA de la route part ICI, et pas à la navigation : c'est le
+    // premier instant où le titre de la page d'ARRIVÉE existe. Publiée sur
+    // `pushState`, elle portait le titre de la page qu'on venait de quitter
+    // (mesuré le 25/10/2026 : `/messages` titrée « Emplois disponibles »).
+    notifierTitreDePage();
     return () => {
       document.title = previous;
     };

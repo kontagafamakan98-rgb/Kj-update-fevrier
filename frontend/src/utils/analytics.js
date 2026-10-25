@@ -63,9 +63,42 @@ const initPlausible = (domain) => {
   document.head.appendChild(script);
 };
 
-// Page vue SPA : GA4 n'envoie qu'un page_view au chargement initial ;
-// react-router change l'URL sans recharger, donc sans ce relais les vues
-// suivantes seraient perdues (les rapports ne montreraient que l'accueil).
+// ── Page vue SPA : le titre de la page d'ARRIVÉE, pas celui de la précédente ─
+// GA4 n'envoie qu'un page_view au chargement initial ; react-router change
+// l'URL sans recharger, donc sans ce relais les vues suivantes seraient perdues
+// (les rapports ne montreraient que l'accueil).
+//
+// Le relais était posé sur `pushState`, donc il partait AVANT que la page
+// d'arrivée ne pose son titre : la vue de `/messages` s'appelait « Emplois
+// disponibles · Kojo ». Mesuré le 25/10/2026 dans un `POST /g/collect` de
+// production (`dl=…/messages`, `dt=Emplois disponibles · Kojo`) : l'URL était
+// juste, le titre était celui de la page d'où l'on venait. Deux conséquences —
+// un rapport GA qui nomme les pages avec le titre de la précédente, et une vue
+// qui part avant même que la route n'existe.
+//
+// La vue est donc PLANIFIÉE à la navigation, puis publiée par la PREMIÈRE des
+// deux issues suivantes :
+//   • la page d'arrivée pose son titre (`usePageTitle`, via `notifierTitreDePage`) —
+//     c'est le cas de toutes les pages qui en déclarent un ;
+//   • à défaut, un repli borné (`TRACKED_TITLE_FALLBACK_MS`) publie la vue avec
+//     le titre courant : les pages privées qui ne déclarent aucun titre
+//     (`/dashboard`, `/create-job`, `/administration`…) n'ont aucun signal à
+//     attendre, et les priver de page vue parce qu'elles ne posent pas de titre
+//     serait une perte de mesure, pas une correction.
+// Une seule vue par navigation : planifier annule la précédente.
+let vueEnAttente = 0;
+
+/**
+ * Délai maximal d'attente du titre de la page d'arrivée avant de publier.
+ *
+ * Borné, et assumé : une page dont le chunk ou les données arrivent après ce
+ * délai publie sa vue avec le titre précédent. Attendre indéfiniment ferait
+ * perdre la vue (une visite de trois secondes n'en aurait aucune), ce qui est
+ * un défaut plus grave que le titre d'une page privée.
+ */
+export const TRACKED_TITLE_FALLBACK_MS = 2000;
+
+/** Publie la vue de la route COURANTE, maintenant, avec le titre courant. */
 const trackGaPageView = () => {
   if (typeof window.gtag !== 'function') return;
   window.gtag('event', 'page_view', {
@@ -73,6 +106,32 @@ const trackGaPageView = () => {
     page_path: `${window.location.pathname}${window.location.search}`,
     page_title: document.title,
   });
+};
+
+/** Planifie la vue de la route qui vient d'être atteinte (voir ci-dessus). */
+const planifierVueDePage = () => {
+  window.clearTimeout(vueEnAttente);
+  vueEnAttente = window.setTimeout(() => {
+    vueEnAttente = 0;
+    trackGaPageView();
+  }, TRACKED_TITLE_FALLBACK_MS);
+};
+
+/**
+ * La page d'arrivée vient de poser son titre : publie la vue planifiée.
+ *
+ * Appelée par `usePageTitle` (utils/seo.js), APRÈS `document.title = …`, et
+ * sans effet quand aucune navigation n'est en attente — un titre posé plus tard
+ * (données d'une fiche) ne crée donc pas une seconde vue.
+ *
+ * @returns {boolean} vrai si une vue a été publiée.
+ */
+export const notifierTitreDePage = () => {
+  if (!vueEnAttente) return false;
+  window.clearTimeout(vueEnAttente);
+  vueEnAttente = 0;
+  trackGaPageView();
+  return true;
 };
 
 /**
@@ -135,10 +194,13 @@ const initGoogleAnalytics = (measurementId) => {
     };
   }
   window.gtag('js', new Date());
-  // send_page_view: false — le premier page_view est envoyé explicitement
-  // ci-dessous, comme les suivants, pour n'avoir qu'un seul chemin de code.
+  // send_page_view: false — toutes les page vue passent par ICI, une seule
+  // fois chacune, pour n'avoir qu'un seul chemin de code (et un seul endroit
+  // où corriger un titre).
   window.gtag('config', measurementId, { send_page_view: false });
-  trackGaPageView();
+  // La vue d'ARRIVÉE est planifiée comme les suivantes : la page monte après
+  // `initAnalytics`, donc son titre n'existe pas encore à cet instant.
+  planifierVueDePage();
 
   // Le tag déclaré par le HTML est chargé hors du chemin critique.
   const src = gaScriptUrlFrom();
@@ -148,13 +210,13 @@ const initGoogleAnalytics = (measurementId) => {
     const original = window.history[type];
     window.history[type] = function patched(...args) {
       const result = original.apply(this, args);
-      window.setTimeout(trackGaPageView, 0);
+      planifierVueDePage();
       return result;
     };
   };
   wrap('pushState');
   wrap('replaceState');
-  window.addEventListener('popstate', trackGaPageView);
+  window.addEventListener('popstate', planifierVueDePage);
 };
 
 /**
