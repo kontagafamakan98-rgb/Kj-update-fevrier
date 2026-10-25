@@ -17,7 +17,8 @@
  * ── Ce qui est mesuré ici, et par quel chemin ──────────────────────────────
  * Trois réponses, trois comportements lus à l'ÉCRAN (jamais dans un état
  * interne) :
- *   • `available: false` → la PHRASE est affichée, jamais la clé ;
+ *   • `available: false` → la PHRASE est affichée UNE SEULE FOIS, jamais la
+ *     clé (elle l'était trois fois : bandeau du haut, bloc de champ, toast) ;
  *   • `available: true`  → « Adresse email disponible » (la coche servie) ;
  *   • `available: null`  → rien : ni reproche, ni coche (un backend d'avant
  *     la correction, ou une autre origine, ne bloque pas l'inscription).
@@ -28,7 +29,7 @@
  */
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, waitFor } from '@testing-library/react';
+import { render, screen, cleanup, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -150,15 +151,67 @@ describe('/register — disponibilité de l’adresse', () => {
     expect(screen.queryByText('Cette adresse email est déjà utilisée')).toBeNull();
   });
 
-  it('« available: false » affiche la phrase, et pas la clé', async () => {
+  /**
+   * MESURÉ LE 25/10/2026 : le même refus s'affichait TROIS fois — bandeau en
+   * haut du formulaire, bloc sous le champ, et toast. Trois copies ne disent
+   * pas trois choses : elles font douter que la première soit la bonne, et sur
+   * un téléphone le toast en bas masque justement le bloc qui porte les issues.
+   * La surface est donc le bloc DU CHAMP, et lui seul.
+   */
+  it('« available: false » affiche la phrase UNE SEULE fois, dans le bloc du champ', async () => {
     etat.reponse = { available: false, email: 'pris@exemple.com', message: 'Cette adresse email est déjà utilisée' };
     monter();
     await saisirEmail('pris@exemple.com');
 
-    // La phrase apparaît (bandeau d'erreur ET message de champ) : ce qui
-    // compte ici, c'est qu'elle soit LISIBLE et que la clé ne le soit pas.
-    expect((await screen.findAllByText('Cette adresse email est déjà utilisée')).length).toBeGreaterThan(0);
+    await screen.findAllByText('Cette adresse email est déjà utilisée');
+    const occurrences = screen.getAllByText('Cette adresse email est déjà utilisée');
+    expect(occurrences).toHaveLength(1);
     expect(screen.queryByText('duplicateEmailError')).toBeNull();
+
+    // Ce qui la porte est le bloc DU CHAMP (`role="alert"`), pas un bandeau en
+    // haut de formulaire : il est dans le même groupe que l'input.
+    const champ = document.getElementById('email');
+    const bloc = screen.getByRole('alert');
+    expect(bloc.contains(occurrences[0])).toBe(true);
+    expect(champ.parentElement.contains(bloc)).toBe(true);
+    // Le champ DÉCRIT le refus : l'annonce d'un lecteur d'écran tombe sur lui.
+    expect(champ.getAttribute('aria-describedby')).toBe('email-disponibilite');
+    expect(champ.getAttribute('aria-invalid')).toBe('true');
+
+    // Les deux issues sont EMPILÉES sur mobile (une par ligne, lisibles en
+    // entier) et alignées à partir de `sm` : jsdom ne calcule aucune mise en
+    // page, donc c'est la CLASSE qui porte le contrat qui est jugée.
+    const issues = screen.getByRole('link', { name: /connectez-vous avec cette adresse/i }).parentElement;
+    expect(issues.className).toContain('flex-col');
+    expect(issues.className).toContain('sm:flex-row');
+
+    // Et rien en toast pour ce refus (le toast était la troisième copie).
+    expect(etat.toastErreur).toEqual([]);
+  });
+
+  /**
+   * Sur un téléphone, le bouton d'envoi est en bas d'un formulaire long : un
+   * refus qui tombe à l'envoi laisserait le message hors de l'écran. Le champ
+   * reprend donc le focus (ce que jsdom sait vérifier), et l'appel de
+   * `scrollIntoView` est ce qui le Y ramène.
+   */
+  it('à l’ENVOI, un refus ramène au champ et n’ajoute aucun toast', async () => {
+    etat.reponse = { available: false, email: 'pris@exemple.com', message: 'Cette adresse email est déjà utilisée' };
+    monter();
+
+    const champ = document.getElementById('email');
+    await userEvent.type(champ, 'pris@exemple.com');
+    await userEvent.type(document.getElementById('password'), 'motdepasse123');
+    await userEvent.type(document.getElementById('confirmPassword'), 'motdepasse123');
+    await userEvent.click(document.getElementById('legal_documents_accepted'));
+
+    fireEvent.submit(champ.closest('form'));
+
+    await waitFor(() => expect(document.activeElement).toBe(champ));
+    expect(screen.getAllByText('Cette adresse email est déjà utilisée')).toHaveLength(1);
+    expect(etat.toastErreur).toEqual([]);
+    expect(screen.getByRole('link', { name: /connectez-vous avec cette adresse/i }).getAttribute('href')).toBe('/login');
+    expect(screen.getByRole('link', { name: /réinitialisez votre mot de passe/i }).getAttribute('href')).toBe('/forgot-password');
   });
 
   /**
