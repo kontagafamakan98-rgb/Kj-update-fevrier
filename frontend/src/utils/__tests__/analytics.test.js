@@ -45,6 +45,12 @@ const init = async () => {
   initAnalytics();
 };
 
+// Les vues publiées dans la file (`gtag('event', 'page_view', …)`).
+const vues = () =>
+  (window.dataLayer || [])
+    .map((appel) => Array.from(appel))
+    .filter(([commande, evenement]) => commande === 'event' && evenement === 'page_view');
+
 describe('initAnalytics — GA4 chargé hors du chemin critique', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -120,5 +126,127 @@ describe('initAnalytics — GA4 chargé hors du chemin critique', () => {
     publierLeTag();
 
     expect(document.querySelectorAll('script[src*="googletagmanager.com/gtag/js"]')).toHaveLength(1);
+  });
+});
+
+/**
+ * Page vue SPA : UNE par navigation, et avec le titre de la page d'ARRIVÉE.
+ *
+ * Mesuré en production le 25/10/2026 dans un `POST /g/collect` : la vue de
+ * `/messages` portait `dt=Emplois disponibles · Kojo`. La vue partait sur
+ * `pushState`, donc avant que la page d'arrivée ne pose son titre. Ces cas
+ * tiennent les trois propriétés qui rendent la mesure exploitable : le bon
+ * moment (après le titre), une seule vue par navigation, et aucune vue perdue
+ * pour les pages qui ne déclarent pas de titre.
+ */
+describe('page vue SPA — le bon titre, une seule fois', () => {
+  let module;
+  // `initAnalytics` POSE un relais sur `history.pushState`. Chaque cas importe
+  // un module NEUF : sans restaurer les méthodes d'origine, les relais
+  // s'empileraient d'un cas à l'autre et une seule navigation publierait
+  // plusieurs vues — le test mesurerait alors sa propre accumulation.
+  const pourStateOrigine = window.history.pushState;
+  const remplaceStateOrigine = window.history.replaceState;
+
+  const restaurerHistory = () => {
+    window.history.pushState = pourStateOrigine;
+    window.history.replaceState = remplaceStateOrigine;
+  };
+
+  beforeEach(async () => {
+    vi.resetModules();
+    restaurerHistory();
+    vi.useFakeTimers();
+    vi.stubEnv('VITE_GA_MEASUREMENT_ID', GA_ID);
+    document.head.innerHTML = '';
+    delete window.dataLayer;
+    delete window.gtag;
+    delete window.requestIdleCallback;
+    window.history.replaceState({}, '', '/');
+    document.title = 'Kojo';
+    module = await import('../analytics.js');
+    module.initAnalytics();
+  });
+
+  afterEach(() => {
+    restaurerHistory();
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it("n'envoie pas la vue d'arrivée avant que la page n'ait posé son titre", () => {
+    // À cet instant, le document porte encore le titre statique d'index.html :
+    // publier maintenant, c'est publier « Kojo » pour toutes les pages.
+    expect(vues()).toHaveLength(0);
+
+    document.title = 'Messages · Kojo';
+    expect(module.notifierTitreDePage()).toBe(true);
+
+    expect(vues()).toHaveLength(1);
+    expect(vues()[0][2]).toMatchObject({
+      page_path: '/',
+      page_title: 'Messages · Kojo',
+    });
+  });
+
+  it('publie la vue après la navigation avec l’URL ET le titre de la page d’arrivée', () => {
+    module.notifierTitreDePage(); // la vue d'arrivée (test précédent)
+
+    window.history.pushState({}, '', '/messages');
+    // La navigation seule ne publie RIEN : le titre de la page d'arrivée
+    // n'existe pas encore (c'est exactement le défaut mesuré).
+    expect(vues()).toHaveLength(1);
+
+    document.title = 'Messages · Kojo';
+    module.notifierTitreDePage();
+
+    expect(vues()).toHaveLength(2);
+    expect(vues()[1][2]).toMatchObject({ page_path: '/messages', page_title: 'Messages · Kojo' });
+
+    // Le repli ne republie pas la même navigation.
+    vi.advanceTimersByTime(module.TRACKED_TITLE_FALLBACK_MS);
+    expect(vues()).toHaveLength(2);
+  });
+
+  it('le repli publie une page privée qui ne déclare aucun titre', () => {
+    // `/dashboard`, `/create-job`, `/administration`… ne posent pas de titre :
+    // les priver de vue serait une perte de mesure, pas une correction.
+    vi.advanceTimersByTime(module.TRACKED_TITLE_FALLBACK_MS);
+
+    expect(vues()).toHaveLength(1);
+
+    window.history.pushState({}, '', '/dashboard');
+    vi.advanceTimersByTime(module.TRACKED_TITLE_FALLBACK_MS);
+
+    expect(vues()).toHaveLength(2);
+    expect(vues()[1][2].page_path).toBe('/dashboard');
+  });
+
+  it('deux navigations rapprochées ne publient que la dernière', () => {
+    window.history.pushState({}, '', '/jobs');
+    window.history.pushState({}, '', '/messages');
+
+    document.title = 'Messages · Kojo';
+    module.notifierTitreDePage();
+    // Le repli de la navigation ANNULÉE (/jobs) ne doit pas publier en plus.
+    vi.advanceTimersByTime(module.TRACKED_TITLE_FALLBACK_MS);
+
+    expect(vues()).toHaveLength(1);
+    expect(vues()[0][2].page_path).toBe('/messages');
+  });
+
+  it('ne publie aucune vue sans mesure configurée', () => {
+    vi.stubEnv('VITE_GA_MEASUREMENT_ID', '');
+    // Un second module, sans identifiant : `initAnalytics` ne pose pas `gtag`.
+    delete window.gtag;
+    delete window.dataLayer;
+    vi.resetModules();
+    return import('../analytics.js').then((sansGa) => {
+      sansGa.initAnalytics();
+      sansGa.notifierTitreDePage();
+      vi.advanceTimersByTime(sansGa.TRACKED_TITLE_FALLBACK_MS);
+      expect(window.dataLayer).toBeUndefined();
+    });
   });
 });
