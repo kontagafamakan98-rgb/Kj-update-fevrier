@@ -108,6 +108,14 @@
   "noAccount": "No account?",
   "personalInformation": "Personal Information",
   "paymentAccounts": "Payment Accounts",
+  "walletHolderTitle": "Mobile money wallet holder",
+  "walletHolderLabel": "Holder name",
+  "walletHolderHelp": "Exactly as it appears on the Orange Money or Wave account. Your earnings are only released when this name is yours; otherwise the Kojo team reviews it before any payment.",
+  "walletHolderPlaceholder": "Holder’s first and last name",
+  "walletStateVerified": "Payouts open: the holder matches your account.",
+  "walletStatePending": "Payouts held: this name is not your account’s. The Kojo team must approve it.",
+  "walletStateNotDeclared": "Payouts held: enter the name of your mobile money account holder.",
+  "walletStateRefused": "Payouts held: this mobile money account was refused. Register an account in your own name.",
   "preferredLanguage": "Preferred Language",
   "selectLanguageLabel": "Select a language",
   "french": "French",
@@ -961,5 +969,7 @@
   "commissionTierLancement": "No commission: launch offer on your first jobs.",
   "commissionTierRecurrent": "Loyalty rate applied: your commission is reduced.",
   "workerDisputesLabel": "Disputes",
-  "workerDisputesLost": "{count} decided for the client"
+  "workerDisputesLost": "{count} decided for the client",
+  "tabRequests": "Requests",
+  "tabWallets": "Wallets"
 }

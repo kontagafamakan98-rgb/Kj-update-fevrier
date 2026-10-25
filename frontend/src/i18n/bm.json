@@ -961,5 +961,15 @@
   "commissionTierLancement": "Komiisiyon tɛ i ka baara fɔlɔw la (offre fɔlɔ).",
   "commissionTierRecurrent": "Komiisiyon dɔgɔra: tarif fidélité bɛ baara kɛ.",
   "workerDisputesLabel": "Kɛlɛ",
-  "workerDisputesLost": "{count} bɛ client ka fɛ"
+  "workerDisputesLost": "{count} bɛ client ka fɛ",
+  "tabRequests": "Dɛmɛ deliliw",
+  "tabWallets": "Jatebɔsɛbɛnw",
+  "walletHolderTitle": "Mobile money jatebɔsɛbɛn tigi",
+  "walletHolderLabel": "Jatebɔsɛbɛn tigi tɔgɔ",
+  "walletHolderHelp": "I ka a sɛbɛn i ka Orange Money walima Wave jatebɔsɛbɛn tigi tɔgɔ la. I ka waribirili bɛ bɔ a bɛɛ kɔ i ka tɔgɔ yé a tigi tɔgɔ yé; n’i tɔgɔ ma zan, Kojo ka kulu b’a ladi ka kɔn.",
+  "walletHolderPlaceholder": "Jatebɔsɛbɛn tigi tɔgɔ",
+  "walletStateVerified": "Waribirili bɛ bɔ: tigi tɔgɔ ye i ka tɔgɔ ye.",
+  "walletStatePending": "Waribirili bɛ bɔ: nin tɔgɔ ma i ka tɔgɔ ye. Kojo ka kulu ka kan ka a ladi.",
+  "walletStateNotDeclared": "Waribirili bɛ bɔ: i ka jatebɔsɛbɛn tigi tɔgɔ sɛbɛn.",
+  "walletStateRefused": "Waribirili bɛ bɔ: u bali nin jatebɔsɛbɛn in. I ka jatebɔsɛbɛn sɛbɛn i yɛrɛ tɔgɔ la."
 }

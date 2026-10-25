@@ -15,6 +15,11 @@ const PaymentAccountsManager = ({ onSuccess }) => {
   const [accounts, setAccounts] = useState({
     orange_money: '',
     wave: '',
+    // NOM DU TITULAIRE du wallet (25/10/2026) : sans lui, rien ne prouve que le
+    // numéro déclaré est celui de la personne — un versement pouvait partir sur
+    // le compte d’un tiers. Il vit à côté des numéros, et il est OBLIGATOIRE
+    // pour que le décaissement soit vérifiable (`kojo_kyc`).
+    holder_name: '',
     bank_account: {
       account_number: '',
       bank_name: '',
@@ -33,6 +38,9 @@ const PaymentAccountsManager = ({ onSuccess }) => {
   const [detectedCountry, setDetectedCountry] = useState(null);
   const [phoneExample, setPhoneExample] = useState('+221 70 12 34 56');
   const [popularBanks, setPopularBanks] = useState([]);
+  // L’ÉTAT du titulaire, calculé par le serveur (`kojo_kyc`) : l’écran affiche
+  // un fait — il ne devine pas si un versement est possible.
+  const [walletVerification, setWalletVerification] = useState(null);
   const supportedOrangeMoneyCountries = [t('mali'), t('senegal'), t('burkina_faso'), t('ivory_coast')].join(', ');
 
   // Wave n'est opéré que par PayDunya au Sénégal et en Côte d'Ivoire : un
@@ -76,9 +84,11 @@ const PaymentAccountsManager = ({ onSuccess }) => {
       
       if (result.success && result.data) {
         const savedAccounts = result.data.payment_accounts || {};
+        setWalletVerification(result.data.wallet_verification || null);
         setAccounts({
           orange_money: savedAccounts.orange_money || '',
           wave: savedAccounts.wave || '',
+          holder_name: savedAccounts.holder_name || '',
           bank_account: savedAccounts.bank_account || {
             account_number: '',
             bank_name: '',
@@ -151,6 +161,16 @@ const PaymentAccountsManager = ({ onSuccess }) => {
     return number;
   };
 
+  // Un état, une phrase : l’écran dit ce qui est BLOQUÉ et par qui ça se
+  // débloque, au lieu de laisser la personne découvrir le refus au moment du
+  // versement.
+  const walletStateLabel = (etat) => {
+    if (etat === 'verifie') return t('walletStateVerified');
+    if (etat === 'en_attente') return t('walletStatePending');
+    if (etat === 'refuse') return t('walletStateRefused');
+    return t('walletStateNotDeclared');
+  };
+
   const maskAccountNumber = (accountNumber) => {
     if (!accountNumber || accountNumber.length < 8) return accountNumber;
     return '****' + accountNumber.slice(-4);
@@ -197,6 +217,9 @@ const PaymentAccountsManager = ({ onSuccess }) => {
       const formattedAccounts = {
         orange_money: accounts.orange_money ? formatPhoneNumber(accounts.orange_money) : '',
         wave: !isWaveUnavailable && accounts.wave ? formatPhoneNumber(accounts.wave) : '',
+        // Le titulaire part avec les numéros : il ne sert à rien sans eux, et
+        // le serveur le compare au nom du compte à chaque écriture.
+        holder_name: accounts.holder_name.trim(),
         bank_account: accounts.bank_account.account_number ? accounts.bank_account : null
       };
 
@@ -396,6 +419,56 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                 <p className="text-gray-700 font-mono">{accounts.wave}</p>
               ) : (
                 <p className="text-gray-500 italic">{t('notConfigured')}</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Titulaire du wallet : la pièce qui rend le versement vérifiable */}
+        <div className="rounded-[3px] border border-stone-200 p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-lg font-semibold text-gray-900">{t('walletHolderTitle')}</h3>
+            {!isEditing && walletVerification && (
+              <span
+                className={`whitespace-nowrap rounded-[3px] border px-2.5 py-1 text-xs font-semibold ${
+                  walletVerification.etat === 'verifie'
+                    ? 'border-green-200 bg-green-50 text-green-800'
+                    : 'border-orange-200 bg-orange-50 text-orange-800'
+                }`}
+              >
+                {walletStateLabel(walletVerification.etat)}
+              </span>
+            )}
+          </div>
+
+          {isEditing ? (
+            <div>
+              <label
+                htmlFor="payment_accounts_holder_name"
+                className="block text-sm font-semibold text-stone-800"
+              >
+                {t('walletHolderLabel')}
+              </label>
+              <input
+                id="payment_accounts_holder_name"
+                name="payment_accounts_holder_name"
+                autoComplete="name"
+                type="text"
+                maxLength={80}
+                value={accounts.holder_name}
+                onChange={(e) => setAccounts({ ...accounts, holder_name: e.target.value })}
+                placeholder={t('walletHolderPlaceholder')}
+                className={`mt-1 ${CHAMP}`}
+              />
+              <p className="mt-1 text-sm text-gray-500">{t('walletHolderHelp')}</p>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <p className="text-gray-700">
+                {accounts.holder_name || <span className="italic text-gray-500">{t('notConfigured')}</span>}
+              </p>
+              {walletVerification && (
+                <p className="text-sm text-gray-500">{walletStateLabel(walletVerification.etat)}</p>
               )}
             </div>
           )}

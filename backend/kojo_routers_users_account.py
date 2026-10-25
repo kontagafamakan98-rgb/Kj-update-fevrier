@@ -126,6 +126,11 @@ ANONYMISATION_CHAMPS = {
     "account_state_at": None,
     "account_state_by": None,
     "account_state_history": [],
+    # Vérification du titulaire du wallet (`kojo_kyc`) : la décision nomme le
+    # TITULAIRE du compte mobile money (une donnée de paiement d'un tiers), son
+    # auteur et sa note. Un compte supprimé n'a plus de wallet à payer, donc
+    # plus rien à vérifier — et `payment_accounts` est effacé juste au-dessus.
+    "wallet_verification": None,
 }
 
 # Champs CONSERVÉS dans le document anonymisé, avec la raison — c'est la
@@ -164,6 +169,13 @@ CHAMPS_HORS_MODELE = frozenset({
     "permissions", "deleted", "deleted_at", "purge_at", "_id",
     "account_state", "account_state_reason", "account_state_at",
     "account_state_by", "account_state_history",
+    # Vérification du TITULAIRE du wallet (`kojo_kyc`, 25/10/2026) : écrite sur
+    # le document par la décision du propriétaire, jamais par le modèle `User`
+    # (le compte n'a pas à publier la décision qui le concerne). Déclarée ici
+    # pour que l'union « effacé ∪ conservé » couvre exactement les champs du
+    # compte — et parce qu'elle nomme le titulaire d'un wallet, donc elle
+    # s'efface avec `payment_accounts` dont elle dépend.
+    "wallet_verification",
 })
 
 @router.delete("/users/account")

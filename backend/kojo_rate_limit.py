@@ -313,7 +313,12 @@ def get_rate_limit_bucket(path: str) -> tuple[str, int, int]:
     # dans ce bucket.
     segments = [morceau for morceau in path.strip("/").split("/") if morceau]
     if (len(segments) == 5 and segments[:3] == ["api", "support", "tickets"] and segments[4] == "status") \
-            or segments[:3] == ["api", "support", "team"]:
+            or segments[:3] == ["api", "support", "team"] \
+            or segments[:3] == ["api", "support", "wallets"]:
+        # Les portefeuilles sont le MÊME guichet (25/10/2026) : une décision
+        # sur un titulaire de wallet se prend au bureau, souvent à plusieurs,
+        # et depuis la même IP — la borne de 10 / 5 min fermerait la file aux
+        # agents précisément quand un travailleur attend son argent.
         return ("support-desk", 120, 1)
     if path.startswith("/api/support"):
         # Tickets support (création publique) : 10 POST/5min/IP. Les GET/HEAD sont

@@ -1,9 +1,9 @@
 import asyncio
 import json
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
@@ -31,6 +31,11 @@ from kojo_equipe_support import (
 )
 from kojo_settings import AI_GATEWAY_MODEL, logger
 from kojo_identifiants import dump_stable, identifiant_query
+# Le TITULAIRE des comptes mobile money (`kojo_kyc`, 25/10/2026) : la décision
+# est du SERVICE CLIENTÈLE, pas du seul propriétaire — c'est le bureau qui
+# reçoit l'appel du travailleur qui attend son argent, et une file que seule une
+# personne peut vider est un goulot d'étranglement.
+import kojo_kyc
 # La politique de l'assistant vit dans UN module (`kojo_support_assistant`) :
 # WhatsApp parle au même assistant, et deux copies des règles divergeraient au
 # premier correctif.
@@ -284,6 +289,112 @@ async def update_support_ticket_status(
 # son code, plutôt que retroduit en un message générique.
 def _refus_equipe(refus: EquipeSupportRefus) -> HTTPException:
     return HTTPException(status_code=refus.statut, detail=refus.motif)
+
+
+# ── TITULAIRE DES COMPTES MOBILE MONEY ───────────────────────────────────────
+#
+# La fraude qui coûte de l'argent réel n'a pas besoin d'un document : il suffit
+# de déclarer le wallet de quelqu'un d'autre. `kojo_kyc` compare le titulaire
+# DÉCLARÉ au nom du compte Kojo ; quand les deux diffèrent (payer un proche est
+# fréquent et parfois légitime), un humain tranche — et ce peut être le
+# propriétaire COMME un membre de l'équipe support : `verify_support_access`
+# ouvre cette file, et rien d'autre ne s'y ajoute (les gains et l'arbitrage
+# restent fermés, cf. `/owner/*`).
+#
+# Ces deux routes ne modifient ni le nom ni le numéro : elles autorisent, ou
+# ferment, un couple (nom, numéro) déjà déclaré par la personne elle-même.
+
+class DecisionPortefeuille(BaseModel):
+    """Corps de `POST /support/wallets/{user_id}/decision`.
+
+    `verifier` AUTORISE le décaissement vers ce wallet, `refuser` le ferme. La
+    note est exigée par `kojo_kyc.decision_proprietaire` (400 nommant la
+    longueur minimale) : une décision sur l'argent de quelqu'un ne se relit pas
+    sans motif.
+    """
+    decision: Literal["verifier", "refuser"]
+    note: str = Field(default="", max_length=500)
+
+
+@router.get("/support/wallets")
+async def list_support_wallets(
+    etat: Optional[str] = Query(None, pattern="^(non_declare|en_attente|verifie|refuse)$"),
+    limite: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    owner_user = Depends(verify_support_access),
+):
+    """Les portefeuilles mobile money et leur état — PROPRIÉTAIRE OU ÉQUIPE SUPPORT.
+
+    L'état est calculé par `kojo_kyc.etat_du_document` (comparaison des noms,
+    décision manuelle comprise) : l'écran lit un fait. `en_attente` est la file
+    utile — un nom déclaré qui n'est pas celui du compte.
+
+    Returns:
+        dict: {total, count, offset, limite, tronque, portefeuilles}.
+        `tronque` dit que la lecture bornée a coupé la vue : une file
+        incomplète qui se tait ferait croire qu'il n'y a plus rien à valider.
+    """
+    page = await kojo_kyc.lister_portefeuilles(etat=etat, limite=limite, offset=offset)
+    # Les clés sont écrites LITTÉRALEMENT ici : `scripts/audit_docstrings.py`
+    # croise la section `Returns:` avec les `return {…}` du handler, donc une
+    # délégation pure ferait passer des clés bien retournées pour des clés
+    # seulement documentées — c'est ce que la CI a refusé le 25/10/2026.
+    return {
+        "total": page["total"],
+        "count": page["count"],
+        "offset": page["offset"],
+        "limite": page["limite"],
+        "tronque": page["tronque"],
+        "portefeuilles": page["portefeuilles"],
+    }
+
+
+@router.post("/support/wallets/{user_id}/decision")
+async def decide_support_wallet(
+    user_id: str,
+    payload: DecisionPortefeuille,
+    owner_user = Depends(verify_support_access),
+):
+    """Valider ou refuser le wallet d'un compte — PROPRIÉTAIRE OU ÉQUIPE SUPPORT.
+
+    Refus nommés : 400 décision inconnue, note trop courte ou aucun wallet à
+    vérifier ; 409 compte propriétaire ou compte supprimé ; 404 identifiant
+    inconnu. La décision est écrite sur le DOCUMENT du compte
+    (`wallet_verification`), avec son auteur, sa date et son motif, et elle ne
+    vaut que pour le couple (nom, numéro) validé.
+
+    Returns:
+        dict: {message, compte_id, etat, decision, note, at, historique}.
+    """
+    compte = await db.users.find_one(
+        {**identifiant_query(user_id)}, {"password_hash": 0}
+    )
+    if not compte:
+        raise HTTPException(status_code=404, detail="Compte introuvable")
+
+    decision = await kojo_kyc.decision_proprietaire(
+        compte,
+        decision=payload.decision,
+        note=payload.note,
+        auteur=owner_user,
+    )
+    logger.info(
+        "💳 Wallet %s → %s par %s (note : %s)",
+        decision["compte_id"],
+        decision["etat"],
+        # Propriétaire = document, agent = modèle `User` : la source de
+        # l'identifiant est lue, jamais supposée (cf. `kojo_kyc._identifiant_auteur`).
+        kojo_kyc._identifiant_auteur(owner_user),
+        decision["note"],
+    )
+    return {
+        "message": (
+            "Portefeuille validé : les versements vers ce compte sont ouverts."
+            if decision["decision"] == "verifier"
+            else "Portefeuille refusé : aucun versement ne partira vers ce compte."
+        ),
+        **decision,
+    }
 
 
 @router.get("/support/team")

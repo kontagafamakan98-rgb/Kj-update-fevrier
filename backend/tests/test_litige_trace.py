@@ -1227,7 +1227,7 @@ class TestEchecDeDecision:
         with _paiements_simules() as notif:
             resume = await completion.passage_liberations_auto()
             await asyncio.sleep(0)
-        assert resume == {"due": 0, "released": 0, "blocked": 0, "skipped": 0, "frozen": 0}
+        assert resume == {"due": 0, "released": 0, "blocked": 0, "skipped": 0, "frozen": 0, "wallet_hold": 0}
         notif.assert_not_called()
         assert (await db_find_one("jobs", {"id": job["id"]}))["status"] == "in_progress"
 

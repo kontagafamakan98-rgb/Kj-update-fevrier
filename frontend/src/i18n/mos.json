@@ -961,5 +961,15 @@
   "commissionTierLancement": "Komisõ ka be ye f tʋʋm pɑɑlã la (offre pɑɑl).",
   "commissionTierRecurrent": "Komisõ boogame: tarif fidélité wã tʋʋmda.",
   "workerDisputesLabel": "Zãnga",
-  "workerDisputesLost": "{count} be clientã nengẽ"
+  "workerDisputesLost": "{count} be clientã nengẽ",
+  "tabRequests": "Sõng kosgo",
+  "tabWallets": "Konta",
+  "walletHolderTitle": "Mobile money konta soaba",
+  "walletHolderLabel": "Konta soabã yʋʋr",
+  "walletHolderHelp": "Sẽn be Orange Money walla Wave kontã zugu la. F ligd yaa kõta tɩ naamã zems ne f kontã; sã n ka zems bɩ Kojo tʋmɓã n pʋʋs pʋʋsgã dẽega.",
+  "walletHolderPlaceholder": "Konta soabã yʋʋr",
+  "walletStateVerified": "Ligdã kõta: naamã zemsame ne f kontã.",
+  "walletStatePending": "Ligdã yaa kõte: naamã ka zems ne f kontã ye. Kojo tʋmɓã segd n pʋʋse.",
+  "walletStateNotDeclared": "Ligdã yaa kõte: gʋls konta soabã yʋʋr.",
+  "walletStateRefused": "Ligdã yaa kõte: b zãbd-la. Gʋls kont sẽn tar f naam."
 }
