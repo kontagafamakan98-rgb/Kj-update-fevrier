@@ -16,7 +16,7 @@
  * mesure sans attendre.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { openLiveStream, isLiveStreamSupported } from '../liveStream';
+import { openLiveStream, isLiveStreamSupported, MAX_RETRY_AFTER_MS } from '../liveStream';
 import {
   BATTEMENT_SERVEUR_MS,
   SILENCE_TIMEOUT_MS,
@@ -218,6 +218,56 @@ describe('flux SSE — reconnexion', () => {
     await attendre(() => statuts.includes('down') && delais.length === 1);
     expect(statuts).toContain('connecting');
     expect(delais[0]).toBe(1000);
+    stop();
+  });
+
+  it('respecte le Retry-After du serveur au lieu de revenir plus tôt', async () => {
+    // Mesuré le 25/10/2026, console de production : au plafond de flux d'un
+    // compte, les deux flux répondent 503 avec `Retry-After: 60`, et le client
+    // revenait à 1 s, 2 s, 4 s… — une rafale de 503 pour un plafond inchangé.
+    // La consigne du serveur est un PLANCHER, jamais un plafond.
+    const delais = [];
+    const refus = {
+      ok: false,
+      status: 503,
+      body: null,
+      headers: { get: (nom) => (nom === 'retry-after' ? '60' : null) },
+    };
+    const stop = ouvrir('/notifications/stream', {
+      fetchImpl: vi.fn(async () => refus),
+      schedule: (run, delay) => {
+        delais.push(delay);
+        return delay;
+      },
+      initialDelayMs: 1000,
+      random: () => 0.5,
+    });
+
+    await attendre(() => delais.length === 1);
+    expect(delais[0]).toBe(60000);
+    stop();
+  });
+
+  it('une consigne absurde est bornée (un flux ne reste pas muet une heure)', async () => {
+    const delais = [];
+    const refus = {
+      ok: false,
+      status: 503,
+      body: null,
+      headers: { get: () => '3600' },
+    };
+    const stop = ouvrir('/notifications/stream', {
+      fetchImpl: vi.fn(async () => refus),
+      schedule: (run, delay) => {
+        delais.push(delay);
+        return delay;
+      },
+      initialDelayMs: 1000,
+      random: () => 0.5,
+    });
+
+    await attendre(() => delais.length === 1);
+    expect(delais[0]).toBe(MAX_RETRY_AFTER_MS);
     stop();
   });
 });

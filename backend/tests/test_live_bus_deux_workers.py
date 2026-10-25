@@ -522,11 +522,19 @@ def test_un_message_traverse_le_bus_entre_deux_workers(tmp_path):
 
 
 def test_le_plafond_de_flux_est_celui_du_compte_pas_du_worker(tmp_path):
-    """Quatre flux PAR WORKER deviendraient seize : le plafond est partagé.
+    """Le plafond du COMPTE se remplit À TRAVERS les workers, pas par worker.
 
-    Deux flux sur chaque worker épuisent les quatre places du COMPTE. Le
-    cinquième, demandé au worker qui n'en sert que deux (donc loin de SON
-    plafond local), est refusé : c'est le registre partagé qui décide.
+    Les places du compte (`MAX_STREAMS_PER_USER`, huit : deux flux par onglet ×
+    quatre onglets) se remplissent en QUATRE flux sur chacun des deux workers :
+    aucun des deux n'a vu passer plus de la moitié du plafond, donc son propre
+    plafond local n'est pas atteint. Le flux suivant, demandé au worker qui n'en
+    sert que quatre, est refusé — c'est le registre PARTAGÉ qui décide. Sans
+    lui, chaque worker en accepterait huit, donc seize pour un seul compte.
+
+    Le compte des flux se DÉRIVE de la constante : quand le plafond a doublé
+    (4 → 8, le 25/10/2026, cf. `test_live_stream.py`), ce cas écrivait encore
+    « deux par worker, le cinquième refusé » et rougissait sur un produit
+    correct.
 
     Ce que ce cas ne fait PAS, et pourquoi : il ne prouve pas ici qu'un flux
     FERMÉ rend sa place. Mesuré le 18/10/2026 : fermer la connexion côté client
@@ -538,15 +546,16 @@ def test_le_plafond_de_flux_est_celui_du_compte_pas_du_worker(tmp_path):
     qui ferme le corps du flux comme le fait Starlette quand le serveur annule
     la réponse —, et ce cas-ci prouve le PARTAGE du plafond.
     """
+    # Import LOCAL, comme `pymongo` : ce fichier se lit sans démarrer le serveur.
+    import kojo_live
+
+    places = kojo_live.MAX_STREAMS_PER_USER
+    par_worker = places // 2
     with banc_deux_workers(tmp_path) as banc:
         ouverts = []
         try:
-            for worker in (
-                banc.worker_a,
-                banc.worker_b,
-                banc.worker_a,
-                banc.worker_b,
-            ):
+            for rang in range(places):
+                worker = banc.worker_a if rang % 2 == 0 else banc.worker_b
                 flux = Flux(worker, banc.jeton_b, "/api/messages/stream")
                 assert flux.reponse.status == 200, (
                     "le flux %d du compte a été refusé avant le plafond (%s)"
@@ -554,12 +563,17 @@ def test_le_plafond_de_flux_est_celui_du_compte_pas_du_worker(tmp_path):
                 )
                 ouverts.append(flux)
 
+            # La moitié EXACTE du plafond sur chaque worker : aucun n'a atteint
+            # son plafond LOCAL, donc un refus ne peut venir que du registre.
+            assert par_worker < places, (places, par_worker)
+
             refused = Flux(banc.worker_b, banc.jeton_b, "/api/messages/stream")
             try:
                 assert refused.reponse.status == 503, (
-                    "un cinquième flux a été ACCEPTÉ sur un worker qui n'en sert "
-                    "que deux : le plafond est resté celui du process (status %s)"
-                    % refused.reponse.status
+                    "le flux de trop (%d sur %d) a été ACCEPTÉ sur un worker "
+                    "qui n'en sert que %d : le plafond est resté celui du "
+                    "process (status %s)"
+                    % (places + 1, places, par_worker, refused.reponse.status)
                 )
                 assert refused.reponse.getheader("Retry-After") == "60", (
                     "le refus n'est pas un refus nommé (Retry-After absent)"
