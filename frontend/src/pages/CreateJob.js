@@ -5,6 +5,7 @@ import TagInput from '../components/TagInput';
 import CadrePage from '../components/CadrePage';
 import { jobsAPI } from '../services/apiEndpoints';
 import { buildJobCreatePayload, normalizeApiErrorMessage } from '../utils/jobCreateBridge';
+import { EVENEMENTS_FUNNEL, trackFunnel } from '../utils/funnel';
 import { getJobUiLabel } from '../utils/jobUiLocale';
 import {
   emptyJobLocation,
@@ -97,6 +98,10 @@ export default function CreateJob() {
     setLoading(true);
     try {
       await jobsAPI.create(payload);
+      // Étape du funnel : la mission est PUBLIÉE (la réponse est le document
+      // créé). Le pays est une dimension bornée du produit ; le titre, le
+      // budget et l'adresse ne sortent pas (ce sont des données de l'annonce).
+      trackFunnel(EVENEMENTS_FUNNEL.missionCreee, { country: payload.location?.countryCode });
       navigate('/jobs');
     } catch (submitError) {
       setError(normalizeApiErrorMessage(submitError));
