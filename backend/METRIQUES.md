@@ -119,7 +119,7 @@ mémoire. Les dates sortent en `..._timestamp_seconds` (jauges), `0` valant
 |---|---|---|
 | `kojo_live_flux_actifs` | gauge | Flux SSE ouverts dans ce process |
 | `kojo_live_flux_plafond_processus` | gauge | `MAX_STREAMS_TOTAL` (400 par défaut) |
-| `kojo_live_flux_plafond_compte` | gauge | `MAX_STREAMS_PER_USER` (4 par défaut) |
+| `kojo_live_flux_plafond_compte` | gauge | `MAX_STREAMS_PER_USER` (8 par défaut, dérivé de `FLUX_PAR_PAGE × ONGLETS_SIMULTANES`) |
 | `kojo_live_flux_reserves_total` | counter | Places admises par le registre partagé |
 | `kojo_live_flux_refus_total` | counter | Flux refusés par le registre partagé (plafond du compte) |
 | `kojo_live_flux_repli_total` | counter | Admissions faites par le plafond **local**, registre injoignable |

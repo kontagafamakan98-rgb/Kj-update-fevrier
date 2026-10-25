@@ -64,16 +64,38 @@ from kojo_settings import logger
 # battement ne crée AUCUNE requête : c'est le même flux qui écrit une ligne.
 HEARTBEAT_SECONDS = float(os.environ.get("KOJO_SSE_HEARTBEAT_SECONDS", "20") or 20)
 
-# Un même compte ouvre normalement UN flux par onglet. Quatre laisse de la marge
-# (plusieurs onglets, téléphone + ordinateur) sans qu'un client bogué puisse
-# épuiser le plafond global à lui seul.
+# Nombre de flux qu'une PAGE ouvre pour un compte : `NotificationContext`
+# (permanent) + la fiche des messages quand elle est ouverte (`Messages.js`).
+# Le plafond du compte s'exprime en ONGLETS, donc il se DÉRIVE de ce nombre —
+# le recopier ailleurs ferait deux sources à garder d'accord.
+FLUX_PAR_PAGE = 2
+
+# Onglets ou appareils simultanés qu'un compte peut tenir. Quatre couvre
+# « téléphone + ordinateur + deux onglets » sans qu'un client bogué épuise le
+# plafond global à lui seul.
+ONGLETS_SIMULTANES = 4
+
+# Un même compte ouvre donc DEUX flux par onglet, pas un : l'application ouvre
+# `/notifications/stream` en permanence (`NotificationContext`) et
+# `/messages/stream` quand la fiche des messages est ouverte. Le plafond se
+# compte en ONGLETS/APPAREILS, pas en flux : 4 × 2 = 8.
+#
+# MESURÉ le 25/10/2026, console de production : à 4 (l'ancienne valeur, écrite
+# quand un onglet n'ouvrait qu'un flux), deux onglets suffisaient à saturer le
+# compte, et TOUTE reconnexion — des deux flux — recevait 503, indéfiniment.
+# `backend/tests/test_live_stream.py` pin la relation (deux flux par page, au
+# moins quatre onglets), donc réduire le plafond sans réduire le nombre de
+# flux par page rougit au lieu de refaire taire le temps réel en silence.
 #
 # C'est le plafond du COMPTE, pas celui d'une machine : la présence des flux
-# était un état de PROCESS, donc quatre flux par worker — seize derrière quatre
-# workers pour un seul compte. Le registre partagé ci-dessous porte cette
-# présence dans Redis, et c'est LUI qui décide ; le compte local reste un filet
-# quand aucun registre n'est branché.
-MAX_STREAMS_PER_USER = int(os.environ.get("KOJO_SSE_MAX_PER_USER", "4") or 4)
+# était un état de PROCESS, donc huit flux par worker — trente-deux derrière
+# quatre workers pour un seul compte. Le registre partagé ci-dessous porte
+# cette présence dans Redis, et c'est LUI qui décide ; le compte local reste un
+# filet quand aucun registre n'est branché.
+MAX_STREAMS_PER_USER = int(
+    os.environ.get("KOJO_SSE_MAX_PER_USER", str(FLUX_PAR_PAGE * ONGLETS_SIMULTANES))
+    or FLUX_PAR_PAGE * ONGLETS_SIMULTANES
+)
 
 # --- Plafond PARTAGÉ (registre Redis) ---------------------------------------
 #

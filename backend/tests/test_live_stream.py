@@ -44,6 +44,39 @@ def flux_vierges():
     kojo_live.reset_streams()
 
 
+def test_le_plafond_du_compte_couvre_les_flux_qu_une_page_ouvre():
+    """Le plafond se compte en ONGLETS, et une page ouvre DEUX flux.
+
+    Mesuré le 25/10/2026 sur la console de production : avec 4, deux onglets
+    saturaient le compte, et TOUTE reconnexion — `/messages/stream` comme
+    `/notifications/stream` — recevait 503 en boucle. Le défaut se DÉRIVE de
+    `FLUX_PAR_PAGE × ONGLETS_SIMULTANES` : réduire l'un sans l'autre rougit ici
+    au lieu de retirer le temps réel en silence.
+    """
+    assert kojo_live.ONGLETS_SIMULTANES >= 4
+    assert (
+        kojo_live.MAX_STREAMS_PER_USER
+        >= kojo_live.FLUX_PAR_PAGE * kojo_live.ONGLETS_SIMULTANES
+    ), (
+        kojo_live.MAX_STREAMS_PER_USER,
+        kojo_live.FLUX_PAR_PAGE,
+        kojo_live.ONGLETS_SIMULTANES,
+    )
+
+
+def test_quatre_onglets_entrent_et_le_cinquieme_est_refuse():
+    """La borne MESURÉE : quatre onglets passent, le suivant est un 503 nommé."""
+    compte = "compte-quatre-onglets"
+    files = [
+        kojo_live.subscribe(compte)
+        for _ in range(kojo_live.FLUX_PAR_PAGE * kojo_live.ONGLETS_SIMULTANES)
+    ]
+    with pytest.raises(kojo_live.StreamCapacityExceeded):
+        kojo_live.subscribe(compte)
+    for queue in files:
+        kojo_live.unsubscribe(compte, queue)
+
+
 def _trame(texte: str) -> tuple:
     """`(event, data)` d'une trame SSE — les commentaires sont ignorés."""
     lignes = [ligne for ligne in texte.splitlines() if ligne and not ligne.startswith(":")]

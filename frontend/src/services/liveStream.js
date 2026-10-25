@@ -46,6 +46,30 @@ export const isLiveStreamSupported = () =>
 
 const defaultSchedule = (run, delay) => setTimeout(run, delay);
 
+/** Borne d'une consigne `Retry-After` : un serveur qui demanderait une heure
+ *  laisserait le compte sans temps réel une heure. */
+export const MAX_RETRY_AFTER_MS = 120000;
+
+/**
+ * Le délai que le serveur DEMANDE avant de revenir (`Retry-After`, en secondes).
+ *
+ * Mesuré le 25/10/2026, console de production : quand le plafond de flux d'un
+ * compte est atteint, les deux flux répondent 503 avec `Retry-After: 60`, et le
+ * client revenait à 1 s, 2 s, 4 s… — plus tôt que ce que le serveur autorisait,
+ * donc une rafale de 503 dans la console pour un plafond qui, lui, ne changeait
+ * pas. La consigne du serveur est un PLANCHER, jamais un plafond.
+ *
+ * @param {Response} response Réponse non-ok.
+ * @returns {number} Délai en millisecondes (0 si absent ou illisible).
+ */
+const delaiConsigne = (response) => {
+  const entetes = response && response.headers;
+  if (!entetes || typeof entetes.get !== 'function') return 0;
+  const secondes = Number(entetes.get('retry-after'));
+  if (!Number.isFinite(secondes) || secondes <= 0) return 0;
+  return Math.min(secondes * 1000, MAX_RETRY_AFTER_MS);
+};
+
 /** `event:` + une ou plusieurs lignes `data:` (jointes par un saut de ligne). */
 const parseBlock = (block) => {
   let event = 'message';
@@ -203,6 +227,7 @@ export function openLiveStream(
       annoncer(STREAM_STATUS.CONNECTING);
       controller = new AbortController();
       let statutHttp = 0;
+      let consigne = 0;
       armerChienDeGarde();
 
       try {
@@ -220,6 +245,7 @@ export function openLiveStream(
         statutHttp = response.status;
 
         if (!response.ok || !response.body) {
+          consigne = delaiConsigne(response);
           throw new Error(`Flux indisponible (HTTP ${response.status})`);
         }
 
@@ -246,7 +272,7 @@ export function openLiveStream(
       annoncer(STREAM_STATUS.DOWN);
       // Le recul se calcule sur l'essai EN COURS (le premier vaut
       // `initialDelayMs`), puis grandit : 1 s, 2 s, 4 s…
-      const delai = recul();
+      const delai = Math.max(recul(), consigne);
       attempt += 1;
       await attendre(delai);
       cancelRetry = null;

@@ -225,6 +225,38 @@ async def stream_messages(current_user: User = Depends(get_current_user)):
             headers={"Retry-After": "60"},
         ) from exc
 
+async def _nomme_participant(conversation_id: str, user_id: str) -> bool:
+    """Le fil encore VIDE nomme-t-il ce compte comme l'un de ses deux participants ?
+
+    `conversation_id` vaut `{id1}_{id2}`, les deux identifiants triés — mais un
+    identifiant peut LUI-MÊME contenir « _ » (comptes hérités, ex.
+    « famakan_kontaga_master_2024 »). Le découpage sur « _ » ne le reconnaît
+    alors plus : mesuré en production le 25/10/2026, ce compte ouvrait une
+    conversation ENCORE VIDE et recevait 403 « Access denied », donc la fiche
+    affichait une erreur au lieu du compositeur de message.
+
+    On lit donc les DEUX côtés de chaque séparateur, et on exige que l'autre
+    côté soit un compte EXISTANT : sans cette vérification, « abc » serait
+    déclaré participant d'un fil entre « abc_def » et « ghi » — un fragment
+    d'identifiant ne désigne personne. Un fil REMPLI ne passe jamais par ici :
+    son appartenance se lit dans ses messages (première requête de la route).
+    """
+    for position, caractere in enumerate(conversation_id):
+        if caractere != "_":
+            continue
+        gauche, droite = conversation_id[:position], conversation_id[position + 1:]
+        if gauche == user_id and droite:
+            autre = droite
+        elif droite == user_id and gauche:
+            autre = gauche
+        else:
+            continue
+        pair = await db.users.find_one({**identifiant_query(autre)}, {"id": 1})
+        if pair is not None:
+            return True
+    return False
+
+
 @router.get("/messages/{conversation_id}")
 async def get_conversation_messages(
     conversation_id: str,
@@ -268,7 +300,7 @@ async def get_conversation_messages(
     )
     if appartient is None:
         fil = await db.messages.find_one({"conversation_id": conversation_id}, {"id": 1})
-        if fil is not None or current_user.id not in conversation_id.split("_"):
+        if fil is not None or not await _nomme_participant(conversation_id, current_user.id):
             raise HTTPException(status_code=403, detail="Access denied")
     
     # Pagination par offset. Le mode asc conserve le contrat historique ; le

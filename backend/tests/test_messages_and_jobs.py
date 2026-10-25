@@ -59,6 +59,50 @@ class TestMessageAccess:
         resp = await client.get(f"/api/messages/{fake_id}", headers=headers_a)
         assert resp.status_code == 403
 
+    async def test_un_compte_herite_ouvre_une_conversation_encore_vide(self, client: AsyncClient):
+        """Un identifiant qui CONTIENT « _ » reste participant d'un fil vide.
+
+        Mesuré en production le 25/10/2026 : `/messages` répondait 403 « Access
+        denied » sur `{uuid}_famakan_kontaga_master_2024`. Le fil était encore
+        VIDE — aucun message ne pouvait donc nommer les participants, et le
+        découpage sur « _ » faisait de cet identifiant quatre morceaux dont
+        aucun n'était le compte.
+        """
+        correspondant = await register_and_login(client, BASE_USER)
+        source = await db_find_one("users", {"email": BASE_USER["email"]})
+        assert source is not None
+        herite_id = "compte_herite_avec_tirets_2024"
+        await db_insert("users", {
+            **{cle: valeur for cle, valeur in source.items() if cle != "_id"},
+            "id": herite_id,
+            "email": "herite.vide@kojo.sn",
+        })
+        connexion = await client.post(
+            "/api/auth/login",
+            json={"email": "herite.vide@kojo.sn", "password": BASE_USER["password"]},
+        )
+        assert connexion.status_code == 200, connexion.text
+        headers = {"Authorization": f"Bearer {connexion.json()['access_token']}"}
+
+        conversation_id = f"{correspondant['user']['id']}_{herite_id}"
+        resp = await client.get(f"/api/messages/{conversation_id}", headers=headers)
+        assert resp.status_code == 200, resp.text
+        assert resp.json() == []
+
+    async def test_un_fragment_d_identifiant_n_ouvre_pas_un_fil_vide(self, client: AsyncClient):
+        """Le découpage ne suffit pas : l'autre côté doit être un compte EXISTANT.
+
+        Sans cette exigence, `abc` serait déclaré participant d'un fil entre
+        `abc_def` et `ghi` — un fragment d'identifiant ne désigne personne.
+        """
+        intrus = await register_and_login(
+            client, {**BASE_USER, "email": "fragment@kojo.sn"}
+        )
+        conversation_id = f"{intrus['user']['id']}_def_ghi_inexistant"
+        headers = {"Authorization": f"Bearer {intrus['access_token']}"}
+        resp = await client.get(f"/api/messages/{conversation_id}", headers=headers)
+        assert resp.status_code == 403, resp.text
+
     async def test_un_fragment_d_identifiant_ne_donne_pas_acces_a_un_fil_rempli(self, client: AsyncClient):
         """Un identifiant qui n'apparaît dans le fil qu'en FRAGMENT est refusé.
 
