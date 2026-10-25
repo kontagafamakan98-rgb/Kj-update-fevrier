@@ -22,10 +22,18 @@ Ce qui est mesuré ici, et pourquoi chaque cas existe :
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
 from httpx import AsyncClient
 
 import kojo_metrics
-from kojo_live import active_streams, bus_actif, bus_stats, partage_stats
+from kojo_live import (
+    active_streams,
+    bus_actif,
+    bus_stats,
+    comptes_satures,
+    partage_stats,
+    refus_stats,
+)
 from kojo_rate_limit import rate_limit_en_redis, rate_limit_stats
 from kojo_auth_core import revocation_stats
 
@@ -226,6 +234,14 @@ class TestBranchement:
         for cle in ("reserves", "refus", "repli"):
             assert _valeur(texte, f"kojo_live_flux_{cle}_total") == str(int(partage[cle]))
         assert _valeur(texte, "kojo_live_flux_actifs") == str(active_streams())
+        refus = refus_stats()
+        assert _valeur(texte, "kojo_live_flux_refus_local_total") == str(
+            int(refus["compte_local"])
+        )
+        assert _valeur(texte, "kojo_live_flux_refus_processus_total") == str(
+            int(refus["processus"])
+        )
+        assert _valeur(texte, "kojo_live_comptes_satures") == str(comptes_satures())
         assert _valeur(texte, "kojo_live_bus_actif") == ("1" if bus_actif() else "0")
         assert _valeur(texte, "kojo_rate_limit_en_redis") == ("1" if rate_limit_en_redis() else "0")
         assert _valeur(texte, "kojo_rate_limit_replis_total") == str(
@@ -283,6 +299,130 @@ class TestCorpus:
         # Les compteurs mémoire restent publiés : une panne de base ne rend pas
         # l'exposition muette.
         assert "kojo_live_bus_publies_total" in texte
+
+
+class TestPlafondMordant:
+    """Un 503 de CAPACITÉ doit se LIRE dans `/metrics`.
+
+    Mesuré le 25/10/2026 sur la console de production : `GET
+    /api/notifications/stream` rendait des 503 par rafales, et aucun chiffre ne
+    disait que le plafond mordait — le symptôme existait, la mesure non. Les
+    causes sont séparées dans les tests comme dans l'exposition, parce qu'un
+    compte saturé et un process plein n'ont pas le même remède.
+    """
+
+    async def test_un_compte_sature_se_compte_et_se_publie(
+        self, client: AsyncClient, monkeypatch
+    ):
+        monkeypatch.setattr(kojo_metrics, "METRICS_TOKEN", JETON)
+        import kojo_live
+
+        kojo_live.reset_streams()
+        try:
+            for _ in range(kojo_live.MAX_STREAMS_PER_USER):
+                kojo_live.subscribe("compte-sature")
+
+            # Avant le refus : le compte est DÉJÀ saturé, la jauge le dit.
+            avant = await _lire(client, ENTETE)
+            assert _valeur(avant, "kojo_live_comptes_satures") == "1"
+            assert _valeur(avant, "kojo_live_flux_refus_local_total") == "0"
+
+            with pytest.raises(kojo_live.StreamCapacityExceeded):
+                kojo_live.subscribe("compte-sature")
+
+            apres = await _lire(client, ENTETE)
+            assert _valeur(apres, "kojo_live_flux_refus_local_total") == "1"
+            # Le refus du COMPTE n'est pas imputé à la machine : les deux
+            # compteurs disent deux choses et ne se contaminent pas.
+            assert _valeur(apres, "kojo_live_flux_refus_processus_total") == "0"
+            assert _valeur(apres, "kojo_live_comptes_satures") == "1"
+        finally:
+            kojo_live.reset_streams()
+
+    async def test_la_jauge_redescend_quand_le_compte_se_libere(
+        self, client: AsyncClient, monkeypatch
+    ):
+        """Une jauge, pas un compteur : sinon la saturation paraîtrait éternelle."""
+        monkeypatch.setattr(kojo_metrics, "METRICS_TOKEN", JETON)
+        import kojo_live
+
+        kojo_live.reset_streams()
+        try:
+            files = [
+                kojo_live.subscribe("compte-libere")
+                for _ in range(kojo_live.MAX_STREAMS_PER_USER)
+            ]
+            assert _valeur(await _lire(client, ENTETE), "kojo_live_comptes_satures") == "1"
+
+            kojo_live.unsubscribe("compte-libere", files[0])
+
+            texte = await _lire(client, ENTETE)
+            assert _valeur(texte, "kojo_live_comptes_satures") == "0"
+        finally:
+            kojo_live.reset_streams()
+
+    async def test_un_processus_plein_est_compte_a_part_du_compte(
+        self, client: AsyncClient, monkeypatch
+    ):
+        monkeypatch.setattr(kojo_metrics, "METRICS_TOKEN", JETON)
+        import kojo_live
+
+        kojo_live.reset_streams()
+        monkeypatch.setattr(kojo_live, "MAX_STREAMS_TOTAL", 2)
+        try:
+            kojo_live.subscribe("compte-a")
+            kojo_live.subscribe("compte-b")
+
+            with pytest.raises(kojo_live.StreamCapacityExceeded) as refus:
+                kojo_live.subscribe("compte-c")
+
+            assert "serveur" in str(refus.value), (
+                "le refus ne dit pas que c'est la MACHINE qui est pleine : "
+                "on chercherait un onglet à fermer côté client"
+            )
+            texte = await _lire(client, ENTETE)
+            assert _valeur(texte, "kojo_live_flux_refus_processus_total") == "1"
+            assert _valeur(texte, "kojo_live_flux_refus_local_total") == "0"
+            # Aucun compte n'a atteint le plafond PAR COMPTE, et pourtant aucun
+            # flux n'entre : la saturation de la machine ne se lit pas non plus
+            # dans `comptes_satures`.
+            assert _valeur(texte, "kojo_live_comptes_satures") == "0"
+        finally:
+            kojo_live.reset_streams()
+
+    async def test_les_trois_causes_de_refus_ne_se_melangent_pas(
+        self, client: AsyncClient, monkeypatch
+    ):
+        """Compte local, machine, registre partagé : trois chiffres, trois objets.
+
+        Un refus décidé par le plafond LOCAL ne doit pas déplacer le compteur du
+        registre partagé (ni l'inverse) : ce sont trois diagnostics différents,
+        et les confondre enverrait chercher le remède au mauvais endroit.
+        """
+        monkeypatch.setattr(kojo_metrics, "METRICS_TOKEN", JETON)
+        import kojo_live
+
+        kojo_live.reset_streams()
+        try:
+            partage_avant = partage_stats()["refus"]
+            for _ in range(kojo_live.MAX_STREAMS_PER_USER):
+                kojo_live.subscribe("compte-triple")
+            with pytest.raises(kojo_live.StreamCapacityExceeded):
+                kojo_live.subscribe("compte-triple")
+
+            assert refus_stats()["compte_local"] == 1
+            assert refus_stats()["processus"] == 0
+            assert partage_stats()["refus"] == partage_avant, (
+                "un refus décidé par le plafond LOCAL a été imputé au registre "
+                "partagé : les deux chiffres ne disent plus la même chose"
+            )
+            texte = await _lire(client, ENTETE)
+            assert _valeur(texte, "kojo_live_flux_refus_total") == str(
+                int(partage_stats()["refus"])
+            )
+            assert _valeur(texte, "kojo_live_flux_refus_local_total") == "1"
+        finally:
+            kojo_live.reset_streams()
 
 
 class TestCollecteDeclaree:
