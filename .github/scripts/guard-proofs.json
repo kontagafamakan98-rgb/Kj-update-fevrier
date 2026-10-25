@@ -6379,8 +6379,8 @@
       "id": "livraison: la base distante est relue par confirmation (deux lectures pour un seul fait)",
       "garde": ".github/scripts/livrer.py",
       "cible": ".github/scripts/livrer.py",
-      "trouve": "    ok_back = verifier_production_backend(base, options.timeout_prod) if base else False",
-      "remplace": "    ok_back = verifier_production_backend(lire_base_distante(merge_sha), options.timeout_prod) if base else False",
+      "trouve": "        verifier_production_backend(base, jeton, options.timeout_prod) if base else False",
+      "remplace": "        verifier_production_backend(lire_base_distante(merge_sha), jeton, options.timeout_prod) if base else False",
       "runner": "python",
       "preuve": "backend/tests/test_gate_perimetre.py",
       "commande": [
@@ -6394,6 +6394,27 @@
       "cwd": "backend",
       "attend": [
         "FAILED tests/test_gate_perimetre.py::TestBaseDistantePartagee::test_main_lit_la_base_une_fois_et_la_donne_aux_deux"
+      ]
+    },
+    {
+      "id": "livraison: backend juge sans attendre son deploiement (le faux rouge du 25/10/2026)",
+      "garde": ".github/scripts/livrer.py",
+      "cible": ".github/scripts/livrer.py",
+      "trouve": "        issue = attendre_deploiement_backend(base.fusion, jeton, nom_job)",
+      "remplace": "        issue = {'etat': 'inconnu', 'conclusion': None, 'detail': 'mute'}",
+      "runner": "python",
+      "preuve": "backend/tests/test_gate_perimetre.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_gate_perimetre.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_gate_perimetre.py::TestAttenteDeploiementBackend::test_le_faux_rouge_du_25_10_2026_est_evite"
       ]
     },
     {

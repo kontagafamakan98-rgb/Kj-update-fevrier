@@ -32,7 +32,12 @@ Trois surfaces sont mesurées ici, chacune sur l'artefact réel :
    sur « tous les check-runs », juger le périmètre en pré-vol avant de pousser,
    REFUSER un arbre de travail sale (elle publie des commits) avant le jeton et le
    réseau, et appeler ses étapes dans l'ordre — production comprise, APRÈS la
-   fusion (lu par AST, pas par expression régulière sur la prose).
+   fusion (lu par AST, pas par expression régulière sur la prose). Sa confirmation
+   backend attend que le job `deploy-fly` du commit de fusion soit TERMINÉ avant
+   de juger `/health` : mesuré le 25/10/2026 (PR #212), une fenêtre fixe refusait
+   une production correcte 29 s avant la fin du déploiement, parce que ce job a
+   `needs: backend-tests` et ne peut donc rien déployer pendant les 9 premières
+   minutes (`TestAttenteDeploiementBackend`).
    Preuve du point d'entrée : `package.json` expose `livrer` vers ce script.
 
 Deux asymétries assumées, écrites ici pour ne pas être relues comme des oublis :
@@ -828,6 +833,211 @@ class TestBaseDistantePartagee:
                 "%s ne reçoit pas la base PARTAGÉE en premier argument : il pourrait "
                 "relire la référence de son côté" % nom
             )
+
+
+class TestAttenteDeploiementBackend:
+    """La confirmation backend attend le DÉPLOIEMENT, elle ne parie plus sur une durée.
+
+    25/10/2026, livraison de la PR #212 : `livrer.py` a interrogé `/health` de
+    01:23:27 à 01:33:25 — sa fenêtre de 10 min — et rendu `servi=6aaf2237
+    attendu=a43f1dad`, alors que le job de déploiement n'a DÉMARRÉ qu'à 01:31:54
+    et a fini VERT à 01:33:54 : 29 secondes après l'abandon. Ce n'est pas un
+    réglage trop court — `deploy-fly` a `needs: backend-tests` (9 min 30 sur ce
+    run), donc il ne peut rien déployer avant, et la fenêtre couvrait la DURÉE
+    du déploiement au lieu de l'attente qui le précède. Un faux rouge sur une
+    production correcte est le verdict qu'on apprend à ignorer : c'est le même
+    raisonnement que pour Vercel (fusion #184, un déploiement en file n'est pas
+    un retard), appliqué à Fly.
+
+    Ce qui est verrouillé : `/health` n'est jugé qu'APRÈS la fin du job (l'ORDRE
+    est asserté), la fenêtre se RÉDUIT ensuite, un job en échec refuse sans
+    interroger `/health`, un job `skipped` est un déploiement attendu, et un
+    état ILLISIBLE est une prémisse (fenêtre complète reprise et dite, jamais un
+    vert). Le nom du job se lit dans `gate-perimetre.json`, jamais recopié.
+    """
+
+    FUSION = "a43f1dad" + "0" * 32
+    RUN_ID = 40150372656
+    NOM_JOB = "Deploy backend to Fly.io"
+
+    class Horloge:
+        """Une horloge qui avance avec les `sleep` — l'attente est réelle, le temps non."""
+
+        def __init__(self):
+            self.t = 1_700_000_000.0
+
+        def time(self):
+            return self.t
+
+        def sleep(self, secondes):
+            self.t += max(float(secondes), 1.0)
+
+    def _horloge(self, livraison, monkeypatch):
+        horloge = self.Horloge()
+        monkeypatch.setattr(livraison.time, "time", horloge.time)
+        monkeypatch.setattr(livraison.time, "sleep", horloge.sleep)
+        return horloge
+
+    def _base(self):
+        return SimpleNamespace(
+            fusion=self.FUSION,
+            ref="origin/main",
+            revision=lambda chemins: self.FUSION,
+        )
+
+    def _journal_et_health(self, livraison, monkeypatch, etats, code_health=0):
+        """Branche l'API GitHub et `subprocess` sur un MÊME journal d'appels.
+
+        Le journal est ce qui permet d'asserter l'ORDRE : `/health` ne doit pas
+        être interrogé avant que le job soit terminé.
+        """
+        journal = []
+        file_etats = list(etats)
+        index = {"i": 0}
+
+        def faux_appel(methode, chemin, jeton, donnees=None):
+            if chemin.startswith("actions/runs?"):
+                journal.append("runs")
+                return {"workflow_runs": [{"id": self.RUN_ID}]}
+            if chemin.startswith(f"actions/runs/{self.RUN_ID}/jobs"):
+                statut, conclusion = file_etats[min(index["i"], len(file_etats) - 1)]
+                index["i"] += 1
+                journal.append(f"job:{statut}")
+                return {
+                    "jobs": [{"name": self.NOM_JOB, "status": statut, "conclusion": conclusion}]
+                }
+            raise AssertionError(f"chemin inattendu : {chemin}")
+
+        appels_health = []
+
+        def faux_run(args, **options):
+            journal.append("health")
+            appels_health.append((args, options))
+            return SimpleNamespace(returncode=code_health)
+
+        monkeypatch.setattr(livraison, "appel_github", faux_appel)
+        monkeypatch.setattr(livraison, "subprocess", SimpleNamespace(run=faux_run))
+        return journal, appels_health
+
+    @staticmethod
+    def _tentatives(appel):
+        args = appel[0]
+        return args[args.index("--tentatives") + 1]
+
+    def test_le_faux_rouge_du_25_10_2026_est_evite(self, livraison, monkeypatch, capsys):
+        """Le job passe de `in_progress` à `completed/success`, puis `/health` est jugé.
+
+        C'est la chronologie mesurée du 25/10/2026 : l'ancienne version interrogeait
+        `/health` pendant que le job tournait encore, et refusait une production qui
+        allait devenir correcte 29 secondes plus tard.
+        """
+        self._horloge(livraison, monkeypatch)
+        journal, appels = self._journal_et_health(
+            livraison,
+            monkeypatch,
+            [("in_progress", None), ("in_progress", None), ("completed", "success")],
+        )
+
+        assert livraison.verifier_production_backend(self._base(), "jeton", 10) is True
+
+        # L'ORDRE est le correctif : aucune interrogation de /health avant la fin du job.
+        assert journal[-1] == "health", journal
+        assert journal.count("health") == 1, journal
+        assert journal.index("job:completed") < journal.index("health"), journal
+
+        # Et une fois le job vert, on ne rejoue pas la fenêtre de 10 min : 3 min = 9 tentatives.
+        assert self._tentatives(appels[0]) == "9", appels[0]
+
+        sortie = capsys.readouterr()
+        assert "Job de déploiement terminé" in (sortie.out + sortie.err), sortie
+
+    def test_un_job_deploiement_en_echec_refuse_sans_interroger_health(
+        self, livraison, monkeypatch, capsys
+    ):
+        self._horloge(livraison, monkeypatch)
+        journal, appels = self._journal_et_health(
+            livraison, monkeypatch, [("completed", "failure")]
+        )
+
+        assert livraison.verifier_production_backend(self._base(), "jeton", 10) is False
+
+        assert appels == [], "un échec de déploiement ne s'éclaircit pas en interrogeant /health"
+        assert "health" not in journal, journal
+        texte = capsys.readouterr()
+        texte = texte.out + texte.err
+        assert "failure" in texte, texte
+        assert self.NOM_JOB in texte, texte
+
+    def test_un_etat_illisible_retombe_sur_la_fenetre_pleine_et_le_dit(
+        self, livraison, monkeypatch, capsys
+    ):
+        """API muette : pas de prémisse inventée, et pas de vert silencieux non plus."""
+        self._horloge(livraison, monkeypatch)
+
+        def faux_appel(*args, **kwargs):
+            raise RuntimeError("GitHub API GET actions/runs -> HTTP 502")
+
+        appels = []
+
+        def faux_run(args, **options):
+            appels.append((args, options))
+            return SimpleNamespace(returncode=0)
+
+        monkeypatch.setattr(livraison, "appel_github", faux_appel)
+        monkeypatch.setattr(livraison, "subprocess", SimpleNamespace(run=faux_run))
+
+        assert livraison.verifier_production_backend(self._base(), "jeton", 10) is True
+
+        # Fenêtre COMPLÈTE (10 min = 30 tentatives), comme avant : l'état non lu ne
+        # réduit ni n'allonge le droit de juger.
+        assert len(appels) == 1, appels
+        assert self._tentatives(appels[0]) == "30", appels[0]
+        texte = capsys.readouterr()
+        texte = texte.out + texte.err
+        assert "NON lu" in texte and "aucune prémisse" in texte, texte
+
+    def test_un_deploiement_qui_ne_finit_jamais_ne_boucle_pas_sans_fin(
+        self, livraison, monkeypatch
+    ):
+        self._horloge(livraison, monkeypatch)
+        journal, _ = self._journal_et_health(livraison, monkeypatch, [("in_progress", None)])
+
+        issue = livraison.attendre_deploiement_backend(
+            self.FUSION, "jeton", self.NOM_JOB, timeout_minutes=1, delai_secondes=30
+        )
+
+        assert issue["etat"] == "inconnu", issue
+        # 1 min / 30 s = 2 sondages + le premier, jamais une boucle ouverte.
+        assert journal.count("job:in_progress") <= 4, journal
+
+    def test_un_job_skipped_est_un_deploiement_attendu(self, livraison, monkeypatch):
+        """Push qui ne touche pas `backend/**` : la révision attendue est celle d'avant,
+        et elle est déjà servie — refuser là-dessus serait un faux rouge de plus."""
+        self._horloge(livraison, monkeypatch)
+        self._journal_et_health(livraison, monkeypatch, [("completed", "skipped")])
+
+        issue = livraison.attendre_deploiement_backend(self.FUSION, "jeton", self.NOM_JOB)
+
+        assert issue["etat"] == "deploye", issue
+        assert issue["conclusion"] == "skipped", issue
+
+    def test_le_nom_du_job_se_lit_dans_le_perimetre_et_le_budget_couvre_la_ci(self, livraison):
+        """Une seule définition du nom, et un budget qui couvre l'attente de `backend-tests`."""
+        assert livraison.nom_du_job_deploiement() == self.NOM_JOB
+
+        source = CHEMIN_LIVRAISON.read_text(encoding="utf-8")
+        assert f'"{self.NOM_JOB}"' not in source, (
+            "le nom du job doit être LU dans gate-perimetre.json : recopié ici, un "
+            "renommage dans ci.yml ferait attendre un job que GitHub ne rapporte plus"
+        )
+        assert livraison.ATTENTE_DEPLOIEMENT_MINUTES >= 25, (
+            "le budget d'attente du déploiement doit couvrir la CI qui le précède "
+            "(`deploy-fly` a `needs: backend-tests`, ~9 min 30 mesurées)"
+        )
+        assert "verifier_production_backend(base, jeton" in source, (
+            "le jeton doit être passé à la confirmation backend : sans lui, l'état du "
+            "job n'est pas lu et l'ancienne fenêtre aveugle revient"
+        )
 
 
 class TestArbrePropre:

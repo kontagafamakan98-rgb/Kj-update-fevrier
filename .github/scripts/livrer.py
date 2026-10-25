@@ -39,7 +39,10 @@ par une fusion manuelle passée sous un check rouge.
        APRÈS la confirmation de la révision servie — la MÊME commande que la CI, et son
        verdict tombe dans le terminal (une intégration requise absente, ou une sonde qui
        ne peut pas conclure, refuse la livraison : code 2)
-     - Fly.io (backend)  : endpoint `/health` sur https://api.kojoforafrica.cc.cd/health
+     - Fly.io (backend)  : endpoint `/health` sur https://api.kojoforafrica.cc.cd/health,
+       jugé APRÈS que le job de déploiement du commit de fusion soit TERMINÉ
+       (mesuré le 25/10/2026 : une fenêtre fixe de 10 min condamnait une
+       production correcte, le job ne démarrant qu'après `backend-tests`)
 
 Un refus de l'une des trois confirmations rend le code 2 (« la PR est fusionnée mais
 la production n'est pas conforme ») — jamais 0.
@@ -53,7 +56,11 @@ Options :
     --corps TEXTE        Corps / description de la PR
     --mode METHODE       Méthode de fusion GitHub : squash | merge | rebase (défaut : squash)
     --timeout-ci MIN     Délai maximal d'attente des checks CI en minutes (défaut : 25)
-    --timeout-prod MIN   Délai maximal de confirmation production en minutes (défaut : 10)
+    --timeout-prod MIN   Délai maximal de confirmation production en minutes (défaut : 10) ;
+                         pour Fly, la révision n'est jugée qu'une fois le job de
+                         déploiement TERMINÉ — l'attente de ce job a son propre budget
+                         (`ATTENTE_DEPLOIEMENT_MINUTES`), parce qu'elle couvre la CI et
+                         pas le déploiement
     --skip-push          Ne pas repousser la branche (si déjà poussée)
     --reprise-pr NUM     Reprendre une PR déjà ouverte sans tenter de la recréer
     --token TOKEN        Jeton GitHub personnel (sinon lu depuis GH_TOKEN ou GITHUB_TOKEN)
@@ -758,7 +765,106 @@ def verifier_seo_production_strict() -> bool:
     return False
 
 
-def verifier_production_backend(base: BaseDistante, timeout_minutes: int = 10) -> bool:
+# ─── La confirmation backend attend le DÉPLOIEMENT, pas une horloge ─────────
+# MESURÉ le 25/10/2026, livraison de la PR #212 : `livrer.py` a interrogé
+# `/health` de 01:23:27 à 01:33:25 (sa fenêtre de 10 min) et rendu un refus
+# (« servi=6aaf2237 attendu=a43f1dad »), alors que le job de déploiement n'a
+# DÉMARRÉ qu'à 01:31:54 et a fini VERT à 01:33:54 — 29 secondes après l'abandon.
+# La fenêtre couvrait la DURÉE du déploiement, pas l'attente qui le précède :
+# `deploy-fly` a `needs: backend-tests`, donc il ne peut rien déployer avant que
+# la suite backend (9 min 30 sur ce run) ait fini. Un faux rouge sur une
+# production correcte apprend à ignorer le verdict — exactement ce que la fusion
+# #184 avait appris côté Vercel (un déploiement en file n'est pas un retard).
+#
+# Donc on ne compte plus les minutes : on LIT l'état du job. Tant qu'il n'est pas
+# terminé, la révision ne peut pas être servie ; quand il est vert, la bascule de
+# `/health` se compte en secondes. Le nom du job vient de `gate-perimetre.json`
+# (entrée `deploy-fly`), jamais recopié : renommé dans `ci.yml`, il serait
+# attendu ici sous un nom que GitHub ne rapporte plus.
+JOB_DEPLOIEMENT_BACKEND = "deploy-fly"
+# Le même budget que `--timeout-ci` : le déploiement ne peut pas finir avant.
+ATTENTE_DEPLOIEMENT_MINUTES = 25
+# Une fois le job vert, la bascule de `/health` est une seconde, pas une minute.
+FENETRE_APRES_DEPLOIEMENT_MINUTES = 3
+DELAI_SONDAGE_DEPLOIEMENT_SECONDES = 30
+
+
+def nom_du_job_deploiement(declaration: dict | None = None) -> str:
+    """Le nom GitHub du job de déploiement, LU dans `gate-perimetre.json`.
+
+    Recopier « Deploy backend to Fly.io » ici en ferait une deuxième source :
+    le jour où le job est renommé, la livraison attendrait un job qui n'existe
+    plus, et refuserait toutes les livraisons sans dire pourquoi. Une liste
+    vide est dite par l'appelant, jamais devinée.
+    """
+    if declaration is None:
+        try:
+            declaration, _, _empechement = lire_perimetre()
+        except Exception:
+            return ""
+    for entree in (declaration or {}).get("checks") or []:
+        if str(entree.get("job") or "").strip() == JOB_DEPLOIEMENT_BACKEND:
+            return str(entree.get("nom") or "").strip()
+    return ""
+
+
+def etat_du_deploiement_backend(sha: str, jeton: str, nom_job: str) -> tuple[str, str | None]:
+    """L'état du job de déploiement SUR CE COMMIT : (status, conclusion).
+
+    « absent » (et non « pas déployé ») quand aucun run du commit ne le rapporte
+    encore : c'est l'état d'un commit qui vient d'être fusionné, et le confondre
+    avec une absence de déploiement ferait conclure sur un fait non observé.
+    """
+    runs = appel_github("GET", f"actions/runs?head_sha={sha}&per_page=50", jeton) or {}
+    for run in runs.get("workflow_runs") or []:
+        identifiant = run.get("id")
+        if not identifiant:
+            continue
+        jobs = appel_github("GET", f"actions/runs/{identifiant}/jobs?per_page=100", jeton) or {}
+        for job in jobs.get("jobs") or []:
+            if str(job.get("name") or "").strip() == nom_job:
+                return str(job.get("status") or ""), job.get("conclusion")
+    return "absent", None
+
+
+def attendre_deploiement_backend(sha: str, jeton: str, nom_job: str,
+                                 timeout_minutes: int | None = None,
+                                 delai_secondes: int | None = None) -> dict:
+    """Attend que le job de déploiement du commit de fusion soit TERMINÉ.
+
+    Trois issues, jamais deux :
+      • `deploye` — terminé en succès, ou `skipped` (le cas d'un push qui ne
+        touche pas `backend/**` : la révision attendue est alors celle d'avant,
+        et elle est déjà servie) ;
+      • `echec`  — terminé autrement : la conclusion est nommée, et juger
+        `/health` ensuite n'apprendrait rien de plus ;
+      • `inconnu` — état illisible, job jamais rapporté, ou attente épuisée.
+        C'est une PRÉMISSE, jamais un vert : l'appelant retombe sur l'ancienne
+        fenêtre et le DIT, plutôt que d'inventer un déploiement non observé.
+    """
+    minutes = ATTENTE_DEPLOIEMENT_MINUTES if timeout_minutes is None else timeout_minutes
+    delai = DELAI_SONDAGE_DEPLOIEMENT_SECONDES if delai_secondes is None else delai_secondes
+    deadline = time.time() + max(0, minutes * 60)
+    dernier = "jamais lu"
+    while True:
+        try:
+            statut, conclusion = etat_du_deploiement_backend(sha, jeton, nom_job)
+            dernier = f"{statut}/{conclusion or '-'}"
+            if statut == "completed":
+                if conclusion in ("success", "skipped", "neutral"):
+                    return {"etat": "deploye", "conclusion": conclusion, "detail": dernier}
+                return {"etat": "echec", "conclusion": conclusion, "detail": dernier}
+            if statut == "absent":
+                dernier = "job pas encore rapporté"
+        except Exception as exc:
+            dernier = f"état illisible ({exc})"
+        if time.time() >= deadline:
+            return {"etat": "inconnu", "conclusion": None, "detail": dernier}
+        time.sleep(delai)
+
+
+def verifier_production_backend(base: BaseDistante, jeton: str | None = None,
+                                timeout_minutes: int = 10) -> bool:
     log(f"Contrôle de la révision servie par FLY.IO (backend sur {URL_BACKEND_HEALTH})...")
     try:
         # MÊME base que le frontend : elle a été relue une seule fois, en amont.
@@ -768,13 +874,44 @@ def verifier_production_backend(base: BaseDistante, timeout_minutes: int = 10) -
         return False
     log(f"Révision backend attendue : {dernier_backend[:10]} (sur {base.ref})")
 
+    nom_job = nom_du_job_deploiement()
+    fenetre = timeout_minutes
+    if jeton and nom_job:
+        log(f"Attente du job « {nom_job} » sur {base.fusion[:10]} avant de juger /health "
+            f"(budget {ATTENTE_DEPLOIEMENT_MINUTES} min : il dépend de `backend-tests`)...")
+        issue = attendre_deploiement_backend(base.fusion, jeton, nom_job)
+        if issue["etat"] == "deploye":
+            fenetre = min(timeout_minutes, FENETRE_APRES_DEPLOIEMENT_MINUTES)
+            log_succes(
+                f"Job de déploiement terminé ({issue['detail']}) : la révision se juge "
+                f"maintenant, sur {fenetre} min."
+            )
+        elif issue["etat"] == "echec":
+            log_erreur(
+                f"Le job « {nom_job} » a échoué sur {base.fusion[:10]} "
+                f"({issue['detail']}) : le backend de ce commit n'a pas été déployé, "
+                "et interroger /health ne ferait que décrire l'ancienne révision."
+            )
+            return False
+        else:
+            log(
+                f"État du job « {nom_job} » NON lu ({issue['detail']}) : révision jugée sur "
+                f"la fenêtre complète de {fenetre} min — aucune prémisse (déploiement "
+                "en cours, en file, ou API muette) n'est traduite en vert."
+            )
+    else:
+        log(
+            "Job de déploiement non identifié (jeton absent ou entrée `deploy-fly` "
+            f"introuvable dans gate-perimetre.json) : fenêtre complète de {fenetre} min."
+        )
+
     cmd = [
         sys.executable,
         "backend/scripts/check_deployed_revision.py",
         "--attendu",
         dernier_backend,
         "--tentatives",
-        str(max(1, int(timeout_minutes * 60 / 20))),
+        str(max(1, int(fenetre * 60 / 20))),
         "--delai",
         "20",
     ]
@@ -968,7 +1105,9 @@ def main(argv=None) -> int:
             "elle jugerait une autre production que celle qui vient d'être livrée."
         )
 
-    ok_back = verifier_production_backend(base, options.timeout_prod) if base else False
+    ok_back = (
+        verifier_production_backend(base, jeton, options.timeout_prod) if base else False
+    )
 
     refus = [
         nom
