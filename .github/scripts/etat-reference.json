@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-25",
-    "motif": "Retry-After expose en CORS : la consigne de retour d'un refus de capacite doit etre lisible par le JavaScript d'une origine croisee (shell natif Capacitor, VITE_USE_SAME_ORIGIN_API=false).",
+    "motif": "Retry-After passe dans expose_headers : sans exposition, un client d'origine croisée (shell natif Capacitor, mode direct VITE_USE_SAME_ORIGIN_API=false) lit null et revient plus tôt que le serveur ne l'autorise — la rafale de 503 mesurée le 25/10/2026, où un onglet saturait son propre plafond.",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
