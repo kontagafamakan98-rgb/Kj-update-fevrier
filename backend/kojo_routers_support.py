@@ -334,7 +334,19 @@ async def list_support_wallets(
         `tronque` dit que la lecture bornée a coupé la vue : une file
         incomplète qui se tait ferait croire qu'il n'y a plus rien à valider.
     """
-    return await kojo_kyc.lister_portefeuilles(etat=etat, limite=limite, offset=offset)
+    page = await kojo_kyc.lister_portefeuilles(etat=etat, limite=limite, offset=offset)
+    # Les clés sont écrites LITTÉRALEMENT ici : `scripts/audit_docstrings.py`
+    # croise la section `Returns:` avec les `return {…}` du handler, donc une
+    # délégation pure ferait passer des clés bien retournées pour des clés
+    # seulement documentées — c'est ce que la CI a refusé le 25/10/2026.
+    return {
+        "total": page["total"],
+        "count": page["count"],
+        "offset": page["offset"],
+        "limite": page["limite"],
+        "tronque": page["tronque"],
+        "portefeuilles": page["portefeuilles"],
+    }
 
 
 @router.post("/support/wallets/{user_id}/decision")
