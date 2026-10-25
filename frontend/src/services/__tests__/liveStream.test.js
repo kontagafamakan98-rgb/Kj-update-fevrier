@@ -16,7 +16,12 @@
  * mesure sans attendre.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { openLiveStream, isLiveStreamSupported, MAX_RETRY_AFTER_MS } from '../liveStream';
+import {
+  openLiveStream,
+  isLiveStreamSupported,
+  CAPACITY_FLOOR_MS,
+  MAX_RETRY_AFTER_MS,
+} from '../liveStream';
 import {
   BATTEMENT_SERVEUR_MS,
   SILENCE_TIMEOUT_MS,
@@ -217,7 +222,101 @@ describe('flux SSE — reconnexion', () => {
 
     await attendre(() => statuts.includes('down') && delais.length === 1);
     expect(statuts).toContain('connecting');
-    expect(delais[0]).toBe(1000);
+    // Ce cas exigeait 1 000 ms — et c'était le DÉFAUT : un 503 de capacité
+    // n'est pas une coupure réseau, et revenir à la seconde rouvre le flux
+    // contre un plafond qui ne rend ses places qu'au bout du bail.
+    expect(delais[0]).toBeGreaterThanOrEqual(CAPACITY_FLOOR_MS);
+    stop();
+  });
+
+  it('un 503 SANS consigne lisible ne revient pas dans la seconde (CORS, proxy, client natif)', async () => {
+    // Le cas réel d'un client en origine croisée quand `Retry-After` n'est pas
+    // exposé : `headers.get` rend `null`, et le client n'a plus QUE son propre
+    // plancher. Sans lui, il revenait à 1 s, 2 s, 4 s, 8 s, 16 s, 30 s — six
+    // tentatives refusées dans la première minute, chacune laissant une place
+    // comptée en attendant son bail.
+    const delais = [];
+    const refusSansConsigne = {
+      ok: false,
+      status: 503,
+      body: null,
+      headers: { get: () => null },
+    };
+    const stop = ouvrir('/notifications/stream', {
+      fetchImpl: vi.fn(async () => refusSansConsigne),
+      schedule: (run, delay) => {
+        delais.push(delay);
+        return delay;
+      },
+      initialDelayMs: 1000,
+      random: () => 0,
+    });
+
+    await attendre(() => delais.length === 1);
+    expect(delais[0]).toBe(CAPACITY_FLOOR_MS);
+    // La gigue reste POSITIVE : jamais sous le plancher, même au tirage bas.
+    expect(delais[0]).toBeGreaterThanOrEqual(CAPACITY_FLOOR_MS);
+    stop();
+  });
+
+  it('deux refus de capacité CONSÉCUTIFS espacent davantage (le plafond ne bouge pas en une minute)', async () => {
+    const delais = [];
+    const stop = ouvrir('/notifications/stream', {
+      fetchImpl: vi.fn(async () => ({ ok: false, status: 503, body: null })),
+      schedule: (run, delay) => {
+        delais.push(delay);
+        // On ne relance que les premiers tours : la boucle doit progresser
+        // jusqu'au DEUXIÈME refus, mais pas tourner sans fin pendant la mesure.
+        if (delais.length <= 3) run();
+        return delay;
+      },
+      initialDelayMs: 1000,
+      random: () => 0,
+    });
+
+    await attendre(() => delais.length >= 2);
+    expect(delais[0]).toBe(CAPACITY_FLOOR_MS);
+    expect(delais[1]).toBeGreaterThan(delais[0]);
+    expect(delais[1]).toBeLessThanOrEqual(MAX_RETRY_AFTER_MS);
+    stop();
+  });
+
+  it('un flux RÉELLEMENT ouvert remet le plancher à zéro', async () => {
+    // Sans cette remise, un onglet qui a subi une rafale resterait puni à deux
+    // minutes pour le reste de la session — et la consolidation serait un
+    // plafond qu'on n'a plus besoin de respecter.
+    const delais = [];
+    let appels = 0;
+    const fetchImpl = vi.fn(async () => {
+      appels += 1;
+      if (appels === 2) {
+        // Le flux s'ouvre… et se ferme aussitôt (panne serveur ordinaire).
+        return { ok: true, status: 200, body: corps(['event: ready\ndata: {}\n\n']) };
+      }
+      return { ok: false, status: 503, body: null };
+    });
+    const stop = ouvrir('/notifications/stream', {
+      fetchImpl,
+      schedule: (run, delay) => {
+        delais.push(delay);
+        // Borné : une relance inconditionnelle ferait tourner la boucle pour
+        // toujours (le worker de test meurt avant la fin des cas).
+        if (delais.length <= 4) run();
+        return delay;
+      },
+      initialDelayMs: 1000,
+      random: () => 0,
+    });
+
+    await attendre(() => delais.length >= 3 && appels >= 3);
+    // 1) 503 → plancher ; 2) flux ouvert puis refermé → petit recul ;
+    // 3) 503 de nouveau → le plancher REPART de sa valeur de base.
+    expect(delais[0]).toBe(CAPACITY_FLOOR_MS);
+    // Recul ordinaire (le plancher de capacité n'est plus armé) : sa valeur
+    // exacte dépend de la gigue, ce que ce cas ne juge pas — seule la REMISE
+    // compte.
+    expect(delais[1]).toBeLessThan(CAPACITY_FLOOR_MS);
+    expect(delais[2]).toBe(CAPACITY_FLOOR_MS);
     stop();
   });
 
@@ -244,7 +343,33 @@ describe('flux SSE — reconnexion', () => {
     });
 
     await attendre(() => delais.length === 1);
-    expect(delais[0]).toBe(60000);
+    // La consigne du serveur est un PLANCHER, jamais une heure exacte : la gigue
+    // positive du plancher de capacité peut ajouter quelques secondes. Ce qui
+    // est exigé, c'est de ne jamais revenir PLUS TÔT qu'il ne l'autorise.
+    expect(delais[0]).toBeGreaterThanOrEqual(60000);
+    stop();
+  });
+
+  it('une consigne PLUS LARGE que le plancher du client est suivie', async () => {
+    const delais = [];
+    const refus = {
+      ok: false,
+      status: 503,
+      body: null,
+      headers: { get: (nom) => (nom === 'retry-after' ? '100' : null) },
+    };
+    const stop = ouvrir('/notifications/stream', {
+      fetchImpl: vi.fn(async () => refus),
+      schedule: (run, delay) => {
+        delais.push(delay);
+        return delay;
+      },
+      initialDelayMs: 1000,
+      random: () => 0,
+    });
+
+    await attendre(() => delais.length === 1);
+    expect(delais[0]).toBe(100000);
     stop();
   });
 

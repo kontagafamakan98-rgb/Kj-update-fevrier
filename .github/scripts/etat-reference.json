@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-25",
-    "motif": "La confirmation backend juge /health APRES que le job de deploiement du commit de fusion soit termine : mesure du 25/10/2026, une fenetre fixe de 10 min refusait une production correcte 29 s avant la fin du deploiement (deploy-fly depend de backend-tests).",
+    "motif": "Retry-After passe dans expose_headers : sans exposition, un client d'origine croisée (shell natif Capacitor, mode direct VITE_USE_SAME_ORIGIN_API=false) lit null et revient plus tôt que le serveur ne l'autorise — la rafale de 503 mesurée le 25/10/2026, où un onglet saturait son propre plafond.",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -68,7 +68,6 @@
       "backend/scripts/check_deployed_revision.py": "bcd6ef28eab30e1365db3cf3c41b3eb203f6578177e93102cc9830bad82113ae",
       "backend/scripts/check_health_probe.py": "136d30b9c6461d473042782a6d0ed70e649901cd27ba7fd555d74544e39f7e4d",
       "backend/scripts/verifier_depot_sauvegarde.py": "165d97d983076e2f03a0ed09950c703935963aef53a917db7b7d70e404f63866",
-      "backend/server.py": "8d1cd59a3ec9e9db652e44f458789f7b98def3a68b3b386d449f4f6295003a74",
       "frontend/scripts/audit_api_returns.cjs": "2e54a6a80a65df023c7d75695a0ea00657d3ee7d40bcaa5d42ca12fa9308afa7",
       "frontend/scripts/audit_tdz.cjs": "09472576d4460656934a5c7a1856959b1d56cd343f0932b4286696797063cc32",
       "frontend/scripts/budget-de-vivacite.js": "3d4beed04f288d57bc0636599f77371f4d9343cf5d9c926eec4f53d111c33c7b",
@@ -141,7 +140,8 @@
       "frontend/scripts/check-job-form-canari.js": "806fdaed94c92d1e1f2fc8040a4db9dba5f49b78006a1b5f81a0358cee25c797",
       "backend/kojo_routers_jobs_proposals.py": "513fa961889e9318173d989836c290c3c08556ff3289f62ba2ebb750563f43a4",
       "frontend/scripts/check-bundle-size.js": "4e823d2e25aeaeb03dc1601665b248b8552dcec55b4146006f8cc604b757b90c",
-      ".github/scripts/livrer.py": "8e76ed3490d5d6244415bb54643e94b756572ef16f3c7f20e8a26b9adb646d42"
+      ".github/scripts/livrer.py": "8e76ed3490d5d6244415bb54643e94b756572ef16f3c7f20e8a26b9adb646d42",
+      "backend/server.py": "9d06ecbe47ef4a930dcb9dfb4858d9e7aedc374ecde8bf4aabe01f4fbbb93c94"
     }
   },
   "hors_perimetre": [

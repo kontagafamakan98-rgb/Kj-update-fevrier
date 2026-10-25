@@ -222,7 +222,9 @@ async def stream_messages(current_user: User = Depends(get_current_user)):
         raise HTTPException(
             status_code=503,
             detail="Flux temps réel momentanément indisponible : réessayez dans un instant.",
-            headers={"Retry-After": "60"},
+            # Même consigne que la route des notifications : la valeur vient de
+            # `kojo_live`, jamais d'un littéral recopié ici.
+            headers={"Retry-After": str(kojo_live.STREAM_REFUSED_RETRY_AFTER_SECONDS)},
         ) from exc
 
 async def _nomme_participant(conversation_id: str, user_id: str) -> bool:

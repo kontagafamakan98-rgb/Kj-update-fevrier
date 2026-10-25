@@ -661,7 +661,16 @@ app.add_middleware(
     # `X-Total-Count` : le nombre de missions du filtre. Sans cette exposition,
     # l'en-tête ARRIVE mais le JavaScript ne peut pas le lire (même règle que
     # `X-Request-ID`), donc la liste ne pourrait pas dire combien elle en a.
-    expose_headers=["Content-Range", "X-Content-Range", "X-Kojo-CSRFToken", "X-Request-ID", "X-Total-Count"],
+    #
+    # `Retry-After` : la consigne de retour d'un refus (503 de plafond de flux,
+    # 429 de débit). Sur le web servi, `/api/*` passe par la réécriture Vercel,
+    # donc même origine — l'en-tête est lisible sans rien exposer. Les clients
+    # qui ne passent PAS par ce proxy (le shell natif Capacitor, qui parle à
+    # l'API distante, et le mode direct `VITE_USE_SAME_ORIGIN_API=false`) sont,
+    # eux, en origine croisée : sans exposition le JavaScript lit `null`, et le
+    # client revient plus tôt que le serveur ne l'autorise. Un en-tête qu'un
+    # client ne peut pas lire n'existe que pour les journaux.
+    expose_headers=["Content-Range", "Retry-After", "X-Content-Range", "X-Kojo-CSRFToken", "X-Request-ID", "X-Total-Count"],
     max_age=86400,
 )
 

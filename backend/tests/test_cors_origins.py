@@ -118,9 +118,23 @@ def preflight(origin, path='/api/geolocation/available-countries', method='GET',
     }
 
 
+# Réponse NON préflight : c'est là que Starlette pose
+# `Access-Control-Expose-Headers`, donc le seul endroit où un navigateur apprend
+# quels en-têtes il a le droit de lire. La racine `/` est choisie parce qu'elle
+# ne touche NI base NI réseau : cette sonde juge une décision de middleware, pas
+# une route, et elle doit rendre le même verdict sans MongoDB.
+def reponse_simple(origin, path='/'):
+    response = client.get(path, headers={'Origin': origin})
+    return {
+        'status': response.status_code,
+        'expose': response.headers.get('access-control-expose-headers'),
+    }
+
+
 print(json.dumps({
     'allowed_origins': server.allowed_origins,
     'frontend': preflight('https://kojoforafrica.cc.cd'),
+    'expose': reponse_simple('https://kojoforafrica.cc.cd'),
     'stats': preflight('https://kojoforafrica.cc.cd', '/api/public/stats'),
     'mutation': preflight('https://kojoforafrica.cc.cd', '/api/jobs', 'POST',
                           'content-type,x-csrftoken,authorization'),
@@ -187,6 +201,23 @@ class TestPreflightProduction:
         result = production_preflight["mutation"]
         assert result["status"] == 200
         assert result["acao"] == PROD
+
+    def test_retry_after_est_lisible_par_le_javascript(self, production_preflight):
+        """La consigne de retour d'un refus doit être LISIBLE, pas seulement servie.
+
+        En origine croisée (shell natif Capacitor, mode direct), un en-tête non
+        exposé arrive mais `response.headers.get('retry-after')` rend `null` côté
+        JavaScript. Le client retombait alors sur son seul recul exponentiel —
+        1 s, 2 s, 4 s… — soit six tentatives refusées dans la minute contre un
+        plafond de flux qui ne rend ses places qu'au bout du bail (60 s).
+        """
+        result = production_preflight["expose"]
+        assert result["status"] == 200, result
+        expose = (result["expose"] or "").lower()
+        assert "retry-after" in expose, (
+            f"`Retry-After` n'est pas exposé (Access-Control-Expose-Headers = {result['expose']!r}) : "
+            "le client d'origine croisée ne peut pas lire la consigne de retour."
+        )
 
     def test_origine_inconnue_toujours_refusee(self, production_preflight):
         """Sonde non vacuité : le 200 vient bien de la liste d'origines, pas

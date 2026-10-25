@@ -136,6 +136,22 @@ MAX_STREAMS_TOTAL = int(os.environ.get("KOJO_SSE_MAX_TOTAL", "400") or 400)
 # silence.
 MAX_QUEUE_SIZE = 100
 
+# Consigne rendue au client quand un flux est REFUSÉ (503), en secondes.
+#
+# Un seul propriétaire : les DEUX routes de flux (`kojo_routers_notifications`,
+# `kojo_routers_messages`) la lisent au lieu d'écrire « 60 » chacune, et le
+# client s'y RANGE au lieu de deviner (son plancher de repli ne peut pas être
+# plus court, cf. `frontend/src/services/liveStream.js`). Deux nombres écrits
+# séparément finissent par diverger, et c'est le client qui reviendrait plus tôt
+# que le serveur ne l'autorise — la rafale de 503 mesurée le 25/10/2026.
+#
+# 60 s n'est pas un chiffre rond choisi pour faire joli : c'est l'ordre de
+# grandeur du BAIL d'un flux abandonné (`PARTAGE_LEASE_SECONDS`, 60 s). Une
+# place laissée par un worker tué, ou par une connexion à demi-ouverte, n'est
+# rendue qu'à l'expiration de ce bail ; revenir plus tôt, c'est retenter contre
+# un plafond qui n'a pas encore bougé d'une place.
+STREAM_REFUSED_RETRY_AFTER_SECONDS = 60
+
 # --- Bus partagé (Redis pub/sub) --------------------------------------------
 #
 # Le fan-out reste EN MÉMOIRE et le bus ne fait que le PROLONGER : c'est ce qui
