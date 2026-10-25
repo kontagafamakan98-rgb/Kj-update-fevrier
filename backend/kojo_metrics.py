@@ -45,7 +45,9 @@ from kojo_live import (
     active_streams,
     bus_actif,
     bus_stats,
+    comptes_satures,
     partage_stats,
+    refus_stats,
 )
 from kojo_rate_limit import rate_limit_en_redis, rate_limit_stats
 from kojo_scheduler import relance_stats
@@ -145,6 +147,7 @@ def rendre(corpus: Optional[dict] = None) -> str:
     """
     bus = bus_stats()
     partage = partage_stats()
+    refus = refus_stats()
     limites = rate_limit_stats()
     revocation = revocation_stats()
 
@@ -242,6 +245,25 @@ def rendre(corpus: Optional[dict] = None) -> str:
         "kojo_live_flux_repli_total",
         "Admissions faites par le plafond LOCAL, registre partage injoignable.",
         partage.get("repli"),
+    )
+    # Un 503 de CAPACITE n'est pas une panne, c'est le produit qui se protege :
+    # mais il ne se voyait nulle part. Les trois causes sont separees parce que
+    # leur remede differe : le compte doit fermer des onglets, le process a
+    # besoin d'une machine de plus, le registre partage compte les workers.
+    compteur(
+        "kojo_live_flux_refus_local_total",
+        "Flux refuses par le plafond LOCAL du compte, avant le registre partage.",
+        refus.get("compte_local"),
+    )
+    compteur(
+        "kojo_live_flux_refus_processus_total",
+        "Flux refuses parce que le process est au plafond MAX_STREAMS_TOTAL.",
+        refus.get("processus"),
+    )
+    jauge(
+        "kojo_live_comptes_satures",
+        "Comptes ayant atteint MAX_STREAMS_PER_USER dans ce process.",
+        comptes_satures(),
     )
 
     # ── Rate-limiter ───────────────────────────────────────────────────────

@@ -121,8 +121,31 @@ mémoire. Les dates sortent en `..._timestamp_seconds` (jauges), `0` valant
 | `kojo_live_flux_plafond_processus` | gauge | `MAX_STREAMS_TOTAL` (400 par défaut) |
 | `kojo_live_flux_plafond_compte` | gauge | `MAX_STREAMS_PER_USER` (8 par défaut, dérivé de `FLUX_PAR_PAGE × ONGLETS_SIMULTANES`) |
 | `kojo_live_flux_reserves_total` | counter | Places admises par le registre partagé |
-| `kojo_live_flux_refus_total` | counter | Flux refusés par le registre partagé (plafond du compte) |
+| `kojo_live_flux_refus_total` | counter | Flux refusés par le registre partagé (plafond du compte, tous workers) |
+| `kojo_live_flux_refus_local_total` | counter | Flux refusés par le plafond **local** du compte, avant le registre |
+| `kojo_live_flux_refus_processus_total` | counter | Flux refusés parce que le process est au plafond `MAX_STREAMS_TOTAL` |
+| `kojo_live_comptes_satures` | gauge | Comptes ayant **atteint** `MAX_STREAMS_PER_USER` dans ce process |
 | `kojo_live_flux_repli_total` | counter | Admissions faites par le plafond **local**, registre injoignable |
+
+Un **503 de capacité** n'est pas une panne : c'est le produit qui se protège.
+Il était pourtant invisible — mesuré le 25/10/2026 sur la console de production,
+`GET /api/notifications/stream` rendait des 503 par rafales sans qu'aucun
+chiffre ne dise que le plafond mordait. Les trois causes de refus sont
+séparées parce que leur remède diffère :
+
+* `flux_refus_local_total` — le **compte** ferme un onglet (il porte déjà
+  `flux_actifs` à `flux_plafond_compte`, et `comptes_satures` le nomme) ;
+* `flux_refus_total` (registre partagé) — le compte sature **tous workers
+  confondus** : fermer un onglet sur l'un ne libère pas l'autre ;
+* `flux_refus_processus_total` — la **machine** est pleine (`flux_actifs`
+  atteint `flux_plafond_processus`) : il faut une instance de plus, rien côté
+  client n'y changera.
+
+La règle de lecture : un refus qui monte **pendant que `flux_actifs` reste
+sous son plafond** n'est pas de la charge, c'est un client qui boucle
+(reconnexion immédiate) ou un plafond sous-dimensionné. `comptes_satures` est
+une jauge et redescend : les compteurs, eux, ne se remettent jamais à zéro
+(sauf redémarrage), donc c'est leur **pente** qu'on lit, pas leur valeur.
 
 ### Rate-limiter
 

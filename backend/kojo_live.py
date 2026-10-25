@@ -210,10 +210,37 @@ class StreamCapacityExceeded(Exception):
 _flux: Dict[str, Set[asyncio.Queue]] = defaultdict(set)
 _total = 0
 
+# ── Refus de CAPACITÉ : la mesure qui dit si le plafond mord ────────────────
+# Un 503 de capacité n'est pas une panne : c'est le produit qui se protège.
+# Mais un refus qui monte sans que personne ne le lise est un temps réel
+# dégradé en silence — le 25/10/2026, la console de production en affichait
+# deux par minute pour un plafond saturé par deux onglets, et le fait n'existait
+# nulle part. Les CAUSES sont séparées : `compte_local` (les flux de CE compte
+# dans ce process), `processus` (la machine au complet) et, côté registre
+# partagé, `partage_stats()['refus']` — même symptôme, remèdes opposés.
+_refus: Dict[str, int] = {"compte_local": 0, "processus": 0}
+
 
 def active_streams() -> int:
     """Nombre de flux ouverts dans ce process (diagnostic / tests)."""
     return _total
+
+
+def refus_stats() -> Dict[str, int]:
+    """Refus de capacité décidés par CE process, par cause."""
+    return dict(_refus)
+
+
+def comptes_satures() -> int:
+    """Comptes ayant ATTEINT le plafond de flux dans ce process.
+
+    Une jauge, pas un compteur : un compte dont un onglet se ferme n'est plus
+    saturé, et une valeur qui ne redescendrait jamais ferait croire à une
+    saturation permanente. Le registre local ne garde que les comptes qui ont
+    au moins un flux ouvert (`unsubscribe` efface la clé vide).
+    """
+    seuil = MAX_STREAMS_PER_USER
+    return sum(1 for files in _flux.values() if len(files) >= seuil)
 
 
 def active_streams_for(user_id: str) -> int:
@@ -233,6 +260,8 @@ def reset_streams() -> None:
     _total = 0
     for cle in _flux_compteurs:
         _flux_compteurs[cle] = 0
+    for cle in _refus:
+        _refus[cle] = 0
 
 
 def subscribe(user_id: str) -> asyncio.Queue:
@@ -242,10 +271,12 @@ def subscribe(user_id: str) -> asyncio.Queue:
     """
     global _total
     if len(_flux.get(user_id) or ()) >= MAX_STREAMS_PER_USER:
+        _refus["compte_local"] += 1
         raise StreamCapacityExceeded(
             "Trop de flux ouverts pour ce compte (%d)" % MAX_STREAMS_PER_USER
         )
     if _total >= MAX_STREAMS_TOTAL:
+        _refus["processus"] += 1
         raise StreamCapacityExceeded(
             "Trop de flux ouverts sur ce serveur (%d)" % MAX_STREAMS_TOTAL
         )
