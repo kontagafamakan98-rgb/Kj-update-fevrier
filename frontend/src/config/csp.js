@@ -63,8 +63,16 @@ export function construireCsp({ apiOrigin = '', plausibleDomain = '', gaMeasurem
   // Plausible n'ouvre script-src que si son domaine est réellement configuré.
   if (plausible) scriptSrc.push('https://plausible.io');
   // GA4 : `googletagmanager.com` sert gtag.js ; les collectes partent vers
-  // google-analytics.com (connect-src) et une balise de repli `img` existe
-  // (img-src) — sans ces trois entrées, GA serait bloqué en silence.
+  // google-analytics.com ET www.google.com (connect-src), et une balise de
+  // repli `img` existe (img-src) — sans ces entrées, GA serait bloqué en
+  // silence, par NOTRE politique.
+  //
+  // `www.google.com` est MESURÉ, pas supposé (24/10/2026, console de
+  // production) : gtag émet une partie de ses balises vers
+  // `https://www.google.com/g/collect`, et la CSP la refusait — « Refused to
+  // connect because it violates the document's Content Security Policy ». La
+  // sonde de production ne pouvait pas le voir : elle compare le site et les
+  // documents, et les deux étaient d'accord pour bloquer.
   if (gaActif) scriptSrc.push('https://www.googletagmanager.com');
 
   // Géolocalisation 100 % centralisée derrière le backend Kojo : détection IP,
@@ -75,7 +83,11 @@ export function construireCsp({ apiOrigin = '', plausibleDomain = '', gaMeasurem
   if (origine) connectSrc.push(origine);
   connectSrc.push('https://accounts.google.com');
   if (gaActif) {
-    connectSrc.push('https://www.google-analytics.com', 'https://region1.google-analytics.com');
+    connectSrc.push(
+      'https://www.google-analytics.com',
+      'https://region1.google-analytics.com',
+      'https://www.google.com',
+    );
   }
 
   const imgSrc = [

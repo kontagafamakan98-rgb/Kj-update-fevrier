@@ -240,13 +240,36 @@ async def get_conversation_messages(
         list[dict]: messages de la conversation (ordre chronologique),
         avec conversation_id et les flags de lecture.
     """
-    # Verify user is part of conversation. conversation_id est formaté
-    # "{id1}_{id2}" - on compare les IDs exacts après split, pas une
-    # recherche de sous-chaîne ("in") qui pouvait matcher par accident si
-    # l'ID d'un utilisateur apparaissait comme fragment d'un autre.
-    participant_ids = conversation_id.split("_")
-    if current_user.id not in participant_ids:
-        raise HTTPException(status_code=403, detail="Access denied")
+    # ── L'appartenance se LIT DANS LE FIL, elle ne se devine pas ───────────
+    # `conversation_id` vaut "{id1}_{id2}", et le découpage sur « _ » supposait
+    # que les identifiants n'en contiennent jamais. C'est faux : les comptes
+    # hérités en portent un (« famakan_kontaga_master_2024 »). Mesuré en
+    # production le 24/10/2026 : ce compte ouvrait une conversation où il avait
+    # écrit et recevait 403 « Access denied » — ses propres messages lui étaient
+    # interdits, parce que le découpage ne le reconnaissait pas comme
+    # participant.
+    #
+    # La première lecture est donc la PLUS EXACTE : un message du fil dont
+    # l'expéditeur ou le destinataire est ce compte. Elle ne dépend d'aucune
+    # forme d'identifiant, et elle resserre le contrôle au passage (un compte
+    # qui n'apparaît dans le fil qu'en FRAGMENT d'un autre identifiant ne passe
+    # plus). Le découpage ne survit que pour le fil VIDE, où il n'y a rien à
+    # lire : c'est ce qui permet à un participant d'ouvrir une conversation
+    # qu'aucun message n'a encore remplie.
+    appartient = await db.messages.find_one(
+        {
+            "conversation_id": conversation_id,
+            "$or": [
+                {"sender_id": current_user.id},
+                {"receiver_id": current_user.id},
+            ],
+        },
+        {"id": 1},
+    )
+    if appartient is None:
+        fil = await db.messages.find_one({"conversation_id": conversation_id}, {"id": 1})
+        if fil is not None or current_user.id not in conversation_id.split("_"):
+            raise HTTPException(status_code=403, detail="Access denied")
     
     # Pagination par offset. Le mode asc conserve le contrat historique ; le
     # mode desc permet au frontend de récupérer d'abord les messages récents,

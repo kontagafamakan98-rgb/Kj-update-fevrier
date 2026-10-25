@@ -34,7 +34,7 @@ const POLITIQUE = [
   "script-src 'self' https://accounts.google.com https://www.googletagmanager.com",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://res.cloudinary.com https://tile.openstreetmap.org https://www.google-analytics.com",
-  "connect-src 'self' https://api.kojo.test https://accounts.google.com https://www.google-analytics.com https://region1.google-analytics.com",
+  "connect-src 'self' https://api.kojo.test https://accounts.google.com https://www.google-analytics.com https://region1.google-analytics.com https://www.google.com",
   "frame-src 'self' https://www.google.com https://www.openstreetmap.org https://accounts.google.com",
   "font-src 'self' data:",
   "object-src 'none'",
