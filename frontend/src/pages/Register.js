@@ -66,6 +66,10 @@ export default function Register() {
   const [detectedCountry, setDetectedCountry] = useState(null);
   const [manualCountrySelection, setManualCountrySelection] = useState(false);
   const manualCountrySelectionRef = useRef(false);
+  // Le champ email, pour RAMENER l'attention dessus quand le refus tombe à
+  // l'envoi : sur un téléphone, le bouton « Créer mon compte » est en bas d'un
+  // formulaire long, et un message resté au-dessus du champ est hors de l'écran.
+  const emailInputRef = useRef(null);
   const [profilePhoto, setProfilePhoto] = useState(null);
   const [userSelectedLanguage, setUserSelectedLanguage] = useState(defaultLanguage); // Choix utilisateur pour profil
   
@@ -82,6 +86,33 @@ export default function Register() {
   const translateApiMessage = (message = '') => isEmailAlreadyUsedMessage(message) ? pageT('duplicateEmailError') : message;
   const displayedError = errorKey ? pageT(errorKey) : error;
   const displayedEmailAvailabilityMessage = emailAvailability?.messageKey ? pageT(emailAvailability.messageKey) : emailAvailability?.message;
+  const emailEstPrise = emailAvailability?.available === false;
+  // Le refus est ANNONCÉ quand il est AFFICHÉ : `aria-describedby` qui pointe
+  // vers un bloc encore caché (vérification en cours) ne décrirait rien.
+  const emailRefusVisible = !emailChecking && emailEstPrise;
+
+  /**
+   * Le refus d'une adresse déjà prise tient en UNE surface : le bloc sous le
+   * champ. Il était publié TROIS fois — bandeau en haut du formulaire, bloc de
+   * champ, et toast (25/10/2026). Trois copies de la même phrase ne disent pas
+   * trois choses : elles font douter que la première soit la bonne, et sur un
+   * téléphone le toast en bas masque justement le bloc qui porte les issues.
+   *
+   * `attirer` n'est vrai qu'à l'ENVOI : la personne a alors quitté le champ et
+   * se trouve en bas de page, donc on la ramène au champ. Au blur, la ramener
+   * de force lui reprendrait le focus qu'elle vient de donner au champ suivant.
+   */
+  const signalerEmailPrise = ({ attirer = false } = {}) => {
+    setError('');
+    setErrorKey('');
+    if (!attirer) return;
+    const champ = emailInputRef.current;
+    if (!champ) return;
+    if (typeof champ.scrollIntoView === 'function') {
+      champ.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+    champ.focus({ preventScroll: true });
+  };
 
   const checkEmailAvailability = async (rawEmail, { silent = false } = {}) => {
     const emailToCheck = String(rawEmail || '').trim().toLowerCase();
@@ -106,13 +137,9 @@ export default function Register() {
       // EXPLICITE refuse ; un `null` (backend plus ancien, autre origine) ne
       // reproche rien et laisse `/auth/register-verified` trancher.
       if (result.available === false) {
-        const translatedMessage = pageT('duplicateEmailError');
         setEmailAvailability({ ...result, messageKey: 'duplicateEmailError' });
-        setError(translatedMessage);
-        setErrorKey('duplicateEmailError');
-        if (!silent) {
-          toast.error({ messageKey: 'duplicateEmailError', scope: 'register' });
-        }
+        // Le bloc de champ est la SEULE surface : ni bandeau, ni toast.
+        signalerEmailPrise({ attirer: !silent });
         return false;
       }
 
@@ -127,11 +154,7 @@ export default function Register() {
 
       if (isEmailAlreadyUsedMessage(rawMessage)) {
         setEmailAvailability({ available: false, messageKey: 'duplicateEmailError' });
-        setError(message);
-        setErrorKey('duplicateEmailError');
-        if (!silent) {
-          toast.error({ messageKey: 'duplicateEmailError', scope: 'register' });
-        }
+        signalerEmailPrise({ attirer: !silent });
         return false;
       }
 
@@ -712,10 +735,15 @@ export default function Register() {
                 type="email"
                 autoComplete="email"
                 required
+                ref={emailInputRef}
                 className={pagePlan.champClass}
                 placeholder={pageT('emailPlaceholder')}
                 value={formData.email}
                 onChange={handleChange}
+                // Le refus est DÉCRIT par le bloc juste en dessous : un lecteur
+                // d'écran l'annonce sur le champ, pas ailleurs dans la page.
+                aria-invalid={emailRefusVisible}
+                aria-describedby={emailRefusVisible ? 'email-disponibilite' : undefined}
                 onBlur={() => {
                   if (formData.email?.trim()) {
                     checkEmailAvailability(formData.email, { silent: true });
@@ -735,26 +763,29 @@ export default function Register() {
                   passe. Les deux liens sont RÉELS (/login, /forgot-password),
                   et les mots viennent du dictionnaire de la page, donc de la
                   langue choisie. */}
-              {!emailChecking && emailAvailability?.available === false && (
-                <div className="mt-1 space-y-1">
-                  <p className="text-sm text-red-600">{displayedEmailAvailabilityMessage || pageT('duplicateEmailError')}</p>
-                  <p className="text-sm text-stone-700">
-                    {pageT('duplicateEmailNextStep')}{' '}
+              {emailRefusVisible && (
+                <div id="email-disponibilite" role="alert" className="mt-2 space-y-1">
+                  <p className="text-sm font-medium text-red-600">{displayedEmailAvailabilityMessage || pageT('duplicateEmailError')}</p>
+                  <p className="text-sm text-stone-700">{pageT('duplicateEmailNextStep')}</p>
+                  {/* Deux issues, EMPILÉES sur mobile : côte à côte, deux liens
+                      longs se coupent en plein mot ou débordent du champ ;
+                      empilés, chacun est lisible en entier et se tape sans
+                      viser. À partir de `sm`, ils tiennent sur une ligne. */}
+                  <div className="flex flex-col items-start gap-0.5 text-sm sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-1.5">
                     <Link
                       to="/login"
                       className="font-semibold text-orange-700 underline underline-offset-2 hover:text-orange-600 transition-colors"
                     >
                       {pageT('duplicateEmailSignIn')}
                     </Link>
-                    {', '}
-                    {pageT('duplicateEmailOr')}{' '}
+                    <span className="text-stone-500">{pageT('duplicateEmailOr')}</span>
                     <Link
                       to="/forgot-password"
                       className="font-semibold text-orange-700 underline underline-offset-2 hover:text-orange-600 transition-colors"
                     >
                       {pageT('duplicateEmailResetPassword')}
                     </Link>
-                  </p>
+                  </div>
                 </div>
               )}
               {!emailChecking && emailAvailability?.available === true && formData.email?.trim() && (
