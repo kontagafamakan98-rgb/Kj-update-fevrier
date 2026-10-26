@@ -64,7 +64,13 @@ describe('trackFunnel — rien ne sort sans être déclaré', () => {
       email: 'quelquun@example.com',
       name: 'Fatoumata Traoré',
       job_id: 'job-42',
-      proposal_id: 'p-7',
+      // Un identifiant de FIXTURE, pas un jeton de classe : le scanneur de
+      // Tailwind lit le TEXTE BRUT (commentaires compris) et générerait
+      // l'utilitaire de padding correspondant, la feuille servie porterait
+      // alors une règle sans porteur (`check-css-selecteurs-morts` refusait le
+      // build pour une chaîne de test). D'où un tiret de moins qu'un utilitaire
+      // ne saurait lire.
+      proposal_id: 'prop42',
     });
 
     // Un seul envoi, et il ne porte QUE la clé déclarée.
