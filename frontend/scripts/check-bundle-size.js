@@ -114,6 +114,16 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 // seul `Home` porte la règle. Le plafond passe donc à 131 Ko, avec 0,9 Ko de
 // marge : un relèvement de 1 Ko pour 56 o mesurés laisserait sinon le prochain
 // hachage de build décider à la place du développeur.
+// ── 26/10/2026 : la preuve sociale QUITTE l'accueil ───────────────────────
+// Rectification du paragraphe ci-dessus, qui n'est plus vrai : la bande de faits
+// n'appelle plus `GET /api/public/stats` et ne formate plus de compteur. Mesuré
+// en production, elle affichait « 0 mission terminée · 0 avis » ; les deux faits
+// qui restent sont déclarés et ne dépendent d'aucune donnée. Le module
+// `utils/preuveSociale.js` est supprimé, et le chunk d'accueil perd son appel
+// comme sa règle de formatage. Le plafond, lui, ne redescend pas dans ce
+// commit : on ne fait pas un budget sur un retrait d'une journée, et la marge
+// reste. Ce qui est refusé, en revanche, est écrit plus haut dans
+// `scripts/check-prerender-shells.js` : un ZÉRO publié comme preuve sociale.
 // ── 24/10/2026 : 131 → 132 Ko et 5,50 → 5,55 Mo, POUR LA MODÉRATION ───────
 // `/administration` donne au propriétaire le répertoire des comptes, leur état
 // (restreint/banni) et la lecture des fils : c'est une PAGE, et elle est
