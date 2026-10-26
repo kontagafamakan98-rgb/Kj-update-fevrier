@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-26",
-    "motif": "Retry-After passe dans expose_headers : sans exposition, un client d'origine croisée (shell natif Capacitor, mode direct VITE_USE_SAME_ORIGIN_API=false) lit null et revient plus tôt que le serveur ne l'autorise — la rafale de 503 mesurée le 25/10/2026, où un onglet saturait son propre plafond. Le 26/10/2026 la référence s'étend à trois surfaces du partage d'une mission : `frontend/scripts/check-funnel-events.js` (cible de la mutation déclarée « funnel: etape declaree sans emetteur toleree », dont l'empreinte est le point de retour du harnais, et dont la docstring déclare l'étape `job_shared`) et `frontend/scripts/check-bundle-size.js` (budget de JS initial relevé de 132 à 133 Ko pour la clé `shareJob` du dictionnaire par défaut, 7 o gzip mesurés dans le chunk d'entrée).",
+    "motif": "nouveau garde 1ter-bis : la bande de faits de l'accueil refuse un zero et exige chaque fait declare peint",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -77,7 +77,6 @@
       "frontend/scripts/check-classes-sans-regle.js": "9b97cfdafd9e3cda768bdc24444688aafbc10d861ad6869c079a897588b906b7",
       "frontend/scripts/check-composants-etat-partage-ecouteurs.js": "5e59c89041821e47fa4c91f1e23508f51c74221f5cf7e91121a4fc3d6882dac0",
       "frontend/scripts/check-corpus-missions.js": "0be42e212f324618e1de0882b07a426c00f115b2a8afe381b13277597ee71a1c",
-      "frontend/scripts/check-cors-preflight.js": "69cabaccb06a20088ac20012a3dd3d0a29f3109279fd4ccb4a771eaab52c9960",
       "frontend/scripts/check-couverture-tiers.js": "623a9b63ef8ec72b52f2699f6047026943d20382f91e8f8ded92084efe72a06f",
       "frontend/scripts/check-csp-contract.js": "e58df807a565f614a54d855376e92289059a5a10f65d1b17d48b5c805fef56f1",
       "frontend/scripts/check-csp-documents-production.js": "35344837c96bd19d8a60d3f7d07a4fbdafd4281d3094f1a541c95870687c5ad2",
@@ -102,7 +101,6 @@
       "frontend/scripts/check-pack2-chunks.js": "953f86f71a0f61e8f446727a41e83097ccbb0ecb7f118dc7571bc6b413c6caef",
       "frontend/scripts/check-pack2-i18n-hygiene.js": "692a809c06b036b51536bf1810317ced7e77d7ee10d777188b00bf78b4389d58",
       "frontend/scripts/check-page-meta.js": "abbdc46403a4e2ce8b06fc9b76c652a98958bc23c8155f973029c600d3ce281b",
-      "frontend/scripts/check-prerender-shells.js": "2ea6bf7d3635b045f0413b6a35e9105845960d46a5ecf4184c2bd5ee2f611077",
       "frontend/scripts/check-pwa-manifest.js": "7840560638e9bb25d11c87e729640fc7208a1e60e0ed521dcfa4e3dc2652ad95",
       "frontend/scripts/check-reliquats-css.js": "afc399893d24bf9831bc9c0094b695746bb0a7ddbe5c06e7f65f9adde936a219",
       "frontend/scripts/check-retard-main.js": "b9c98e4c23382b24d1ce361acc7ea5d0cc6dc166d83ab288402f76436d205e61",
@@ -141,8 +139,10 @@
       "backend/kojo_routers_jobs_proposals.py": "513fa961889e9318173d989836c290c3c08556ff3289f62ba2ebb750563f43a4",
       ".github/scripts/livrer.py": "8e76ed3490d5d6244415bb54643e94b756572ef16f3c7f20e8a26b9adb646d42",
       "backend/server.py": "9d06ecbe47ef4a930dcb9dfb4858d9e7aedc374ecde8bf4aabe01f4fbbb93c94",
-      "frontend/scripts/check-bundle-size.js": "2ed1a6decd4effb968ea6f0f0e7b12d7d1002185ec3070c1125fb88251bdb20c",
-      "frontend/scripts/check-funnel-events.js": "19b016ff1cd4a442ca8173e06dbbc5897d0bbb71b918835c638f0062e1879221"
+      "frontend/scripts/check-funnel-events.js": "19b016ff1cd4a442ca8173e06dbbc5897d0bbb71b918835c638f0062e1879221",
+      "frontend/scripts/check-bundle-size.js": "f20f09005c98c5a9ea0ad71def7f6956ed1893285529e2c0e6540cc3eda1563b",
+      "frontend/scripts/check-cors-preflight.js": "10ef1c5f33a3e72d5e89f69a02d6d414513c0be06899edf4b53ce0ba86793cb8",
+      "frontend/scripts/check-prerender-shells.js": "3c2e05a992f92ec565487147c823c13b82230fcd47443a55df5e6db70a6b6f59"
     }
   },
   "hors_perimetre": [
