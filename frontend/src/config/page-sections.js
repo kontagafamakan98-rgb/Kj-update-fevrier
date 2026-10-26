@@ -947,15 +947,22 @@ export const PAGE_SECTIONS = {
     workerKey: 'worker',
     iAmWorkerKey: 'iAmWorker',
     countryKey: 'country',
-    firstNameKey: 'firstName',
-    lastNameKey: 'lastName',
+    // ── LE NOM EN UN CHAMP (26/10/2026) ───────────────────────────────────
+    // `firstNameKey`/`lastNameKey` ont disparu avec les deux champs qu'ils
+    // nommaient : le formulaire pose un seul `name` (le nom complet), et le
+    // serveur le répartit (`kojo_models._noms_resolus`). La coquille pré-rendue
+    // lit ce champ comme le reste de son corps déclaré — deux canaux, une clé.
+    fullNameKey: 'fullName',
     emailKey: 'email',
     emailPlaceholderKey: 'emailPlaceholder',
     phoneKey: 'phone',
+    phoneOptionalKey: 'phoneOptional',
     phoneFormatHintKey: 'phoneFormatHint',
     passwordKey: 'password',
     passwordTooShortKey: 'passwordTooShort',
-    confirmPasswordKey: 'confirmPassword',
+    // `confirmPasswordKey` est RETIRÉ avec le champ de confirmation : le mot de
+    // passe a déjà son révélateur (œil) et sa règle de 8 caractères, et une
+    // seconde saisie ne prouve rien de plus (elle se tape dans le même champ).
     profilePhotoOptionalKey: 'profilePhotoOptional',
     profilePhotoHelpsKey: 'profilePhotoHelps',
     addProfilePhotoKey: 'addProfilePhoto',

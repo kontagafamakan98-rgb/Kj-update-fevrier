@@ -41,10 +41,16 @@ export default function Register() {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    confirmPassword: '',
-    first_name: '',
-    last_name: '',
-    phone: '', // Défini après détection ou choix manuel
+    // ── UN SEUL CHAMP POUR LE NOM (26/10/2026) ─────────────────────────────
+    // `first_name`/`last_name` demandaient de décider où coupe un nom, et la
+    // règle « prénom puis nom » n'est pas universelle. Le champ porte le nom
+    // COMPLET ; le serveur le répartit (`kojo_models._noms_resolus`), et il
+    // reste la seule source de vérité pour les comptes déjà créés.
+    name: '',
+    // `confirmPassword` est RETIRÉ : une seconde saisie du même mot de passe
+    // ne prouve rien de plus (elle se tape dans le même champ, avec le même
+    // révélateur), et elle coûtait un champ obligatoire au seuil du formulaire.
+    phone: '', // FACULTATIF depuis le 26/10/2026 — défini après détection ou choix manuel
     user_type: initialUserType,
     country: '', // Défini après détection ou choix manuel
     preferred_language: defaultLanguage, // Langue courante par défaut, peut être modifiée
@@ -266,8 +272,11 @@ export default function Register() {
     setErrorKey('');
 
     // Validation de base
-    if (formData.password !== formData.confirmPassword) {
-      const errorMsg = t('passwordsDontMatch');
+    // Le nom complet est jugé ICI, avant l'envoi : le serveur sait le répartir,
+    // mais un nom d'un caractère n'est pas un nom, et un refus local garde la
+    // saisie (pas d'aller-retour réseau pour l'apprendre).
+    if ((formData.name || '').trim().length < 2) {
+      const errorMsg = pageT('fullNameRequired');
       setError(errorMsg);
       toast.error(errorMsg);
       setLoading(false);
@@ -312,12 +321,17 @@ export default function Register() {
     // Préparer les données utilisateur
     const userData = {
       ...formData,
+      name: formData.name.trim(),
+      // Le téléphone est FACULTATIF : vide, il part en `null` plutôt qu'en
+      // chaîne vide (le serveur traite les deux comme « pas de numéro », mais
+      // une charge utile qui dit la même chose de deux façons finit par être
+      // lue de travers).
+      phone: formData.phone.trim() || null,
       preferred_language: userSelectedLanguage, // Utiliser la langue choisie par l'utilisateur
       legal_documents_accepted_at: new Date().toISOString(),
       // Ajouter la photo si sélectionnée
       profile_photo_base64: profilePhoto?.base64 || null
     };
-    delete userData.confirmPassword;
 
     // Rediriger d'abord vers la vérification email
     devLog.info('📝 Redirection vers la vérification email...');
@@ -433,16 +447,17 @@ export default function Register() {
   // à remplir ICI.
   //
   // Elle ne compte que les champs EXIGÉS, et le consentement légal en est un
-  // (l'envoi le refuse sans lui). Le téléphone est compté sur le NUMÉRO, jamais
-  // sur le préfixe : la géolocalisation le pré-remplit avec « +223 » seul, et un
-  // préfixe n'est pas une réponse.
+  // (l'envoi le refuse sans lui).
+  //
+  // Changé le 26/10/2026 en même temps que le formulaire : le NOM compte pour
+  // UN (il n'y a plus deux champs, et une confirmation de mot de passe ne se
+  // demande plus), et le TÉLÉPHONE n'y est plus — une jauge qui compterait un
+  // champ facultatif resterait bloquée sous 100 % en accusant la personne de
+  // n'avoir pas rempli quelque chose qu'on ne lui demande pas.
   const champsExiges = [
-    formData.first_name,
-    formData.last_name,
+    formData.name,
     formData.email,
-    stripPhonePrefix(formData.phone, activePhonePrefix),
     formData.password,
-    formData.confirmPassword,
     formData.country,
     formData.user_type,
     formData.legal_documents_accepted ? 'ok' : '',
@@ -736,41 +751,24 @@ export default function Register() {
               )}
             </div>
 
-            {/* Names */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="first_name" className="block text-sm font-semibold text-stone-800 mb-2">
-                  {t('firstName')}
-                </label>
-                <input
-                  id="first_name"
-                  name="first_name"
-                  type="text"
-                  autoComplete="given-name"
-                  required
-                  className={pagePlan.champClass}
-                  placeholder={`${t('firstName')}...`}
-                  value={formData.first_name}
-                  onChange={handleChange}
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="last_name" className="block text-sm font-semibold text-stone-800 mb-2">
-                  {t('lastName')}
-                </label>
-                <input
-                  id="last_name"
-                  name="last_name"
-                  type="text"
-                  autoComplete="family-name"
-                  required
-                  className={pagePlan.champClass}
-                  placeholder={`${t('lastName')}...`}
-                  value={formData.last_name}
-                  onChange={handleChange}
-                />
-              </div>
+            {/* Le NOM, en un seul champ (26/10/2026) : le serveur répartit.
+                La classe du champ vient du plan (`champClass`), donc la
+                coquille pré-rendue peint le même élément et la même hauteur. */}
+            <div>
+              <label htmlFor="name" className="block text-sm font-semibold text-stone-800 mb-2">
+                {pageT('fullName')}
+              </label>
+              <input
+                id="name"
+                name="name"
+                type="text"
+                autoComplete="name"
+                required
+                className={pagePlan.champClass}
+                placeholder={`${pageT('fullName')}...`}
+                value={formData.name}
+                onChange={handleChange}
+              />
             </div>
             
             <div>
@@ -842,8 +840,17 @@ export default function Register() {
             </div>
 
             <div>
+              {/* FACULTATIF (26/10/2026) : le téléphone est un champ de CONTACT,
+                  jamais un identifiant — aucune connexion ni OTP par téléphone.
+                  L'exiger à l'inscription ajoutait une barrière sans contrepartie
+                  (et un numéro jamais vérifié ne prouvait rien). */}
               <label htmlFor="phone" className="block text-sm font-semibold text-stone-800 mb-2">
-                {t('phone')}
+                {t('phone')}{' '}
+                {/* Les PARENTHÈSES font partie du libellé traduit : ajoutées
+                    ici, elles formeraient un fragment « (optionnel) » que
+                    la coquille publie sans porteur (garde de provenance des
+                    textes). */}
+                <span className="font-normal text-stone-500">{pageT('phoneOptional')}</span>
               </label>
               <div className="flex">
                 <span className={pagePlan.champPrefixeClass}>
@@ -854,7 +861,6 @@ export default function Register() {
                   name="phone"
                   type="tel"
                   autoComplete="tel"
-                  required
                   className={pagePlan.champTelephoneClass}
                   placeholder={activePhoneExample}
                   value={stripPhonePrefix(formData.phone, activePhonePrefix)}
@@ -887,23 +893,6 @@ export default function Register() {
                 onChange={handleChange}
               />
               <p className="mt-1 text-xs text-gray-500">{t('passwordTooShort')}</p>
-            </div>
-
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-semibold text-stone-800 mb-2">
-                {t('confirmPassword')}
-              </label>
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                autoComplete="new-password"
-                required
-                className={pagePlan.champClass}
-                placeholder={t('passwordMasked')}
-                value={formData.confirmPassword}
-                onChange={handleChange}
-              />
             </div>
 
             {/* Code de parrainage (optionnel) — réservé aux TRAVAILLEURS :

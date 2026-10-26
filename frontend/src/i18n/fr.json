@@ -36,7 +36,6 @@
   "firstName": "Prénom",
   "lastName": "Nom",
   "phone": "Téléphone",
-  "confirmPassword": "Confirmer le mot de passe",
   "client": "Client",
   "worker": "Travailleur",
   "mali": "Mali",
