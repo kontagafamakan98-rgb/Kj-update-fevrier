@@ -123,6 +123,12 @@ const SURFACES_DU_VERRE = [VERRE_SUR_SABLE, VERRE_SUR_ENCRE];
 const ENCRES = {
   'text-gray-700': '#374151',
   'text-stone-700': '#44403c',
+  // `orange-600` est la teinte de survol que la barre portait AVANT le
+  // 26/10/2026 : elle reste dans la table pour que la régression qui y
+  // reviendrait soit MESURÉE (« 3.36:1, sous le seuil ») et non pas refusée
+  // comme une teinte inconnue — un refus dit qu'on ne sait pas, pas de combien
+  // on échoue.
+  'text-orange-600': '#ea580c',
   'text-orange-700': '#c2410c',
   'text-orange-800': '#9a3412',
   'text-orange-900': '#7c2d12',
