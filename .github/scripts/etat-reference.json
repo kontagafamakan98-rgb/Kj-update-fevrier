@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-26",
-    "motif": "nouveau garde 1ter-bis : la bande de faits de l'accueil refuse un zero et exige chaque fait declare peint",
+    "motif": "fusion de main dans la branche de la bande de faits : le garde des coquilles porte les deux changements (nom unique et faits sans compteurs), son empreinte de reference suit l'arbre fusionne",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -142,7 +142,7 @@
       "frontend/scripts/check-funnel-events.js": "19b016ff1cd4a442ca8173e06dbbc5897d0bbb71b918835c638f0062e1879221",
       "frontend/scripts/check-bundle-size.js": "f20f09005c98c5a9ea0ad71def7f6956ed1893285529e2c0e6540cc3eda1563b",
       "frontend/scripts/check-cors-preflight.js": "10ef1c5f33a3e72d5e89f69a02d6d414513c0be06899edf4b53ce0ba86793cb8",
-      "frontend/scripts/check-prerender-shells.js": "3c2e05a992f92ec565487147c823c13b82230fcd47443a55df5e6db70a6b6f59"
+      "frontend/scripts/check-prerender-shells.js": "3f0974bb336736aa2ec7a7d91fcdfc04678806b6e2a5697f9af856beff1f2260"
     }
   },
   "hors_perimetre": [

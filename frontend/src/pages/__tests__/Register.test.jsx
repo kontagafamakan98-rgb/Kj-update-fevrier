@@ -209,9 +209,9 @@ describe('/register — disponibilité de l’adresse', () => {
     monter();
 
     const champ = document.getElementById('email');
+    await userEvent.type(document.getElementById('name'), 'Awa Diop');
     await userEvent.type(champ, 'pris@exemple.com');
     await userEvent.type(document.getElementById('password'), 'motdepasse123');
-    await userEvent.type(document.getElementById('confirmPassword'), 'motdepasse123');
     await userEvent.click(document.getElementById('legal_documents_accepted'));
 
     fireEvent.submit(champ.closest('form'));
@@ -380,5 +380,85 @@ describe('/register — permission de géolocalisation, ordre des titres et sép
       ratio,
       `« ou » en ${teinte} : ${ratio.toFixed(2)}:1 sur blanc, sous le seuil ${SEUIL_TEXTE}:1 (WCAG 1.4.3)`
     ).toBeGreaterThanOrEqual(SEUIL_TEXTE);
+  });
+});
+
+/**
+ * ── L'INSCRIPTION ALLÉGÉE (26/10/2026) ─────────────────────────────────────
+ *
+ * Mesuré sur le formulaire : SEPT champs obligatoires au seuil du parcours,
+ * dont deux pour le nom, une confirmation de mot de passe, et un téléphone qui
+ * n'était jamais vérifié. Ce que ce bloc referme, un fait par test :
+ *
+ * 1. le nom tient en UN champ (`#name`), et le serveur le répartit ;
+ * 2. la confirmation du mot de passe a disparu (le champ n'existe plus à
+ *    l'écran — une seconde saisie du même mot de passe ne prouve rien de
+ *    plus que le révélateur déjà présent) ;
+ * 3. le téléphone est FACULTATIF : le champ ne porte plus `required`, et le
+ *    libellé le DIT (un champ facultatif muet se lit comme obligatoire) ;
+ * 4. l'envoi SANS téléphone enregistre la suite avec `phone: null`, c'est-à-
+ *    dire exactement ce que la page de vérification enverra au serveur.
+ */
+describe('/register — inscription allégée', () => {
+  beforeEach(() => {
+    etat.reponse = { available: null, email: 'nouveau@exemple.com', message: 'Vérification effectuée.' };
+    etat.erreur = null;
+    etat.toastErreur = [];
+    geo.appels = [];
+    window.sessionStorage.clear();
+  });
+
+  afterEach(() => cleanup());
+
+  it('le nom tient en UN champ, et les deux champs historiques ont disparu', () => {
+    monter();
+
+    expect(document.getElementById('name'), 'le champ `name` n’est pas rendu').toBeTruthy();
+    expect(document.getElementById('first_name')).toBeNull();
+    expect(document.getElementById('last_name')).toBeNull();
+  });
+
+  it('la confirmation du mot de passe n’existe plus', () => {
+    monter();
+
+    expect(document.getElementById('confirmPassword')).toBeNull();
+    // Et le mot de passe, lui, garde sa règle : l'allègement ne retire pas une
+    // contrainte de sécurité, seulement une seconde saisie du MÊME secret.
+    expect(document.getElementById('password')).toBeTruthy();
+  });
+
+  it('le téléphone est facultatif, et le libellé le DIT', () => {
+    monter();
+
+    const telephone = document.getElementById('phone');
+    expect(telephone, 'le champ téléphone doit rester là (contact, rappel)').toBeTruthy();
+    expect(telephone.required, 'un champ facultatif ne porte pas `required`').toBe(false);
+    // Le suffixe « (optionnel) » fait partie du libellé : sans lui, un champ
+    // vide se lit comme un oubli à corriger.
+    const libelle = telephone.closest('div').parentElement.querySelector('label');
+    expect(libelle.textContent).toMatch(/\(optionnel\)/i);
+  });
+
+  it('sans téléphone, l’envoi enregistre la suite avec `phone: null`', async () => {
+    monter();
+    await userEvent.type(document.getElementById('name'), 'Awa Diop');
+    await userEvent.type(document.getElementById('email'), 'awa@exemple.com');
+    await userEvent.type(document.getElementById('password'), 'motdepasse123');
+    await userEvent.click(document.getElementById('legal_documents_accepted'));
+
+    fireEvent.submit(document.getElementById('name').closest('form'));
+
+    // La suite du parcours est ce que la page de vérification LIRA : c'est donc
+    // la charge utile réelle qui est jugée ici, pas un état interne.
+    await waitFor(() => {
+      expect(window.sessionStorage.getItem('kojo_registration_flow')).toBeTruthy();
+    });
+    const suite = JSON.parse(window.sessionStorage.getItem('kojo_registration_flow'));
+
+    expect(suite.userData.name).toBe('Awa Diop');
+    expect(suite.userData.phone).toBeNull();
+    expect(suite.userData.first_name).toBeUndefined();
+    expect(suite.userData.confirmPassword).toBeUndefined();
+    expect(etat.toastErreur).toEqual([]);
   });
 });

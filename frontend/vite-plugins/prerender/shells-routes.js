@@ -371,13 +371,19 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, pageSectio
       + `<input type="hidden" name="country" value="" />`
       + `</div>`
       + `</div>`
-      + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">`
-      + `<div><label class="block text-sm font-semibold text-stone-800 mb-2">${esc(registerT('firstName'))}</label><input readonly placeholder="${esc(registerT('firstName'))}..." class="${registerPlan.champClass}" /></div>`
-      + `<div><label class="block text-sm font-semibold text-stone-800 mb-2">${esc(registerT('lastName'))}</label><input readonly placeholder="${esc(registerT('lastName'))}..." class="${registerPlan.champClass}" /></div>`
-      + `</div>`
+      // Le NOM en UN champ (26/10/2026) : la coquille peint le même `<div>`,
+      // le même libellé et le même champ que React (`champClass` lue dans le
+      // plan), parce qu'une grille de deux champs laisserait une hauteur que
+      // React ne peint plus — tout le reste du formulaire remonterait à
+      // l'hydratation.
+      + `<div><label class="block text-sm font-semibold text-stone-800 mb-2">${esc(registerT(registerPlan.fullNameKey))}</label><input readonly placeholder="${esc(registerT(registerPlan.fullNameKey))}..." class="${registerPlan.champClass}" /></div>`
       + `<div><label class="block text-sm font-semibold text-stone-800 mb-2">${esc(registerT('email'))}</label><input readonly type="email" placeholder="${esc(registerT('emailPlaceholder'))}" class="${registerPlan.champClass}" /></div>`
       + `<div>`
-      + `<label class="block text-sm font-semibold text-stone-800 mb-2">${esc(registerT('phone'))}</label>`
+      // FACULTATIF : le « (optionnel) » fait partie du libellé dans les deux
+      // canaux, et le champ ne porte plus `required` — un champ obligatoire
+      // resté dans la coquille ferait lire à un visiteur sans JavaScript une
+      // condition que la page ne pose plus.
+      + `<label class="block text-sm font-semibold text-stone-800 mb-2">${esc(registerT('phone'))} <span class="font-normal text-stone-500">${esc(registerT(registerPlan.phoneOptionalKey))}</span></label>`
       + `<div class="flex">`
       + `<span class="${registerPlan.champPrefixeClass}">${esc(PHONE_PREFIX_FALLBACK)}</span>`
       + `<input readonly placeholder="${esc(phoneNumberExample())}" class="${registerPlan.champTelephoneClass}" />`
@@ -385,7 +391,6 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, pageSectio
       + `<p class="mt-1 text-sm text-gray-500">${esc(registerT('phoneFormatHint'))}: ${esc(phoneNumberExample())}</p>`
       + `</div>`
       + `<div><label class="block text-sm font-semibold text-stone-800 mb-2">${esc(registerT('password'))}</label><input readonly type="password" class="${registerPlan.champClass}" /><p class="mt-1 text-xs text-gray-500">${esc(registerT('passwordTooShort'))}</p></div>`
-      + `<div><label class="block text-sm font-semibold text-stone-800 mb-2">${esc(registerT('confirmPassword'))}</label><input readonly type="password" class="${registerPlan.champClass}" /></div>`
       + `<div class="bloc-differe-photo carte-editoriale carte-publique mb-6">`
       + `<div class="mb-4 flex items-center gap-3">${svgDeLIcone(registerPlan.photoIcon, 'photoTitre')}<h3 class="titre-entree">${esc(registerT('profilePhotoOptional'))}</h3></div>`
       + `<p class="mb-4 text-sm text-stone-600">${esc(registerT('profilePhotoHelps'))}</p>`

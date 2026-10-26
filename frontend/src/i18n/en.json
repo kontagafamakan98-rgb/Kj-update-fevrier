@@ -23,7 +23,6 @@
   "firstName": "First Name",
   "lastName": "Last Name",
   "phone": "Phone",
-  "confirmPassword": "Confirm Password",
   "client": "Client",
   "worker": "Worker",
   "mali": "Mali",

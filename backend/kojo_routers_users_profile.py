@@ -114,10 +114,19 @@ async def update_profile(
         update_data["preferred_language"] = lang_value
 
     if "phone" in update_data:
-        try:
-            update_data["phone"] = validate_west_africa_phone(str(update_data["phone"]))
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc))
+        # Le téléphone est FACULTATIF depuis le 26/10/2026 : une chaîne vide
+        # (formulaire vidé, compte créé sans numéro) vaut « pas de numéro » et
+        # s'écrit `None`. Sans cela, un compte parfaitement valide créé SANS
+        # téléphone recevait un 400 en enregistrant son profil — la même valeur
+        # acceptée à l'inscription, refusée à la mise à jour.
+        raw_phone = str(update_data["phone"] or "").strip()
+        if not raw_phone:
+            update_data["phone"] = None
+        else:
+            try:
+                update_data["phone"] = validate_west_africa_phone(raw_phone)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc))
 
     for name_field in ("first_name", "last_name"):
         if name_field in update_data:
