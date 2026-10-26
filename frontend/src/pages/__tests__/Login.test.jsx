@@ -19,6 +19,19 @@
  * surface que la page ne peint pas : le rapport est donc calculé sur les DEUX
  * — la pastille et la carte —, et c'est la plus défavorable qui décide.
  *
+ * ── LA MESURE NE S'ARRÊTE PLUS AU SÉPARATEUR (26/10/2026) ───────────────────
+ * Trois textes décident de la lisibilité du formulaire, et aucun n'était mesuré :
+ * les LIBELLÉS des deux champs, le lien « mot de passe oublié » (le seul recours
+ * d'une personne qui n'entre plus) et l'ENCART LÉGAL, qui porte la notice, le
+ * lien des conditions et la ligne de contact. Chacun est jugé sur la surface
+ * qu'il peint RÉELLEMENT : la carte composite pour les deux premiers, et le
+ * SABLE pour l'encart — `.encart` déclare `background-color: var(--kojo-sable)`,
+ * il ne laisse donc pas voir la carte derrière lui. C'est cette distinction qui
+ * a trouvé le défaut : le SURVOL des liens orange était en `orange-600`
+ * (#ea580c), **3,39:1** sur la carte, sous le seuil — la teinte a été corrigée
+ * dans le plan (`hover:text-orange-800`, 6,95:1), et le survol est désormais
+ * mesuré, pas seulement l'état au repos.
+ *
  * ── Ce que ce fichier ne prouve pas ─────────────────────────────────────────
  * La géométrie du séparateur (sondes e2e), ni la connexion elle-même (OTP,
  * Google) : il mesure la LISIBILITÉ d'un texte publié, avec l'arithmétique
@@ -99,6 +112,76 @@ const composer = ([r, g, b, a], fond) => {
 const SABLE = jeton('--kojo-sable');
 const CARTE = composer(fondDeLaCarte(), versRgb(SABLE));
 
+/**
+ * Les teintes Tailwind employées sur la page, avec leur valeur hexadécimale.
+ *
+ * La table est PARTAGÉE par les quatre mesures de ce fichier (séparateur,
+ * libellés, lien, encart) : deux tables pour une même teinte finiraient par
+ * diverger, et l'une certifierait alors une valeur que la page ne peint plus.
+ * Une classe inconnue n'est jamais ignorée — la mesure refuse de conclure.
+ */
+const TEINTES = {
+  'text-stone-900': '#1c1917',
+  'text-stone-800': '#292524',
+  'text-stone-700': '#44403c',
+  'text-stone-600': '#57534e',
+  'text-stone-500': '#78716c',
+  'text-stone-400': '#a8a29e',
+  'text-gray-500': '#6b7280',
+  'text-gray-400': '#9ca3af',
+  'text-orange-600': '#ea580c',
+  'text-orange-700': '#c2410c',
+  'text-orange-800': '#9a3412',
+};
+
+/** L'encre d'un élément, lue sur sa classe — refus nommé si elle est inconnue. */
+const encreDe = (element, ou) => {
+  const classes = String(element.className || '').split(/\s+/);
+  const teinte = classes.find((classe) => Object.hasOwn(TEINTES, classe));
+  if (!teinte) {
+    throw new Error(
+      `${ou} : aucune teinte connue sur « ${classes.join(' ')} » — la mesure refuse de conclure ` +
+        `(ajouter la teinte à TEINTES, dans ce fichier, en la mesurant)`
+    );
+  }
+  return { teinte, valeur: TEINTES[teinte] };
+};
+
+/** L'encre de SURVOL déclarée (`hover:text-…`), ou `null` si l'élément n'en a pas. */
+const encreAuSurvol = (element, ou) => {
+  const classe = String(element.className || '')
+    .split(/\s+/)
+    .find((nom) => nom.startsWith('hover:text-'));
+  if (!classe) return null;
+  const nom = classe.slice('hover:'.length);
+  if (!Object.hasOwn(TEINTES, nom)) {
+    throw new Error(
+      `${ou} : teinte de survol « ${nom} » inconnue — la mesure refuse de conclure sans sa valeur`
+    );
+  }
+  return { classe, teinte: nom, valeur: TEINTES[nom] };
+};
+
+/**
+ * Le fond de l'ENCART légal, lu dans la feuille.
+ *
+ * Il est OPAQUE (`var(--kojo-sable)`) : les textes de l'encart ne sont donc pas
+ * posés sur la carte, et mesurer contre la carte aurait certifié une surface que
+ * la page ne peint pas — un composite plus clair, donc un rapport plus flatteur.
+ */
+const fondDeLEncart = () => {
+  const regle = CSS.match(/\.encart\s*\{[^}]*background-color:\s*var\((--kojo-[a-z-]+)\)/);
+  if (!regle) {
+    throw new Error(
+      '`.encart` ne déclare plus un fond en jeton (--kojo-…) : la mesure des textes de l’encart ' +
+        'refuserait de conclure sur une surface qu’elle ne connaît pas'
+    );
+  }
+  return jeton(regle[1]);
+};
+
+const ENCART = fondDeLEncart();
+
 const monter = () =>
   render(
     <MemoryRouter initialEntries={['/login']}>
@@ -149,27 +232,13 @@ describe('/login — lisibilité du séparateur « ou »', () => {
     const carte = span.closest(`.${PAGE_SECTIONS['/login'].carteClass.trim().split(/\s+/)[0]}`);
     expect(carte, 'le séparateur est sorti de la carte du formulaire').not.toBeNull();
 
-    // Les valeurs des teintes Tailwind employées sur ce séparateur — la même
-    // table que le garde de /register : deux tables pour un même séparateur
-    // finiraient par diverger.
-    const teintes = {
-      'text-stone-500': '#78716c',
-      'text-stone-600': '#57534e',
-      'text-stone-700': '#44403c',
-      'text-gray-500': '#6b7280',
-      'text-gray-400': '#9ca3af',
-      'text-stone-400': '#a8a29e',
-    };
-    const teinte = Object.keys(teintes).find((classe) =>
-      span.className.split(/\s+/).includes(classe)
-    );
-    expect(
-      teinte,
-      'aucune teinte connue sur le séparateur : la mesure refuse de conclure'
-    ).toBeTruthy();
+    // Les valeurs viennent de la table PARTAGÉE de ce fichier (TEINTES) : le
+    // séparateur et les autres textes de la page ne peuvent pas être mesurés
+    // avec deux tables qui divergeraient.
+    const { teinte, valeur } = encreDe(span, 'le séparateur « ou »');
 
-    const surPastille = contrasteEntre(teintes[teinte], '#ffffff');
-    const surCarte = contrasteEntre(teintes[teinte], CARTE);
+    const surPastille = contrasteEntre(valeur, '#ffffff');
+    const surCarte = contrasteEntre(valeur, CARTE);
 
     expect(
       surPastille,
@@ -182,5 +251,112 @@ describe('/login — lisibilité du séparateur « ou »', () => {
       surCarte,
       `« ou » en ${teinte} : ${surCarte.toFixed(2)}:1 sur la carte (${CARTE}), sous le seuil ${SEUIL_TEXTE}:1 (WCAG 1.4.3)`
     ).toBeGreaterThanOrEqual(SEUIL_TEXTE);
+  });
+});
+
+/**
+ * Le verdict d'un texte posé sur une surface : un refus nommé, jamais un
+ * arrondi. Le nom de l'élément et la surface sont dans le message, sinon un
+ * rouge ne dit pas quoi corriger.
+ */
+const exigerLisible = ({ ou, encre, surface, surfaceNom }) => {
+  const ratio = contrasteEntre(encre.valeur, surface);
+  expect(
+    ratio,
+    `${ou} en ${encre.teinte} : ${ratio.toFixed(2)}:1 sur ${surfaceNom} (${surface}), ` +
+      `sous le seuil ${SEUIL_TEXTE}:1 (WCAG 1.4.3)`
+  ).toBeGreaterThanOrEqual(SEUIL_TEXTE);
+  return ratio;
+};
+
+describe('/login — lisibilité du formulaire sur la carte', () => {
+  it('les libellés des deux champs tiennent 4,5:1 sur la carte', () => {
+    monter();
+
+    const libelles = Array.from(document.querySelectorAll('form label'));
+    expect(
+      libelles.length,
+      'aucun libellé de champ n’est rendu : la mesure n’a rien à juger'
+    ).toBeGreaterThanOrEqual(2);
+
+    for (const libelle of libelles) {
+      exigerLisible({
+        ou: `le libellé « ${libelle.textContent.replace(/\s+/g, ' ').trim()} »`,
+        encre: encreDe(libelle, 'un libellé de champ'),
+        surface: CARTE,
+        surfaceNom: 'la carte',
+      });
+    }
+  });
+
+  it('le lien « mot de passe oublié » tient 4,5:1, y compris AU SURVOL', () => {
+    monter();
+
+    const lien = document.querySelector('a[href="/forgot-password"]');
+    expect(
+      lien,
+      'le lien « mot de passe oublié » n’est plus rendu : la mesure n’a rien à juger'
+    ).not.toBeNull();
+
+    exigerLisible({
+      ou: 'le lien « mot de passe oublié »',
+      encre: encreDe(lien, 'le lien « mot de passe oublié »'),
+      surface: CARTE,
+      surfaceNom: 'la carte',
+    });
+
+    // Le survol est un état PEINT : une teinte qui s'éclaircit y perd le seuil
+    // au moment précis où la personne vise le lien. C'est ce défaut
+    // (`hover:text-orange-600`, 3,39:1 sur la carte) que la mesure a trouvé.
+    const survol = encreAuSurvol(lien, 'le lien « mot de passe oublié »');
+    if (survol) {
+      exigerLisible({
+        ou: `le lien « mot de passe oublié » au survol (${survol.classe})`,
+        encre: survol,
+        surface: CARTE,
+        surfaceNom: 'la carte',
+      });
+    }
+  });
+
+  it('l’encart légal tient 4,5:1 sur le SABLE qu’il peint, pas sur la carte', () => {
+    monter();
+
+    const encart = document.querySelector('.encart');
+    expect(encart, 'l’encart légal n’est plus rendu : la mesure n’a rien à juger').not.toBeNull();
+    expect(
+      encart.closest('.carte-editoriale'),
+      'l’encart légal est sorti de la carte du formulaire : ce fichier mesure la carte'
+    ).not.toBeNull();
+
+    // Les trois textes de l'encart : la notice, le lien des conditions et la
+    // ligne de contact. Un texte retiré n'est pas un texte mesuré.
+    const textes = Array.from(encart.querySelectorAll('p, a, span')).filter(
+      (element) => element.textContent.trim().length > 0
+    );
+    expect(
+      textes.length,
+      `l’encart légal ne porte que ${textes.length} texte(s) — la notice, le lien des conditions et ` +
+        'la ligne de contact en font trois ; la mesure refuse de conclure sur un encart amputé'
+    ).toBe(3);
+
+    for (const texte of textes) {
+      const ou = `« ${texte.textContent.replace(/\s+/g, ' ').trim()} »`;
+      exigerLisible({
+        ou,
+        encre: encreDe(texte, `l’encart légal, ${ou}`),
+        surface: ENCART,
+        surfaceNom: 'le sable de l’encart',
+      });
+      const survol = encreAuSurvol(texte, `l’encart légal, ${ou}`);
+      if (survol) {
+        exigerLisible({
+          ou: `${ou} au survol (${survol.classe})`,
+          encre: survol,
+          surface: ENCART,
+          surfaceNom: 'le sable de l’encart',
+        });
+      }
+    }
   });
 });

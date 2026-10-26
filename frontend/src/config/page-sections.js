@@ -241,6 +241,14 @@ const EDITORIAL_ACCUEIL = {
   faitClass: 'fait-cta',
   faitFigureClass: 'fait-cta-figure',
   faitLibelleClass: 'fait-cta-libelle',
+  // ── LA LIGNE DE PREUVE MESURÉE (26/10/2026) ──────────────────────────────
+  // Sous les deux faits, une ligne existe DANS LES DEUX CANAUX dès le premier
+  // paint : la coquille la peint vide de chiffres (elle écrit l'attente), React
+  // remplace son TEXTE dans ce même nœud quand `utils/preuveSociale.js` juge la
+  // mesure publiable. La classe est déclarée ici pour que les deux canaux la
+  // lisent au même endroit, et sa réserve de hauteur vit dans `index.css`.
+  preuveClass: 'faits-cta-preuve',
+  preuveAttenteKey: 'figuresToCome',
   ctaClass: 'cta-final',
   ctaInnerClass: 'cta-final-inner',
   ctaActionsClass: 'cta-actions',
@@ -504,13 +512,26 @@ export const PAGE_SECTIONS = {
     // vide. La bande redevient ce que sa grille de DEUX colonnes demande
     // (`index.css`, `.faits-cta`) : deux faits VERIFIABLES, sans volume.
     //
-    // Ce qui n'est pas fait, et pourquoi : un chiffre lu au runtime ne peut pas
-    // non plus être peint par la coquille pré-rendue (écrite au BUILD, sans
-    // accès à la base) — publier la promesse à la place du compteur ferait
-    // diverger les deux canaux, et remplacer une phrase par un chiffre après
-    // le montage déplacerait la bande (CLS mesuré à 0,0000 sur `/`). Les
-    // chiffres de volume restent lisibles là où ils servent : le tableau de
-    // bord du propriétaire et `GET /metrics`.
+    // ── LA PREUVE MESURÉE A UN SEUIL, ET UN ÉTAT D'ATTENTE (26/10/2026) ────
+    // Retirer les compteurs a réglé le mensonge, mais a laissé la bande sans
+    // aucune preuve de ce que la plateforme a RÉELLEMENT fait. Ce qui est publié
+    // est donc décidé par `utils/preuveSociale.js` : au-delà de trois missions
+    // terminées ET deux avis, la page écrit les deux chiffres réels lus de
+    // `GET /api/public/stats` dans la ligne de preuve ; en dessous — et sur
+    // toute lecture illisible — elle écrit l'état d'attente déclaré ici
+    // (`preuveAttenteKey`). Aucun zéro n'est jamais publié, et une panne ne se
+    // lit pas comme une mesure.
+    //
+    // La coquille pré-rendue ne connaît pas les compteurs : elle peint l'ÉTAT
+    // D'ATTENTE, et c'est le seul état qu'un build sans accès à la base puisse
+    // tenir. La ligne existe des deux côtés AVANT le montage (même classe, même
+    // réserve de hauteur) : React remplace son TEXTE dans le nœud déjà peint,
+    // il n'en insère jamais un — c'est la règle qui gardait le CLS à 0,0000 sur
+    // `/`. Conséquence ASSUMÉE : le HTML pré-rendu publie l'attente, les chiffres
+    // ne vivent que dans le document monté. La bande ne peut donc jamais
+    // publier un chiffre périmé ; elle perd en revanche la preuve chiffrée pour
+    // un moteur sans JavaScript, et ce prix est préféré à un nombre figé au
+    // build qui serait faux dès la mission suivante.
     stats: [
       { labelKey: 'countriesCovered', fallback: '4', shellText: '4', icone: 'countryGlobe' },
       { labelKey: 'customerSupport', fallback: '7j/7', shellText: '7j/7', icone: 'contactCall' },
@@ -824,7 +845,15 @@ export const PAGE_SECTIONS = {
     // relevé au port du dessin le 17/10/2026. Le lien ne se coupe plus, et si
     // les deux ne tiennent pas, le lien passe à la ligne.
     ligneMotDePasseClass: 'flex flex-wrap items-center justify-between gap-x-3 gap-y-1',
-    lienMotDePasseClass: 'whitespace-nowrap text-sm font-semibold text-orange-700 underline underline-offset-2 hover:text-orange-600',
+    // LE SURVOL ASSOMBRIT, IL N'ÉCLAIRCIT PAS (26/10/2026) : le survol était
+    // `text-orange-600` (#ea580c), soit **3,39:1** sur la carte du formulaire
+    // (#fcf9f2) — sous le 4,5:1 du texte courant, donc un état peint qui devenait
+    // ILLISIBLE au moment précis où la personne le vise. `orange-800` (#9a3412)
+    // tient 6,95:1 sur la même surface. La règle vaut pour les deux liens orange
+    // de la carte : le lien d'inscription (`lienInscriptionClass`) portait le
+    // même jeton de survol. Mesuré par `src/pages/__tests__/Login.test.jsx`, qui
+    // juge les DEUX états sur la surface réellement peinte.
+    lienMotDePasseClass: 'whitespace-nowrap text-sm font-semibold text-orange-700 underline underline-offset-2 hover:text-orange-800',
     // La place de l'œil (quarante-quatre pixels à droite) s'ajoute au champ
     // partagé : c'est la seule différence, et elle est lisible ici.
     champMotDePasseClass: `${CHAMP} pr-11`,
@@ -839,7 +868,7 @@ export const PAGE_SECTIONS = {
     legalLienClass: 'inline-flex items-center text-sm font-medium text-orange-700 underline underline-offset-2 hover:text-orange-800',
     noAccountClass: 'text-center',
     noAccountTexteClass: 'text-sm text-stone-600',
-    lienInscriptionClass: 'font-semibold text-orange-700 hover:text-orange-600',
+    lienInscriptionClass: 'font-semibold text-orange-700 hover:text-orange-800',
     // Le glyphe du bloc légal est DESSINÉ (page-icons.js) : le plan nomme une
     // icône, pas une clé i18n d'emoji (`iconLegalNotice` reste au dictionnaire
     // comme valeur interdite pour les coquilles, cf. check-prerender-shells).

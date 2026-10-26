@@ -5,8 +5,13 @@
 // sans le raccord que le chrome avait déjà. Le composant se comporte comme le
 // `Link` d'origine (mêmes propriétés, même `<a href>` réel pour un crawler et
 // pour « ouvrir dans un nouvel onglet »).
+import { useEffect, useState } from 'react';
 import { IconePage } from '../config/page-icons';
 import Link from '../components/LienVue';
+import { api } from '../services/api';
+// La SEULE règle qui dit si un chiffre prouve quelque chose : seuils, état
+// d'attente, refus des valeurs illisibles (utils/preuveSociale.js).
+import { ETAT_MESURE, formaterCompteur, preuvesDeLAccueil } from '../utils/preuveSociale';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { getAllCountries } from '../components/CountryDisplay';
@@ -36,19 +41,42 @@ const ICONE_DE_CONTACT = Object.fromEntries(
 );
 
 export default function Home() {
-  const { t } = useLanguage();
+  const { t, currentLanguage } = useLanguage();
   const { user } = useAuth();
   usePageMeta();
 
-  // ── LA BANDE DE FAITS NE PUBLIE PLUS DE VOLUME (26/10/2026) ─────────────
-  // Elle a lu `GET /api/public/stats` du 22/10 au 26/10 et remplaçait un tiret
-  // par le compteur mesuré : sur une plateforme sans mission, cela affichait
-  // « 0 mission terminée · 0 avis » au seuil d'une page qui vend la confiance.
-  // Les deux faits qui restent sont VÉRIFIABLES et ne dépendent d'aucune
-  // donnée (pays couverts, support 7j/7), donc l'accueil ne fait plus cette
-  // requête du tout : ni compteur à zéro, ni aller-retour pour un ornement.
-  // Les chiffres de volume se lisent dans le tableau de bord propriétaire et
-  // dans `GET /metrics`.
+  // ── LA PREUVE SOCIALE EST MESURÉE, PLUTÔT QU'ABSENTE (26/10/2026) ────────
+  // La bande a lu `GET /api/public/stats` du 22/10 au 26/10 et publiait le
+  // compteur BRUT : « 0 mission terminée · 0 avis » au seuil d'une page qui
+  // vend la confiance. Les deux faits statiques (pays, support) ont remplacé
+  // les compteurs — mais ils ne prouvent rien de ce que la plateforme a FAIT.
+  //
+  // La règle est donc déplacée, pas supprimée : `utils/preuveSociale.js` décide
+  // si les compteurs PROUVENT quelque chose (trois missions terminées et deux
+  // avis), et rend `mesure` ou `attente`. En attente, la ligne dit « chiffres à
+  // venir » — l'état que la coquille pré-rendue peint déjà — et un échec de
+  // lecture reste en attente : il ne devient jamais un zéro.
+  //
+  // La requête ne bloque rien : elle part après le montage, elle remplit un
+  // nœud que la coquille a DÉJÀ peint (même classe, même réserve de hauteur),
+  // donc le premier écran et le LCP ne l'attendent pas.
+  const [statsPubliques, setStatsPubliques] = useState(null);
+  useEffect(() => {
+    let annule = false;
+    api
+      .get('/public/stats')
+      .then((donnees) => {
+        if (!annule) setStatsPubliques(donnees);
+      })
+      .catch(() => {
+        // Une lecture en panne n'est pas une mesure : la ligne garde l'attente
+        // déclarée. Aucun message d'erreur — un ornement ne mérite pas un rouge.
+        if (!annule) setStatsPubliques(null);
+      });
+    return () => {
+      annule = true;
+    };
+  }, []);
 
   // Catégories, promesses, étapes et chiffres : lus dans la déclaration du
   // corps de la page (src/config/page-sections.js) — la MÊME que le build
@@ -130,6 +158,8 @@ export default function Home() {
     faitClass,
     faitFigureClass,
     faitLibelleClass,
+    preuveClass,
+    preuveAttenteKey,
     ctaClass,
     ctaInnerClass,
     ctaActionsClass,
@@ -169,10 +199,19 @@ export default function Home() {
   const titreDeLaCarte = t('mapIframeTitle').replace('{address}', CONTACT.address);
 
   // LES CHIFFRES SONT DES FAITS VÉRIFIABLES, jamais des compteurs inventés :
-  // les deux anciens replis fabriqués (« 1 000+ travailleurs », « 500+
-  // projets ») et la promesse « 24/7 » sont retirés de la déclaration (voir
-  // src/config/page-sections.js). Ce qui reste est publié tel quel par les deux
-  // canaux — aucun appel réseau, aucun chiffre à remplacer au montage.
+  // les deux replis fabriqués (« 1 000+ travailleurs », « 500+ projets ») et la
+  // promesse « 24/7 » sont retirés de la déclaration (voir
+  // src/config/page-sections.js). Les deux faits de la bande sont publiés tels
+  // quels par les deux canaux ; la ligne de preuve, elle, n'affiche un chiffre
+  // que si la règle le juge publiable, et parle d'attente sinon.
+  const preuve = preuvesDeLAccueil(statsPubliques);
+  const textePreuve =
+    preuve.etat === ETAT_MESURE
+      ? [
+          t('proofMissions').replace('{n}', formaterCompteur(preuve.missions, currentLanguage)),
+          t('proofReviews').replace('{n}', formaterCompteur(preuve.avis, currentLanguage)),
+        ].join(' · ')
+      : t(preuveAttenteKey);
 
   // Les pays : la liste ET la couleur de carte viennent du référentiel partagé
   // (src/config/countries.js), que le build lit aussi pour écrire la coquille.
@@ -578,6 +617,12 @@ export default function Home() {
                 <span className={faitLibelleClass}>{t(stat.labelKey)}</span>
               </div>
             ))}
+            {/* LA LIGNE DE PREUVE — le seul nœud de la bande dont le TEXTE
+                change après le montage. Elle est peinte par la coquille
+                pré-rendue avec l'état d'attente, et React n'écrit que dans ce
+                nœud : aucun élément n'est inséré, donc rien ne se déplace
+                (réserve de hauteur dans `index.css`, `.faits-cta-preuve`). */}
+            <p className={preuveClass}>{textePreuve}</p>
           </div>
         </div>
       </section>
