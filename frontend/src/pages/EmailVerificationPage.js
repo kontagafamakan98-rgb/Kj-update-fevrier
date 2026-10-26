@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/emailVerification';
 import { clearRegistrationFlow, loadRegistrationFlow, mergeRegistrationFlow } from '../utils/registrationFlowStorage';
 import { devLog, safeLog } from '../utils/env';
+import { EVENEMENTS_FUNNEL, trackFunnel } from '../utils/funnel';
 import { Mail, ShieldCheck, Lock, Hourglass, Check } from 'lucide-react';
 
 const OTP_LENGTH = 6;
@@ -181,6 +182,12 @@ const EmailVerificationPage = () => {
         purpose: 'signup'
       });
 
+      // ÉTAPE 1 du funnel : le code est vérifié. Ce n'est PAS encore
+      // l'inscription — le compte naît à l'appel suivant, et une étape qui
+      // compterait un compte avant qu'il existe mentirait sur le taux de
+      // conversion.
+      trackFunnel(EVENEMENTS_FUNNEL.otpVerifie, { user_type: userData.user_type });
+
       // ── LE COMPTE EST CRÉÉ ICI (22/10/2026) ─────────────────────────
       // Cette page renvoyait vers /payment-verification, qui exigeait UN
       // compte mobile money (client) ou DEUX (travailleur) avant de créer le
@@ -193,6 +200,17 @@ const EmailVerificationPage = () => {
       const inscription = await authAPI.registerVerified({
         ...userData,
         email_verification_token: verificationResult.verification_token
+      });
+
+      // ÉTAPE 2 du funnel : le compte EXISTE (la réponse vient de
+      // `/auth/register-verified`). Émise AVANT l'auto-connexion : si celle-ci
+      // échouait, l'inscription serait quand même un fait accompli, et la
+      // compter comme un échec d'entonnoir enverrait chercher au mauvais endroit.
+      trackFunnel(EVENEMENTS_FUNNEL.inscription, {
+        user_type: inscription.user?.user_type || userData.user_type,
+        country: userData.country,
+        signup_method: 'email',
+        has_referral: Boolean(inscription.referral_applied),
       });
 
       const autoLoginResult = autoLoginAfterRegistration(inscription.user, inscription.access_token);

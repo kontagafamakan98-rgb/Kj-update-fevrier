@@ -9,6 +9,7 @@ import {
   rememberAppliedJob,
   sendProposalConversationMessage,
 } from '../utils/jobProposalWorkflow';
+import { EVENEMENTS_FUNNEL, trackFunnel } from '../utils/funnel';
 
 const normalizeProposalApiError = (submitError, t) => {
   const detail = submitError?.response?.data?.detail;
@@ -125,6 +126,10 @@ export default function ProposalModal({ job, onClose, onProposalSubmitted }) {
       };
 
       const createdProposal = await jobsAPI.apply(jobId, payload);
+      // Étape du funnel : la proposition est ENREGISTRÉE. Aucun paramètre — le
+      // montant proposé et le message sont des données du contrat, pas des
+      // dimensions de mesure ; l'identifiant de mission encore moins.
+      trackFunnel(EVENEMENTS_FUNNEL.propositionEnvoyee);
       const normalizedCreatedProposal = {
         ...(createdProposal && typeof createdProposal === 'object' ? createdProposal : {}),
         ...payload,

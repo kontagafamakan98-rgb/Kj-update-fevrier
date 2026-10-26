@@ -15,6 +15,7 @@ import { PaymentContentSkeleton } from '../components/SkeletonLoader';
 import { usePageMeta } from '../utils/seo';
 import { PAGE_SECTIONS } from '../config/page-sections';
 import { carteMissionRequise, retourDuPayeur } from '../utils/paymentBranche';
+import { EVENEMENTS_FUNNEL, trackFunnel } from '../utils/funnel';
 import { AlertTriangle } from 'lucide-react';
 
 // Pays proposés, statuts de paiement et méthodes : des CODES, jamais du texte.
@@ -251,6 +252,12 @@ const Payment = () => {
         returnUrl: `${window.location.origin}/payment`,
         cancelUrl: `${window.location.origin}/payment`
       });
+      // Étape du funnel : le paiement est LANCÉ (une session de paiement
+      // existe). Émise juste avant la sortie du site : au-delà, la page ne
+      // s'exécute plus. Le montant n'est pas transmis — un montant exact est un
+      // identifiant de transaction à peu de choses près, et GA n'en a pas
+      // besoin pour dire où l'entonnoir s'arrête.
+      trackFunnel(EVENEMENTS_FUNNEL.paiementLance, { payment_method: form.method });
       window.location.href = checkout.checkout_url;
     } catch (err) {
       const msg = handleApiError(err, t('paymentError'));

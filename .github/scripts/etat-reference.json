@@ -34,8 +34,8 @@
     "Preuve : backend/tests/test_etat_reference.py"
   ],
   "reference": {
-    "etablie_le": "2026-10-25",
-    "motif": "Retry-After passe dans expose_headers : sans exposition, un client d'origine croisée (shell natif Capacitor, mode direct VITE_USE_SAME_ORIGIN_API=false) lit null et revient plus tôt que le serveur ne l'autorise — la rafale de 503 mesurée le 25/10/2026, où un onglet saturait son propre plafond.",
+    "etablie_le": "2026-10-26",
+    "motif": "Retry-After passe dans expose_headers : sans exposition, un client d'origine croisée (shell natif Capacitor, mode direct VITE_USE_SAME_ORIGIN_API=false) lit null et revient plus tôt que le serveur ne l'autorise — la rafale de 503 mesurée le 25/10/2026, où un onglet saturait son propre plafond. Le 26/10/2026, la référence s'étend à `frontend/scripts/check-funnel-events.js`, cible de la mutation déclarée « funnel: etape declaree sans emetteur toleree » : son empreinte est le point de retour du harnais après neutralisation d'une ligne, et une surface non déclarée rendait ce garde aveugle au lint des workflows.",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -141,7 +141,8 @@
       "backend/kojo_routers_jobs_proposals.py": "513fa961889e9318173d989836c290c3c08556ff3289f62ba2ebb750563f43a4",
       "frontend/scripts/check-bundle-size.js": "4e823d2e25aeaeb03dc1601665b248b8552dcec55b4146006f8cc604b757b90c",
       ".github/scripts/livrer.py": "8e76ed3490d5d6244415bb54643e94b756572ef16f3c7f20e8a26b9adb646d42",
-      "backend/server.py": "9d06ecbe47ef4a930dcb9dfb4858d9e7aedc374ecde8bf4aabe01f4fbbb93c94"
+      "backend/server.py": "9d06ecbe47ef4a930dcb9dfb4858d9e7aedc374ecde8bf4aabe01f4fbbb93c94",
+      "frontend/scripts/check-funnel-events.js": "1dfd2076c9364414dd4ade7af8371ac9b7d31660ec95bf6cf2364d91d1e3e6f3"
     }
   },
   "hors_perimetre": [

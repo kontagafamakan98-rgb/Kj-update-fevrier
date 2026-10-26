@@ -4,6 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import TagInput from './TagInput';
 import { jobsAPI } from '../services/apiEndpoints';
 import { buildJobCreatePayload, normalizeApiErrorMessage } from '../utils/jobCreateBridge';
+import { EVENEMENTS_FUNNEL, trackFunnel } from '../utils/funnel';
 import { getJobUiLabel } from '../utils/jobUiLocale';
 import {
   emptyJobLocation,
@@ -116,6 +117,10 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
     setLoading(true);
     try {
       const created = await jobsAPI.create(payload);
+      // Le MÊME événement que la page `/create-job` : publier depuis la modale
+      // est la même étape du parcours, et deux noms pour un seul fait
+      // couperaient l'entonnoir en deux séries.
+      trackFunnel(EVENEMENTS_FUNNEL.missionCreee, { country: payload.location?.countryCode });
       if (typeof onJobCreated === 'function') onJobCreated(created);
       if (typeof onClose === 'function') onClose();
     } catch (submitError) {
