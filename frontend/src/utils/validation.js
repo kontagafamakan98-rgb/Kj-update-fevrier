@@ -24,9 +24,14 @@ export const ValidationRules = {
   
   name: {
     minLength: 2,
-    maxLength: 50,
+    // Le NOM COMPLET (26/10/2026) : le formulaire ne demande plus deux champs
+    // (prénom + nom), donc la borne haute couvre les deux — 50 caractères
+    // n'étaient déjà pas assez pour certains noms composés d'Afrique de
+    // l'Ouest. Le serveur tronque chaque partie à 50
+    // (`kojo_models._noms_resolus`).
+    maxLength: 101,
     pattern: /^[a-zA-ZÀ-ÿ\s\-']+$/,
-    message: 'Le nom doit contenir entre 2 et 50 caractères (lettres uniquement)'
+    message: 'Le nom doit contenir entre 2 et 101 caractères (lettres uniquement)'
   },
 
 };
@@ -165,29 +170,23 @@ export function validateRegistrationForm(formData) {
     errors.password = passwordResult.message;
   }
   
-  // Password confirmation
-  if (formData.password) {
-    const confirmResult = validatePasswordConfirmation(formData.password, formData.confirmPassword);
-    if (!confirmResult.isValid) {
-      errors.confirmPassword = confirmResult.message;
+  // Pas de confirmation de mot de passe : le champ a été retiré de
+  // l'inscription (26/10/2026) — une seconde saisie du MÊME mot de passe ne
+  // prouve rien de plus que la première, et elle coûtait un champ obligatoire.
+
+  // Le NOM, en un champ : le serveur le répartit en prénom/nom.
+  const nameResult = validateName(formData.name, 'Nom complet');
+  if (!nameResult.isValid) {
+    errors.name = nameResult.message;
+  }
+
+  // Le TÉLÉPHONE est FACULTATIF : vide n'est pas une erreur, un numéro
+  // renseigné l'est s'il est illisible.
+  if (formData.phone && formData.phone.trim() !== '') {
+    const phoneResult = validatePhone(formData.phone);
+    if (!phoneResult.isValid) {
+      errors.phone = phoneResult.message;
     }
-  }
-  
-  // Name validation
-  const firstNameResult = validateName(formData.first_name, 'Prénom');
-  if (!firstNameResult.isValid) {
-    errors.first_name = firstNameResult.message;
-  }
-  
-  const lastNameResult = validateName(formData.last_name, 'Nom');
-  if (!lastNameResult.isValid) {
-    errors.last_name = lastNameResult.message;
-  }
-  
-  // Phone validation
-  const phoneResult = validatePhone(formData.phone);
-  if (!phoneResult.isValid) {
-    errors.phone = phoneResult.message;
   }
   
   // Worker-specific validation

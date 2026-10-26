@@ -335,10 +335,12 @@ if (register) {
     errors.push('register.html : bouton submit (classes du site) absent du shell');
   }
   // Champs du formulaire (les LCP/paint du formulaire complet avant React) :
-  // prénom/nom, email, téléphone doivent être peints dans le shell statique,
-  // pas seulement les boutons — sinon le LCP du formulaire register reste
-  // attendu du boot React.
-  for (const champ of [`${fr.firstName}...`, `${fr.lastName}...`, registerT('emailPlaceholder')]) {
+  // NOM, email, téléphone doivent être peints dans le shell statique, pas
+  // seulement les boutons — sinon le LCP du formulaire register reste attendu
+  // du boot React. Le NOM est UN champ depuis le 26/10/2026 (le serveur le
+  // répartit en prénom/nom) : la liste porte donc la clé du plan, jamais
+  // `fr.firstName`/`fr.lastName`, qui ne sont plus peints par la page.
+  for (const champ of [`${registerT('fullName')}...`, registerT('emailPlaceholder')]) {
     if (!register.includes(`placeholder="${champ}"`)) {
       errors.push(`register.html : champ de formulaire « ${champ} » ABSENT du shell`);
     }
