@@ -114,6 +114,16 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 // seul `Home` porte la règle. Le plafond passe donc à 131 Ko, avec 0,9 Ko de
 // marge : un relèvement de 1 Ko pour 56 o mesurés laisserait sinon le prochain
 // hachage de build décider à la place du développeur.
+// ── 26/10/2026 (soir) : ELLE REVIENT, SOUS SEUIL ET DANS UN NŒUD DÉJÀ PEINT ──
+// Le retrait ci-dessous a laissé la bande sans aucune preuve de ce que la
+// plateforme a FAIT. `utils/preuveSociale.js` revient, plus court qu'en octobre
+// (seuils + lecture + formatage, aucune phrase) : la page lit de nouveau
+// `GET /api/public/stats` APRÈS montage et n'écrit que le TEXTE de la ligne de
+// preuve, dans le nœud que la coquille a déjà peint. Mesuré : 132,0 Ko gzip des
+// sept chunks référencés, budget 133,0 — la marge tombe à 1,0 Ko, et ce chiffre
+// est publié ici pour que le prochain ajout sache qu'il n'y a plus de place
+// pour un import lourd dans le chunk d'accueil (le prochain levier est de
+// déplacer la lecture, pas de relever le plafond).
 // ── 26/10/2026 : la preuve sociale QUITTE l'accueil ───────────────────────
 // Rectification du paragraphe ci-dessus, qui n'est plus vrai : la bande de faits
 // n'appelle plus `GET /api/public/stats` et ne formate plus de compteur. Mesuré

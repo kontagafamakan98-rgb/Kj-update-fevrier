@@ -2645,6 +2645,27 @@ body {
   text-transform: uppercase;
 }
 
+/* LA LIGNE DE PREUVE — état d'attente ou chiffres mesurés (26/10/2026).
+
+   Elle est peinte par la coquille AVANT le JavaScript (état d'attente) et React
+   n'en change que le TEXTE : même nœud, même classe, donc rien n'est inséré
+   après hydratation. Ce qui pourrait encore déplacer la page, c'est la HAUTEUR :
+   « chiffres à venir : les premières missions terminées seront publiées ici »
+   se replie sur deux lignes à 320 px, alors que « 12 missions terminées · 8 avis
+   vérifiés » en tient une. La réserve vaut donc DEUX lignes (2 × 1,125 rem) : ce
+   sont les deux états qui occupent la même boîte, jamais le premier qui pousse
+   le second. Au-delà de deux lignes, le texte sortirait de sa réserve — c'est
+   pourquoi les phrases publiées restent courtes et pourquoi aucun nombre n'est
+   suivi d'une phrase. */
+.faits-cta-preuve {
+  grid-column: 1 / -1;
+  min-height: 2.25rem;
+  margin-top: 1rem;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
 /* La CLÔTURE : orange, pleine largeur, avec deux anneaux qui débordent — le
    seul endroit de la page où le dessin sort du cadre. Rien n'y est animé. */
 .cta-final {

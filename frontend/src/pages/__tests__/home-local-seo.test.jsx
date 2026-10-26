@@ -36,8 +36,8 @@
  */
 
 import React from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Home from '../Home';
 import { CONTACT } from '../../config/contact';
@@ -46,6 +46,26 @@ import fr from '../../i18n/fr.json';
 
 // Le hook de métadonnées écrit dans document.head : hors du sujet ici.
 vi.mock('../../utils/seo', () => ({ usePageMeta: vi.fn() }));
+
+// La réponse de `GET /public/stats` : c'est elle qui départage l'état d'attente et
+// les chiffres réels. Tenue de l'extérieur pour juger les TROIS états — sous le
+// seuil, au-dessus, et en panne — sans jamais appeler le réseau.
+const statsPubliques = vi.hoisted(() => ({ reponse: null, erreur: null }));
+
+vi.mock('../../services/api', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      get: vi.fn(async (chemin) => {
+        if (chemin !== '/public/stats') throw new Error(`route inattendue : ${chemin}`);
+        if (statsPubliques.erreur) throw statsPubliques.erreur;
+        return statsPubliques.reponse;
+      }),
+    },
+  };
+});
 
 // Seuls les HOOKS sont figés (mêmes raisons que pages-render.test.jsx) : le
 // dictionnaire, lui, est le vrai — une clé absente doit se voir dans le rendu.
@@ -197,5 +217,79 @@ describe('accueil — SEO local (carte intégrée + lien Google Maps)', () => {
     expect(hrefs.some((h) => h.startsWith('mailto:')), 'aucun lien mailto:').toBe(true);
     expect(hrefs.some((h) => h.includes('wa.me/')), 'aucun lien WhatsApp').toBe(true);
     expect(hrefs).toContain(`tel:${CONTACT.phone.replace(/[^+\d]/g, '')}`);
+  });
+});
+
+/**
+ * ── LA PREUVE SOCIALE PUBLIE UN ÉTAT D'ATTENTE, PUIS DES CHIFFRES RÉELS ───
+ *
+ * Le 26/10/2026, la bande publiait « 0 mission terminée · 0 avis » : le compteur
+ * brut de l'API. Les deux faits statiques (pays, support) l'ont remplacée — et
+ * ne prouvent rien de ce que la plateforme a FAIT. La ligne de preuve rétablit
+ * la mesure sans rétablir le mensonge : elle dit « chiffres à venir » tant que
+ * trois missions terminées et deux avis ne sont pas atteints, puis publie les
+ * compteurs réels.
+ *
+ * Ce qui est jugé ici, et pourquoi ces trois cas :
+ *   • SOUS le seuil — l'état d'attente est l'état PAR DÉFAUT, celui que la
+ *     coquille pré-rendue peint avant tout JavaScript. Un premier paint qui
+ *     afficherait déjà autre chose ferait diverger les deux canaux ;
+ *   • AU-DESSUS — les chiffres réels, formatés par la langue, remplacent le
+ *     texte d'attente dans le MÊME nœud (la ligne existe avant le montage :
+ *     rien n'est inséré, donc rien ne se déplace) ;
+ *   • PANNE — une lecture qui échoue laisse l'attente : elle ne devient ni un
+ *     zéro ni un message d'erreur.
+ */
+describe('accueil — preuve sociale mesurée', () => {
+  const ATTTENTE = fr[PAGE_SECTIONS['/'].preuveAttenteKey];
+  const ligneDePreuve = (conteneur) =>
+    conteneur.querySelector(`.${PAGE_SECTIONS['/'].preuveClass}`);
+
+  beforeEach(() => {
+    statsPubliques.reponse = null;
+    statsPubliques.erreur = null;
+  });
+
+  it('sous le seuil, la ligne dit l’état d’attente déclaré — et n’avance aucun chiffre', async () => {
+    statsPubliques.reponse = { completed_jobs: 2, reviews: 9 };
+    const { container } = rendreLAccueil();
+
+    const ligne = ligneDePreuve(container);
+    expect(ligne, 'la ligne de preuve n’est pas peinte dans la bande').not.toBeNull();
+    expect(
+      ligne.closest(`.${PAGE_SECTIONS['/'].faitsClass}`),
+      'la ligne de preuve est sortie de la bande de faits'
+    ).not.toBeNull();
+
+    // Le PREMIER paint est déjà l'attente : c'est ce que la coquille publie.
+    expect(ligne.textContent.trim()).toBe(ATTTENTE);
+    // …et la lecture ne la change pas : deux missions ne sont pas une preuve.
+    await waitFor(() => expect(ligne.textContent.trim()).toBe(ATTTENTE));
+    expect(ligne.textContent, 'un chiffre a été publié sous le seuil').not.toMatch(/\d/);
+  });
+
+  it('au-dessus du seuil, la ligne publie les compteurs RÉELS, dans le nœud déjà peint', async () => {
+    statsPubliques.reponse = { completed_jobs: 12, reviews: 8 };
+    const { container } = rendreLAccueil();
+
+    const ligne = ligneDePreuve(container);
+    expect(ligne, 'la ligne de preuve n’est pas peinte dans la bande').not.toBeNull();
+    const avant = ligne.textContent.trim();
+    expect(avant, 'le premier paint doit rester l’attente déclarée').toBe(ATTTENTE);
+
+    await waitFor(() => expect(ligne.textContent).toContain('12 missions terminées'));
+    expect(ligne.textContent).toContain('8 avis vérifiés');
+    expect(ligne.textContent, 'l’attente est restée affichée avec les chiffres').not.toContain(
+      ATTTENTE
+    );
+  });
+
+  it('une lecture en panne reste en attente — jamais un zéro, jamais un rouge', async () => {
+    statsPubliques.erreur = new Error('503 Service Unavailable');
+    const { container } = rendreLAccueil();
+
+    const ligne = ligneDePreuve(container);
+    await waitFor(() => expect(ligne.textContent.trim()).toBe(ATTTENTE));
+    expect(ligne.textContent, 'une panne de lecture a publié un compteur').not.toMatch(/\b0\b/);
   });
 });
