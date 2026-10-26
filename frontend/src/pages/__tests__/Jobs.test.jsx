@@ -379,6 +379,33 @@ describe('Jobs — la carte n’est chargée qu’à son ouverture', () => {
   });
 });
 
+describe('Jobs — la carte de mission porte un bouton Partager, HORS de son lien', () => {
+  // Ce cas verrouille la forme de la carte, pas le bouton (le partage a son
+  // propre fichier) : la carte était ENTIÈREMENT un lien, et y poser un bouton
+  // sans la défaire aurait produit un bouton DANS un lien — du HTML invalide,
+  // et un piège au clavier (le bouton et le lien répondraient tous les deux à
+  // Entrée). La carte est donc une boîte dont la colonne gauche est le lien.
+  it('garde la carte cliquable et met Partager à côté, jamais dedans', async () => {
+    jobsAPI.getAll.mockResolvedValue([JOB_A]);
+    vi.spyOn(window, 'open').mockImplementation(() => null);
+    render(<Jobs />);
+
+    const titre = await screen.findByText('Réparation de plomberie');
+    // Le lien de la fiche existe toujours, et porte le titre.
+    expect(titre.closest('a')).toBeTruthy();
+
+    const partage = screen.getByRole('button', { name: /Partager/ });
+    // Le bouton n'est PAS un descendant du lien. `closest('a')` remonterait au
+    // lien ancêtre s'il y en avait un : c'est exactement ce qu'on refuse.
+    expect(partage.closest('a')).toBeNull();
+
+    // Et il partage réellement : wa.me avec le lien de la FICHE.
+    fireEvent.click(partage);
+    expect(window.open).toHaveBeenCalledTimes(1);
+    expect(decodeURIComponent(window.open.mock.calls[0][0])).toContain('/jobs/job-1');
+  });
+});
+
 describe('Jobs — le premier paint ne dépend pas de la réponse de l’API', () => {
   // Le plus grand texte de la page est son paragraphe d'intro : c'est lui
   // l'élément LCP. Il est déclaré par le plan, peint par la coquille

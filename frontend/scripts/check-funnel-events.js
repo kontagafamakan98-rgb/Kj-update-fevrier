@@ -22,9 +22,9 @@
  *      liste. Un nom calculé est refusé : on ne juge pas ce qu'on ne lit pas.
  *   2. CLÉS — l'objet de paramètres est LITTÉRAL, sans `spread` ni clé
  *      calculée, et chacune de ses clés est déclarée dans `CLES_FUNNEL`.
- *   3. ÉMETTEUR — chacune des cinq étapes déclarées a au moins un appelant
- *      hors des tests. Une étape déclarée sans émetteur est un refus nommé.
- *   4. AUCUN CONTOURNEMENT — un `gtag('event', …)` direct est refusé partout,
+ *   3. ÉMETTEUR — chacune des étapes déclarées (les cinq de l'entonnoir, plus
+ *      `job_shared` du partage) a au moins un appelant hors des tests. Une
+ *      étape déclarée sans émetteur est un refus nommé. *   4. AUCUN CONTOURNEMENT — un `gtag('event', …)` direct est refusé partout,
  *      sauf l'exception DÉCLARÉE ci-dessous (la page vue, qui n'est pas une
  *      étape de funnel et n'a qu'un seul propriétaire).
  *   5. PLANCHERS — sous `PLANCHERS.fichiers` fichiers lus ou `PLANCHERS.appels`

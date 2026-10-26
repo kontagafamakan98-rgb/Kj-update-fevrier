@@ -14,6 +14,10 @@ import CompletionPanel from '../components/CompletionPanel';
 // décision du propriétaire (kojo_job_disputes). Tant qu'il est ouvert, l'argent
 // ne bouge pas — le panneau le DIT au lieu de le laisser deviner.
 import DisputePanel from '../components/DisputePanel';
+// PARTAGER : le lien de la fiche est PUBLIC, et c'est par WhatsApp que ce
+// marché recrute. Le bouton ne dépend d'aucun compte, donc un visiteur à froid
+// peut faire circuler une mission qu'il vient de lire.
+import BoutonPartageMission from '../components/BoutonPartageMission';
 import { jobsAPI } from '../services/apiEndpoints';
 import { handleApiError } from '../services/api';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/jobDetails';
@@ -809,6 +813,11 @@ export default function JobDetails() {
             </div>
 
             <div className="mt-6 flex flex-wrap gap-3">
+              {/* En PREMIER et pour tout le monde : le partage ne demande aucun
+                  droit, alors que les boutons suivants dépendent du rôle. Un
+                  visiteur anonyme qui arrive par un lien partagé doit pouvoir
+                  le repartager sans créer de compte. */}
+              <BoutonPartageMission job={job} variante="libelle" />
               {isJobOwner && (
                 <>
                   <button onClick={() => navigate('/jobs')} className="rounded-[3px] border border-stone-200 px-4 py-3 font-semibold text-stone-700 hover:bg-stone-50">

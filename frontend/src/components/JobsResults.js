@@ -10,6 +10,9 @@ import Link from './LienVue';
 import { formatBudgetRange, formatJobDate, formatJobStatus } from '../utils/jobPageSafeHelpers';
 import { getRememberedApplication } from '../utils/jobProposalWorkflow';
 import { CONTACT } from '../config/contact';
+// Le bouton Partager de la carte. Il vit HORS du lien de la carte (voir plus
+// bas) : un bouton dans un lien est du HTML invalide et un piège au clavier.
+import BoutonPartageMission from './BoutonPartageMission';
 
 // ── LA DESCRIPTION D'UNE CARTE EST BORNÉE, ET C'EST UNE MESURE DE LCP ──────
 //
@@ -133,25 +136,24 @@ export function JobCard({ job, user, userType, appliedJobIds, t }) {
     appliedJobIds ? appliedJobIds.has(String(jobId)) : Boolean(getRememberedApplication(jobId, user))
   );
 
-  // La carte entière est le lien : la cible est donc énorme au doigt, et le
-  // contour de focus (`focus-visible`) dit où l'on est au clavier. Le survol
-  // soulève la carte de 2 px et teinte la bordure en orange — assez pour dire
-  // « c'est cliquable » sans faire sauter la liste. Les deux viennent de la
-  // feuille (`.carte-editoriale-cliquable`) : la même réponse au survol que
-  // toutes les autres cartes cliquables du site.
+  // La carte entière ÉTAIT le lien. Elle porte maintenant un bouton Partager,
+  // et un bouton dans un lien est du HTML invalide (contenu interactif dans
+  // contenu interactif) autant qu'un piège au clavier : la carte est donc une
+  // BOÎTE, dont la colonne gauche est le lien. Le survol et le focus ne
+  // changent pas — ils viennent toujours de la feuille
+  // (`.carte-editoriale-cliquable`), donc la même réponse au survol que toutes
+  // les autres cartes cliquables du site.
+  //
+  // Ce que ce partage conserve : ni le rayon ni l'ombre ne participent à la
+  // mise en page, et le bouton vit dans la colonne du budget (à côté du
+  // montant), donc la hauteur calibrée par `JobCardSkeleton` ne bouge pas.
   return (
-    <Link
-      to={`/jobs/${job.id}`}
-      // La CARTE du vocabulaire éditorial (src/index.css) : un filet de 1 px,
-      // un rayon de 8 px, aucune ombre large — c'est ce qui distingue une carte
-      // d'un bouton sur ce site. Le survol reste porté par la feuille
-      // (`.carte-editoriale-cliquable`), donc il ne peut pas diverger d'une
-      // autre carte cliquable. NI le rayon ni l'ombre ne participent à la mise
-      // en page : la hauteur calibrée par `JobCardSkeleton` ne bouge pas.
-      className="carte-editoriale carte-editoriale-cliquable block p-6"
-    >
+    // La CARTE du vocabulaire éditorial (src/index.css) : un filet de 1 px, un
+    // rayon de 8 px, aucune ombre large — c'est ce qui distingue une carte d'un
+    // bouton sur ce site.
+    <div className="carte-editoriale carte-editoriale-cliquable block p-6">
       <div className="flex flex-wrap items-start justify-between gap-6">
-        <div className="min-w-[240px] flex-1">
+        <Link to={`/jobs/${job.id}`} className="block min-w-[240px] flex-1">
           {/* Titre + état, sur une ligne qui se replie : mêmes hauteurs de
               ligne que le squelette (titre text-lg, pastille 24 px). */}
           <div className="mb-2 flex flex-wrap items-center gap-3">
@@ -178,14 +180,20 @@ export function JobCard({ job, user, userType, appliedJobIds, t }) {
             <span className="inline-flex items-center gap-1.5"><IconeEpingle />{locationText}</span>
             {job.category && <span className="inline-flex items-center gap-1.5"><IconeEtiquette />{job.category}</span>}
           </div>
-        </div>
+        </Link>
         <div className="ml-0 min-w-[170px] text-right md:ml-6">
-          <div className="text-2xl font-bold text-orange-600">{formatBudgetRange(job.budget_min, job.budget_max)}</div>
+          {/* Le montant et le partage sur la même ligne : le bouton ne prend pas
+              de hauteur au-delà de celle du chiffre `text-2xl`, donc le
+              squelette reste calé (voir l'en-tête de `JobCardSkeleton`). */}
+          <div className="flex items-start justify-end gap-2">
+            <div className="text-2xl font-bold text-orange-600">{formatBudgetRange(job.budget_min, job.budget_max)}</div>
+            <BoutonPartageMission job={job} variante="icone" className="mt-1" />
+          </div>
           {job.estimated_duration && <div className="mt-1 text-sm text-stone-500">{job.estimated_duration}</div>}
           {userType === 'worker' && job.status === 'open' && !hasApplied && <div className="mt-2 inline-flex rounded-sm border border-green-200 bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">{t('applyAvailable')}</div>}
           {hasApplied && <div className="mt-2 inline-flex rounded-sm border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">{t('proposalSent')}</div>}
         </div>
       </div>
-    </Link>
+    </div>
   );
 }

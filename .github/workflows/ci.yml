@@ -777,7 +777,8 @@ jobs:
 
       # LE FUNNEL SE MESURE, ET SES CLÉS SONT BORNÉES. `src/utils/funnel.js`
       # porte les cinq étapes (inscription, code vérifié, mission publiée,
-      # proposition envoyée, paiement lancé) et la LISTE BLANCHE des paramètres,
+      # proposition envoyée, paiement lancé) plus `job_shared` (partage d'une
+      # mission), et la LISTE BLANCHE des paramètres,
       # et il filtre à l'envoi. Un filtre runtime ne protège que ce qui passe par
       # lui : un `gtag('event', …)` écrit directement dans une page l'ignore, une
       # clé mal orthographiée est écartée sans que personne ne le voie, et une

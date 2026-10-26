@@ -130,8 +130,20 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 // et 40 Ko de marge, pour la même raison qu'au 22/10 : laisser le prochain
 // hachage de build fixer le seuil, c'est laisser un hash décider à la place du
 // développeur.
+// ── 25/10/2026 : 132 → 133 Ko, POUR LE PARTAGE D'UNE MISSION ──────────────
+// Le bouton Partager ajoute une clé au dictionnaire GLOBAL (`shareJob`) : le
+// français est le dictionnaire par DÉFAUT, donc il vit dans `index` et la clé y
+// coûte ses octets (mesuré sur le chunk minifié : `shareJob:ng,` = 12 o bruts,
+// 7 o gzip — la valeur est déjà partagée par le minifieur). Les boutons, eux, ne
+// sont PAS dans le premier écran : la carte est dans le chunk `Jobs`, la fiche
+// dans `JobDetails`, tous deux paresseux. Mesure du jour : 135 189 o gzip des
+// sept chunks référencés, soit 21 o au-dessus de l'ancien plafond — dont 7 o de
+// cette clé ; la branche au moment de la mesure en portait 14 de plus, et c'est
+// ÉCRIT plutôt qu'attribué à ce seul bouton. Le plafond passe à 133 Ko avec
+// 1 Ko de marge, pour la raison du 22/10 : laisser le prochain hachage de build
+// fixer le seuil, c'est laisser un hash décider à la place du développeur.
 export const BUDGETS = {
-  initialGzip: 132 * 1024, // JS initial (chunks référencés par index.html), gzip
+  initialGzip: 133 * 1024, // JS initial (chunks référencés par index.html), gzip
   largestChunkGzip: 200 * 1024, // plus gros chunk JS, gzip
   totalRaw: 5.55 * 1024 * 1024, // build/ entier, brut (voir les deux mesures ci-dessus)
 };
