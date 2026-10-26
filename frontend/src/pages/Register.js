@@ -204,16 +204,29 @@ export default function Register() {
   const activePhonePrefix = activeCountry?.phonePrefix || '';
   const activePhoneExample = activeCountry ? stripPhonePrefix(getPhoneExampleForCountry(activeCountry), activePhonePrefix) : pageT('phonePlaceholder');
 
-  // Géolocalisation automatique au chargement
+  // Géolocalisation au chargement — PAR IP, SANS DEMANDER LA POSITION (26/10/2026).
+  //
+  // La détection complète commençait par `navigator.geolocation` : le navigateur
+  // affichait donc sa demande de permission dès l'ouverture de la page
+  // d'inscription, avant tout geste. Mesuré en production par Lighthouse mobile
+  // le 26/10/2026 (`geolocation-on-start`, bonnes pratiques 96) : un refus au
+  // seuil d'un formulaire coûte des inscriptions, et un visiteur qui refuse ne
+  // revient pas sur sa décision à la deuxième visite.
+  //
+  // Ce que la page a besoin de savoir au montage est le PAYS, et il vient de
+  // l'IP (`sansGps: true`, côté service). La position précise reste offerte par
+  // le bouton « Utiliser ma position », où la demande de permission répond à un
+  // geste explicite.
   useEffect(() => {
-    detectUserLocationAndSetDefaults();
+    detectUserLocationAndSetDefaults({ sansGps: true });
   }, []);
 
 
-  const detectUserLocationAndSetDefaults = async () => {
+  const detectUserLocationAndSetDefaults = async ({ sansGps = true } = {}) => {
     try {
-      devLog.info('🌍 Détection automatique du pays de l’utilisateur...');
-      const country = await detectUserCountry();
+      setGeoLoading(true);
+      devLog.info(`🌍 Détection ${sansGps ? 'par IP' : 'précise'} du pays de l’utilisateur...`);
+      const country = await detectUserCountry({ sansGps });
       
       // detected:false = échec de détection (objet neutre, jamais null) : on
       // ne remplace PAS un pays déjà choisi ni n'auto-sélectionne un code vide.
@@ -514,6 +527,18 @@ export default function Register() {
                 <p className="text-xs text-yellow-700">
                   <MapPin className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {pageT('positionNotDetected')}
                 </p>
+                {/* Le seul chemin qui DEMANDE la position de l'appareil : un
+                    geste, donc une permission comprise. La détection par IP a
+                    déjà échoué (on est dans cette branche) — la relance est
+                    ici plutôt qu'automatique. */}
+                <button
+                  type="button"
+                  onClick={() => detectUserLocationAndSetDefaults({ sansGps: false })}
+                  className="mt-2 inline-flex items-center gap-2 rounded-lg border border-stone-300 fond-papier px-3 py-2 text-xs font-semibold text-stone-700 transition-colors hover:border-orange-500 hover:text-orange-700"
+                >
+                  <MapPin className="h-4 w-4" aria-hidden="true" />
+                  {t('useMyPosition')}
+                </button>
               </div>
             )}
             
@@ -598,7 +623,7 @@ export default function Register() {
                   <div className="w-full border-t border-gray-200" />
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="bg-white px-3 text-gray-400">{pageT('orSeparator') || 'ou'}</span>
+                  <span className="bg-white px-3 text-stone-500">{pageT('orSeparator') || 'ou'}</span>
                 </div>
               </div>
             )}
@@ -924,7 +949,7 @@ export default function Register() {
 
           <div className="bloc-differe-legal rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-3">
             <div>
-              <h3 className="text-sm font-semibold text-orange-900"><IconePage nom={pagePlan.legalNoticeIcon} role="notice" /> {pageT('legalNoticeTitle')}</h3>
+              <h2 className="text-sm font-semibold text-orange-900"><IconePage nom={pagePlan.legalNoticeIcon} role="notice" /> {pageT('legalNoticeTitle')}</h2>
               <p className="text-xs text-orange-800 mt-1">{pageT('legalConsentHelp')}</p>
             </div>
             <a

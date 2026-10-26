@@ -186,19 +186,35 @@ class PreciseGeolocationService {
     this.isDetecting = true;
 
     try {
-      const gpsLocation = await this.getHighPrecisionGPSLocation();
-      if (gpsLocation?.detected === true) {
-        devLog.info('✅ Localisation GPS obtenue:', gpsLocation);
-        this.lastKnownLocation = gpsLocation;
-        this.detectionAccuracy = gpsLocation.confidence || 0;
-        this.saveCachedLocation(gpsLocation);
-        this.isDetecting = false;
+      // ── `sansGps` : NE PAS DEMANDER LA POSITION DE L'APPAREIL (26/10/2026) ──
+      //
+      // `getHighPrecisionGPSLocation` appelle `navigator.geolocation` : le
+      // navigateur affiche alors sa demande de permission. Sur /register, cet
+      // appel partait au MONTAGE — mesuré par Lighthouse mobile en production le
+      // 26/10/2026 (`geolocation-on-start`, bonnes pratiques 96) : la page
+      // d'inscription demandait la position du visiteur avant qu'il ait touché
+      // quoi que ce soit, et un refus de permission au seuil d'un formulaire se
+      // paie en inscriptions perdues.
+      //
+      // Un appelant qui n'a besoin que du PAYS passe donc `sansGps: true` : le
+      // pays vient de l'IP (serveur, aucun prompt), et la position précise reste
+      // disponible sur un GESTE explicite (`sansGps` absent), où la demande de
+      // permission est comprise par la personne qui vient de la déclencher.
+      if (!options.sansGps) {
+        const gpsLocation = await this.getHighPrecisionGPSLocation();
+        if (gpsLocation?.detected === true) {
+          devLog.info('✅ Localisation GPS obtenue:', gpsLocation);
+          this.lastKnownLocation = gpsLocation;
+          this.detectionAccuracy = gpsLocation.confidence || 0;
+          this.saveCachedLocation(gpsLocation);
+          this.isDetecting = false;
 
-        const detectionTime = Date.now() - startTime;
-        geolocationMonitor.recordDetection(gpsLocation, detectionTime, true);
-        devLog.info(`✅ Géolocalisation GPS complétée en ${detectionTime}ms`);
+          const detectionTime = Date.now() - startTime;
+          geolocationMonitor.recordDetection(gpsLocation, detectionTime, true);
+          devLog.info(`✅ Géolocalisation GPS complétée en ${detectionTime}ms`);
 
-        return gpsLocation;
+          return gpsLocation;
+        }
       }
 
       const ipLocation = await this.getMultiIPGeolocation();

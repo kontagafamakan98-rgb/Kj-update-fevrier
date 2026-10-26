@@ -97,9 +97,9 @@ const RegistrationLanguageSelector = ({
     <div className="bg-gradient-to-r from-orange-50 to-yellow-50 border border-orange-200 rounded-lg p-6">
       <div className="flex items-center mb-4">
         <Languages className="h-6 w-6 mr-3 text-orange-600" aria-hidden="true" />
-        <h3 className="text-lg font-semibold text-orange-900">
+        <h2 className="text-lg font-semibold text-orange-900">
           {t('choosePreferredLanguage') || 'Choisissez votre langue préférée'}
-        </h3>
+        </h2>
       </div>
 
       {/* Message de suggestion basé sur la géolocalisation ou le pays choisi */}
