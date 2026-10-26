@@ -191,7 +191,12 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, pageSectio
           // (17/10/2026) : ce bloc vit sous condition Google, donc sa chaîne
           // ne peut pas être déclarée dans le plan (elle devrait y être
           // toujours publiée) — elle est écrite ici et dans src/pages/Login.js.
-          + `<div class="relative flex justify-center text-sm"><span class="bg-white px-3 text-sm text-stone-400">${esc(T('orSeparator'))}</span></div>`
+          //
+          // `text-stone-500` (26/10/2026) : c'est du TEXTE sur blanc, et le
+          // seuil AA est 4,5:1. `stone-400` n'y arrive pas (2,1:1) ; la valeur
+          // est la MÊME que celle de React, sinon la coquille sert l'ancienne
+          // teinte jusqu'à l'hydratation (`check-classes-coquilles.js`).
+          + `<div class="relative flex justify-center text-sm"><span class="bg-white px-3 text-sm text-stone-500">${esc(T('orSeparator'))}</span></div>`
           + `</div>`
         : '')
       + `<div class="${loginPlan.champsClass}">`
@@ -292,7 +297,10 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, pageSectio
       + (googleAuth
         ? `<div class="relative">`
           + `<div class="absolute inset-0 flex items-center"><div class="w-full border-t border-gray-200"></div></div>`
-          + `<div class="relative flex justify-center text-sm"><span class="bg-white px-3 text-gray-400">${esc(registerT('orSeparator'))}</span></div>`
+          // `text-stone-500` et non `gray-400` (26/10/2026) : mesuré 2,54:1 sur
+          // blanc pour `gray-400`, sous le 4,5:1 du texte courant — et la
+          // coquille doit peindre la teinte de React, pas celle d'avant.
+          + `<div class="relative flex justify-center text-sm"><span class="bg-white px-3 text-stone-500">${esc(registerT('orSeparator'))}</span></div>`
           + `</div>`
         : '')
       + `<fieldset>`
