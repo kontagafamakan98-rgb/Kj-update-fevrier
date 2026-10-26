@@ -80,7 +80,7 @@ function basculeListeCarte({ esc, T }) {
     `<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">${paths}</svg>`
   const bouton = (actif, paths, cle) =>
     `<button type="button" class="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
-      actif ? 'bg-orange-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+      actif ? 'bg-orange-700 text-white' : 'text-gray-600 hover:bg-gray-100'
     }">${icone(paths)}${esc(T(cle))}</button>`
   return (
     `<div class="flex flex-wrap items-center gap-3">` +
@@ -293,7 +293,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, pageSectio
       + `</div>`
       + `<div class="flex flex-wrap items-center justify-center gap-3 pb-1 text-xs sm:text-sm">`
       + `<div class="flex items-center">`
-      + `<div class="w-6 h-6 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-medium">${esc(registerT(registerPlan.step1NumberKey))}</div>`
+      + `<div class="w-6 h-6 bg-orange-700 text-white rounded-full flex items-center justify-center text-xs font-medium">${esc(registerT(registerPlan.step1NumberKey))}</div>`
       + `<span class="ml-2 text-orange-600 font-medium whitespace-nowrap">${esc(registerT('personalInformation'))}</span>`
       + `</div>`
       + `<div class="flex items-center">`

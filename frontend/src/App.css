@@ -252,7 +252,11 @@
 
 /* High contrast mode support */
 @media (prefers-contrast: high) {
-  .bg-orange-600 {
+  /* `bg-orange-700` est le fond des boutons PLEINS à texte blanc depuis le
+     26/10/2026 (`orange-600` ne tenait que 3,56:1 sous du blanc). Le repli suit
+     le jeton réellement porté : viser l'ancienne teinte ne noircirait plus aucun
+     bouton, et le mode contraste élevé ne servirait plus à rien là où il compte. */
+  .bg-orange-700 {
     background-color: #000;
   }
   

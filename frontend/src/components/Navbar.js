@@ -37,12 +37,13 @@ import {
 // une seule encre de survol pour la barre, mesurée sur LES DEUX composites.
 // L'icône de la cloche garde `orange-700` : c'est un OBJET GRAPHIQUE (seuil
 // WCAG 1.4.11 de 3:1), et 3,13:1 sur le pire cas suffit là où du texte échoue.
-// Ce qui n'est PAS corrigé ici, et qui se dit plutôt que de se taire : les deux
-// boutons pleins de la barre (inscription, déconnexion) portent du texte BLANC
-// sur `orange-600`, soit 3,56:1 — sous le seuil au repos. C'est le même jeton
-// que trente autres boutons du site : une décision de la charte, pas de la
-// barre, et la changer seulement ici rendrait la barre plus sombre que le reste.
-// Garde : `src/components/__tests__/Navbar.test.jsx`.
+// Les deux boutons PLEINS de la barre (inscription, déconnexion) portaient du
+// texte BLANC sur `orange-600`, soit 3,56:1 — sous le seuil au repos. Ils sont
+// passés au jeton des autres boutons pleins du site le 26/10/2026 (`orange-700`
+// avec un survol `orange-800`) : 5,18:1 et 7,31:1. Ils sont donc MESURÉS comme
+// les autres entrées du tiroir, et non plus écartés.
+// Garde : `src/components/__tests__/Navbar.test.jsx` (la barre) et
+// `src/__tests__/boutons-pleins.test.js` (tout le site).
 
 /**
  * Une entrée du menu de bureau, dans ses deux états.
@@ -259,7 +260,7 @@ export default function Navbar() {
                 <Link to="/profile" className="text-gray-700 hover:text-orange-900 px-3 py-2 rounded-md text-sm font-medium transition-colors">
                   {t('profile')}
                 </Link>
-                <button onClick={handleLogout} className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                <button onClick={handleLogout} className="bg-orange-700 hover:bg-orange-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                   {t('logout')}
                 </button>
               </div>
@@ -268,7 +269,7 @@ export default function Navbar() {
                 <Link to="/login" className="text-gray-700 hover:text-orange-900 px-3 py-2 rounded-md text-sm font-medium transition-colors">
                   {t('login')}
                 </Link>
-                <Link to="/register" className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                <Link to="/register" className="bg-orange-700 hover:bg-orange-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                   {t('register')}
                 </Link>
               </div>
@@ -348,7 +349,7 @@ export default function Navbar() {
                     {t('support')}
                   </Link>
                   <div className="pt-2">
-                    <button onClick={handleLogout} className="w-full rounded-xl bg-orange-600 hover:bg-orange-700 text-white px-4 py-3 text-base font-medium transition-colors">
+                    <button onClick={handleLogout} className="w-full rounded-xl bg-orange-700 hover:bg-orange-800 text-white px-4 py-3 text-base font-medium transition-colors">
                       {t('logout')}
                     </button>
                   </div>
@@ -376,7 +377,7 @@ export default function Navbar() {
                   <Link to="/login" className="block rounded-xl text-gray-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('login')}
                   </Link>
-                  <Link to="/register" className="block rounded-xl bg-orange-600 hover:bg-orange-700 text-white px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/register" className="block rounded-xl bg-orange-700 hover:bg-orange-800 text-white px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('register')}
                   </Link>
                 </>

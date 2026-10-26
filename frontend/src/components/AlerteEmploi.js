@@ -153,7 +153,7 @@ const AlerteEmploi = ({ categories = [], pays = '' }) => {
         <button
           type="submit"
           disabled={envoi}
-          className="rounded-lg bg-orange-600 px-4 py-2.5 font-semibold text-white transition-colors hover:bg-orange-700 disabled:opacity-60"
+          className="rounded-lg bg-orange-700 px-4 py-2.5 font-semibold text-white transition-colors hover:bg-orange-800 disabled:opacity-60"
         >
           {alerte.active ? t('jobAlertUpdate') : t('jobAlertSave')}
         </button>

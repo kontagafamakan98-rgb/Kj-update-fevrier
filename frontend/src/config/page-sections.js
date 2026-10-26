@@ -817,7 +817,7 @@ export const PAGE_SECTIONS = {
     // ── LE DESSIN DE L'ÉCRAN (17/10/2026) ───────────────────────────────────
     // /login était la dernière page publique restée au vocabulaire d'AVANT la
     // refonte : libellés `text-gray-700`, champs `rounded-md border-gray-300`,
-    // bouton `bg-orange-600`, encadré légal `bg-orange-50` — quatre familles de
+    // bouton `bg-orange-700`, encadré légal `bg-orange-50` — quatre familles de
     // chaînes qu'aucune autre page ne portait plus. Le formulaire devient une
     // CARTE du site (`.carte-editoriale` + `.carte-publique`), son bouton lit
     // `.bouton` comme les actions des écrans connectés, et son encadré légal
@@ -1036,7 +1036,7 @@ export const PAGE_SECTIONS = {
     frameClass: 'min-h-full flex items-center justify-center fond-sable py-12 px-4 sm:px-6 lg:px-8',
     colonneClass: 'max-w-md w-full space-y-8',
     enteteClass: 'text-center',
-    badgeClass: 'mx-auto h-14 w-14 flex items-center justify-center rounded-lg bg-orange-600',
+    badgeClass: 'mx-auto h-14 w-14 flex items-center justify-center rounded-lg bg-orange-700',
     badgeTexteClass: 'text-white text-2xl font-bold',
     titleClass: 'mt-6 text-3xl font-bold text-stone-900',
     carteClass: 'carte-editoriale carte-publique space-y-6',
@@ -1047,7 +1047,7 @@ export const PAGE_SECTIONS = {
     labelClass: 'block text-sm font-medium text-gray-700',
     champClass: 'mt-1 block w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-hidden focus:ring-orange-500',
     aideClass: 'text-xs text-gray-500',
-    boutonClass: 'relative w-full rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-700',
+    boutonClass: 'relative w-full rounded-lg bg-orange-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-800',
     retourClass: 'text-center',
     lienRetourClass: 'text-sm font-medium text-orange-600 hover:text-orange-500',
   },
@@ -1372,7 +1372,7 @@ export const PAGE_SECTIONS = {
     mapFrameClass:
       'mt-6 w-full rounded-xl border border-stone-200 bg-white flex h-80 flex-col items-center justify-center gap-3 px-4 text-center',
     mapControlClass:
-      'inline-flex items-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700',
+      'inline-flex items-center rounded-xl bg-orange-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-800',
     // Une ligne de contact = une donnée (icône, libellé, destination, valeur
     // affichée, accent). `href` vient de src/config/contact.js : la règle `tel:`
     // et la règle `mailto:` (sujet compris) n'existent qu'à cet endroit, donc la

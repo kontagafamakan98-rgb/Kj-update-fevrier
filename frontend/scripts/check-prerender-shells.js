@@ -522,8 +522,8 @@ if (forgot) {
   // Le bouton du formulaire prend l'orange de la marque (il était bleu, la
   // seule teinte du site qui n'appartenait à personne) — même forme, même
   // hauteur, seule la couleur change.
-  if (!forgot.includes('bg-orange-600 px-4 py-2 text-sm font-semibold text-white')) {
-    errors.push('forgot-password.html : bouton « Envoyer le code » (bg-blue-600) absent du shell');
+  if (!forgot.includes('bg-orange-700 px-4 py-2 text-sm font-semibold text-white')) {
+    errors.push('forgot-password.html : bouton « Envoyer le code » (bg-orange-700) absent du shell');
   }
   if (!/<link rel="modulepreload"[^>]*href="[^"]*ForgotPassword-[^"]*\.js"/.test(forgot)) {
     errors.push('forgot-password.html : modulepreload du chunk ForgotPassword absent');

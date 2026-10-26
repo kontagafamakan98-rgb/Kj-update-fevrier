@@ -343,7 +343,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
         {/* Orange Money */}
         <div className="rounded-[3px] border border-stone-200 p-4">
           <div className="flex items-center mb-3">
-            <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center mr-3">
+            <div className="w-8 h-8 bg-orange-700 rounded-full flex items-center justify-center mr-3">
               <span className="text-white text-sm font-bold">OM</span>
             </div>
             <h3 className="text-lg font-semibold text-gray-900">{t('orangeMoney')}</h3>

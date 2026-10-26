@@ -839,7 +839,7 @@ export default function JobDetails() {
               )}
 
               {canApply && (
-                <button onClick={() => setShowProposalModal(true)} className="rounded-[3px] bg-orange-600 px-4 py-3 font-semibold text-white hover:bg-orange-700">
+                <button onClick={() => setShowProposalModal(true)} className="rounded-[3px] bg-orange-700 px-4 py-3 font-semibold text-white hover:bg-orange-800">
                   {t('jobUiApply')}
                 </button>
               )}
@@ -854,7 +854,7 @@ export default function JobDetails() {
                   traduction, la seconde avec un redessin, soit deux faux
                   rouges pour un geste intact. */}
               {!user && (job?.status === 'open' || !job?.status) && !assignedWorkerId && (
-                <button data-sonde="postuler-anonyme" onClick={() => navigate('/login')} className="rounded-[3px] bg-orange-600 px-4 py-3 font-semibold text-white hover:bg-orange-700">
+                <button data-sonde="postuler-anonyme" onClick={() => navigate('/login')} className="rounded-[3px] bg-orange-700 px-4 py-3 font-semibold text-white hover:bg-orange-800">
                   {pageT('loginToApply') || t('jobUiApply')}
                 </button>
               )}
@@ -932,7 +932,7 @@ export default function JobDetails() {
                           });
                           navigate(`/payment?${paymentParams.toString()}`);
                         }}
-                        className="rounded-[3px] bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
+                        className="rounded-[3px] bg-orange-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-800"
                       >
                         {t('payNow')}
                       </button>
@@ -1120,7 +1120,7 @@ export default function JobDetails() {
                   placeholder={pageT('writeMessagePlaceholder')}
                 />
                 <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
-                  <button onClick={handleSendMessage} disabled={sendingMessage} className="rounded-[3px] bg-orange-600 px-5 py-3 font-semibold text-white hover:bg-orange-700 disabled:opacity-60">
+                  <button onClick={handleSendMessage} disabled={sendingMessage} className="rounded-[3px] bg-orange-700 px-5 py-3 font-semibold text-white hover:bg-orange-800 disabled:opacity-60">
                     {sendingMessage ? pageT('sending') : pageT('sendMessage')}
                   </button>
                 </div>

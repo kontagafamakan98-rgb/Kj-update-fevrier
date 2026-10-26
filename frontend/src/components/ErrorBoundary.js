@@ -63,7 +63,7 @@ class ErrorBoundaryInner extends React.Component {
             <AlertTriangle className="mx-auto mb-4 h-14 w-14 text-red-500" aria-hidden="true" />
             <h2 className="text-xl font-bold text-gray-800 mb-2">{t('unexpectedErrorTitle')}</h2>
             <p className="text-gray-600 mb-4">{t('unexpectedErrorText')}</p>
-            <button onClick={() => window.location.reload()} className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors">{t('refreshPage')}</button>
+            <button onClick={() => window.location.reload()} className="bg-orange-700 text-white px-4 py-2 rounded-lg hover:bg-orange-800 transition-colors">{t('refreshPage')}</button>
           </div>
         </div>
       );
