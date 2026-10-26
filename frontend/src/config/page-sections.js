@@ -928,6 +928,11 @@ export const PAGE_SECTIONS = {
     // formulaire (47 textes) était 1 px trop haut.
     countryGlobeIcon: 'countryGlobe',
     countryChevronIcon: 'countryChevron',
+    // Le repère du bloc « langue sélectionnée » : le CARACTÈRE « ✓ » y était
+    // publié sans domicile (aucune clé, aucune config) et le garde de provenance
+    // refusait la coquille. Dessiné par le registre, nommé ici, lu par les DEUX
+    // canaux : la page (RegistrationLanguageSelector) et la coquille.
+    selectedLanguageIcon: 'check',
     photoTipsTitleKey: 'tipsGoodPhoto',
     photoTipsKeys: ['useRecentPhoto', 'lookCamera', 'avoidGroup', 'neutralBackground'],
     // Le glyphe du bloc légal est DESSINÉ (page-icons.js) : le plan nomme une

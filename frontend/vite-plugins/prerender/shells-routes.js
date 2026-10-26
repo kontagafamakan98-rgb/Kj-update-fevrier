@@ -271,9 +271,16 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, pageSectio
       // La MÊME boîte que les états finaux de src/pages/Register.js (classe LUE
       // dans le plan) : elle réserve la hauteur du plus haut des trois états, si
       // bien que le passage « détection en cours » → « pays détecté / non
-      // détecté » ne déplace plus les pastilles ni le formulaire. Le
-      // `border-transparent` garde l'aspect d'origine (pas de cadre pendant
-      // l'attente) tout en occupant la même place qu'un état final encadré.
+      // détecté » ne déplace plus les pastilles ni le formulaire. La coquille
+      // peint l'état FINAL encadré (bordure ambre), pas un cadre neutre : il n'y
+      // a plus d'état d'attente à occuper depuis que la page ne demande plus la
+      // position au chargement.
+      //
+      // Le nom d'utilitaire de l'ancien cadre neutre n'est PAS écrit ici, même
+      // en prose : Tailwind lit le texte des sources, donc un nom recopié dans un
+      // commentaire GÉNÈRE la règle — et cette règle n'aurait alors aucun porteur
+      // (mesuré le 26/10/2026 : 13 pages servaient une règle sans porteur à cause
+      // de ce seul mot dans ce commentaire).
       + `<div class="${registerPlan.geoStatusBoxClass} bg-yellow-50 border-yellow-200">`
       + `<p class="text-xs text-yellow-700">${esc(registerT('positionNotDetected'))}</p>`
       // Le bouton n'agit pas sans JavaScript, et la coquille ne prétend pas le
@@ -434,7 +441,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, pageSectio
       // l'hydratation.
       + `<div class="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">`
       + `<div class="flex items-center">`
-      + `<span class="text-green-500 text-lg mr-2">✓</span>`
+      + svgDeLIcone(registerPlan.selectedLanguageIcon, 'langueSelectionnee')
       + `<div>`
       + `<p class="text-sm font-medium text-green-800">${esc(T('selectedLanguage'))} : <span class="inline-flex items-center gap-2">${svgDuDrapeau(nomDuDrapeau(LANGUES_PAR_DEFAUT[0].code), classeDuDrapeau('w-5 h-4'))}<span>${esc(LANGUES_PAR_DEFAUT[0].name)}</span></span></p>`
       + `<p class="text-xs text-green-700">${esc(T('interfaceAndProfileUpdated'))}</p>`

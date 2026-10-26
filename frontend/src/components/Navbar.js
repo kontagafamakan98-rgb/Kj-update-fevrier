@@ -21,6 +21,31 @@ import {
   NAV_PWA_SUFFIXE,
 } from '../config/classes-chrome';
 
+/**
+ * Une entrée du menu de bureau, dans ses deux états.
+ *
+ * Le composant existe pour que les classes des DEUX variantes soient écrites
+ * dans une position de classe — celles du `className` du `<Link>` — plutôt que
+ * rendues par une fonction : `scripts/check-css-selecteurs-morts.js` lit les
+ * positions de classe, pas la valeur de retour d'un appel, et la variante
+ * inactive n'avait donc aucun porteur dès que la coquille de /register a cessé
+ * de l'écrire (13 pages servaient `.border-transparent` sans porteur).
+ */
+function LienDesktop({ to, actif, children }) {
+  return (
+    <Link
+      to={to}
+      className={`px-3 py-2 text-sm font-medium transition-colors border-b-2 ${
+        actif
+          ? 'border-orange-600 bg-orange-50 text-orange-700'
+          : 'border-transparent text-stone-700 hover:text-orange-700'
+      }`}
+    >
+      {children}
+    </Link>
+  );
+}
+
 export default function Navbar() {
   const { user, logout } = useAuth();
   const { t } = useLanguage();
@@ -105,21 +130,20 @@ export default function Navbar() {
   // règle de survol des liens (même épaisseur, même couleur).
   const estActif = (chemin) =>
     chemin === '/' ? location.pathname === '/' : location.pathname.startsWith(chemin);
-  // Le dessin d'une entrée de barre reste un UTILITAIRE : ce lien est rendu par
-  // une fonction (`className={lienDesktop('/dashboard')}`), donc la classe
-  // n'est jamais écrite en position de classe littérale — une classe de SITE y
-  // serait déclarée « nommée et jamais posée » par
-  // `scripts/check-css-selecteurs-mortes.js`, à juste titre. La mesure ne
-  // change pas (px-3 py-2, 14 px, filet de 2 px) ; l'entrée courante prend en
-  // plus un fond de crème, pour qu'on sache où l'on est sans lire le
-  // soulignement. Aucune hauteur ne bouge : la barre fait 65 px dans les deux
-  // canaux, et la coquille pré-rendue publie une barre VIDE.
-  const lienDesktop = (chemin) =>
-    `px-3 py-2 text-sm font-medium transition-colors border-b-2 ${
-      estActif(chemin)
-        ? 'border-orange-600 bg-orange-50 text-orange-700'
-        : 'border-transparent text-stone-700 hover:text-orange-700'
-    }`;
+  // Le dessin d'une entrée de barre reste un UTILITAIRE (px-3 py-2, 14 px,
+  // filet de 2 px) ; l'entrée courante prend en plus un fond de crème, pour
+  // qu'on sache où l'on est sans lire le soulignement. Aucune hauteur ne bouge :
+  // la barre fait 65 px dans les deux canaux, et la coquille pré-rendue publie
+  // une barre VIDE.
+  //
+  // Les deux variantes sont écrites DANS la position de classe, par
+  // `LienDesktop` ci-dessous — plus dans une fonction qui les rendait :
+  // `className={lienDesktop('/jobs')}` n'est pas une position de classe que
+  // `scripts/check-css-selecteurs-morts.js` sache suivre, donc la variante
+  // inactive n'avait de porteur QUE la coquille pré-rendue de /register, qui a
+  // cessé de l'écrire le 26/10/2026 — et le garde a alors mesuré 13 pages
+  // servant une règle sans porteur. Le porteur doit être là où la classe est
+  // PEINTE, pas chez une page qui ne s'en sert pas.
 
   return (
     <nav className={navbarClass}>
@@ -162,18 +186,18 @@ export default function Navbar() {
           <div className="hidden md:flex items-center space-x-6">
             {user ? (
               <>
-                <Link to="/dashboard" className={lienDesktop('/dashboard')}>
+                <LienDesktop to="/dashboard" actif={estActif('/dashboard')}>
                   {t('dashboard')}
-                </Link>
-                <Link to="/jobs" className={lienDesktop('/jobs')}>
+                </LienDesktop>
+                <LienDesktop to="/jobs" actif={estActif('/jobs')}>
                   {t('jobs')}
-                </Link>
-                <Link to="/messages" className={lienDesktop('/messages')}>
+                </LienDesktop>
+                <LienDesktop to="/messages" actif={estActif('/messages')}>
                   {t('messages')}
-                </Link>
-                <Link to={versSupport} className={lienDesktop('/support')}>
+                </LienDesktop>
+                <LienDesktop to={versSupport} actif={estActif('/support')}>
                   {t('support')}
-                </Link>
+                </LienDesktop>
               </>
             ) : (
               /* Visiteur NON connecté : la navigation publique. Sans elle, un
@@ -181,18 +205,18 @@ export default function Navbar() {
                  et ne pouvait atteindre les emplois, la page « Comment ça
                  marche ? » ou le contact que par le bas de page. */
               <>
-                <Link to="/jobs" className={lienDesktop('/jobs')}>
+                <LienDesktop to="/jobs" actif={estActif('/jobs')}>
                   {t('jobs')}
-                </Link>
-                <Link to="/how-it-works" className={lienDesktop('/how-it-works')}>
+                </LienDesktop>
+                <LienDesktop to="/how-it-works" actif={estActif('/how-it-works')}>
                   {t('howItWorksTitle')}
-                </Link>
-                <Link to="/about" className={lienDesktop('/about')}>
+                </LienDesktop>
+                <LienDesktop to="/about" actif={estActif('/about')}>
                   {t('aboutTitle')}
-                </Link>
-                <Link to="/contact" className={lienDesktop('/contact')}>
+                </LienDesktop>
+                <LienDesktop to="/contact" actif={estActif('/contact')}>
                   {t('contactTitle')}
-                </Link>
+                </LienDesktop>
               </>
             )}
           </div>

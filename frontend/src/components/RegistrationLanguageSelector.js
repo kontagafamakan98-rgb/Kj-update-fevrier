@@ -9,8 +9,16 @@ import {
 } from '../services/geolocationService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { normalizeCountryCode } from '../utils/pack2PageI18n/core';
+import { PAGE_SECTIONS } from '../config/page-sections';
+import { IconePage } from '../config/page-icons';
 import FlagIcon from './FlagIcon';
 import { Lightbulb, MapPin } from 'lucide-react';
+
+// Le nom de l'icône est DÉCLARÉ par le plan de /register, pas écrit ici : la
+// coquille pré-rendue lit le même champ, donc les deux canaux peignent le même
+// tracé (avant, un caractère « ✓ » en littéral, refusé par
+// `check-shell-text-provenance.js`).
+const ICONE_LANGUE_SELECTIONNEE = PAGE_SECTIONS['/register'].selectedLanguageIcon;
 
 const COUNTRY_PREFERENCE_KEYS = {
   mali: 'maliLanguagePreference',
@@ -180,7 +188,7 @@ const RegistrationLanguageSelector = ({
       {selectedLanguage && (
         <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
           <div className="flex items-center">
-            <span className="text-green-500 text-lg mr-2">✓</span>
+            <IconePage nom={ICONE_LANGUE_SELECTIONNEE} role="langueSelectionnee" />
             <div>
               <p className="text-sm font-medium text-green-800">
                 {t('selectedLanguage') || 'Langue sélectionnée'} : <span className="inline-flex items-center gap-2"><FlagIcon country={selectedLanguage} className="w-5 h-4" /><span>{AVAILABLE_LANGUAGES[selectedLanguage]?.name}</span></span>
