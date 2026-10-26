@@ -131,16 +131,35 @@ describe('le support répond sept jours sur sept — dans les valeurs publiées'
 
   it("aucune valeur publiée (cinq dictionnaires + le plan) ne dit six jours sur sept", () => {
     const dictionnaires = valeursDesDictionnaires();
+    const bande = PAGE_SECTIONS['/'].stats;
     const plan = valeursDuPlan();
 
     // Anti-faux-vert : un balayage qui ne lit presque rien ne prouve rien.
-    // 10 = deux champs (fallback + shellText) pour CHACUNE des cinq entrées
-    // de la bande de faits : les deux faits déclarés (pays, support) et les
-    // trois preuves mesurées du 22/10/2026 (travailleurs, missions terminées,
-    // avis), dont la valeur publiée est « — » jusqu'à la réponse de l'API.
+    //
+    // Le NOMBRE de valeurs jugées se DÉRIVE de la déclaration — deux champs
+    // (`fallback` et `shellText`) pour chaque entrée de la bande —, il ne se
+    // recopie pas. Mesuré le 26/10/2026 : un `expect(plan.length).toBe(10)`
+    // écrit en dur a rendu ce garde ROUGE sur la PR qui RETIRAIT trois entrées
+    // de la bande (le compte tombait à 4). Le refus accusait donc un changement
+    // VOULU au lieu d'une lecture aveugle, et il fallait desserrer le garde
+    // pour livrer une décision produit : c'est exactement le genre de verrou
+    // qu'on finit par désactiver.
+    //
+    // Ce qui est exigé est ce qui prouve la LECTURE, et rien de plus : la bande
+    // déclare au moins ses deux faits statiques (pays, support), chaque entrée
+    // publie ses DEUX canaux, et aucun des deux n'est vide (`String(undefined)`
+    // vaudrait « undefined » : un champ oublié se verrait ici).
     expect(DICTIONNAIRES.length).toBe(5);
     expect(dictionnaires.length).toBeGreaterThan(2000);
-    expect(plan.length).toBe(10);
+    expect(
+      bande.length,
+      'la bande de faits de l’accueil doit déclarer au moins ses deux faits statiques'
+    ).toBeGreaterThanOrEqual(2);
+    expect(plan.length).toBe(bande.length * 2);
+    expect(
+      plan.every(({ texte }) => texte.trim().length > 0 && texte.trim() !== 'undefined'),
+      'une entrée de la bande publie un champ vide : le balayage ne l’aurait pas lue'
+    ).toBe(true);
 
     expect(valeursFautives([...dictionnaires, ...plan])).toEqual([]);
   });
