@@ -495,21 +495,25 @@ export const PAGE_SECTIONS = {
     // textes qui l'énonçaient sont corrigés ensemble — un chiffre faux dans la
     // seule bande de faits d'une page est exactement ce que cette bande
     // interdit, et une phrase qui le contredit ailleurs le serait autant.
+    // ── DEUX FAITS, ET PLUS DE COMPTEURS MESURÉS (26/10/2026) ─────────────
+    // La bande a porté trois compteurs lus de `/api/public/stats` du
+    // 22/10 au 26/10 : « 3 travailleurs · 0 mission terminée · 0 avis ». La
+    // doctrine d'alors — « un zéro publié est une mesure » — est juste dans un
+    // tableau de bord, et fausse ici : sur un accueil qui vend la confiance,
+    // deux zéros alignés ne mesurent pas la plateforme, ils la décrivent comme
+    // vide. La bande redevient ce que sa grille de DEUX colonnes demande
+    // (`index.css`, `.faits-cta`) : deux faits VERIFIABLES, sans volume.
+    //
+    // Ce qui n'est pas fait, et pourquoi : un chiffre lu au runtime ne peut pas
+    // non plus être peint par la coquille pré-rendue (écrite au BUILD, sans
+    // accès à la base) — publier la promesse à la place du compteur ferait
+    // diverger les deux canaux, et remplacer une phrase par un chiffre après
+    // le montage déplacerait la bande (CLS mesuré à 0,0000 sur `/`). Les
+    // chiffres de volume restent lisibles là où ils servent : le tableau de
+    // bord du propriétaire et `GET /metrics`.
     stats: [
       { labelKey: 'countriesCovered', fallback: '4', shellText: '4', icone: 'countryGlobe' },
       { labelKey: 'customerSupport', fallback: '7j/7', shellText: '7j/7', icone: 'contactCall' },
-      // ── LA PREUVE MESURÉE (22/10/2026) ──────────────────────────────────
-      // Trois entrées de plus, et leur valeur publiée est « — » : le HTML
-      // pré-rendu ne peut pas appeler `/api/public/stats` (il est écrit au
-      // BUILD), donc il publie « pas mesuré ici » plutôt qu'un chiffre figé
-      // qui aurait l'air mesuré. React remplace ce tiret par la mesure dès
-      // que la route répond, DANS LE MÊME NŒUD (même boîte, même classe) :
-      // aucun décalage de mise en page, aucune seconde peinture de la bande.
-      // La règle de ce remplacement vit dans `utils/preuveSociale.js`, et
-      // elle n'invente jamais de repli chiffré.
-      { labelKey: 'measuredWorkers', fallback: '—', shellText: '—', icone: 'client' },
-      { labelKey: 'measuredCompletedJobs', fallback: '—', shellText: '—', icone: 'step3' },
-      { labelKey: 'measuredReviews', fallback: '—', shellText: '—', icone: 'check' },
     ],
     // Le bloc « séquestre » de l'accueil ouvre sur un glyphe que la page
     // (src/pages/Home.js) et sa coquille publiaient chacune en littéral — le

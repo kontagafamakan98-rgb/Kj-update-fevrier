@@ -115,6 +115,12 @@ import { PAGE_META } from '../src/config/page-meta.js';
 import { NOM_DU_GABARIT_APP } from '../vite-plugins/prerender/app-template.js';
 import { NOM_DE_LA_PAGE_404 } from '../vite-plugins/prerender/not-found.js';
 
+// Un ZÉRO publié comme preuve sociale : « 0 », « 0,0 », « 0 % » — la forme
+// seule, jamais un chiffre qui CONTIENT un zéro (« 10 », « 7j/7 »).
+// Partagée avec la bande de faits (voir 1ter-bis) : c'est la même règle qui
+// interdit à la coquille et à React de publier un compteur vide.
+const ZERO_PUBLIE = /^0([.,]\s?0+)?\s*(\+|%|\/7)?$/;
+
 // ── L'ALIGNEMENT NE SE CENTRE PLUS PAR HÉRITAGE : c'est la refonte ──────────
 // `.App { text-align: center }` a été RETIRÉE de src/App.css le 25/09/2026 : le
 // site est aligné à gauche par défaut, et chaque bloc qui doit être centré le
@@ -216,6 +222,53 @@ if (index) {
       `index.html : le bloc social est publié sans son titre « ${fr.homeContactFollow} » ` +
         '(texte déclaré dans le dictionnaire global)'
     );
+  }
+}
+
+// 1ter-bis. index.html : la BANDE DE FAITS du héros ne publie aucun compteur.
+//
+// Mesuré le 26/10/2026 : la bande portait « 3 travailleurs · 0 mission
+// terminée · 0 avis », et les deux zéros étaient peints par la coquille comme
+// par React. Un zéro publié au seuil d'un accueil qui vend la confiance ne
+// mesure pas la plateforme, il la décrit comme vide — et un compteur lu au
+// runtime ne peut pas être peint au BUILD, donc il ne pouvait que mentir d'un
+// côté ou diverger de l'autre.
+//
+// Ce garde tient les deux moitiés : une entrée dont la valeur est un ZÉRO est
+// refusée (le prochain qui réintroduit un compteur rougit ici, pas dans six
+// mois), et chaque fait DÉCLARÉ doit être réellement peint dans l'artefact —
+// sinon la liste et la coquille peuvent diverger en silence.
+if (index) {
+  const declarees = (PAGE_SECTIONS['/'].stats || []).map((fait) => ({ ...fait }));
+  // Les VALEURS PEINTES, lues dans l'artefact servi : le garde juge la coquille
+  // (ce qu'un crawler reçoit), pas seulement l'intention du plan. Une entrée
+  // ajoutée à la liste sans être peinte est donc vue, et un zéro posé dans le
+  // HTML est refusé même si le plan, lui, reste propre.
+  const figures = [...index.matchAll(/<span class="fait-cta-figure">[^]*?<\/svg>([^<]*)<\/span>/g)]
+    .map((occurrence) => occurrence[1].replace(/\s+/g, ' ').trim());
+
+  if (figures.length < 2) {
+    errors.push(
+      `index.html : la bande de faits du héros ne peint que ${figures.length} valeur(s) — ` +
+        'sous le plancher de 2, ce garde ne prouverait plus rien (la bande a été amputée)'
+    );
+  }
+  for (const valeur of figures) {
+    if (ZERO_PUBLIE.test(valeur)) {
+      errors.push(
+        `index.html : la bande de faits du héros publie « ${valeur} » — un ZÉRO présenté ` +
+          'comme preuve sociale est refusé (règle du 26/10/2026 : la bande ne publie que des faits vérifiables, ' +
+          'les chiffres de volume vivent dans le tableau de bord et /metrics)'
+      );
+    }
+  }
+  for (const fait of declarees) {
+    if (!figures.includes(String(fait.shellText))) {
+      errors.push(
+        `index.html : le fait « ${fait.labelKey} » est déclaré « ${fait.shellText} » mais ` +
+          'la coquille ne le peint pas (icône puis valeur) — la liste et la coquille ont divergé'
+      );
+    }
   }
 }
 

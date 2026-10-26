@@ -5,11 +5,8 @@
 // sans le raccord que le chrome avait déjà. Le composant se comporte comme le
 // `Link` d'origine (mêmes propriétés, même `<a href>` réel pour un crawler et
 // pour « ouvrir dans un nouvel onglet »).
-import { useEffect, useState } from 'react';
 import { IconePage } from '../config/page-icons';
 import Link from '../components/LienVue';
-import { publicAPI } from '../services/apiEndpoints';
-import { valeurDePreuve } from '../utils/preuveSociale';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { getAllCountries } from '../components/CountryDisplay';
@@ -39,29 +36,19 @@ const ICONE_DE_CONTACT = Object.fromEntries(
 );
 
 export default function Home() {
-  const { t, currentLanguage } = useLanguage();
+  const { t } = useLanguage();
   const { user } = useAuth();
   usePageMeta();
 
-  // ── LA PREUVE SOCIALE EST MESURÉE, PAS DÉCORÉE (22/10/2026) ──────────────
-  // La bande de faits du héros porte trois entrées dont la valeur publiée est
-  // « — » : la coquille pré-rendue ne peut pas appeler l'API au build, donc
-  // elle publie « pas mesuré ici » plutôt qu'un chiffre figé. Ce `useEffect`
-  // lit `GET /api/public/stats` après le montage et remplace le tiret DANS LE
-  // MÊME NŒUD (`valeurDePreuve`, `utils/preuveSociale.js`) : aucune entrée
-  // ajoutée ou retirée après peinture, donc aucun décalage de mise en page.
-  //
-  // Un échec n'est pas une erreur d'écran : la bande garde ses tirets (un
-  // chiffre absent reste absent), et rien n'est journalisé comme une panne —
-  // ce n'est qu'un ornement de la landing, la page fonctionne sans lui.
-  const [mesuresPubliques, setMesuresPubliques] = useState(null);
-  useEffect(() => {
-    let monte = true;
-    publicAPI.getStats()
-      .then((r) => monte && setMesuresPubliques(r && typeof r === 'object' ? r : null))
-      .catch(() => monte && setMesuresPubliques(null));
-    return () => { monte = false; };
-  }, []);
+  // ── LA BANDE DE FAITS NE PUBLIE PLUS DE VOLUME (26/10/2026) ─────────────
+  // Elle a lu `GET /api/public/stats` du 22/10 au 26/10 et remplaçait un tiret
+  // par le compteur mesuré : sur une plateforme sans mission, cela affichait
+  // « 0 mission terminée · 0 avis » au seuil d'une page qui vend la confiance.
+  // Les deux faits qui restent sont VÉRIFIABLES et ne dépendent d'aucune
+  // donnée (pays couverts, support 7j/7), donc l'accueil ne fait plus cette
+  // requête du tout : ni compteur à zéro, ni aller-retour pour un ornement.
+  // Les chiffres de volume se lisent dans le tableau de bord propriétaire et
+  // dans `GET /metrics`.
 
   // Catégories, promesses, étapes et chiffres : lus dans la déclaration du
   // corps de la page (src/config/page-sections.js) — la MÊME que le build
@@ -583,10 +570,10 @@ export default function Home() {
               <div key={stat.labelKey} className={faitClass}>
                 <span className={faitFigureClass}>
                   <IconePage nom={stat.icone} role="heros" />
-                  {/* La valeur se LIT dans la règle (`utils/preuveSociale.js`) :
-                      mesure formatée quand elle existe, texte déclaré sinon —
-                      et JAMAIS un repli chiffré inventé. */}
-                  {valeurDePreuve(stat, mesuresPubliques, currentLanguage)}
+                  {/* La valeur est le texte DÉCLARÉ du plan : aucune donnée
+                      lue au runtime, donc aucun zéro à afficher et aucun
+                      décalage de mise en page après le montage. */}
+                  {stat.fallback}
                 </span>
                 <span className={faitLibelleClass}>{t(stat.labelKey)}</span>
               </div>

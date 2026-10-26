@@ -146,6 +146,46 @@ describe('accueil — SEO local (carte intégrée + lien Google Maps)', () => {
     }
   });
 
+  /**
+   * ── LA BANDE DE FAITS NE PUBLIE AUCUN COMPTEUR (26/10/2026) ─────────────
+   *
+   * Mesuré en production : la bande du héros affichait « 3 travailleurs ·
+   * 0 mission terminée · 0 avis ». La doctrine d'alors — « un zéro publié est
+   * une mesure » — est juste dans un tableau de bord et fausse au seuil d'un
+   * accueil qui vend la confiance : deux zéros alignés ne mesurent pas la
+   * plateforme, ils la décrivent comme vide.
+   *
+   * Les deux faits qui restent sont déclarés dans le plan et ne dépendent
+   * d'AUCUNE donnée : la valeur peinte est donc exactement celle du plan, ce
+   * qui interdit à la fois le compteur à zéro et le remplacement après
+   * montage (celui-ci déplaçait la bande).
+   */
+  it('la bande de faits ne publie que les faits DÉCLARÉS — aucun compteur, aucun zéro', () => {
+    const { container } = rendreLAccueil();
+
+    const figures = [...container.querySelectorAll('.fait-cta-figure')];
+    const declarees = PAGE_SECTIONS['/'].stats;
+
+    expect(
+      declarees.length,
+      'la bande doit garder un plancher de faits : un garde qui ne lit rien ne prouve rien'
+    ).toBeGreaterThanOrEqual(2);
+    expect(
+      figures.length,
+      `${figures.length} fait(s) peint(s) pour ${declarees.length} déclaré(s) — la bande a divergé de son plan`
+    ).toBe(declarees.length);
+
+    const peintes = figures.map((figure) => figure.textContent.replace(/\s+/g, ' ').trim());
+    expect(peintes).toEqual(declarees.map((stat) => stat.fallback));
+
+    for (const valeur of peintes) {
+      expect(
+        /^0([.,]\s?0+)?\s*(\+|%|\/7)?$/.test(valeur),
+        `« ${valeur} » est un compteur à zéro publié comme preuve sociale`
+      ).toBe(false);
+    }
+  });
+
   it('garde les moyens de contact cliquables (tel:, mailto:, wa.me)', () => {
     rendreLAccueil();
 

@@ -57,7 +57,13 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { API_ORIGIN, SITE_ORIGIN } from './site-meta.js';
 
-/** Appel public que l'accueil fait réellement (`getStats`), avec préflight. */
+/**
+ * Appel public de l'API, avec préflight : n'importe quelle route PUBLIÉE sert de
+ * sujet à cette paire. `/public/stats` l'était parce que l'accueil la lisait ;
+ * l'accueil ne lit plus de compteur depuis le 26/10/2026 (bande de faits
+ * éditoriale), et la route reste un sujet valide — c'est la PAIRE CORS qui est
+ * mesurée ici, pas l'usage qu'en fait une page.
+ */
 export const PROBE_PATH = '/api/public/stats';
 
 /** En-tête envoyé par le client sur ce GET : c'est lui qui force le préflight. */

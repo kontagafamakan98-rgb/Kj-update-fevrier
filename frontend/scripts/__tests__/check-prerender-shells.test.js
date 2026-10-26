@@ -167,12 +167,23 @@ const TETE_SHELL = '<!doctype html><html><head><style>.App{display:block}</style
 /** La fermeture du chrome, ÉCRITE DEPUIS SA SOURCE (jamais recopiée). */
 const FIN_DE_PAGE = CHROME_FERMETURE + FERMETURE_DE_L_APPLICATION;
 
+/**
+ * La BANDE DE FAITS du héros, matérialisée depuis le PLAN : le garde exige que
+ * chaque fait déclaré soit peint à sa place (icône puis valeur), et refuse un
+ * zéro. Écrire ces deux valeurs ici les aurait fait diverger du plan au premier
+ * changement — c'est exactement ce que le garde reproche à la coquille.
+ */
+const BANDE_DE_FAITS = PAGE_SECTIONS['/'].stats
+  .map(({ shellText }) => `<span class="fait-cta-figure"><svg></svg>${shellText}</span>`)
+  .join('');
+
 /** HTML minimal mais CONFORME à chaque attente du garde. */
 const pages = () => ({
   'index.html':
     TETE_SHELL +
     ogTagFor('index.html') +
     `</head><body><div id="root">${CHROME_OUVERTURE}<h1>Kojo</h1><p>Contenu statique de l${APOSTROPHE_PUBLIEE}accueil</p>` +
+    BANDE_DE_FAITS +
     '<a href="/jobs">Emplois</a>' +
     `<h2>${fr.contactTitle}</h2><p>${fr.homeContactText}</p>` +
     `<div>${fr.homeContactCall}</div><div>${fr.contactWhatsapp}</div>` +
@@ -585,6 +596,32 @@ describe('check-prerender-shells — chaque refus sait mordre', () => {
         html['index.html'] = html['index.html'].replace(fr.homeContactCall, '');
       },
       attendu: 'absent de la coquille (section contact / pied de page)',
+    },
+    {
+      // Le défaut mesuré le 26/10/2026 : la bande de faits publiait « 0 mission
+      // terminée · 0 avis ». Le compteur revenait par le RUNTIME ; ici il est
+      // posé dans l'artefact, exactement là où le garde doit le voir — un zéro
+      // peint par la coquille est un zéro servi à un crawler.
+      nom: 'bande de faits du héros publiant un compteur à zéro',
+      mutate: ({ html }) => {
+        const premier = PAGE_SECTIONS['/'].stats[0].shellText;
+        html['index.html'] = html['index.html'].replace(
+          `</svg>${premier}</span>`,
+          '</svg>0</span>'
+        );
+      },
+      attendu: 'ZÉRO présenté comme preuve sociale',
+    },
+    {
+      nom: 'bande de faits du héros amputée (un fait déclaré n’est plus peint)',
+      mutate: ({ html }) => {
+        const dernier = PAGE_SECTIONS['/'].stats.at(-1);
+        html['index.html'] = html['index.html'].replace(
+          `</svg>${dernier.shellText}</span>`,
+          '</svg>—</span>'
+        );
+      },
+      attendu: 'la coquille ne le peint pas',
     },
     {
       // La page et la coquille lisent le MÊME dictionnaire : si la coquille
