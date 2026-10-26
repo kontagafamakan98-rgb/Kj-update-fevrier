@@ -572,7 +572,7 @@ export default function Register() {
             
             <div className="flex flex-wrap items-center justify-center gap-3 pb-1 text-xs sm:text-sm">
               <div className="flex items-center">
-                <div className="w-6 h-6 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-medium">
+                <div className="w-6 h-6 bg-orange-700 text-white rounded-full flex items-center justify-center text-xs font-medium">
                   {t(pagePlan.step1NumberKey)}
                 </div>
                 <span className="ml-2 text-orange-600 font-medium whitespace-nowrap">{t(pagePlan.step1TitleKey)}</span>

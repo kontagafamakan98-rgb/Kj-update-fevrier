@@ -33,7 +33,9 @@
  * Aucune géométrie (hauteur de barre, rupture mobile) : c'est
  * `e2e/barres-rupture.spec.js`. Il ne mesure pas non plus le texte des menus
  * déroulants qui ne sont pas ouverts ici (langue, notifications) : ils ont
- * leurs propres composants et leurs propres mesures.
+ * leurs propres composants et leurs propres mesures. Les boutons PLEINS du
+ * reste du site sont jugés par `src/__tests__/boutons-pleins.test.js`, qui
+ * balaie tout `src/`.
  */
 import React from 'react';
 import fs from 'node:fs';
@@ -340,30 +342,22 @@ describe('navbar — lisibilité sur le verre', () => {
 
   // Les deux tiroirs sont mesurés : celui d'un visiteur (les entrées publiques)
   // et celui d'un compte connecté (le sien, plus court mais plus utilisé).
+  //
+  // L'APPEL À L'ACTION n'est plus écarté (26/10/2026) : son fond plein est passé
+  // de `orange-600` à `orange-700`, donc blanc sur ce fond vaut 5,18:1 et il
+  // entre dans la mesure comme les autres. Un bouton qu'on n'avait le droit de
+  // mesurer que pour dire qu'il échouait est un bouton qu'on finit par oublier.
   it.each([
-    ['un VISITEUR', null, 6, 1],
-    ['un compte CONNECTÉ', { id: 'u1', email: 'a@b.c', email_verified: true }, 5, 0],
-  ])('les entrées du TIROIR mobile d’%s tiennent 4,5:1, sur leur fond', (_cas, compte, plancher, actionsAttendues) => {
+    ['un VISITEUR', null, 7],
+    ['un compte CONNECTÉ', { id: 'u1', email: 'a@b.c', email_verified: true }, 5],
+  ])('les entrées du TIROIR mobile d’%s tiennent 4,5:1, sur leur fond', (_cas, compte, plancher) => {
     const nav = monter(compte);
     ouvrirLeTiroir(nav);
 
-    const entrees = liensDuTiroir(nav);
-    // L'APPEL À L'ACTION du tiroir (inscription d'un visiteur, déconnexion d'un
-    // compte — ce dernier est un `<button>`, donc absent de cette liste) n'est
-    // pas une entrée de navigation : son encre blanche est posée sur son PROPRE
-    // fond plein (`bg-orange-600`), pas sur la barre. Il est donc écarté — et le
-    // fait est dit, pas tu : blanc sur `orange-600` vaut 3,56:1, et c'est le
-    // même jeton qu'une trentaine de boutons du site (une décision de la charte,
-    // pas de cette barre). Ce qui se mesure ici, c'est la navigation.
-    const liens = entrees.filter((lien) => !classes(lien).includes('text-white'));
-    const actions = entrees.filter((lien) => classes(lien).includes('text-white'));
-    expect(
-      actions.length,
-      `le tiroir porte ${actions.length} appel(s) à l’action au lieu de ${actionsAttendues} : la mesure ne sait plus ce qu’elle écarte`
-    ).toBe(actionsAttendues);
+    const liens = liensDuTiroir(nav);
     expect(
       liens.length,
-      `le tiroir mobile ne peint que ${liens.length} entrée(s) de navigation — il en porte ${plancher} ou plus`
+      `le tiroir mobile ne peint que ${liens.length} entrée(s) — il en porte ${plancher} ou plus`
     ).toBeGreaterThanOrEqual(plancher);
 
     for (const lien of liens) {

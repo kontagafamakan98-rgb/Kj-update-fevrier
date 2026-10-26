@@ -243,7 +243,7 @@ const pages = () => ({
     '</head><body><div id="root">' + CHROME_OUVERTURE +
     '<h1 class="mt-6 text-3xl font-bold text-stone-900">Mot de passe oublié</h1>' +
     '<input id="reset-email" />' +
-    '<div class="bg-orange-600 px-4 py-2 text-sm font-semibold text-white">Envoyer le code</div>' +
+    '<div class="bg-orange-700 px-4 py-2 text-sm font-semibold text-white">Envoyer le code</div>' +
     FIN_DE_PAGE +
     '</div>' +
     preload('ForgotPassword') +

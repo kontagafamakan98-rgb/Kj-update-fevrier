@@ -157,7 +157,7 @@ const RegistrationLanguageSelector = ({
                 
                 {/* Badge sélection */}
                 {isSelected && (
-                  <div className="absolute -top-2 -right-2 bg-orange-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
+                  <div className="absolute -top-2 -right-2 bg-orange-700 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
                     ✓
                   </div>
                 )}

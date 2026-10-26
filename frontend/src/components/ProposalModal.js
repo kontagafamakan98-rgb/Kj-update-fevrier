@@ -231,7 +231,7 @@ export default function ProposalModal({ job, onClose, onProposalSubmitted }) {
             <button type="button" onClick={onClose} className="rounded-xl border border-gray-200 px-5 py-3 font-semibold text-gray-700 hover:bg-gray-50">
               {t('jobUiCancel')}
             </button>
-            <button type="submit" disabled={loading} className="rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white hover:bg-orange-700 disabled:opacity-60">
+            <button type="submit" disabled={loading} className="rounded-xl bg-orange-700 px-5 py-3 font-semibold text-white hover:bg-orange-800 disabled:opacity-60">
               {loading ? t('jobUiSending') : t('jobUiSubmitProposal')}
             </button>
           </div>
