@@ -56,8 +56,7 @@ export const EVENEMENTS_FUNNEL = Object.freeze({
   paiementLance: 'begin_checkout',
   // Hors entonnoir d'inscription, mais même règle : le partage d'une mission
   // est ce qui fait entrer du trafic par le canal réel du marché (WhatsApp).
-  partageMission: 'job_shared',
-});
+  partageMission: 'job_shared',});
 
 // Marqueur de validation : une clé dont la valeur est une ÉNUMÉRATION porte son
 // tableau ; un booléen porte ce marqueur explicite.
@@ -83,8 +82,7 @@ export const CLES_FUNNEL = Object.freeze({
   // Un code de parrainage a-t-il été appliqué ? Un booléen, jamais le code.
   has_referral: BOOLEEN,
   // Par où le partage est parti : la feuille du système ou `wa.me`.
-  channel: Object.freeze(['whatsapp', 'natif']),
-});
+  channel: Object.freeze(['whatsapp', 'natif']),});
 
 /** Les noms d'événements déclarés, pour le refus des noms inconnus. */
 const NOMS_DECLARES = new Set(Object.values(EVENEMENTS_FUNNEL));

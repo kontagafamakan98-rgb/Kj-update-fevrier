@@ -76,6 +76,14 @@
       "runner": "vitest"
     },
     {
+      "chemin": "frontend/scripts/check-funnel-events.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-funnel-events.test.js",
+      "runner": "vitest",
+      "motif": "le funnel GA n'est tenu que si l'envoi passe par la liste blanche : `utils/funnel.js` FILTRE à l'exécution, mais un `gtag('event', …)` écrit directement dans une page contourne le filtre, une clé mal orthographiée est écartée sans que personne ne le voie, et une étape DÉCLARÉE que plus aucune page n'émet se lit comme mesurée alors qu'elle n'existe plus. Le garde lit les imports dans l'ARBRE SYNTAXIQUE (pas par expression régulière : `trackFunnel(` cité en commentaire n'est pas un appel) et refuse ces trois écarts, plus des paramètres non littéraux (`spread` ou clé calculée : une clé illisible peut porter un email), plus un SECOND propriétaire d'un événement hors funnel (seule exception déclarée : `page_view` dans `utils/analytics.js`, qui n'est pas une étape). Il refuse aussi de conclure sous ses planchers de lecture (150 fichiers, 5 appels) : un balayage cassé rendrait tous ses refus muets en rendant son périmètre vide, et ça passerait pour un vert. Il ne lit que `src/`, donc il passe AVANT le build. Preuve d'échec : les cas de `frontend/scripts/__tests__/check-funnel-events.test.js` injectent chaque écart dans des sources synthétiques, et le CLI réel est exécuté en sous-processus pour vérifier qu'il publie ses étapes et sort en 0 sur l'arbre sain."
+    },
+    {
       "chemin": "frontend/scripts/check-formulaire-differe.js",
       "role": "garde",
       "invoque_par": "ci",
@@ -1185,6 +1193,26 @@
     }
   ],
   "mutations": [
+    {
+      "id": "funnel: etape declaree sans emetteur toleree",
+      "garde": "frontend/scripts/check-funnel-events.js",
+      "cible": "frontend/scripts/check-funnel-events.js",
+      "trouve": "    if ((emetteurs.get(nom) || 0) === 0) {",
+      "remplace": "    if (false && (emetteurs.get(nom) || 0) === 0) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-funnel-events.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-funnel-events.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "SANS AUCUN ÉMETTEUR"
+      ]
+    },
     {
       "id": "api-split: fuite d'un groupe lazy toleree",
       "garde": "frontend/scripts/check-api-split.js",

@@ -63,6 +63,14 @@ L'endpoint est **hors `/api`** (comme `/monitor`, `/health`) : il se scrape
 directement sur l'hôte du backend, pas à travers le proxy Vercel (`/api/:path*`).
 Prometheus n'a pas de cookie de session : le jeton porteur est la seule preuve.
 
+La configuration ci-dessous est aussi un FICHIER exécutable,
+[`backend/metrics/prometheus.yml`](metrics/prometheus.yml) : c'est lui qu'on
+monte sur l'hôte qui collecte (`prometheus --config.file=…`), et
+`backend/tests/test_metrics_scrape_config.py` refuse que ce fichier et ce bloc
+ne disent plus la même chose — deux déclarations de la même collecte
+finiraient par diverger, et Prometheus collecterait un objet que personne n'a
+mesuré.
+
 ```yaml
 scrape_configs:
   - job_name: kojo-api

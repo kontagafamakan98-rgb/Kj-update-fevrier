@@ -64,8 +64,13 @@ describe('trackFunnel — rien ne sort sans être déclaré', () => {
       email: 'quelquun@example.com',
       name: 'Fatoumata Traoré',
       job_id: 'job-42',
-      proposal_id: 'p-7',
-    });
+      // Un identifiant de FIXTURE, pas un jeton de classe : le scanneur de
+      // Tailwind lit le TEXTE BRUT (commentaires compris) et générerait
+      // l'utilitaire de padding correspondant, la feuille servie porterait
+      // alors une règle sans porteur (`check-css-selecteurs-morts` refusait le
+      // build pour une chaîne de test). D'où un tiret de moins qu'un utilitaire
+      // ne saurait lire.
+      proposal_id: 'prop42',    });
 
     // Un seul envoi, et il ne porte QUE la clé déclarée.
     expect(envois(gtag)).toHaveLength(1);
@@ -138,8 +143,7 @@ describe('la déclaration elle-même', () => {
     // Cinq étapes d'ENTONNOIR, plus `job_shared` — le partage d'une mission,
     // hors entonnoir mais soumis à la même liste blanche (le canal seul sort).
     expect(NOMS_DECLARES).toHaveLength(6);
-    expect(new Set(NOMS_DECLARES).size).toBe(6);
-    for (const nom of NOMS_DECLARES) {
+    expect(new Set(NOMS_DECLARES).size).toBe(6);    for (const nom of NOMS_DECLARES) {
       // Un nom GA4 : minuscules, chiffres et `_`, commençant par une lettre.
       expect(nom, `« ${nom} » n'est pas un nom d'événement GA4`).toMatch(/^[a-z][a-z0-9_]{2,39}$/);
     }
@@ -159,7 +163,6 @@ describe('la déclaration elle-même', () => {
     expect(EVENEMENTS_FUNNEL.partageMission).toBe('job_shared');
     expect(CLES_FUNNEL.channel).toEqual(['whatsapp', 'natif']);
   });
-
   it('donne à chaque clé une règle de validation bornée', () => {
     for (const [cle, regle] of Object.entries(CLES_FUNNEL)) {
       const bornee = Array.isArray(regle) ? regle.length > 0 : regle === 'booleen';

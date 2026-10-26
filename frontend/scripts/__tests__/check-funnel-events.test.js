@@ -43,8 +43,7 @@ const SANS_PLANCHERS = Object.freeze({ fichiers: 1, appels: 1 });
  * La fixture suit la déclaration : une étape ajoutée à `EVENEMENTS_FUNNEL`
  * sans émetteur ici ferait échouer les cas qui n'en parlent pas, en nommant
  * l'étape manquante — c'est le garde qui a raison, pas la fixture.
- */
-const SOURCE_CONFORME = `
+ */const SOURCE_CONFORME = `
 import { EVENEMENTS_FUNNEL, trackFunnel } from '../utils/funnel';
 
 export const a = () => trackFunnel(EVENEMENTS_FUNNEL.inscription, { user_type: 'client' });
@@ -55,8 +54,7 @@ export const e = () => trackFunnel(EVENEMENTS_FUNNEL.paiementLance, { payment_me
 export const f = () => trackFunnel(EVENEMENTS_FUNNEL.partageMission, { channel: 'whatsapp' });
 `;
 
-/** Les sources conformes, une page qui porte toutes les étapes déclarées. */
-const sources = (extras = {}) => ({ 'pages/Probe.js': SOURCE_CONFORME, ...extras });
+/** Les sources conformes, une page qui porte toutes les étapes déclarées. */const sources = (extras = {}) => ({ 'pages/Probe.js': SOURCE_CONFORME, ...extras });
 
 const refusDe = (sourcesJugees, options = {}) =>
   auditerSources(sourcesJugees, { planchers: SANS_PLANCHERS, ...options }).refus.join('\n');
