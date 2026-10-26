@@ -4,7 +4,19 @@
 import { PHONE_PREFIX_FALLBACK, phoneNumberExample } from '../../src/config/phone-format.js'
 import { COUNTRY_PLACEHOLDER } from '../../src/config/country-placeholder.js'
 import { photoFormatsLine } from '../../src/config/photo-formats.js'
-import { svgDeLIcone, svgDeLaMarque } from './icons-serveur.js'
+import { svgDeLIcone, svgDeLaMarque, svgDuDrapeau } from './icons-serveur.js'
+import { LANGUAGES } from '../../src/config/languages.js'
+import { nomDuDrapeau, classeDuDrapeau } from '../../src/config/flags.js'
+
+// L'ordre par défaut du sélecteur de langue (sans pays connu) : les deux
+// premières langues du registre — la MÊME source que la page
+// (`src/components/RegistrationLanguageSelector.js`), donc deux canaux ne
+// peuvent pas publier deux listes différentes.
+const LANGUES_PAR_DEFAUT = LANGUAGES.slice(0, 2)
+
+// Les notes du bloc « À propos de votre sélection », publiées par la page et par
+// la coquille : l'ORDRE est celui du rendu, les phrases sont des clés.
+const LANGUES_NOTES = ['interfaceWillChangeNote', 'languageOnProfile', 'clientsCanSee', 'canModifyLater']
 
 // Le TEXTE vient du dictionnaire global (T), des dictionnaires de page
 // (registerT/jobsT) et des configs partagées avec les pages (préfixe et
@@ -262,11 +274,15 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, pageSectio
       // détecté » ne déplace plus les pastilles ni le formulaire. Le
       // `border-transparent` garde l'aspect d'origine (pas de cadre pendant
       // l'attente) tout en occupant la même place qu'un état final encadré.
-      + `<div class="${registerPlan.geoStatusBoxClass} border-transparent">`
-      + `<div class="flex items-center justify-center py-2">`
-      + `<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-500 mr-2"></div>`
-      + `<span class="text-xs text-blue-700">${esc(T('detectingLocation'))}</span>`
-      + `</div>`
+      + `<div class="${registerPlan.geoStatusBoxClass} bg-yellow-50 border-yellow-200">`
+      + `<p class="text-xs text-yellow-700">${esc(registerT('positionNotDetected'))}</p>`
+      // Le bouton n'agit pas sans JavaScript, et la coquille ne prétend pas le
+      // contraire : il est `disabled`. Ce qu'elle publie est l'ÉTAT FINAL de la
+      // page (`positionNotDetected`), parce que c'est celui qu'un visiteur sans
+      // script peut lire — peindre un « Détection en cours » qui ne finira
+      // jamais serait une promesse que cette page ne peut pas tenir, et un
+      // premier rendu différent de la coquille se déplace à l'hydratation.
+      + `<button type="button" disabled class="mt-2 inline-flex items-center gap-2 rounded-lg border border-stone-300 fond-papier px-3 py-2 text-xs font-semibold text-stone-700 transition-colors hover:border-orange-500 hover:text-orange-700 disabled:opacity-60">${esc(T('useMyPosition'))}</button>`
       + `</div>`
       + `<div class="flex flex-wrap items-center justify-center gap-3 pb-1 text-xs sm:text-sm">`
       + `<div class="flex items-center">`
@@ -375,16 +391,65 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, pageSectio
       // langue, 232 px plus bas) remontait au montage de React. Le rang de la
       // liste est de la PONCTUATION (`• `), qui n'appartient à aucun plan.
       + `<div class="mt-4 rounded-[3px] border border-orange-200 bg-orange-50 p-3">`
-      + `<h4 class="mb-1 font-medium text-orange-900">${svgDeLIcone(registerPlan.photoTipsIcon, 'notice')} ${esc(registerT(registerPlan.photoTipsTitleKey))}</h4>`
+      + `<h3 class="mb-1 font-medium text-orange-900">${svgDeLIcone(registerPlan.photoTipsIcon, 'notice')} ${esc(registerT(registerPlan.photoTipsTitleKey))}</h3>`
       + `<ul class="space-y-1 text-xs text-orange-800">`
       + registerPlan.photoTipsKeys.map((cle) => `<li>• ${esc(registerT(cle))}</li>`).join('')
       + `</ul>`
       + `</div>`
       + `</div>`
-      + `<div class="bg-gray-50 border border-gray-200 rounded-lg p-6">`
-      + `<div class="flex items-center justify-center">`
-      + `<div class="animate-spin rounded-full h-5 w-5 border-b-2 border-orange-500 mr-3"></div>`
-      + `<span class="text-gray-600">${esc(registerT('detectingLanguage'))}</span>`
+      // Le CONTRÔLE DE LANGUE, dans son état FINAL et sans pays connu : c'est
+      // exactement ce que React peint au premier rendu (les deux langues par
+      // défaut). La coquille peignait un « Détection de votre langue… » que
+      // React ne peint plus une fois la détection aboutie — et sans JavaScript,
+      // cette détection n'a jamais lieu : c'était une attente qui ne finissait
+      // pas, dont la hauteur ne correspondait à rien.
+      + `<div class="bg-gradient-to-r from-orange-50 to-yellow-50 border border-orange-200 rounded-lg p-6">`
+      + `<div class="flex items-center mb-4">`
+      + `<h2 class="text-lg font-semibold text-orange-900">${esc(T('choosePreferredLanguage'))}</h2>`
+      + `</div>`
+      + `<div>`
+      + `<p class="text-sm text-gray-700 mb-3"><strong>${esc(T('languageNote'))}</strong> ${esc(T('interfaceWillChange'))}</p>`
+      + `<div class="grid grid-cols-2 md:grid-cols-4 gap-3">`
+      // La PREMIÈRE langue est celle de l'interface, donc la langue SÉLECTIONNÉE :
+      // React la peint `border-orange-500 bg-orange-100 shadow-md` et la coquille
+      // doit porter la même classe — sinon le bouton change d'aspect à
+      // l'hydratation (garde `e2e/classes-coquille-react.spec.js`).
+      + LANGUES_PAR_DEFAUT.map(
+        (langue, rang) =>
+          `<button type="button" class="relative p-4 border-2 rounded-lg transition-all hover:scale-105 ${
+            rang === 0 ? 'border-orange-500 bg-orange-100 shadow-md' : 'border-gray-300 bg-white hover:border-gray-400'
+          }">`
+          + `<div class="text-center">`
+          + `<div class="flex justify-center mb-2">${svgDuDrapeau(nomDuDrapeau(langue.code), classeDuDrapeau('w-8 h-6'))}</div>`
+          + `<div class="font-medium text-gray-900 text-sm">${esc(langue.name)}</div>`
+          + `<div class="text-xs text-gray-600 mt-1">${esc(langue.nativeName)}</div>`
+          + `</div>`
+          + `</button>`
+      ).join('')
+      + `</div>`
+      + `</div>`
+      // La langue SÉLECTIONNÉE (celle de l'interface) : React la peint toujours,
+      // donc la coquille la peint aussi — c'est un bloc de plus, et sans lui
+      // tout ce qui suit (l'information légale, l'envoi, le lien) remontait à
+      // l'hydratation.
+      + `<div class="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">`
+      + `<div class="flex items-center">`
+      + `<span class="text-green-500 text-lg mr-2">✓</span>`
+      + `<div>`
+      + `<p class="text-sm font-medium text-green-800">${esc(T('selectedLanguage'))} : <span class="inline-flex items-center gap-2">${svgDuDrapeau(nomDuDrapeau(LANGUES_PAR_DEFAUT[0].code), classeDuDrapeau('w-5 h-4'))}<span>${esc(LANGUES_PAR_DEFAUT[0].name)}</span></span></p>`
+      + `<p class="text-xs text-green-700">${esc(T('interfaceAndProfileUpdated'))}</p>`
+      + `</div>`
+      + `</div>`
+      + `</div>`
+      + `<div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">`
+      + `<div class="flex items-start">`
+      + `<div class="text-xs text-yellow-800">`
+      + `<p class="font-medium mb-1">${esc(T('aboutSelection'))}</p>`
+      + `<ul class="space-y-1">`
+      + LANGUES_NOTES.map((cle) => `<li>• ${esc(T(cle))}</li>`).join('')
+      + `</ul>`
+      + `</div>`
+      + `</div>`
       + `</div>`
       + `</div>`
       + `<div class="bloc-differe-legal rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-3">`

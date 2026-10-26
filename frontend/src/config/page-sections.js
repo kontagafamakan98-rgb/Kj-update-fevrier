@@ -860,10 +860,13 @@ export const PAGE_SECTIONS = {
     boutonClass: 'relative bouton bouton-encre w-full',
     titleKey: 'title',
     subtitleKey: 'subtitle',
-    detectingLocationKey: 'detectingLocation',
+    // L'état d'ATTENTE (« Détection de votre position… ») n'est plus publié
+    // (26/10/2026) : sans JavaScript la coquille ne peut pas le faire aboutir,
+    // et un premier rendu qui diffère d'elle se déplace à l'hydratation.
     // ── La hauteur RÉSERVÉE du bloc d'état de géolocalisation ───────────────
-    // Les trois états ont des hauteurs NATURELLES différentes (mesuré à 412 ET
-    // 1350 px : 32 / 42,5 / 16 px de contenu) et le bloc des états FINAUX
+    // Les deux états ont des hauteurs NATURELLES différentes (mesuré à 412 ET
+    // 1350 px : 42,5 px pour « pays détecté », et l'état « position non
+    // détectée » qui porte désormais le bouton) et le bloc des états FINAUX
     // portait en plus un `mb-3` (12 px) que l'état de chargement n'avait pas :
     // quand la détection se terminait, les pastilles d'étape et tout le
     // formulaire descendaient de 14 px — CLS 0,0088 sur /register mobile et
@@ -953,7 +956,6 @@ export const PAGE_SECTIONS = {
     addProfilePhotoKey: 'addProfilePhoto',
     clickToChooseOptionKey: 'clickToChooseOption',
     upToKey: 'upTo',
-    detectingLanguageKey: 'detectingLanguage',
     legalNoticeTitleKey: 'legalNoticeTitle',
     legalConsentHelpKey: 'legalConsentHelp',
     legalConsentLinkKey: 'legalConsentLink',

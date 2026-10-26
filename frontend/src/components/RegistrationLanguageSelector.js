@@ -10,7 +10,7 @@ import {
 import { useLanguage } from '../contexts/LanguageContext';
 import { normalizeCountryCode } from '../utils/pack2PageI18n/core';
 import FlagIcon from './FlagIcon';
-import { Languages, Lightbulb, MapPin, Info } from 'lucide-react';
+import { Lightbulb, MapPin } from 'lucide-react';
 
 const COUNTRY_PREFERENCE_KEYS = {
   mali: 'maliLanguagePreference',
@@ -19,6 +19,13 @@ const COUNTRY_PREFERENCE_KEYS = {
   ivory_coast: 'ivoryCoastLanguagePreference',
   cote_divoire: 'ivoryCoastLanguagePreference'
 };
+
+// L'ORDRE PAR DÉFAUT, sans pays connu : les deux langues de l'interface. Il est
+// ici — et pas dans un état initial vide (26/10/2026) — parce que la coquille
+// pré-rendue peint la grille SANS JavaScript : un premier rendu à grille vide
+// puis remplie par un effet faisait grandir le bloc d'une rangée à l'hydratation,
+// et le garde `e2e/texte-coquille-react.spec.js` refusait cette divergence.
+const LANGUES_PAR_DEFAUT = [AVAILABLE_LANGUAGES['fr'], AVAILABLE_LANGUAGES['en']];
 
 const stripLeadingFlag = (value) => {
   if (typeof value !== 'string') return '';
@@ -38,9 +45,8 @@ const RegistrationLanguageSelector = ({
   isManualSelection = false, 
   selectedLanguage, 
   onLanguageSelect, 
-  isLoading = false 
 }) => {
-  const [orderedLanguages, setOrderedLanguages] = useState([]);
+  const [orderedLanguages, setOrderedLanguages] = useState(LANGUES_PAR_DEFAUT);
   const [suggestionMessage, setSuggestionMessage] = useState(null);
   const { changeLanguage, t, getAvailableLanguagesForCountry } = useLanguage(); // Utiliser le contexte de langue
   const normalizedCountryCode = normalizeCountryCode(country?.code || '');
@@ -65,10 +71,7 @@ const RegistrationLanguageSelector = ({
       }
     } else {
       // Ordre par défaut sans géolocalisation
-      setOrderedLanguages([
-        AVAILABLE_LANGUAGES['fr'],
-        AVAILABLE_LANGUAGES['en']
-      ]);
+      setOrderedLanguages(LANGUES_PAR_DEFAUT);
     }
   }, [country, selectedLanguage, getAvailableLanguagesForCountry]);
 
@@ -82,21 +85,13 @@ const RegistrationLanguageSelector = ({
     onLanguageSelect(languageCode);
   };
 
-  if (isLoading) {
-    return (
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-        <div className="flex items-center justify-center">
-          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-orange-500 mr-3"></div>
-          <span className="text-gray-600">{t('detectingLanguage') || 'Détection de votre langue préférée...'}</span>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="bg-gradient-to-r from-orange-50 to-yellow-50 border border-orange-200 rounded-lg p-6">
+      {/* Pas de pastille `Languages` ici (26/10/2026) : la coquille pré-rendue
+          peint ce même en-tête sans SVG, et un glyphe d'un seul côté décale le
+          texte (x) et la hauteur de ligne (y) — refusé par
+          `e2e/geometrie-coquille-react.spec.js`. */}
       <div className="flex items-center mb-4">
-        <Languages className="h-6 w-6 mr-3 text-orange-600" aria-hidden="true" />
         <h2 className="text-lg font-semibold text-orange-900">
           {t('choosePreferredLanguage') || 'Choisissez votre langue préférée'}
         </h2>
@@ -200,7 +195,7 @@ const RegistrationLanguageSelector = ({
 
       {/* Information importante */}
       <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <div className="flex items-start">            <Info className="h-5 w-5 text-yellow-600 mr-2 shrink-0" aria-hidden="true" />
+        <div className="flex items-start">
           <div className="text-xs text-yellow-800">
             <p className="font-medium mb-1">{t('aboutSelection') || 'À propos de votre sélection :'}</p>
             <ul className="space-y-1">

@@ -63,7 +63,14 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [emailChecking, setEmailChecking] = useState(false);
   const [emailAvailability, setEmailAvailability] = useState(null);
-  const [geoLoading, setGeoLoading] = useState(true);
+  // `geoLoading` ne porte plus l'ÉTAT AFFICHÉ (26/10/2026) : il ne sert plus
+  // qu'au bouton « Utiliser ma position », qui se désactive le temps de la
+  // demande. Le montage ne peint donc plus « Détection en cours » puis
+  // « Position non détectée » : la coquille pré-rendue n'a pas de JavaScript,
+  // donc la seule chose qu'elle puisse peindre HONNÊTEMENT est cet état final —
+  // et une page dont le premier rendu diffère de la coquille se déplace à
+  // l'hydratation (garde `e2e/texte-coquille-react.spec.js`).
+  const [geoLoading, setGeoLoading] = useState(false);
   const [detectedCountry, setDetectedCountry] = useState(null);
   const [manualCountrySelection, setManualCountrySelection] = useState(false);
   const manualCountrySelectionRef = useRef(false);
@@ -224,7 +231,6 @@ export default function Register() {
 
   const detectUserLocationAndSetDefaults = async ({ sansGps = true } = {}) => {
     try {
-      setGeoLoading(true);
       devLog.info(`🌍 Détection ${sansGps ? 'par IP' : 'précise'} du pays de l’utilisateur...`);
       const country = await detectUserCountry({ sansGps });
       
@@ -250,8 +256,6 @@ export default function Register() {
       }
     } catch (error) {
       safeLog.error('❌ Erreur géolocalisation:', error);
-    } finally {
-      setGeoLoading(false);
     }
   };
 
@@ -498,22 +502,17 @@ export default function Register() {
           </p>
           
           {/* Information sur le processus avec géolocalisation.
-              Les TROIS états partagent la boîte DÉCLARÉE au plan
-              (`geoStatusBoxClass`, lue aussi par la coquille
-              vite-plugins/prerender/shells-routes.js) : elle réserve la hauteur
-              du plus haut des trois, si bien que le passage « détection en
-              cours » → « pays détecté / non détecté » ne déplace plus les
-              pastilles d'étape ni le formulaire (mesuré : 14 px, CLS 0,0088).
-              Seules les COULEURS restent propres à chaque état. */}
+              Les DEUX états (pays détecté / position non détectée) partagent la
+              boîte DÉCLARÉE au plan (`geoStatusBoxClass`, lue aussi par la
+              coquille `vite-plugins/prerender/shells-routes.js`) : elle réserve
+              la hauteur du plus haut des deux, si bien que la détection qui
+              aboutit ne déplace ni les pastilles d'étape ni le formulaire.
+              L'état d'ATTENTE a disparu le 26/10/2026 : la coquille, sans
+              JavaScript, ne peut peindre que l'état final, et un premier rendu
+              différent de la coquille se déplace à l'hydratation. Seules les
+              COULEURS restent propres à chaque état. */}
           <div className="mt-6 bg-orange-50 border border-orange-200 rounded-lg p-4">
-            {geoLoading ? (
-              <div className={`${pagePlan.geoStatusBoxClass} border-transparent`}>
-                <div className="flex items-center justify-center py-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-500 mr-2"></div>
-                  <span className="text-xs text-blue-700">{t('detectingLocation')}</span>
-                </div>
-              </div>
-            ) : detectedCountry ? (
+            {detectedCountry ? (
               <div className={`${pagePlan.geoStatusBoxClass} bg-green-50 border-green-200`}>
                 <p className="text-sm text-green-800">
                   <span className="font-medium"><MapPin className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {pageT('positionDetected')}:</span> <CountryDisplay countryCode={detectedCountry.code} className="inline-flex align-middle" />
@@ -524,8 +523,15 @@ export default function Register() {
               </div>
             ) : (
               <div className={`${pagePlan.geoStatusBoxClass} bg-yellow-50 border-yellow-200`}>
+                {/* Pas de pastille de position ici (26/10/2026) : la coquille
+                    pré-rendue peint cet ÉTAT FINAL sans JavaScript, et un SVG
+                    en ligne dans ce paragraphe change la hauteur de ligne
+                    (mesuré : 2,21 px sur TOUT ce qui suit, et 11,6 px en X sur
+                    le texte) — donc deux peintures pour un même état, refusées
+                    par `e2e/geometrie-coquille-react.spec.js`. Le glyphe reste
+                    sur l'état « pays détecté », que la coquille ne peint pas. */}
                 <p className="text-xs text-yellow-700">
-                  <MapPin className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {pageT('positionNotDetected')}
+                  {pageT('positionNotDetected')}
                 </p>
                 {/* Le seul chemin qui DEMANDE la position de l'appareil : un
                     geste, donc une permission comprise. La détection par IP a
@@ -533,10 +539,17 @@ export default function Register() {
                     ici plutôt qu'automatique. */}
                 <button
                   type="button"
-                  onClick={() => detectUserLocationAndSetDefaults({ sansGps: false })}
-                  className="mt-2 inline-flex items-center gap-2 rounded-lg border border-stone-300 fond-papier px-3 py-2 text-xs font-semibold text-stone-700 transition-colors hover:border-orange-500 hover:text-orange-700"
+                  disabled={geoLoading}
+                  onClick={async () => {
+                    setGeoLoading(true);
+                    try {
+                      await detectUserLocationAndSetDefaults({ sansGps: false });
+                    } finally {
+                      setGeoLoading(false);
+                    }
+                  }}
+                  className="mt-2 inline-flex items-center gap-2 rounded-lg border border-stone-300 fond-papier px-3 py-2 text-xs font-semibold text-stone-700 transition-colors hover:border-orange-500 hover:text-orange-700 disabled:opacity-60"
                 >
-                  <MapPin className="h-4 w-4" aria-hidden="true" />
                   {t('useMyPosition')}
                 </button>
               </div>
@@ -934,7 +947,6 @@ export default function Register() {
             isManualSelection={manualCountrySelection}
             selectedLanguage={userSelectedLanguage}
             onLanguageSelect={setUserSelectedLanguage}
-            isLoading={geoLoading}
           />
 
           {/* Champs spécifiques aux travailleurs */}
