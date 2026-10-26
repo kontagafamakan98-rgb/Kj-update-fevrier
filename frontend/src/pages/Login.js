@@ -187,7 +187,11 @@ export default function Login() {
                   <div className="w-full border-t border-gray-200" />
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="bg-white px-3 text-sm text-stone-400">{t('orSeparator') || 'ou'}</span>
+                  {/* stone-500 et non stone-400 : le séparateur « ou » est du
+                      TEXTE sur blanc, et stone-400 n'atteint pas le 4,5:1 du
+                      seuil AA (mesuré par Lighthouse sur /register, où le même
+                      séparateur était en gray-400 : 2,5:1). */}
+                  <span className="bg-white px-3 text-sm text-stone-500">{t('orSeparator') || 'ou'}</span>
                 </div>
               </div>
             </>

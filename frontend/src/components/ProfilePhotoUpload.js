@@ -118,9 +118,12 @@ const ProfilePhotoUpload = ({
     <div className={`carte-editoriale carte-publique mb-6${classeBloc ? ` ${classeBloc}` : ''}`}>
       <div className="mb-4 flex items-center gap-3">
         <IconePage nom={iconePhoto} role="photoTitre" />
-        <h3 className="titre-entree">
+        {/* h2 et non h3 : la page n'a qu'un h1 et aucun h2, donc un h3 en
+            première section faisait sauter un niveau — mesuré par Lighthouse
+            le 26/10/2026 (`heading-order`, accessibilité 95). */}
+        <h2 className="titre-entree">
           {t('profilePhotoOptional')}
-        </h3>
+        </h2>
       </div>
       
       <p className="mb-4 text-sm text-stone-600">
@@ -229,9 +232,12 @@ const ProfilePhotoUpload = ({
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="truncate font-medium text-stone-900">
+                  {/* Le NOM du fichier n'est pas un titre de section : garder un
+                      h4 sous un h2 ferait sauter un niveau que personne ne voit
+                      (Lighthouse `heading-order`). Une légende suffit. */}
+                  <p className="truncate font-medium text-stone-900">
                     {photoData.name}
-                  </h4>
+                  </p>
                   <p className="text-sm text-stone-500">
                     {(photoData.size / 1024 / 1024).toFixed(2)} MB
                   </p>
@@ -320,7 +326,7 @@ const ProfilePhotoUpload = ({
           le budget de /register, et une notice plus haute déplaçait tout ce qui
           le suit. */}
       <div className="mt-4 rounded-[3px] border border-orange-200 bg-orange-50 p-3">
-        <h4 className="mb-1 font-medium text-orange-900"><IconePage nom={iconeConseils} role="notice" /> {t('tipsGoodPhoto')}</h4>
+        <h3 className="mb-1 font-medium text-orange-900"><IconePage nom={iconeConseils} role="notice" /> {t('tipsGoodPhoto')}</h3>
         <ul className="space-y-1 text-xs text-orange-800">
           <li>• {t('useRecentPhoto')}</li>
           <li>• {t('lookCamera')}</li>
