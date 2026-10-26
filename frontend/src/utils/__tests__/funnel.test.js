@@ -134,9 +134,11 @@ describe('trackFunnel — rien ne sort sans être déclaré', () => {
 });
 
 describe('la déclaration elle-même', () => {
-  it('déclare cinq étapes distinctes, aux noms valides pour GA4', () => {
-    expect(NOMS_DECLARES).toHaveLength(5);
-    expect(new Set(NOMS_DECLARES).size).toBe(5);
+  it('déclare six étapes distinctes, aux noms valides pour GA4', () => {
+    // Cinq étapes d'ENTONNOIR, plus `job_shared` — le partage d'une mission,
+    // hors entonnoir mais soumis à la même liste blanche (le canal seul sort).
+    expect(NOMS_DECLARES).toHaveLength(6);
+    expect(new Set(NOMS_DECLARES).size).toBe(6);
     for (const nom of NOMS_DECLARES) {
       // Un nom GA4 : minuscules, chiffres et `_`, commençant par une lettre.
       expect(nom, `« ${nom} » n'est pas un nom d'événement GA4`).toMatch(/^[a-z][a-z0-9_]{2,39}$/);
@@ -148,6 +150,14 @@ describe('la déclaration elle-même', () => {
     // de ses rapports d'entonnoir : c'est une décision, donc elle est verrouillée.
     expect(NOMS_DECLARES).toContain('sign_up');
     expect(NOMS_DECLARES).toContain('begin_checkout');
+  });
+
+  it('déclare le PARTAGE hors entonnoir, avec le seul canal comme dimension', () => {
+    // Le partage n'est pas une étape d'installation : il fait entrer du trafic
+    // par WhatsApp. Ce qui sort est le CANAL, jamais l'identifiant de la
+    // mission ni le titre — une valeur libre créerait une série par valeur.
+    expect(EVENEMENTS_FUNNEL.partageMission).toBe('job_shared');
+    expect(CLES_FUNNEL.channel).toEqual(['whatsapp', 'natif']);
   });
 
   it('donne à chaque clé une règle de validation bornée', () => {

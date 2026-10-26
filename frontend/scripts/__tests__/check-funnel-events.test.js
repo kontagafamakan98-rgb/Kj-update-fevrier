@@ -37,7 +37,13 @@ const SCRIPTS = path.resolve(ICI, '..');
 /** Planchers minimaux : ces cas jugent une RÈGLE, pas le corpus. */
 const SANS_PLANCHERS = Object.freeze({ fichiers: 1, appels: 1 });
 
-/** Une page MINIMALE mais conforme : elle émet les cinq étapes, clés déclarées. */
+/**
+ * Une page MINIMALE mais conforme : elle émet TOUTES les étapes déclarées
+ * (les cinq de l'entonnoir, plus `job_shared` du partage), clés déclarées.
+ * La fixture suit la déclaration : une étape ajoutée à `EVENEMENTS_FUNNEL`
+ * sans émetteur ici ferait échouer les cas qui n'en parlent pas, en nommant
+ * l'étape manquante — c'est le garde qui a raison, pas la fixture.
+ */
 const SOURCE_CONFORME = `
 import { EVENEMENTS_FUNNEL, trackFunnel } from '../utils/funnel';
 
@@ -46,9 +52,10 @@ export const b = () => trackFunnel(EVENEMENTS_FUNNEL.otpVerifie);
 export const c = () => trackFunnel('job_created', { country: 'mali' });
 export const d = () => trackFunnel(EVENEMENTS_FUNNEL.propositionEnvoyee);
 export const e = () => trackFunnel(EVENEMENTS_FUNNEL.paiementLance, { payment_method: 'wave' });
+export const f = () => trackFunnel(EVENEMENTS_FUNNEL.partageMission, { channel: 'whatsapp' });
 `;
 
-/** Les sources conformes, une page qui porte les cinq étapes. */
+/** Les sources conformes, une page qui porte toutes les étapes déclarées. */
 const sources = (extras = {}) => ({ 'pages/Probe.js': SOURCE_CONFORME, ...extras });
 
 const refusDe = (sourcesJugees, options = {}) =>
