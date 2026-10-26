@@ -591,7 +591,10 @@ async def get_public_stats(response: Response):
         liste publique et le sitemap) ;
       • aucun champ d'identité ne sort : la réponse est une liste FERMÉE de
         compteurs, pas une projection de documents (garde :
-        `tests/test_public_stats.py`).
+        `tests/test_public_radius.py`, avec le cas « ne publie que des
+        compteurs » et ses trois voisins — cette docstring citait un
+        `tests/test_public_stats.py` qui n'a jamais existé, donc un garde
+        introuvable pour une règle qui, elle, est bien tenue).
 
     `Cache-Control` : la donnée ne bouge qu'aux inscriptions et publications,
     donc la landing peut la garder une minute — un visiteur ne martèle pas
@@ -601,15 +604,26 @@ async def get_public_stats(response: Response):
         dict: {workers, clients, open_jobs, completed_jobs, reviews, countries}.
     """
     actifs = {"deleted": {"$ne": True}}
-    workers = await db.users.count_documents({"user_type": "worker", **actifs})
-    clients = await db.users.count_documents({"user_type": "client", **actifs})
-    open_jobs = await db.jobs.count_documents(
-        {"status": "open", "deleted": {"$ne": True}}
+    # UNE LATENCE, PAS CINQ (mesuré le 26/10/2026). `GET /api/public/stats`
+    # répondait en **1,07 s** en chaud sur production (`api/public/stats`, trois
+    # relevés : 1,072 / 1,096 / 1,082 s), quand `/metrics` — qui ne touche pas la
+    # base — répond en **0,33 s** et `/health` en 0,62 s. Les cinq compteurs
+    # étaient donc lus l'un APRÈS l'autre : cinq allers-retours vers Atlas, pour
+    # le premier chiffre que lit la page d'accueil.
+    #
+    # `gather` les envoie ENSEMBLE : mêmes requêtes, mêmes index, un seul temps de
+    # réseau. Aucune valeur n'est mémorisée — la fraîcheur reste celle du
+    # `Cache-Control` ci-dessous, et un compteur n'a pas à servir le chiffre de
+    # la minute précédente. Si une lecture échoue, `gather` propage l'exception
+    # comme le faisait la boucle : un 500 nommé, jamais un zéro qui aurait l'air
+    # d'un fait.
+    workers, clients, open_jobs, completed_jobs, reviews = await asyncio.gather(
+        db.users.count_documents({"user_type": "worker", **actifs}),
+        db.users.count_documents({"user_type": "client", **actifs}),
+        db.jobs.count_documents({"status": "open", "deleted": {"$ne": True}}),
+        db.jobs.count_documents({"status": "completed", "deleted": {"$ne": True}}),
+        db.reviews.count_documents({}),
     )
-    completed_jobs = await db.jobs.count_documents(
-        {"status": "completed", "deleted": {"$ne": True}}
-    )
-    reviews = await db.reviews.count_documents({})
     response.headers["Cache-Control"] = "public, max-age=60, s-maxage=60"
     return {
         "workers": workers,
@@ -643,13 +657,23 @@ async def get_sitemap_xml():
         (base + "/login", "weekly", "0.8"),
         (base + "/register", "weekly", "0.8"),
         (base + "/jobs", "hourly", "0.9"),
-        # Les trois pages de confiance : un moteur (et une régie publicitaire)
-        # cherche à savoir qui édite le site, comment le joindre et ce qu'il fait
-        # des données. Elles existent en pages pré-rendues depuis le 19/09/2026 ;
-        # les lister ici est ce qui les rend DÉCOUVRABLES sans lien entrant.
+        # Les QUATRE pages de confiance : un moteur (et une régie publicitaire)
+        # cherche à savoir qui édite le site, comment le joindre, ce qu'il fait
+        # des données ET à quelles conditions il le fait. Elles existent en pages
+        # pré-rendues depuis le 19/09/2026 ; les lister ici est ce qui les rend
+        # DÉCOUVRABLES sans lien entrant.
+        #
+        # `/terms` MANQUAIT (mesuré le 26/10/2026) : la page répond 200, elle est
+        # pré-rendue, sa balise `robots` vaut `index, follow` et son HTML pèse
+        # 105 553 o — mais le sitemap ne la citait pas, alors que son commentaire
+        # annonçait « les trois pages de confiance » et que /privacy, sa jumelle
+        # juridique, y était. Une page indexable absente du sitemap n'est pas
+        # cachée : elle est explorée moins tôt et moins souvent — et un sitemap
+        # qui n'énumère pas ce qu'il prétend énumérer se lit comme complet à tort.
         (base + "/about", "monthly", "0.6"),
         (base + "/contact", "monthly", "0.6"),
         (base + "/privacy", "yearly", "0.4"),
+        (base + "/terms", "yearly", "0.4"),
     ]
 
     lines = [
