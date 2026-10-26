@@ -775,6 +775,21 @@ jobs:
         working-directory: frontend
         run: node scripts/check-juges-de-temps.js
 
+      # LE FUNNEL SE MESURE, ET SES CLÉS SONT BORNÉES. `src/utils/funnel.js`
+      # porte les cinq étapes (inscription, code vérifié, mission publiée,
+      # proposition envoyée, paiement lancé) et la LISTE BLANCHE des paramètres,
+      # et il filtre à l'envoi. Un filtre runtime ne protège que ce qui passe par
+      # lui : un `gtag('event', …)` écrit directement dans une page l'ignore, une
+      # clé mal orthographiée est écartée sans que personne ne le voie, et une
+      # étape déclarée que plus aucune page n'émet se lit comme mesurée. Ce garde
+      # lit les imports dans l'ARBRE SYNTAXIQUE (pas par expression régulière :
+      # `trackFunnel(` cité en commentaire n'est pas un appel) et refuse ces
+      # quatre écarts, plus un `spread` dans les paramètres — une clé illisible
+      # peut porter un email. Il ne lit que `src/`, donc il passe AVANT le build.
+      - name: Check the GA funnel emits declared events with allowlisted keys
+        working-directory: frontend
+        run: node scripts/check-funnel-events.js
+
       # LE DOCUMENT QUE JUGENT LES GARDES CI-DESSOUS est publié ici, une fois :
       # les gardes qui suivent lisent CE `build/`, et `bundle-size-report` (plus
       # bas) MESURE ce même répertoire au lieu de le reconstruire. Les deux jobs

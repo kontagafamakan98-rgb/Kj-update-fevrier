@@ -110,6 +110,10 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  // Le funnel lit `window.gtag`, qui n'existe qu'après consentement en
+  // production : un cas qui l'installe le RETIRE, sinon les cas suivants
+  // mesureraient l'espion du cas précédent.
+  delete window.gtag;
   vi.clearAllMocks();
 });
 
@@ -148,5 +152,51 @@ describe('Vérification email — le compte est créé ici', () => {
     expect(authAPI.registerVerified).not.toHaveBeenCalled();
     expect(autoLoginAfterRegistration).not.toHaveBeenCalled();
     expect(screen.queryByText(/TABLEAU/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * LES DEUX ÉTAPES DU FUNNEL QUE CETTE PAGE PORTE, dans l'ordre et séparément.
+ *
+ * Le garde statique (`scripts/check-funnel-events.js`) prouve qu'un appel
+ * `trackFunnel` est ÉCRIT dans cette page ; il ne peut pas dire qu'il est
+ * ATTEINT, ni dans quel ordre. C'est ce que ces cas mesurent — et ce qu'ils
+ * empêcheraient : un `sign_up` émis avant que le compte n'existe, ou une étape
+ * émise sur un code REFUSÉ.
+ */
+describe('Vérification email — les étapes du funnel', () => {
+  const evenements = (gtag) => gtag.mock.calls.filter(([commande]) => commande === 'event');
+
+  it('émet le code vérifié PUIS l’inscription, avec les dimensions déclarées', async () => {
+    const gtag = vi.fn();
+    window.gtag = gtag;
+
+    rendre();
+    await validerLeCode();
+    await waitFor(() => expect(authAPI.registerVerified).toHaveBeenCalledTimes(1));
+
+    const envois = evenements(gtag);
+    expect(envois.map(([, nom]) => nom)).toEqual(['email_otp_verified', 'sign_up']);
+
+    // L'ordre est la propriété : `sign_up` ne part qu'une fois le compte créé.
+    expect(envois[0][2]).toEqual({ user_type: 'worker' });
+    expect(envois[1][2]).toEqual({
+      user_type: 'worker',
+      country: 'senegal',
+      signup_method: 'email',
+      has_referral: false,
+    });
+  });
+
+  it('un code REFUSÉ n’émet AUCUNE étape (l’inscription n’a pas eu lieu)', async () => {
+    const gtag = vi.fn();
+    window.gtag = gtag;
+    authAPI.verifyEmailOtp.mockRejectedValueOnce(new Error('Code expiré'));
+
+    rendre();
+    await validerLeCode();
+
+    await waitFor(() => expect(authAPI.verifyEmailOtp).toHaveBeenCalledTimes(1));
+    expect(evenements(gtag)).toEqual([]);
   });
 });

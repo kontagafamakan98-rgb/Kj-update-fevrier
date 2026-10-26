@@ -21,6 +21,7 @@ import { clearRegistrationFlow, saveRegistrationFlow } from '../utils/registrati
 import { devLog, safeLog } from '../utils/env';
 import { authAPI, handleApiError } from '../services/api';
 import { usePageMeta } from '../utils/seo';
+import { EVENEMENTS_FUNNEL, trackFunnel } from '../utils/funnel';
 import { PAGE_SECTIONS } from '../config/page-sections';
 import { MarqueKojo } from '../config/marque-kojo';
 import { PHONE_PREFIX_FALLBACK, phoneNumberExample } from '../config/phone-format';
@@ -350,6 +351,15 @@ export default function Register() {
       // entre directement. Les comptes de paiement ne sont plus un passage
       // obligatoire à l'inscription (22/10/2026) — ils se demandent là où ils
       // servent, et le tableau de bord le rappelle à qui n'en a pas.
+      //
+      // Le canal est DIT : sans ça, l'entonnoir d'inscription ne distinguerait
+      // pas le formulaire email (deux étapes) de Google (une seule), et le taux
+      // de vérification de code se calculerait sur une base faussée.
+      trackFunnel(EVENEMENTS_FUNNEL.inscription, {
+        user_type: formData.user_type || 'client',
+        country: formData.country,
+        signup_method: 'google',
+      });
       toast.success(pageT('googleSuccess'));
       navigate('/dashboard', { replace: true });
       return;
