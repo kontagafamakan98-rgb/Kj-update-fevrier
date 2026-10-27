@@ -216,6 +216,23 @@ def _cle_normalisee(cle) -> Dict[str, object]:
     return {champ: sens for champ, sens in cle}
 
 
+def est_texte(declare: Dict[str, object]) -> bool:
+    """L'index est-il un index TEXTE (un `sens` vaut `text`) ?
+
+    Ce cas ne se compare pas comme les autres : MongoDB ne stocke pas la clé
+d'un index texte sous la forme `champ: "text"` (voir `champs_texte`).
+    """
+    cle = declare["cle"]
+    if isinstance(cle, str):
+        return False
+    return any(sens == "text" for _, sens in cle)
+
+
+def champs_texte(declare: Dict[str, object]) -> List[str]:
+    """Les champs d'un index texte, dans l'ordre de la déclaration."""
+    return [champ for champ, sens in declare["cle"] if sens == "text"]
+
+
 def spec_attendue(declare: Dict[str, object]) -> Dict[str, object]:
     """Ce que `list_indexes()` DOIT rendre pour cet index, au champ près.
 
@@ -225,6 +242,12 @@ def spec_attendue(declare: Dict[str, object]) -> Dict[str, object]:
     """
     options: Dict[str, object] = declare.get("options") or {}
     attendu: Dict[str, object] = {"cle": _cle_normalisee(declare["cle"])}
+    if est_texte(declare):
+        # Les champs indexés se LISENT dans `weights` d'un index texte : Mongo
+        # replie la clé en `_fts`/`_ftsx`, donc la clé ne dit pas les champs.
+        attendu["weights"] = dict(
+            options.get("weights") or {champ: 1 for champ in champs_texte(declare)}
+        )
     for champ in ("unique", "sparse"):
         if options.get(champ):
             attendu[champ] = True
@@ -239,6 +262,8 @@ def spec_presente(index_doc: Dict[str, object]) -> Dict[str, object]:
     presente: Dict[str, object] = {
         "cle": {champ: sens for champ, sens in (index_doc.get("key") or {}).items()}
     }
+    if index_doc.get("weights"):
+        presente["weights"] = _normaliser(index_doc["weights"])
     for champ in ("unique", "sparse"):
         if index_doc.get(champ):
             presente[champ] = True
@@ -269,7 +294,19 @@ def comparer(declare: Dict[str, object], index_doc: Optional[Dict[str, object]])
     attendu = spec_attendue(declare)
     presente = spec_presente(index_doc)
     ecarts = []
-    if presente["cle"] != attendu["cle"]:
+    if est_texte(declare):
+        # MESURÉ le 27/10/2026 sur la production : `list_indexes()` rend la clé
+        # d'un index texte repliée en `{'_fts': 'text', '_ftsx': 1}`, jamais les
+        # champs déclarés. Comparer la clé rendait donc « clé … ≠ {'_fts': …} »
+        # sur un index PARFAITEMENT conforme — un rouge qu'aucune création ne
+        # pouvait corriger. Les champs se lisent dans `weights`.
+        champs_attendus = sorted(attendu.get("weights") or {})
+        champs_presents = sorted(presente.get("weights") or {})
+        if champs_presents != champs_attendus:
+            ecarts.append(
+                f"champs texte {champs_attendus} ≠ {champs_presents}"
+            )
+    elif presente["cle"] != attendu["cle"]:
         ecarts.append(f"clé {attendu['cle']} ≠ {presente['cle']}")
     for champ in ("unique", "sparse", "expireAfterSeconds", "default_language"):
         if presente.get(champ) != attendu.get(champ):

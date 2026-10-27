@@ -30,6 +30,53 @@ import kojo_index_declares as index_declares
 
 # ── La déclaration ─────────────────────────────────────────────────────────
 
+
+class TestLIndexTexte:
+    """Un index TEXTE se juge sur ses CHAMPS, pas sur la clé que Mongo replie.
+
+    Mesuré le 27/10/2026 en production : `list_indexes()` rend la clé d'un index
+    texte sous la forme `{'_fts': 'text', '_ftsx': 1}`. Comparer la clé faisait
+    donc afficher « clé … ≠ {'_fts': …} » sur un index parfaitement conforme —
+    un rouge qu'AUCUNE création ne peut corriger, donc un rouge qui apprend à
+    être ignoré. Les champs se lisent dans `weights`.
+    """
+
+    def _declare_texte(self):
+        return next(
+            declare
+            for declare in index_declares.declarations()
+            if index_declares.est_texte(declare)
+        )
+
+    def _document_mongo(self, declare):
+        """La forme RÉELLE d'un index texte dans `list_indexes()`."""
+        return {
+            "name": index_declares.nom(declare),
+            "key": {"_fts": "text", "_ftsx": 1},
+            "weights": {champ: 1 for champ in index_declares.champs_texte(declare)},
+            "default_language": (declare.get("options") or {}).get("default_language"),
+        }
+
+    def test_un_index_texte_reel_est_conforme(self):
+        declare = self._declare_texte()
+        assert index_declares.comparer(declare, self._document_mongo(declare)) == []
+
+    def test_un_champ_texte_disparu_est_nomme_avec_les_deux_listes(self):
+        declare = self._declare_texte()
+        document = self._document_mongo(declare)
+        document["weights"].pop("location.address")
+        ecarts = index_declares.comparer(declare, document)
+        assert len(ecarts) == 1, ecarts
+        assert "champs texte" in ecarts[0]
+        assert "location.address" in ecarts[0].split("≠")[0]
+
+    def test_un_index_texte_absent_reste_un_ecart(self):
+        declare = self._declare_texte()
+        assert index_declares.comparer(declare, None) == [
+            "absent de la base (aucun index de ce nom)"
+        ]
+
+
 class TestLaDeclaration:
     def test_aucun_index_n_est_declare_deux_fois(self):
         declares = index_declares.declarations()
