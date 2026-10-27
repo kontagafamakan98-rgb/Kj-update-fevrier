@@ -45,7 +45,20 @@ RACINE = Path(__file__).resolve().parents[1]
 if str(RACINE) not in sys.path:
     sys.path.insert(0, str(RACINE))
 
-import kojo_index_declares as index_declares  # noqa: E402 - après le sys.path
+# La déclaration est lue au CHARGEMENT, et son échec est CAPTURÉ. La sonde
+# importe la chaîne `kojo_index_declares → kojo_retention → kojo_settings`, donc
+# un profil d'environnement incomplet la fait tomber AVANT tout verdict —
+# mesuré le 27/10/2026 sur le premier run du workflow : sans `APP_ENV`, la CI
+# n'a pas de `JWT_SECRET`, `kojo_settings` refuse de démarrer en production, et
+# le TRACEBACK sortait en code 1, c'est-à-dire « index non conformes » alors
+# qu'aucun index n'avait été LU. Une déclaration illisible est une PRÉMISSE
+# (code 2), et elle est nommée.
+try:
+    import kojo_index_declares as index_declares  # noqa: E402 - après le sys.path
+    ERREUR_DECLARATION = None
+except Exception as exc:  # noqa: BLE001 - une surface aveugle se déclare, elle ne vaut pas un vert
+    index_declares = None
+    ERREUR_DECLARATION = exc
 
 BASE_PAR_DEFAUT = "kojo_db"
 
@@ -53,6 +66,22 @@ BASE_PAR_DEFAUT = "kojo_db"
 # rend une liste vide) ferait passer la sonde sans rien juger. 81 index lus le
 # 27/10/2026 ; en dessous de 40, le fichier n'est plus celui du dépôt.
 PLANCHER_DECLARES = 40
+
+
+def declarations_lues():
+    """`(declares, erreur)` — charger la déclaration ne LÈVE jamais.
+
+    Deux échecs distincts mènent ici : l'import du module (profil
+    d'environnement incomplet, fichier amputé) et l'appel de
+    `declarations()` (qui lit les règles de conservation). Les deux sont des
+    prémisses : sans déclaration, la sonde n'a rien à comparer.
+    """
+    if index_declares is None:
+        return None, ERREUR_DECLARATION
+    try:
+        return index_declares.declarations(), None
+    except Exception as exc:  # noqa: BLE001 - reporté comme prémisse nommée
+        return None, exc
 
 
 def collections_declarees(declares) -> list:
@@ -215,6 +244,19 @@ def main(argv=None):
     parseur.add_argument("--delai", type=int, default=20, help="délai de connexion (secondes)")
     args = parseur.parse_args(argv)
 
+    declares, erreur = declarations_lues()
+    if declares is None:
+        print(
+            "[PREMISSE] La déclaration des index est ILLISIBLE "
+            f"({type(erreur).__name__}: {erreur}) : aucun index n'a été jugé, donc "
+            "aucun verdict n'est rendu. Une surface aveugle se déclare — elle ne "
+            "vaut pas un vert. Vérifier backend/kojo_index_declares.py et le profil "
+            "d'environnement de la sonde (elle importe les durées de conservation, "
+            "donc `kojo_settings`).",
+            file=sys.stderr,
+        )
+        return 2
+
     uri = os.environ.get("MONGO_URL")
     base_nom = os.environ.get("DB_NAME") or BASE_PAR_DEFAUT
     if not uri:
@@ -231,7 +273,6 @@ def main(argv=None):
         print(f"[PREMISSE] `pymongo` indisponible ({exc}) : aucun verdict rendu.", file=sys.stderr)
         return 2
 
-    declares = index_declares.declarations()
     collections = collections_declarees(declares)
 
     try:

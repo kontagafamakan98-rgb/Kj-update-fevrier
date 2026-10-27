@@ -167,7 +167,50 @@ def test_le_script_sort_en_2_sans_mongo_url(sonde, monkeypatch):
     assert "PREMISSE" in tampon.getvalue()
 
 
+def test_une_declaration_illisible_est_une_premisse_nommee(sonde, monkeypatch):
+    """La déclaration ne se lit pas → PRÉMISSE (2), jamais un vert ni un écart.
+
+    Cas mesuré le 27/10/2026, au premier run du workflow : la CI n'avait pas le
+    profil d'environnement que réclame l'import des durées de conservation, et
+    le TRACEBACK sortait en code 1 — lu comme « au moins un index non
+    conforme » alors qu'aucun index n'avait été lu. Le code 1 est un verdict ;
+    ici il n'y avait rien à juger.
+    """
+    import contextlib
+    import io
+
+    monkeypatch.setenv("MONGO_URL", "mongodb://exemple.invalide")
+    monkeypatch.setattr(sonde, "index_declares", None)
+    monkeypatch.setattr(
+        sonde,
+        "ERREUR_DECLARATION",
+        RuntimeError("JWT_SECRET environment variable is not set"),
+    )
+    tampon = io.StringIO()
+    with contextlib.redirect_stderr(tampon):
+        code = sonde.main([])
+
+    sortie = tampon.getvalue()
+    assert code == 2, sortie
+    assert "PREMISSE" in sortie and "ILLISIBLE" in sortie
+    # La cause est nommée : « illisible » sans elle n'envoie vers aucun remède.
+    assert "JWT_SECRET" in sortie
+
+
 # ── Le câblage ─────────────────────────────────────────────────────────────
+
+
+def test_le_workflow_donne_a_la_sonde_un_profil_capable_d_importer_la_declaration():
+    """Le run quotidien doit pouvoir LIRE la déclaration qu'il juge.
+
+    Sans profil, `kojo_settings` refuse de démarrer en production sans
+    `JWT_SECRET` et la sonde tombe avant tout verdict (mesuré le 27/10/2026).
+    Le profil est celui de la suite de tests, et aucun secret factice n'est
+    posé : la sonde ne démarre pas l'application.
+    """
+    texte = WORKFLOW.read_text(encoding="utf-8")
+    assert "APP_ENV: test" in texte, "le workflow doit fournir le profil d'import"
+    assert "APP_ENV: production" not in texte
 
 def test_le_workflow_lance_la_sonde_sans_etape_qui_ne_peut_pas_echouer():
     texte = WORKFLOW.read_text(encoding="utf-8")
