@@ -30,6 +30,8 @@ from kojo_routers_jobs_listing import _job_view
 from kojo_routers_workers_public import profil_public
 from kojo_settings import FRONTEND_APP_URL, logger
 from kojo_identifiants import identifiant_job_query, identifiant_public
+import kojo_pages_metier as pages_metier
+import kojo_pages_guides as pages_guides
 from kojo_worker_og import (
     nom_complet,
     worker_meta_lines,
@@ -562,6 +564,162 @@ async def get_worker_og_html(worker_id: str):
         headers={"Cache-Control": _OG_CACHE_ACTIVE},
     )
 
+# ── Pages indexables par VILLE et par MÉTIER (/emplois/{ville}, /metiers/{metier})
+# Mesuré le 27/10/2026 : le sitemap de production servait 13 URL pour quatre
+# pays, dont neuf pages statiques (deux formulaires) — aucune page ne répondait
+# à « emploi Abidjan » ni à « plombier Bamako ». Ces deux familles de pages
+# publient le contenu RÉEL des missions ouvertes, avec un titre, une description,
+# une introduction écrite, un JSON-LD et le maillage vers les autres villes et
+# métiers. Les URL sortent de `kojo_pages_metier.urls_sitemap()`, la même
+# déclaration que ces routes : une URL de sitemap ne peut pas répondre 404.
+#
+# Les pages sont autonomes et ne démarrent PAS React (voir la docstring du
+# module) : une page de l'application exigerait une route React pour cette URL,
+# et sans elle le boot peindrait la 404 par-dessus un contenu correct.
+PAGES_METIER_CACHE = "public, max-age=300, s-maxage=1800, stale-while-revalidate=86400"
+PROJECTION_PAGE_METIER = {
+    "id": 1,
+    "job_id": 1,
+    "title": 1,
+    "budget": 1,
+    "currency": 1,
+    "location": 1,
+    "city": 1,
+    "created_at": 1,
+    "posted_at": 1,
+    "_id": 1,
+}
+
+
+async def _missions_de_page(filtre: dict, limite: int | None = None) -> list:
+    """Les missions d'une page ville/métier : ouvertes, les plus récentes.
+
+    `limite` sert au guide de prix, qui mesure les budgets sur un échantillon
+    plus large que la liste qu'il cite (borné par `MAX_MISSIONS_LUES`).
+    """
+    borne = limite or pages_metier.MAX_MISSIONS
+    curseur = (
+        db.jobs.find(filtre, PROJECTION_PAGE_METIER).sort("created_at", -1).limit(borne)
+    )
+    return await curseur.to_list(borne)
+
+
+def _reponse_page(contenu: str, statut: int) -> Response:
+    """Le document servi, après la MÊME règle d'équilibre que les fiches."""
+    return Response(
+        content=contenu,
+        media_type="text/html; charset=utf-8",
+        status_code=statut,
+        headers={
+            "Cache-Control": PAGES_METIER_CACHE if statut == 200 else "no-store",
+            **({"X-Robots-Tag": "noindex"} if statut != 200 else {}),
+        },
+    )
+
+
+@router.get("/pages/villes/{slug}", include_in_schema=False)
+async def get_page_ville(slug: str):
+    """Page indexable d'une ville (/emplois/{slug}).
+
+    Returns:
+        Response: HTML 200, ou 404 `noindex` si la ville n'est pas déclarée.
+    """
+    page = pages_metier.trouver_ville(slug)
+    base = _site_base()
+    if not page:
+        return _reponse_page(
+            exiger_balises_equilibrees(
+                f"la 404 de la page ville {slug}",
+                pages_metier.document_introuvable(base),
+                origine="kojo_pages_metier",
+            ),
+            404,
+        )
+    missions = await _missions_de_page(pages_metier.requete_ville(page))
+    return _reponse_page(
+        exiger_balises_equilibrees(
+            f"la page ville {page['slug']}",
+            pages_metier.document(page, "ville", base, missions),
+            origine="kojo_pages_metier",
+        ),
+        200,
+    )
+
+
+# ── Guides ÉDITORIAUX (/guides/{slug}) — 27/10/2026 ───────────────────────
+# Les pages ville et métier répondent à « plombier Bamako » et « emploi
+# Abidjan » ; elles ne répondent pas aux deux questions qui les précèdent dans
+# une recherche — « combien ça coûte » et « comment choisir quelqu'un ». Un
+# guide par métier publie les budgets RÉELLEMENT annoncés sur les missions
+# ouvertes (nombre, fourchette, médiane, ville par ville), et un guide
+# transversal dit ce qui se vérifie avant de payer. Aucun prix n'est estimé :
+# une ville sans budget publié l'écrit (cf. la docstring de `kojo_pages_guides`).
+@router.get("/pages/guides/{slug}", include_in_schema=False)
+async def get_page_guide(slug: str):
+    """Guide éditorial (`/guides/{slug}`).
+
+    Returns:
+        Response: HTML 200, ou 404 `noindex` si le guide n'est pas déclaré.
+    """
+    page = pages_guides.trouver_guide(slug)
+    base = _site_base()
+    if not page:
+        return _reponse_page(
+            exiger_balises_equilibrees(
+                f"la 404 du guide {slug}",
+                pages_guides.document_introuvable(base),
+                origine="kojo_pages_guides",
+            ),
+            404,
+        )
+    missions = []
+    if page["type"] == "prix":
+        # Les budgets mesurés et les exemples viennent de la MÊME lecture : une
+        # page qui afficherait une fourchette calculée sur une requête et une
+        # liste tirée d'une autre publierait deux marchés différents.
+        missions = await _missions_de_page(
+            pages_metier.requete_metier(page["metier"]),
+            limite=pages_guides.MAX_MISSIONS_LUES,
+        )
+    return _reponse_page(
+        exiger_balises_equilibrees(
+            f"le guide {page['slug']}",
+            pages_guides.document(page, base, missions),
+            origine="kojo_pages_guides",
+        ),
+        200,
+    )
+
+
+@router.get("/pages/metiers/{slug}", include_in_schema=False)
+async def get_page_metier(slug: str):
+    """Page indexable d'un métier (/metiers/{slug}).
+
+    Returns:
+        Response: HTML 200, ou 404 `noindex` si le métier n'est pas déclaré.
+    """
+    page = pages_metier.trouver_metier(slug)
+    base = _site_base()
+    if not page:
+        return _reponse_page(
+            exiger_balises_equilibrees(
+                f"la 404 de la page métier {slug}",
+                pages_metier.document_introuvable(base),
+                origine="kojo_pages_metier",
+            ),
+            404,
+        )
+    missions = await _missions_de_page(pages_metier.requete_metier(page))
+    return _reponse_page(
+        exiger_balises_equilibrees(
+            f"la page métier {page['slug']}",
+            pages_metier.document(page, "metier", base, missions),
+            origine="kojo_pages_metier",
+        ),
+        200,
+    )
+
+
 # Base du site pour le SITEMAP (seul reste à être servi par le backend ; le
 # robots.txt, lui, est un fichier du build). En production, FRONTEND_APP_URL doit
 # pointer vers le domaine public (kojoforafrica.cc.cd, alias Vercel) ; repli sur
@@ -651,11 +809,17 @@ async def get_sitemap_xml():
     """
     base = _site_base()
 
+    # `/login` et `/register` en sont SORTIS le 27/10/2026. Ce sont deux
+    # FORMULAIRES : aucun moteur ne les classe sur une intention de recherche, et
+    # les annoncer en `weekly` + 0,8 les présentait comme les pages les plus
+    # importantes du site après l'accueil et les missions — mesuré le 27/10, deux
+    # des neuf entrées statiques décrivaient une porte, pas un contenu. Ils
+    # restent indexables (une recherche de marque « kojo connexion » doit tomber
+    # dessus, et un `noindex` la ferait disparaître) : c'est leur PRIORITÉ dans le
+    # sitemap qui était fausse, pas leur existence.
     static_urls = [
         (base + "/", "daily", "1.0"),
         (base + "/how-it-works", "monthly", "0.7"),
-        (base + "/login", "weekly", "0.8"),
-        (base + "/register", "weekly", "0.8"),
         (base + "/jobs", "hourly", "0.9"),
         # Les QUATRE pages de confiance : un moteur (et une régie publicitaire)
         # cherche à savoir qui édite le site, comment le joindre, ce qu'il fait
@@ -674,6 +838,27 @@ async def get_sitemap_xml():
         (base + "/contact", "monthly", "0.6"),
         (base + "/privacy", "yearly", "0.4"),
         (base + "/terms", "yearly", "0.4"),
+    ]
+
+    # ── Les pages VILLE et MÉTIER (27/10/2026) ───────────────────────────────
+    # Elles viennent de `kojo_pages_metier.urls_sitemap()`, c'est-à-dire de la
+    # MÊME déclaration que les routes `/api/pages/villes|metiers/{slug}` : une
+    # URL publiée ici répond forcément, et un slug renommé ne peut pas laisser
+    # derrière lui une entrée morte (un sitemap qui renvoie des 404 fait perdre
+    # la confiance du crawler sur tout le fichier).
+    static_urls += [
+        (base + chemin, freq, prio)
+        for chemin, freq, prio in pages_metier.urls_sitemap()
+    ]
+
+    # ── Les GUIDES ÉDITORIAUX (27/10/2026) ──────────────────────────────────
+    # Même règle : la liste sort de `kojo_pages_guides.urls_sitemap()`, la même
+    # déclaration que la route `/api/pages/guides/{slug}`. Sans eux, le site
+    # n'aurait, pour « combien coûte un plombier », que des listes d'offres à
+    # classer ; avec eux, une page répond à la question posée avant l'offre.
+    static_urls += [
+        (base + chemin, freq, prio)
+        for chemin, freq, prio in pages_guides.urls_sitemap()
     ]
 
     lines = [

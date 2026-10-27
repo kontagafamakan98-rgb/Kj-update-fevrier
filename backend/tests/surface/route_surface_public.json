@@ -49,6 +49,30 @@
   },
   {
     "methode": "GET",
+    "chemin": "/api/pages/villes/{slug}",
+    "nom": "get_page_ville",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/pages/guides/{slug}",
+    "nom": "get_page_guide",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/pages/metiers/{slug}",
+    "nom": "get_page_metier",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "GET",
     "chemin": "/api/public/stats",
     "nom": "get_public_stats",
     "code": null,

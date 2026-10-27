@@ -243,9 +243,49 @@ def test_seuls_les_modules_declares_ecrivent_du_html():
     # (email), pas un document servi : il entre dans l'inventaire pour la même
     # raison que les autres, et parce qu'un producteur tu est exactement ce que
     # ce test existe pour empêcher.
+    # LES PAGES VILLE, MÉTIER ET GUIDES (27/10/2026). Elles ne sont pas des
+    # coquilles de l'application : elles écrivent leur document de bout en bout,
+    # donc elles entrent dans l'inventaire comme les fiches. Leur équilibre est
+    # vérifié juste au-dessus, sur des titres hostiles compris.
     assert producteurs == {
         "kojo_job_og.py",
         "kojo_worker_og.py",
+        "kojo_pages_metier.py",
+        "kojo_pages_guides.py",
         "kojo_routers_job_alerts.py",
         "kojo_routers_public.py",
     }
+
+
+def test_les_pages_de_contenu_sont_equilibrees():
+    """Les documents VILLE, MÉTIER et GUIDE passent la même règle que les fiches.
+
+    Sans cette vérification, les deux modules seraient déclarés producteurs sans
+    qu'aucun document réel ne soit mesuré — la déclaration dirait « vérifié »
+    d'une chose que personne n'a lue.
+    """
+    import kojo_pages_guides as guides
+    import kojo_pages_metier as pages
+
+    origine = "https://kojoforafrica.cc.cd"
+    hostile = {
+        "id": "j1",
+        "title": '<script>alert("x")</script> & <img src=x onerror=alert(1)>',
+        "budget": 25000,
+        "currency": "FCFA",
+        "location": {"city": "Abidjan"},
+        "created_at": "2026-10-20T10:00:00",
+    }
+    documents = {
+        "ville": pages.document(pages.trouver_ville("abidjan"), "ville", origine, [hostile]),
+        "metier": pages.document(pages.trouver_metier("plomberie"), "metier", origine, [hostile]),
+        "metier vide": pages.document(pages.trouver_metier("menage"), "metier", origine, []),
+        "404 ville": pages.document_introuvable(origine),
+        "guide prix": guides.document(guides.trouver_guide("prix-plomberie"), origine, [hostile]),
+        "guide prix vide": guides.document(guides.trouver_guide("prix-menage"), origine, []),
+        "guide choisir": guides.document(guides.trouver_guide("choisir-un-artisan"), origine, []),
+        "404 guide": guides.document_introuvable(origine),
+    }
+    for nom, doc in documents.items():
+        assert exiger_balises_equilibrees(nom, doc) == doc, nom
+        assert desequilibres_des_balises(doc) == [], nom
