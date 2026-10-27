@@ -1739,7 +1739,26 @@ jobs:
     # ci-dessus. Le renommer ici sans changer la protection de main ferait
     # attendre un check que personne ne publie.
     name: E2E Playwright tests (Chromium)
-    runs-on: ubuntu-latest
+    # L'IMAGE EST ÉPINGLÉE, et pas par prudence de principe : c'est une mesure.
+    #
+    # Le 26/10/2026 à 23:46 (run 40420225135, `main`), ce job tournait sur
+    # Ubuntu 24.04 (noble, ICU 74) et les TROIS moteurs passaient. Le
+    # 27/10/2026 à 02:53 (run 40439331472, cette PR), le même job est tombé sur
+    # Ubuntu 26.04 (resolute, ICU 78) et les ONZE cas `webkit` ont échoué au
+    # LANCEMENT, en 2 ms chacun :
+    #
+    #   MiniBrowser: error while loading shared libraries:
+    #   libicudata.so.74: cannot open shared object file
+    #
+    # WebKit 2359 (celui de Playwright 1.63) est lié à l'ICU de 24.04 ;
+    # `--with-deps` installe ce que la distribution fournit, donc ICU 78, et se
+    # déclare satisfait. Aucun test n'a été jugé : un moteur qui ne démarre pas
+    # ne dit rien du code de la PR, et un `ubuntu-latest` qui change de version
+    # majeure entre deux runs fait exactement cela — un vert la veille, onze
+    # rouges le lendemain, pour une bibliothèque. Épingler l'image rend le fait
+    # LISIBLE au lieu de le subir ; le remède de fond est de suivre Playwright
+    # quand une version brutale pour resolute sortira.
+    runs-on: ubuntu-24.04
     # 20 → 30 min le 22/10/2026 : le cache des binaires est indexé sur
     # l'empreinte de `frontend/package-lock.json`, donc l'ajout d'UNE
     # dépendance de test (`@axe-core/playwright`) l'a invalidé et le job a payé
