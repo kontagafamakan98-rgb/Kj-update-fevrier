@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-27",
-    "motif": "la confirmation d'actifs mesure jusqu'a ACTIFS_TENTATIVES fois, espacees de 20 s : deux livraisons correctes du 27/10/2026 ont ete refusees en pleine bascule Vercel, et la fenetre est bornee et publiee",
+    "motif": "le passage de purge de retention est sorti dans kojo_purge_retention et reexporte a l'identique : le planificateur ne garde que la cadence et le bail, garde backend/tests/test_purge_retention_module.py",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -60,7 +60,6 @@
       "backend/kojo_routers_jobs.py": "12d708991877f307f60af638cdce0ec7d2d3a3b7cf529611b662cb65cc5088ad",
       "backend/kojo_routers_users.py": "93b34ef87ebd8d4f75368fb7619d85e43e23ff891f3b03255f936a6c66d45d5f",
       "backend/kojo_routers_users_push.py": "85a2e4017a51444818caf8fd6042fa2f63b464d034fb830e22310544d73f72b7",
-      "backend/kojo_scheduler.py": "f530832390cefdcdbd4c88c88cac399ff3935d1f6e8bbf66d5fe943471df1a37",
       "backend/scripts/audit_docstrings.py": "fc1092b0f72619462c8d5e056dc652729f0a65e40abf171d249ed3993dc9ff39",
       "backend/scripts/audit_none_signatures.py": "2eef502b52f9c7e3482bd414ba9388105edd000be2b1a03e71195e1f4baa65d1",
       "backend/scripts/check_ai_assistant_probe.py": "2ce9e4a4acca1a3cdd2a651ee976e14cfda9db09fee76b0f5f61ecf9fd42d94d",
@@ -143,7 +142,8 @@
       "frontend/scripts/check-prerender-shells.js": "3ac51916663c3bf144220196cb68107c197e50611f3744174ce479946112b0fc",
       "backend/server.py": "911c4d0c8d71aa1cf56dc268c71a823cc385df8d4f36c391b79a6c41c8730253",
       ".github/scripts/alerte_sondes.py": "35c6b645b431b932c6af1ed53704acc4f096da428a49e2f7461259358f137687",
-      ".github/scripts/livrer.py": "7debdcaf504701b083b5c13575c41a2e2cdc2ae5b58e84d9cb62c5aadf4c8ba1"
+      ".github/scripts/livrer.py": "7debdcaf504701b083b5c13575c41a2e2cdc2ae5b58e84d9cb62c5aadf4c8ba1",
+      "backend/kojo_scheduler.py": "a66d11b182fca4236d91941b9319b3bd72577acd550f233df3afbc6551fabaf6"
     }
   },
   "hors_perimetre": [
