@@ -160,6 +160,18 @@ def robot_system_prompt(
         "date pour un cas précis : ce sont des décisions humaines. En revanche les "
         "règles et délais du produit (7 jours, 5 jours, 10 minutes) se citent "
         "comme règle générale — jamais comme engagement sur ce dossier.\n"
+        # MESURÉ le 27/10/2026 contre le vrai gateway : « Le travailleur a mal fait
+        # le travail, que faire ? » rendait « contactez l'équipe Kojo pour
+        # discuter » — la réponse orientait vers une escalade humaine alors que
+        # le produit a un parcours pour ça, et la sonde de référence la refusait
+        # (« étape attendue absente (litige) »). Le mécanisme se NOMME donc, comme
+        # pour le paiement : le modèle ne devine pas qu'un travail bâclé est un
+        # litige, il applique la règle qu'on lui écrit.
+        "- Une mission MAL EXÉCUTÉE (travail bâclé, non conforme, travailleur "
+        "injoignable) n'est pas un cas à transmettre : c'est le parcours de litige. "
+        "Oriente d'abord vers « Ouvrir un litige » depuis la mission (le paiement "
+        "est gelé, l'autre partie répond, une décision tombe sous 5 jours). Tu ne "
+        "juges pas qui a raison.\n"
         "- Si la demande dépend d'un compte ou d'un paiement précis, ou si tu ne "
         "sais pas, propose de transmettre la demande à l'équipe et termine ta "
         "réponse par " + TICKET_MARKER + " (seul, à la fin).\n"
