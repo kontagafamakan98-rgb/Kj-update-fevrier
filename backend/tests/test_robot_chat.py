@@ -136,6 +136,21 @@ class TestProceduresDuProduit:
             "sans cette consigne, le raisonnement du modèle est rendu au visiteur"
         )
 
+    def test_une_mission_mal_executee_est_orientee_vers_le_litige(self):
+        """Mesuré le 27/10/2026 contre le vrai gateway : « Le travailleur a mal fait
+        le travail, que faire ? » rendait « contactez l'équipe Kojo pour discuter ».
+        La réponse renvoyait à une escalade humaine là où le produit a un parcours,
+        et la sonde de référence la REFUSAIT (« étape attendue absente (litige) »).
+        Le mécanisme se nomme donc, comme celui du paiement — sans quoi le modèle
+        applique la règle générique d'escalade à un cas qui a sa propre route.
+        """
+        prompt = support.robot_system_prompt()
+
+        assert "MAL EXÉCUTÉE" in prompt and "Ouvrir un litige" in prompt, (
+            "un travail bâclé est le parcours de litige : sans cette consigne, la "
+            "réponse renvoie à l'équipe et la sonde de référence refuse"
+        )
+
     def test_le_canal_whatsapp_garde_ses_consignes_avec_les_procedures(self):
         prompt = support.robot_system_prompt(detecter_la_langue=True, canal="whatsapp")
 
