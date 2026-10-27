@@ -792,9 +792,23 @@ OWNER_INITIAL_PASSWORD = os.environ.get('OWNER_INITIAL_PASSWORD', '').strip()
 # Le slash final est retiré ici : sinon `…/v1` deviendrait `…//v1`.
 AI_GATEWAY_BASE_URL = os.environ.get('NEON_AI_GATEWAY_BASE_URL', '').strip().rstrip('/')
 AI_GATEWAY_TOKEN = os.environ.get('NEON_AI_GATEWAY_TOKEN', '').strip()
-# Identifiant de catalogue du modèle (models.dev/providers/neon) : le gateway
+# Identifiant de catalogue du modèle (`GET /v1/models` du gateway) : le gateway
 # route selon ce seul champ, donc changer de fournisseur ne touche PAS le code.
-AI_GATEWAY_MODEL = os.environ.get('NEON_AI_GATEWAY_MODEL', 'claude-haiku-4-5').strip()
+#
+# LE DÉFAUT A ÉTÉ MESURÉ, plus supposé (27/10/2026), depuis la machine de
+# production, contre le catalogue réel (464 modèles) :
+#   • `claude-haiku-4-5` (l'ancien défaut) → **400 « is not a valid model ID »** :
+#     une production sans `NEON_AI_GATEWAY_MODEL` n'aurait jamais répondu ;
+#   • `recursive/flint-v1.0:free` (le modèle GRATUIT configuré en production) →
+#     429 par intermittence, « temporarily rate-limited upstream » ;
+#   • `openai/gpt-oss-20b` et `qwen/qwen3.7-flash` → 200 avec un corps VIDE
+#     (donc 502 « réponse vide » côté route) ;
+#   • `mistralai/mistral-nemo` → **200 en 0,6 s**, réponse française fluide,
+#     ~0,029 $ par million de jetons d'entrée.
+# C'est ce dernier qui devient le défaut : un modèle payant bon marché répond
+# toujours, là où un modèle libre se met en file. Le plafond de dépense
+# (`kojo_ai_budget`) borne la facture, pas ce réglage.
+AI_GATEWAY_MODEL = os.environ.get('NEON_AI_GATEWAY_MODEL', 'mistralai/mistral-nemo').strip()
 # Un appel modèle est facturé et plus lent qu'une requête interne : borne
 # explicite, pour qu'un gateway lent ne bloque pas un worker indéfiniment.
 AI_GATEWAY_TIMEOUT_SECONDS = int(os.environ.get('NEON_AI_GATEWAY_TIMEOUT_SECONDS', '30'))

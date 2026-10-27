@@ -21,6 +21,9 @@ Deux règles qui expliquent la forme de ce fichier :
     de gateway est fréquente (quota, modèle retiré du catalogue) et doit être
     diagnosticable depuis les journaux, sans fuiter de secret.
 """
+import time
+from datetime import datetime, timezone
+
 import requests
 
 from kojo_settings import (
@@ -52,6 +55,165 @@ class AiGatewayError(RuntimeError):
     inspecter le message ni confondre une panne du gateway avec un bug du
     handler.
     """
+
+
+# ── L'ÉTAT DU DERNIER APPEL, PUBLIÉ PAR /health ────────────────────────────
+#
+# Pourquoi ce bloc existe, et ce qu'il a coûté de ne pas l'avoir : mesuré le
+# 27/10/2026, `POST /api/support/robot/chat` a rendu **502 en une seconde, cinq
+# fois sur cinq**, pendant que la sonde quotidienne était rouge depuis la veille.
+# Le code journalisait la cause (`gateway HTTP <statut> : <corps>`) — mais la
+# lire demande un accès aux journaux Fly, donc la seule chose que le site disait
+# de sa propre panne était « l'assistant n'a pas pu répondre ». Une panne qui ne
+# se lit qu'avec un accès privilégié est une panne qui dure.
+#
+# Le remède n'est pas d'exposer le corps d'erreur (il peut nommer l'hôte ou un
+# identifiant de branche) : c'est de garder la CAUSE CLASSÉE — un statut, un
+# genre d'échec — et de la publier sur `/health`, à côté du circuit PayDunya qui
+# suit exactement la même règle. Aucun jeton, aucun hôte, aucun corps :
+# `last_status` et `cause` suffisent à choisir entre « renouveler le jeton »,
+# « recharger le crédit » et « corriger le modèle », et c'est tout ce dont un
+# diagnostic a besoin.
+#
+# L'état est PAR PROCESS, comme les compteurs de `/metrics` et pour la même
+# raison : le dépôt refuse `WEB_CONCURRENCY > 1` sans Redis. Il est remis à zéro
+# au redémarrage — un déploiement qui rend l'assistant guéri ne doit pas garder
+# l'échec d'avant, et `state: "inconnu"` le dit au lieu de faire passer un
+# silence pour un vert.
+_diagnostic = {
+    "cause": "",
+    "last_status": None,
+    "consecutive_failures": 0,
+    "last_failure_at": None,
+    "last_success_at": None,
+}
+
+# Ce que chaque statut veut dire pour qui doit RÉPARER, écrit une fois. Un
+# dictionnaire de phrases plutôt qu'un message générique : « 401 » et « 402 »
+# n'appellent pas la même personne (renouveler un jeton ; recharger un compte).
+MOTIFS_PAR_STATUT = {
+    400: (
+        "requête refusée (400) : modèle ou paramètre refusé — vérifier "
+        "NEON_AI_GATEWAY_MODEL dans le catalogue"
+    ),
+    401: "jeton refusé (401) : renouveler NEON_AI_GATEWAY_TOKEN",
+    402: "crédit épuisé (402) : recharger le compte du gateway",
+    403: "accès refusé (403) : jeton sans droit sur cette branche",
+    404: "modèle ou branche introuvable (404) : vérifier NEON_AI_GATEWAY_MODEL",
+    # 429 observé le 27/10/2026 sur le modèle GRATUIT `recursive/flint-v1.0:free` :
+    # le corps disait « is temporarily rate-limited upstream … or add your own
+    # key ». Ce n'est donc pas toujours le quota du COMPTE, et le motif le dit :
+    # le remède est de choisir un modèle payant du catalogue, ou de réessayer.
+    429: (
+        "modèle saturé chez le fournisseur (429) : les modèles libres se mettent "
+        "en file — configurer un modèle payant dans NEON_AI_GATEWAY_MODEL, ou réessayer"
+    ),
+}
+
+# Ce que chaque genre d'échec veut dire, quand il n'y a pas de statut à lire.
+MOTIFS_PAR_CAUSE = {
+    "non_configure": (
+        "gateway non configuré : NEON_AI_GATEWAY_BASE_URL ou "
+        "NEON_AI_GATEWAY_TOKEN absent"
+    ),
+    "reseau": "gateway injoignable (réseau) : vérifier l'hôte de branche",
+    "illisible": "réponse du gateway sans texte exploitable",
+    "tronquee": "réponse tronquée par le plafond de jetons",
+    "vide": "réponse du gateway vide",
+}
+
+
+def _attente_429(response) -> float:
+    """L'attente avant de rejouer un 429 : son en-tête, borné à 5 s.
+
+    Un `Retry-After` lisible l'emporte ; une valeur absente, non numérique ou
+    déraisonnable retombe sur 1,5 s. Le plafond existe pour qu'un fournisseur
+    qui annoncerait 120 s ne bloque pas une requête publique pendant deux
+    minutes — au-delà de 5 s, mieux vaut le dire au visiteur que l'attendre.
+    """
+    try:
+        valeur = float((getattr(response, "headers", None) or {}).get("Retry-After", ""))
+    except (TypeError, ValueError):
+        return 1.5
+    return max(0.5, min(valeur, 5.0))
+
+
+def _maintenant() -> str:
+    """L'instant en ISO 8601 UTC — la forme que `/health` publie déjà (timestamp)."""
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _noter_echec(cause: str, statut=None) -> None:
+    """Mémorise un échec : genre, statut, et le compteur consécutif.
+
+    Appelée sur CHAQUE chemin de sortie en erreur, y compris celui du gateway
+    non configuré : une fonctionnalité éteinte est un état, pas un silence.
+    """
+    _diagnostic["cause"] = cause
+    _diagnostic["last_status"] = int(statut) if isinstance(statut, int) else None
+    _diagnostic["consecutive_failures"] += 1
+    _diagnostic["last_failure_at"] = _maintenant()
+
+
+def _noter_succes() -> None:
+    """Un appel réussi remet le compteur à zéro et date le dernier succès.
+
+    Le genre d'échec précédent est CONSERVÉ : il date `last_failure_at` et
+    explique une reprise qui vient d'avoir lieu — l'effacer ferait perdre la
+    seule trace d'une panne récente, alors que `state` dit déjà « ok ».
+    """
+    _diagnostic["consecutive_failures"] = 0
+    _diagnostic["last_success_at"] = _maintenant()
+
+
+def _motif(cause: str, statut) -> str:
+    """La phrase actionnable d'un échec, ou vide quand il n'y en a pas."""
+    if isinstance(statut, int):
+        if statut in MOTIFS_PAR_STATUT:
+            return MOTIFS_PAR_STATUT[statut]
+        if statut >= 500:
+            return f"gateway en panne ({statut}) : incident côté fournisseur"
+    return MOTIFS_PAR_CAUSE.get(cause, "")
+
+
+def diagnostic() -> dict:
+    """L'état du dernier appel, publiable tel quel (aucun secret, aucun hôte).
+
+    `state` a TROIS valeurs, jamais deux : `ok` (le dernier appel a réussi),
+    `echec` (le dernier appel a échoué) et `inconnu` (aucun appel depuis le
+    démarrage). Un gateway jamais appelé ne doit pas se lire comme un gateway
+    sain — c'est la règle du dépôt : un vert qui n'a rien mesuré est un silence.
+    """
+    cause = _diagnostic["cause"]
+    statut = _diagnostic["last_status"]
+    if _diagnostic["consecutive_failures"] > 0:
+        etat = "echec"
+    elif _diagnostic["last_success_at"]:
+        etat = "ok"
+    else:
+        etat = "inconnu"
+    return {
+        "configured": is_configured(),
+        "model": AI_GATEWAY_MODEL,
+        "state": etat,
+        "cause": cause,
+        "motif": _motif(cause, statut) if etat == "echec" else "",
+        "last_status": statut,
+        "consecutive_failures": _diagnostic["consecutive_failures"],
+        "last_failure_at": _diagnostic["last_failure_at"],
+        "last_success_at": _diagnostic["last_success_at"],
+    }
+
+
+def reinitialiser() -> None:
+    """Remet l'état à zéro (démarrage, ou test qui isole son scénario)."""
+    _diagnostic.update({
+        "cause": "",
+        "last_status": None,
+        "consecutive_failures": 0,
+        "last_failure_at": None,
+        "last_success_at": None,
+    })
 
 
 def _valeur_nette(valeur: str) -> str:
@@ -108,6 +270,7 @@ def chat_completion(
             `PLAFOND_JETONS_MAX`) plutôt que rendu au visiteur en 502.
     """
     if not is_configured():
+        _noter_echec("non_configure")
         raise AiGatewayError("gateway non configuré (NEON_AI_GATEWAY_BASE_URL / NEON_AI_GATEWAY_TOKEN absents)")
 
     url = f"{_valeur_nette(AI_GATEWAY_BASE_URL).rstrip('/')}{CHAT_COMPLETIONS_PATH}"
@@ -138,12 +301,30 @@ def chat_completion(
         except requests.RequestException as exc:
             # La cause réseau nommée, l'hôte réduit à son domaine : un journal de
             # production ne doit pas porter l'identifiant de branche en clair.
+            _noter_echec("reseau")
             raise AiGatewayError(f"appel au gateway impossible ({type(exc).__name__})")
 
         if response.status_code != 200:
+            # ── Le 429 est REJOUABLE (27/10/2026) ────────────────────────────
+            # Mesuré ce jour sur le modèle gratuit de production : deux
+            # questions sur trois passaient, la troisième rendait 429 avec
+            # « temporarily rate-limited upstream, please retry shortly ». Le
+            # code la rendait au visiteur en 502 instantané, alors que le
+            # fournisseur demandait une seconde d'attente. Un 429 est donc
+            # rejoué UNE fois, dans le budget d'essais qui existe déjà (aucune
+            # boucle) ; un second 429 garde sa cause et son statut.
+            if response.status_code == 429 and tentative == 0:
+                attente = _attente_429(response)
+                logger.warning(
+                    "⚠️ Assistant IA : gateway 429 (modèle saturé), nouvel essai dans %.1f s",
+                    attente,
+                )
+                time.sleep(attente)
+                continue
             # Le corps d'erreur du gateway nomme le problème (modèle absent du
             # catalogue, quota, jeton révoqué) : tronqué, c'est le seul
             # diagnostic utile en production.
+            _noter_echec("http", response.status_code)
             raise AiGatewayError(
                 f"gateway HTTP {response.status_code} : {response.text[:200]}"
             )
@@ -153,6 +334,7 @@ def chat_completion(
             choice = payload["choices"][0]
             content = choice["message"]["content"]
         except (ValueError, KeyError, IndexError, TypeError):
+            _noter_echec("illisible")
             raise AiGatewayError("réponse du gateway sans texte exploitable")
 
         # Un plafond atteint n'est PAS une réponse : rendre le texte coupé ferait
@@ -169,11 +351,14 @@ def chat_completion(
                 )
                 max_tokens = nouveau_plafond
                 continue
+            _noter_echec("tronquee")
             raise AiGatewayError(
                 f"réponse tronquée par le plafond de {max_tokens} jetons (finish_reason=length)"
             )
 
         if not isinstance(content, str) or not content.strip():
+            _noter_echec("vide")
             raise AiGatewayError("réponse du gateway vide")
 
+        _noter_succes()
         return content.strip()
