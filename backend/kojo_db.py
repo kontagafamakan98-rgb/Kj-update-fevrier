@@ -10,8 +10,7 @@ Extrait de `kojo_core`, qui n'en garde que la facade : le nom continue d'y
 etre servi (`from kojo_core import X`) pour ses importeurs. La surface
 publique de la facade est figee par `tests/test_core_surface.py`.
 """
-from kojo_recherche_missions import CHAMPS_TEXTE, LANGUE_TEXTE, NOM_INDEX_TEXTE
-from kojo_retention import RETENTION_RULES
+import kojo_index_declares as index_declares
 from kojo_settings import logger
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
@@ -46,216 +45,102 @@ async def is_database_available() -> bool:
     except Exception as e:
         logger.warning(f"⚠️ MongoDB unavailable: {e}")
         return False
+async def _backfill_geo_jobs():
+    """Recopie `location.latitude/longitude` dans le point GeoJSON `geo`.
+
+    Best-effort, borné, non bloquant : la recherche par rayon ne voit que
+    `geo`, et des missions d'avant cette fonctionnalité n'en portent pas.
+    """
+    try:
+        cursor = db.jobs.find(
+            {"geo": {"$exists": False}, "location.latitude": {"$ne": None}, "location.longitude": {"$ne": None}},
+            {"_id": 0, "id": 1, "location": 1},
+        ).limit(500)
+        async for job_doc in cursor:
+            loc = job_doc.get("location") or {}
+            try:
+                lat = float(loc.get("latitude"))
+                lng = float(loc.get("longitude"))
+                if lat is not None and lng is not None:
+                    await db.jobs.update_one(
+                        {"id": job_doc.get("id")},
+                        {"$set": {"geo": {"type": "Point", "coordinates": [lng, lat]}}},
+                    )
+            except (TypeError, ValueError):
+                continue
+    except Exception as exc:
+        logger.warning(f"⚠️ Backfill geo jobs impossible: {exc}")
+
+
 async def create_database_indexes():
-    """Create indexes on frequently queried fields for better performance"""
+    """Crée (ou RÉPARE) chaque index DÉCLARÉ — un `try` PAR index.
+
+    POURQUOI UN `try` PAR INDEX (mesuré le 27/10/2026) : la version d'avant
+    enveloppait les ~70 créations dans un seul `try`. Le sixième index échouait
+    (`google_sub` en `unique`+`sparse` face aux `null` écrits par
+    l'inscription), et les 66 suivants n'étaient JAMAIS créés — index texte de
+    la recherche, `2dsphere` du tri par distance, TTL de conservation compris.
+    L'échec partait dans un `logger.warning` à chaque démarrage, et le repli
+    `$regex` de la recherche répondait 200 sans que rien ne signale la lenteur.
+
+    Un index en échec ne doit plus emporter les autres, et le RÉSUMÉ doit être
+    lisible une fois par démarrage : combien sont conformes, lesquels ont été
+    remplacés, lesquels ont échoué. `scripts/check_index_db.py` juge la même
+    déclaration côté production — la sonde et la création lisent la MÊME liste.
+    """
     if not await is_database_available():
         logger.warning("⚠️ Skipping MongoDB index creation because the database is unavailable.")
         return
 
-    try:
-        # Users collection indexes
-        await db.users.create_index("email", unique=True)
-        await db.users.create_index("id", unique=True)
-        await db.users.create_index("user_type")
-        await db.users.create_index("country")
-        await db.users.create_index([("email", 1), ("password_hash", 1)])
-        # Comptes SSO Google : un sub Google est lié à AU PLUS UN compte Kojo.
-        # Sparse : les comptes mot-de-passe n'ont pas de google_sub et ne
-        # doivent pas être contraints par cet index.
-        await db.users.create_index("google_sub", unique=True, sparse=True)
-        
-        # Jobs collection indexes
-        await db.jobs.create_index("id", unique=True)
-        await db.jobs.create_index("client_id")
-        # `GET /jobs?mine=assigned` filtre là-dessus : sans cet index, chaque
-        # ouverture de « mes missions » balayait toute la collection (mesuré
-        # au banc de charge, cf. backend/SCALING.md §6).
-        await db.jobs.create_index("assigned_worker_id")
-        await db.jobs.create_index("status")
-        await db.jobs.create_index("category")
-        await db.jobs.create_index("country")
-        await db.jobs.create_index([("status", 1), ("category", 1)])
-        await db.jobs.create_index([("status", 1), ("created_at", -1)])
-        await db.jobs.create_index([("created_at", -1)])  # For sorting by date
-        # Tri par BUDGET (`GET /jobs?tri=budget`) : sans cet index, la liste
-        # était ENTIÈREMENT triée en mémoire à chaque ouverture, et le tri
-        # portait sur la seule colonne `created_at`.
-        await db.jobs.create_index([("status", 1), ("budget_max", -1)])
-        await db.jobs.create_index([("budget_max", -1)])
-        # Recherche par MOTS (`GET /jobs?q=`) : un index texte, pas seulement
-        # les `$regex` — ceux-ci ne peuvent pas s'appuyer sur un index et
-        # balayaient la collection à chaque frappe. Les champs, la langue et le
-        # nom viennent de `kojo_recherche_missions` (un seul propriétaire, lu
-        # aussi par la requête et par la doublure de test) : une liste recopiée
-        # ici indexerait d'autres champs que ceux que la recherche interroge.
-        await db.jobs.create_index(
-            [(champ, "text") for champ in CHAMPS_TEXTE],
-            default_language=LANGUE_TEXTE,
-            name=NOM_INDEX_TEXTE,
-        )
-        # Géospatial : recherche par rayon (GET /jobs?lat=&lng=&radius_km=)
-        await db.jobs.create_index([("geo", "2dsphere")])
+    declares = index_declares.declarations()
+    crees = 0
+    remplaces = []
+    echecs = []
 
-        # Backfill best-effort des jobs existants : certains ont des
-        # coordonnées dans location.latitude/longitude mais pas de point
-        # GeoJSON (ajouté à la création depuis cette fonctionnalité). On les
-        # met à jour pour que la recherche par rayon fonctionne sur les
-        # données historiques. Borné et non bloquant.
+    for declare in declares:
+        collection = str(declare["collection"])
+        nom = index_declares.nom(declare)
         try:
-            cursor = db.jobs.find(
-                {"geo": {"$exists": False}, "location.latitude": {"$ne": None}, "location.longitude": {"$ne": None}},
-                {"_id": 0, "id": 1, "location": 1},
-            ).limit(500)
-            async for job_doc in cursor:
-                loc = job_doc.get("location") or {}
-                try:
-                    lat = float(loc.get("latitude"))
-                    lng = float(loc.get("longitude"))
-                    if lat is not None and lng is not None:
-                        await db.jobs.update_one(
-                            {"id": job_doc.get("id")},
-                            {"$set": {"geo": {"type": "Point", "coordinates": [lng, lat]}}},
-                        )
-                except (TypeError, ValueError):
-                    continue
-        except Exception as exc:
-            logger.warning(f"⚠️ Backfill geo jobs impossible: {exc}")
-        
-        # Proposals collection indexes — sur la VRAIE collection job_proposals
-        # (l'ancienne "proposals" n'est plus utilisée par aucun code ; les
-        # index y étaient créés à tort, laissant job_proposals sans index).
-        await db.job_proposals.create_index("id", unique=True)
-        await db.job_proposals.create_index("job_id")
-        await db.job_proposals.create_index("worker_id")
-        await db.job_proposals.create_index([("job_id", 1), ("worker_id", 1)])
+            await db[collection].create_index(declare["cle"], **declare["options"])
+            crees += 1
+            continue
+        except Exception as exc:  # noqa: BLE001 - l'échec d'un index ne vaut pas les autres
+            if not index_declares.conflit_d_options(exc):
+                echecs.append((collection, nom, exc))
+                logger.error(f"❌ Index {collection}.{nom} NON créé : {exc}")
+                continue
 
-        # Alertes emploi (kojo_job_alerts) : UNE veille par compte, garantie par
-        # l'index unique — sans lui, deux activations simultanées (double clic,
-        # deux onglets) inséreraient deux documents, donc deux emails pour les
-        # mêmes missions. Le jeton de désinscription est unique et sparse : il
-        # n'est comparé qu'à la recherche, et les veilles d'avant son
-        # introduction n'en portent pas.
-        await db.job_alerts.create_index("user_id", unique=True)
-        await db.job_alerts.create_index("token", unique=True, sparse=True)
-        await db.job_alerts.create_index("active")
-
-        # Journal des événements métier (kojo_business_events) : `cle` unique
-        # absorbe une écriture répétée d'un même jalon.
-        await db.business_events.create_index("cle", unique=True)
-        await db.business_events.create_index("job_id")
-        await db.business_events.create_index("user_id")
-
-        # Faits de livraison des emails (kojo_email_suppressions) :
-        # `id_evenement` (en-tête `svix-id` de Resend) est UNIQUE — c'est la
-        # contrainte qui absorbe une re-livraison du même fait, et sans elle un
-        # rebond rejoué compterait deux fois, donc l'alerte et le journal
-        # mentiraient. L'index TTL de ce journal vient des règles de
-        # conservation (bloc plus bas), jamais d'un expireAfterSeconds écrit
-        # ici.
-        await db.email_delivery_events.create_index("id_evenement", unique=True)
-        await db.email_delivery_events.create_index("email")
-
-        # Adresses injoignables : une adresse = un état. `email` est normalisé
-        # (minuscules, sans étiquette `+tag`, cf. kojo_email_suppressions) pour
-        # que `prenom+tag@…` et `prenom@…` ne fassent qu'une seule boîte.
-        await db.email_suppressions.create_index("email", unique=True)
-
-        # Support WhatsApp (kojo_whatsapp) : `provider_message_id` est UNIQUE —
-        # c'est la contrainte qui absorbe une re-livraison du fournisseur, et
-        # sans elle un même message ferait répondre deux fois, sur un canal où
-        # l'on ne peut pas effacer. L'index de conversation sert le CONTEXTE de
-        # l'assistant (derniers tours) à chaque message.
-        await db.whatsapp_messages.create_index("provider_message_id", unique=True)
-        await db.whatsapp_messages.create_index([("conversation", 1), ("created_at", -1)])
-        
-        # Messages collection indexes
-        # NOTE: les index précédents portaient sur "job_id" et "created_at",
-        # deux champs qui n'existent pas sur le modèle Message (id,
-        # conversation_id, sender_id, receiver_id, content, timestamp, read)
-        # - ces index ne servaient donc à rien. "conversation_id", lui,
-        # est utilisé dans quasiment toutes les requêtes messages et n'était
-        # pas indexé du tout (full collection scan à chaque conversation
-        # ouverte).
-        await db.messages.create_index("id", unique=True)
-        await db.messages.create_index([("sender_id", 1), ("receiver_id", 1)])
-        await db.messages.create_index([("conversation_id", 1), ("timestamp", 1)])
-        await db.messages.create_index([("timestamp", -1)])
-        await db.messages.create_index("job_id")
-        
-        # Commissions collection indexes
-        await db.commissions.create_index("id", unique=True)
-        await db.commissions.create_index("job_id")
-        await db.commissions.create_index("worker_id")
-        await db.commissions.create_index("status")
-        await db.commissions.create_index([("created_at", -1)])
-
-        # Payments collection indexes
-        await db.payments.create_index("id", unique=True)
-        await db.payments.create_index("job_id")
-        await db.payments.create_index("payer_id")
-        await db.payments.create_index("receiver_id")
-        await db.payments.create_index("status")
-        await db.payments.create_index("invoice_token", sparse=True)
-        # `disburse_token` est relu par la re-vérification d'un décaissement
-        # (`kojo_routers_payments`, chemin de l'argent) et n'était pas indexé :
-        # chaque re-vérification balayait la collection entière.
-        await db.payments.create_index("disburse_token", sparse=True)
-        # Clé d'idempotence du checkout : UNIQUE et SPARSE. Le champ était
-        # accepté et stocké sans jamais être lu — deux requêtes simultanées
-        # créaient donc deux factures pour le même geste client. L'unicité
-        # n'est pas qu'un accélérateur : c'est elle qui rend le rejeu
-        # inoffensif (index créé même sur les documents `None`, exclus par
-        # `sparse`).
-        await db.payments.create_index("idempotency_key", unique=True, sparse=True)
-        await db.payments.create_index([("created_at", -1)])
-        # (index TTL des paiements : dans le bloc de conservation plus bas,
-        # créé depuis kojo_retention.RETENTION_RULES)
-
-        # Support : `id` (lecture d'un ticket) et `email` (retrouver les tickets
-        # d'un demandeur) étaient interrogés SANS index — un balayage complet à
-        # chaque ouverture, sur la collection la plus identifiante du dépôt.
-        await db.support_tickets.create_index("id", unique=True)
-        await db.support_tickets.create_index("email")
-        await db.support_tickets.create_index([("status", 1), ("created_at", -1)])
-
-        # Email OTP collection indexes
-        await db.email_otps.create_index([("email", 1), ("purpose", 1)], unique=True)
-        # (index TTL des codes OTP : bloc de conservation plus bas)
-        await db.email_otps.create_index([("created_at", -1)])
-
-        # Notifications collection indexes
-        await db.notifications.create_index("id", unique=True)
-        await db.notifications.create_index("user_id")
-        await db.notifications.create_index([("user_id", 1), ("is_read", 1)])
-        await db.notifications.create_index([("user_id", 1), ("created_at", -1)])
-        # (index TTL des notifications : bloc de conservation plus bas)
-
-        # Reviews (avis) collection indexes
-        await db.reviews.create_index("id", unique=True)
-        await db.reviews.create_index("job_id")
-        await db.reviews.create_index("reviewee_id")
-        await db.reviews.create_index([("job_id", 1), ("reviewer_id", 1)], unique=True)
-        await db.reviews.create_index([("created_at", -1)])
-
-        # Push tokens collection indexes
-        await db.push_tokens.create_index("id", unique=True)
-        await db.push_tokens.create_index("user_id")
-        await db.push_tokens.create_index([("user_id", 1), ("active", 1)])
-
-        await db.revoked_tokens.create_index("jti", unique=True)
-        # (index TTL des jetons révoqués : bloc de conservation plus bas)
-
-        # --- Index TTL : conservation des données ----------------------------
-        # Ces index ne reçoivent plus leur `expireAfterSeconds` écrit à la main
-        # ici : la durée ET l'index viennent de kojo_retention.RETENTION_RULES,
-        # qui est aussi ce dont PRIVACY.md publie le tableau. Un chiffre écrit
-        # des deux côtés finit toujours par diverger ; un garde le refuse
-        # désormais (.github/scripts/check-privacy-policy.py).
-        for regle in RETENTION_RULES:
-            await db[regle.collection].create_index(
-                regle.ttl_field, **regle.options_index()
+        # Même nom, AUTRES options : c'est l'état que laisse un index dont la
+        # règle a changé (le `google_sub` unique+sparse d'avant). Un index
+        # périmé n'est pas un index : il ne porte pas la contrainte annoncée.
+        # Un retrait, UNE reprise — jamais une boucle, jamais un retrait en aveugle
+        # (seul un conflit d'options 85/86 y mène ; un 11000 est un doublon réel).
+        try:
+            await db[collection].drop_index(nom)
+            await db[collection].create_index(declare["cle"], **declare["options"])
+            crees += 1
+            remplaces.append(f"{collection}.{nom}")
+            logger.warning(
+                f"⚠️ Index {collection}.{nom} REMPLACÉ : il existait avec d'autres "
+                "options que celles déclarées."
             )
+        except Exception as seconde:
+            echecs.append((collection, nom, seconde))
+            logger.error(f"❌ Index {collection}.{nom} NON remplacé : {seconde}")
 
-        logger.info("✅ MongoDB indexes created successfully")
-    except Exception as e:
-        logger.warning(f"⚠️ Error creating indexes (may already exist): {e}")
+    await _backfill_geo_jobs()
+
+    resume = f"Index MongoDB : {crees}/{len(declares)} conformes"
+    if remplaces:
+        resume += f", {len(remplaces)} remplacé(s)"
+    if echecs:
+        resume += f", {len(echecs)} ÉCHEC(S)"
+        logger.error(resume)
+        logger.error(
+            "Index en échec (la sonde `scripts/check_index_db.py` les nomme aussi) : "
+            + ", ".join(f"{collection}.{nom}" for collection, nom, _ in echecs)
+        )
+    else:
+        logger.info("✅ " + resume)
+
+

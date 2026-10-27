@@ -834,6 +834,13 @@
       "runner": "pytest"
     },
     {
+      "chemin": "backend/scripts/check_index_db.py",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "backend/tests/test_index_db_probe.py",
+      "runner": "pytest"
+    },
+    {
       "chemin": "backend/scripts/check_ai_assistant_probe.py",
       "role": "garde",
       "invoque_par": "ci",
@@ -2513,6 +2520,27 @@
       "cwd": "backend",
       "attend": [
         "FAILED tests/test_atlas_backups_probe.py::TestSauvegardeExterne::test_une_sauvegarde_perimee_est_refusee_en_nommant_les_deux_durees"
+      ]
+    },
+    {
+      "id": "index-db: declaration tronquee acceptee",
+      "garde": "backend/scripts/check_index_db.py",
+      "cible": "backend/scripts/check_index_db.py",
+      "trouve": "    if len(declares) < PLANCHER_DECLARES:",
+      "remplace": "    if False:",
+      "runner": "python",
+      "preuve": "backend/tests/test_index_db_probe.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_index_db_probe.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_index_db_probe.py::test_une_declaration_tronquee_refuse_de_conclure"
       ]
     },
     {
