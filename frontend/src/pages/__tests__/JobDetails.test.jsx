@@ -20,7 +20,7 @@
  */
 import React from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, cleanup, waitFor } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 vi.mock('../../contexts/LanguageContext', async (importOriginal) => {
@@ -230,5 +230,36 @@ describe('Fiche mission — les candidatures lues, ou l’échec DIT', () => {
     expect(await screen.findByText('Kojo Plomberie')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.queryByText('Aucune proposition pour le moment')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * LE PARTAGE N'ATTEND AUCUN COMPTE.
+ *
+ * Le visiteur à froid — celui qui arrive par un lien déjà partagé — est le seul
+ * à pouvoir faire circuler une mission sans rien créer : le bouton est donc
+ * rendu AVANT les actions qui dépendent d'un rôle, et il ne dépend d'aucun. Ce
+ * qu'il envoie est le lien de la FICHE (`/jobs/:id`), la seule URL que le
+ * backend pré-rend avec ses balises Open Graph, donc la seule qui affiche un
+ * aperçu lisible chez le destinataire.
+ */
+describe('Fiche mission — le partage, pour un visiteur sans compte', () => {
+  it('offre Partager et envoie le lien de la FICHE, avec son titre', async () => {
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    getById.mockResolvedValueOnce(reponse(MISSION));
+
+    rendre();
+
+    const partage = await screen.findByRole('button', { name: /Partager/ });
+    fireEvent.click(partage);
+
+    expect(open).toHaveBeenCalledTimes(1);
+    const [url] = open.mock.calls[0];
+    expect(url.startsWith('https://wa.me/?text=')).toBe(true);
+    const message = decodeURIComponent(url);
+    expect(message).toContain('/jobs/j-1');
+    expect(message).toContain(MISSION.title);
+
+    open.mockRestore();
   });
 });

@@ -443,7 +443,7 @@ const Administration = () => {
                   {comptes.map((compte) => (
                     <li key={compte.id} className="py-3">
                       <div className="flex flex-wrap items-center gap-3">
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-600 text-xs font-bold text-white" aria-hidden="true">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-700 text-xs font-bold text-white" aria-hidden="true">
                           {initiales(compte)}
                         </span>
                         <div className="min-w-0 flex-1">

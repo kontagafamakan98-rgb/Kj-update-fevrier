@@ -1,68 +1,100 @@
-/**
- * LA PREUVE SOCIALE DE L'ACCUEIL — ce que la bande de faits affiche, et ce
- * qu'elle refuse d'inventer.
- *
- * ── Le défaut que ce module ferme ───────────────────────────────────────────
- * L'accueil a publié des compteurs FABRIQUÉS (« 1 000+ travailleurs »,
- * « 500+ projets ») jusqu'au 07/10/2026 : le HTML pré-rendu les servait à un
- * crawler et le premier paint les montrait à un visiteur, comme s'ils étaient
- * mesurés. Ils ont été retirés, et la bande ne portait plus que des faits
- * vérifiables (4 pays, support 7j/7).
- *
- * Depuis le 22/10/2026 elle porte AUSSI la preuve mesurée par
- * `GET /api/public/stats` (travailleurs, missions terminées, avis). La règle
- * qui rend les deux compatibles est ici, et nulle part ailleurs :
- *
- *   • un chiffre MESURÉ s'affiche tel quel — zéro compris. Un « 0 » publié est
- *     une mesure ; c'est le taire qui serait un mensonge par omission (même
- *     doctrine que les taux d'arbitrage : « 0 % publié reste une mesure ») ;
- *   • une mesure ABSENTE (pas encore de réponse, panne réseau, champ manquant
- *     ou non numérique) laisse le texte DÉCLARÉ du plan — « — », qui ne dit
- *     rien d'autre que « pas mesuré ici ». Aucun repli chiffré n'existe ;
- *   • la valeur est formatée par la LANGUE COURANTE (`Intl.NumberFormat`) :
- *     « 1 250 » en français, « 1,250 » en anglais — un séparateur recopié à la
- *     main se tromperait sur l'une des cinq langues du site.
- *
- * Ce module ne lit ni réseau ni DOM : l'appel vit dans la page (`Home.js`), et
- * la règle se juge ici, sans navigateur (voir son test).
- */
+// ============================================================================
+// LA PREUVE SOCIALE DE L'ACCUEIL : un SEUIL, un ÉTAT D'ATTENTE, jamais un zéro.
+//
+// ── Ce que ce module décide, et pourquoi il existe (26/10/2026) ─────────────
+// La bande de faits de l'accueil a publié trois compteurs lus de
+// `GET /api/public/stats` du 22/10 au 26/10. En production, faute de missions,
+// elle affichait « 3 travailleurs · 0 mission terminée · 0 avis » : deux zéros
+// alignés au seuil d'une page qui vend la confiance. La correction du 26/10 a
+// retiré les compteurs ET l'appel — mais elle a laissé la bande sans aucune
+// preuve de ce que la plateforme a réellement fait.
+//
+// Ce module rétablit la preuve avec la règle inverse : un chiffre n'est publié
+// que lorsqu'il PROUVE quelque chose. Trois missions terminées et deux avis
+// forment le plancher ; en dessous, la bande publie un état d'attente («
+// chiffres à venir ») au lieu d'un petit nombre qui se lirait comme un test.
+//
+// ── Pourquoi deux seuils, et pourquoi ces valeurs-là ────────────────────────
+// `SEUIL_MISSIONS_TERMINEES = 3` : deux missions terminées peuvent être les
+// essais du propriétaire lui-même ; trois engagent une plateforme.
+// `SEUIL_AVIS = 2` : un avis unique ne fait pas une réputation, et deux est le
+// premier nombre dont le PLURIEL est juste dans les cinq langues du site — le
+// singulier demanderait une forme par langue que personne n'a écrite, donc la
+// bande ne peut pas le publier. Le seuil n'est donc pas une opinion sur la
+// qualité : c'est aussi ce qui rend la phrase traduisible telle quelle.
+//
+// ── Trois états, jamais deux ────────────────────────────────────────────────
+//   • `mesure`   : les deux compteurs sont lisibles ET au-dessus des seuils ;
+//   • `attente`  : l'un des deux est sous son seuil (le fait existe, il ne
+//                  prouve pas encore) ;
+//   • `attente`  aussi pour une lecture ILLISIBLE : une réponse absente, un
+//     champ manquant, un NaN ou un négatif ne sont pas des mesures. Une panne
+//     qui se lirait « chiffres à venir » ne ment pas ; une panne qui se lirait
+//     « 0 » mentirait exactement comme le 26/10.
+//
+// Ce module ne connaît NI React NI les dictionnaires : il rend des NOMBRES et
+// un état. La phrase qui les porte appartient à la page (`Home.js`), qui la
+// compose avec `t()` ; le formatage des milliers appartient à `Intl`, donc à la
+// langue, et jamais à une constante recopiée.
+// ============================================================================
 
-/** Le pont entre une entrée du plan d'accueil et le champ de `/public/stats`. */
-export const MESURES_DE_PREUVE = {
-  measuredWorkers: 'workers',
-  measuredCompletedJobs: 'completed_jobs',
-  measuredReviews: 'reviews',
-};
+/** Missions terminées minimales pour qu'un chiffre soit publié. */
+export const SEUIL_MISSIONS_TERMINEES = 3;
+
+/** Avis minima pour qu'un chiffre soit publié (premier pluriel juste). */
+export const SEUIL_AVIS = 2;
+
+/** La bande publie des chiffres mesurés. */
+export const ETAT_MESURE = 'mesure';
+
+/** La bande publie son état d'attente : c'est le défaut, pas une erreur. */
+export const ETAT_ATTENTE = 'attente';
 
 /**
- * Un nombre lisible dans la langue demandée, ou `null` si l'entrée n'est pas
- * un nombre fini.
+ * Un compteur publié : un entier positif ou nul. Tout le reste est illisible
+ * (chaîne, `null`, `undefined`, `NaN`, flottant, négatif) et ne devient JAMAIS
+ * un zéro — c'est la règle qui a coûté un audit le 26/10/2026.
  *
- * Le repli sur le français est EXPLICITE : `Intl` ne lève pas forcément sur une
- * étiquette inconnue — il retombe en silence sur la locale par défaut du
- * runtime (`en-US` sur le runner de CI), donc un séparateur anglais aurait été
- * présenté comme le repli français. Les cinq langues publiées sont donc le seul
- * arbitre, et `fr` le seul repli.
+ * @param {unknown} valeur Champ brut de `GET /api/public/stats`.
+ * @returns {number|null} Le compteur, ou `null` si la valeur ne se lit pas.
  */
-export function nombreLisible(valeur, langue) {
-  if (typeof valeur !== 'number' || !Number.isFinite(valeur)) return null;
-  const demandee = String(langue || 'fr');
-  // `toLocaleString` après le filtre : la langue est toujours l'une des cinq
-  // publiées ou `fr`, donc jamais une étiquette qu'`Intl` refuserait.
-  return valeur.toLocaleString(/^(fr|en|wo|bm|mos)$/.test(demandee) ? demandee : 'fr');
+const lireCompteur = (valeur) => (Number.isInteger(valeur) && valeur >= 0 ? valeur : null);
+
+/**
+ * L'état de la preuve sociale de l'accueil, à partir de la réponse de l'API.
+ *
+ * @param {object|null|undefined} stats `{completed_jobs, reviews, …}` ou rien.
+ * @returns {{etat: string, missions: number|null, avis: number|null}}
+ *   `missions` et `avis` sont les compteurs LUS (même sous le seuil), pour que
+ *   le diagnostic puisse dire le fait sans le publier.
+ */
+export function preuvesDeLAccueil(stats) {
+  const missions = lireCompteur(stats?.completed_jobs);
+  const avis = lireCompteur(stats?.reviews);
+
+  if (missions === null || avis === null) {
+    return { etat: ETAT_ATTENTE, missions, avis };
+  }
+  if (missions < SEUIL_MISSIONS_TERMINEES || avis < SEUIL_AVIS) {
+    return { etat: ETAT_ATTENTE, missions, avis };
+  }
+  return { etat: ETAT_MESURE, missions, avis };
 }
 
 /**
- * La valeur affichée pour une entrée de `PAGE_SECTIONS['/'].stats`.
+ * Le séparateur de milliers appartient à la LANGUE (`Intl`), pas au code : la
+ * repli n'existe que pour un environnement sans `Intl` complet, et il ne
+ * prétend pas formater (il rend le nombre tel quel plutôt qu'un groupe inventé).
  *
- * @param {{labelKey: string, fallback: string}} stat  l'entrée DÉCLARÉE.
- * @param {object|null} mesures  la réponse de `/public/stats`, ou `null`.
- * @param {string} langue  code de langue courant (`fr`, `en`, `wo`…).
- * @returns {string} le chiffre mesuré formaté, ou le texte déclaré.
+ * @param {number} valeur Compteur entier positif ou nul.
+ * @param {string} [langue] Code de langue (`fr`, `en`, `wo`, `bm`, `mos`).
+ * @returns {string}
  */
-export function valeurDePreuve(stat, mesures, langue) {
-  const champ = MESURES_DE_PREUVE[stat?.labelKey];
-  // `?? stat.fallback` et non `||` : un « 0 » formaté est une chaîne NON vide,
-  // donc une mesure publiée — le seul cas de repli est l'absence de mesure.
-  return nombreLisible(champ && mesures ? mesures[champ] : undefined, langue) ?? stat.fallback;
+export function formaterCompteur(valeur, langue = 'fr') {
+  if (!Number.isInteger(valeur) || valeur < 0) return String(valeur);
+  try {
+    return new Intl.NumberFormat(langue).format(valeur);
+  } catch (_erreur) {
+    return String(valeur);
+  }
 }

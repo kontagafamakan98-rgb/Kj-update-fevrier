@@ -43,6 +43,11 @@ import {
 } from '../published-copy.js';
 import { ROUTES } from '../check-og-images.js';
 import { SITE_ORIGIN, shellFileFor } from '../site-meta.js';
+// La TABLE des textes de page : la fixture en dérive la description de chaque
+// coquille de route, comme le garde la lit — une description recopiée ici
+// pourrait diverger de ce qu'il exige, et le cas conforme rougirait pour la
+// mauvaise raison (la leçon du 25/09/2026).
+import { PAGE_META } from '../../src/config/page-meta.js';
 // Le scope register, résolu EXACTEMENT comme le fait le garde : la fixture ne
 // peut donc pas dériver des octets que la coquille doit publier.
 import { makeScopedTranslator as makeRegisterTranslator } from '../../src/utils/pack2PageI18n/register.js';
@@ -167,12 +172,29 @@ const TETE_SHELL = '<!doctype html><html><head><style>.App{display:block}</style
 /** La fermeture du chrome, ÉCRITE DEPUIS SA SOURCE (jamais recopiée). */
 const FIN_DE_PAGE = CHROME_FERMETURE + FERMETURE_DE_L_APPLICATION;
 
+/**
+ * La BANDE DE FAITS du héros, matérialisée depuis le PLAN : le garde exige que
+ * chaque fait déclaré soit peint à sa place (icône puis valeur), et refuse un
+ * zéro. Écrire ces deux valeurs ici les aurait fait diverger du plan au premier
+ * changement — c'est exactement ce que le garde reproche à la coquille.
+ */
+const BANDE_DE_FAITS =
+  PAGE_SECTIONS['/'].stats
+    .map(({ shellText }) => `<span class="fait-cta-figure"><svg></svg>${shellText}</span>`)
+    .join('') +
+  // La LIGNE DE PREUVE (26/10/2026) : la coquille la peint avec l'état
+  // d'attente déclaré, React n'en changera que le TEXTE. Elle est écrite depuis
+  // le plan et le dictionnaire, jamais recopiée — sinon la fixture dériverait
+  // de ce que la coquille publie vraiment.
+  `<p class="${PAGE_SECTIONS['/'].preuveClass}">${fr[PAGE_SECTIONS['/'].preuveAttenteKey]}</p>`;
+
 /** HTML minimal mais CONFORME à chaque attente du garde. */
 const pages = () => ({
   'index.html':
     TETE_SHELL +
     ogTagFor('index.html') +
     `</head><body><div id="root">${CHROME_OUVERTURE}<h1>Kojo</h1><p>Contenu statique de l${APOSTROPHE_PUBLIEE}accueil</p>` +
+    BANDE_DE_FAITS +
     '<a href="/jobs">Emplois</a>' +
     `<h2>${fr.contactTitle}</h2><p>${fr.homeContactText}</p>` +
     `<div>${fr.homeContactCall}</div><div>${fr.contactWhatsapp}</div>` +
@@ -221,7 +243,7 @@ const pages = () => ({
     '</head><body><div id="root">' + CHROME_OUVERTURE +
     '<h1 class="mt-6 text-3xl font-bold text-stone-900">Mot de passe oublié</h1>' +
     '<input id="reset-email" />' +
-    '<div class="bg-orange-600 px-4 py-2 text-sm font-semibold text-white">Envoyer le code</div>' +
+    '<div class="bg-orange-700 px-4 py-2 text-sm font-semibold text-white">Envoyer le code</div>' +
     FIN_DE_PAGE +
     '</div>' +
     preload('ForgotPassword') +
@@ -329,7 +351,12 @@ const pages = () => ({
     '<meta name="robots" content="noindex, follow" /></head><body><div id="root"></div></body></html>',
   '404.html':
     '<!doctype html><html lang="fr"><head><meta name="robots" content="noindex">' +
-    `<title>${fr.notFoundMetaTitle}</title></head><body><main>` +
+    `<title>${fr.notFoundMetaTitle}</title>` +
+    // La description de la 404 vient du PARAGRAPHE de la page (noindex, donc
+    // aucun extrait de résultat à distinguer du texte visible) : elle est lue au
+    // dictionnaire, jamais recopiée.
+    `<meta name="description" content="${fr.notFoundText}">` +
+    '</head><body><main>' +
     `<h1>${fr.notFoundTitle}</h1><p>${fr.notFoundText}</p><nav>` +
     `<a href="/">${fr.home}</a><a href="/jobs">${fr.notFoundJobsLink}</a>` +
     `<a href="/how-it-works">${fr.howItWorksTitle}</a>` +
@@ -402,6 +429,18 @@ const fixture = (mutate) => {
   fs.writeFileSync(path.join(build, 'assets', 'vendor-abc123.js'), 'export const dep = 1;\n');
 
   const html = pages();
+  // LA DESCRIPTION de chaque coquille de route, écrite depuis la TABLE et le
+  // dictionnaire que le garde lit (sa section 4septies) : la fixture conforme ne
+  // peut donc pas porter une description qu'il refuserait, et les cas négatifs
+  // la retirent, la dupliquent ou la remplacent pour exiger le refus nommé.
+  for (const [route, keys] of Object.entries(PAGE_META)) {
+    const nom = shellFileFor(route);
+    if (!html[nom]) continue;
+    html[nom] = html[nom].replace(
+      TETE_SHELL,
+      `${TETE_SHELL}<meta name="description" content="${fr[keys.description]}" />`
+    );
+  }
   const files = [...Object.keys(html), ...CLIENT_PAGES];
   let config = { rewrites: rewritesFor(files), cleanUrls: true };
 
@@ -587,6 +626,59 @@ describe('check-prerender-shells — chaque refus sait mordre', () => {
       attendu: 'absent de la coquille (section contact / pied de page)',
     },
     {
+      // Le défaut mesuré le 26/10/2026 : la bande de faits publiait « 0 mission
+      // terminée · 0 avis ». Le compteur revenait par le RUNTIME ; ici il est
+      // posé dans l'artefact, exactement là où le garde doit le voir — un zéro
+      // peint par la coquille est un zéro servi à un crawler.
+      nom: 'bande de faits du héros publiant un compteur à zéro',
+      mutate: ({ html }) => {
+        const premier = PAGE_SECTIONS['/'].stats[0].shellText;
+        html['index.html'] = html['index.html'].replace(
+          `</svg>${premier}</span>`,
+          '</svg>0</span>'
+        );
+      },
+      attendu: 'ZÉRO présenté comme preuve sociale',
+    },
+    {
+      nom: 'bande de faits du héros amputée (un fait déclaré n’est plus peint)',
+      mutate: ({ html }) => {
+        const dernier = PAGE_SECTIONS['/'].stats.at(-1);
+        html['index.html'] = html['index.html'].replace(
+          `</svg>${dernier.shellText}</span>`,
+          '</svg>—</span>'
+        );
+      },
+      attendu: 'la coquille ne le peint pas',
+    },
+    {
+      // Le défaut que la ligne de preuve rendrait au montage : sans elle dans
+      // l'artefact, React peindrait une phrase là où la coquille n'a rien
+      // peint — le nœud serait INSÉRÉ, donc la bande se déplacerait (CLS).
+      nom: 'ligne de preuve absente du shell (React l’insérerait au montage)',
+      mutate: ({ html }) => {
+        const classe = PAGE_SECTIONS['/'].preuveClass;
+        html['index.html'] = html['index.html'].replace(
+          new RegExp(`<p class="${classe}">[^<]*</p>`),
+          ''
+        );
+      },
+      attendu: 'la ligne de preuve',
+    },
+    {
+      // Un chiffre FIGÉ au build vieillirait en silence : la coquille doit
+      // publier l'état d'attente déclaré, pas une mesure de la veille.
+      nom: 'ligne de preuve publiant un chiffre figé au build',
+      mutate: ({ html }) => {
+        const classe = PAGE_SECTIONS['/'].preuveClass;
+        html['index.html'] = html['index.html'].replace(
+          new RegExp(`<p class="${classe}">[^<]*</p>`),
+          `<p class="${classe}">12 missions terminées</p>`
+        );
+      },
+      attendu: 'un chiffre figé au build',
+    },
+    {
       // La page et la coquille lisent le MÊME dictionnaire : si la coquille
       // publie l'apostrophe droite là où sa page publie la typographique,
       // l'octet publié diverge — c'est ce que la bascule a fermé.
@@ -750,6 +842,53 @@ describe('check-prerender-shells — chaque refus sait mordre', () => {
         delete html['terms.html'];
       },
       attendu: 'ne sont vérifiées par personne',
+    },
+    {
+      // LA DESCRIPTION (26/10/2026) : une coquille servie sans elle fait lire à
+      // un moteur l'extrait de l'accueil, ou rien — et aucun autre garde ne la
+      // lit sur l'ARTEFACT (check-page-meta.js compare l'app et la coquille des
+      // routes de la table, pas la présence de la balise).
+      nom: 'description retirée de la coquille /jobs',
+      mutate: ({ html }) => {
+        html['jobs.html'] = html['jobs.html'].replace(/<meta name="description"[^>]*>/, '');
+      },
+      attendu: 'AUCUNE balise <meta name="description">',
+    },
+    {
+      // Le défaut historique que cette section ferme : toutes les pages
+      // héritaient de la description de l'accueil.
+      nom: 'description d’une page remplacée par celle de l’accueil',
+      mutate: ({ html }) => {
+        html['privacy.html'] = html['privacy.html'].replace(
+          `<meta name="description" content="${fr.privacyMetaDescription}" />`,
+          `<meta name="description" content="${fr.homeMetaDescription}" />`
+        );
+      },
+      attendu: 'la coquille et la page annonceraient deux extraits différents',
+    },
+    {
+      // Deux balises : un moteur en choisit une et l'autre est morte. Le refus
+      // nomme le compte, donc il ne se confond pas avec « absente ».
+      nom: 'description publiée deux fois par la coquille /payment',
+      mutate: ({ html }) => {
+        html['payment.html'] = html['payment.html'].replace(
+          '</head>',
+          `<meta name="description" content="${fr.paymentMetaDescription}" /></head>`
+        );
+      },
+      attendu: '2 balises <meta name="description">',
+    },
+    {
+      // La 404 est le seul document du build que check-page-meta.js ne lit pas :
+      // sans ce cas, sa description pourrait disparaître sans que rien ne rougisse.
+      nom: 'description retirée de la page 404',
+      mutate: ({ html }) => {
+        html['404.html'] = html['404.html'].replace(
+          `<meta name="description" content="${fr.notFoundText}">`,
+          ''
+        );
+      },
+      attendu: 'la page servie à une URL inconnue doit en publier exactement une',
     },
     {
       // Le motif de ce découpage : un fragment publié recopié au lieu d'être lu

@@ -431,6 +431,13 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
         `<span class="${faitLibelleClass}">${esc(T(labelKey))}</span>` +
         `</div>`
     ),
+    // La LIGNE DE PREUVE. La coquille ne connaît pas les compteurs (le build
+    // n'a pas d'accès à la base) : elle peint l'ÉTAT D'ATTENTE déclaré
+    // (`preuveAttenteKey`), et React remplace ce TEXTE dans ce nœud une fois
+    // la mesure jugée publiable. La ligne existe donc AVANT le montage, des
+    // deux côtés, avec la même classe et la même réserve de hauteur : rien
+    // n'est inséré après hydratation, donc rien ne se déplace.
+    `<p class="${homePlan.preuveClass}">${esc(T(homePlan.preuveAttenteKey))}</p>`,
     `</div>`,
     `</div>`,
     `</section>`,

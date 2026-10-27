@@ -21,6 +21,7 @@ import { clearRegistrationFlow, saveRegistrationFlow } from '../utils/registrati
 import { devLog, safeLog } from '../utils/env';
 import { authAPI, handleApiError } from '../services/api';
 import { usePageMeta } from '../utils/seo';
+import { EVENEMENTS_FUNNEL, trackFunnel } from '../utils/funnel';
 import { PAGE_SECTIONS } from '../config/page-sections';
 import { MarqueKojo } from '../config/marque-kojo';
 import { PHONE_PREFIX_FALLBACK, phoneNumberExample } from '../config/phone-format';
@@ -40,10 +41,16 @@ export default function Register() {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    confirmPassword: '',
-    first_name: '',
-    last_name: '',
-    phone: '', // Défini après détection ou choix manuel
+    // ── UN SEUL CHAMP POUR LE NOM (26/10/2026) ─────────────────────────────
+    // `first_name`/`last_name` demandaient de décider où coupe un nom, et la
+    // règle « prénom puis nom » n'est pas universelle. Le champ porte le nom
+    // COMPLET ; le serveur le répartit (`kojo_models._noms_resolus`), et il
+    // reste la seule source de vérité pour les comptes déjà créés.
+    name: '',
+    // `confirmPassword` est RETIRÉ : une seconde saisie du même mot de passe
+    // ne prouve rien de plus (elle se tape dans le même champ, avec le même
+    // révélateur), et elle coûtait un champ obligatoire au seuil du formulaire.
+    phone: '', // FACULTATIF depuis le 26/10/2026 — défini après détection ou choix manuel
     user_type: initialUserType,
     country: '', // Défini après détection ou choix manuel
     preferred_language: defaultLanguage, // Langue courante par défaut, peut être modifiée
@@ -62,7 +69,14 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [emailChecking, setEmailChecking] = useState(false);
   const [emailAvailability, setEmailAvailability] = useState(null);
-  const [geoLoading, setGeoLoading] = useState(true);
+  // `geoLoading` ne porte plus l'ÉTAT AFFICHÉ (26/10/2026) : il ne sert plus
+  // qu'au bouton « Utiliser ma position », qui se désactive le temps de la
+  // demande. Le montage ne peint donc plus « Détection en cours » puis
+  // « Position non détectée » : la coquille pré-rendue n'a pas de JavaScript,
+  // donc la seule chose qu'elle puisse peindre HONNÊTEMENT est cet état final —
+  // et une page dont le premier rendu diffère de la coquille se déplace à
+  // l'hydratation (garde `e2e/texte-coquille-react.spec.js`).
+  const [geoLoading, setGeoLoading] = useState(false);
   const [detectedCountry, setDetectedCountry] = useState(null);
   const [manualCountrySelection, setManualCountrySelection] = useState(false);
   const manualCountrySelectionRef = useRef(false);
@@ -203,16 +217,28 @@ export default function Register() {
   const activePhonePrefix = activeCountry?.phonePrefix || '';
   const activePhoneExample = activeCountry ? stripPhonePrefix(getPhoneExampleForCountry(activeCountry), activePhonePrefix) : pageT('phonePlaceholder');
 
-  // Géolocalisation automatique au chargement
+  // Géolocalisation au chargement — PAR IP, SANS DEMANDER LA POSITION (26/10/2026).
+  //
+  // La détection complète commençait par `navigator.geolocation` : le navigateur
+  // affichait donc sa demande de permission dès l'ouverture de la page
+  // d'inscription, avant tout geste. Mesuré en production par Lighthouse mobile
+  // le 26/10/2026 (`geolocation-on-start`, bonnes pratiques 96) : un refus au
+  // seuil d'un formulaire coûte des inscriptions, et un visiteur qui refuse ne
+  // revient pas sur sa décision à la deuxième visite.
+  //
+  // Ce que la page a besoin de savoir au montage est le PAYS, et il vient de
+  // l'IP (`sansGps: true`, côté service). La position précise reste offerte par
+  // le bouton « Utiliser ma position », où la demande de permission répond à un
+  // geste explicite.
   useEffect(() => {
-    detectUserLocationAndSetDefaults();
+    detectUserLocationAndSetDefaults({ sansGps: true });
   }, []);
 
 
-  const detectUserLocationAndSetDefaults = async () => {
+  const detectUserLocationAndSetDefaults = async ({ sansGps = true } = {}) => {
     try {
-      devLog.info('🌍 Détection automatique du pays de l’utilisateur...');
-      const country = await detectUserCountry();
+      devLog.info(`🌍 Détection ${sansGps ? 'par IP' : 'précise'} du pays de l’utilisateur...`);
+      const country = await detectUserCountry({ sansGps });
       
       // detected:false = échec de détection (objet neutre, jamais null) : on
       // ne remplace PAS un pays déjà choisi ni n'auto-sélectionne un code vide.
@@ -236,8 +262,6 @@ export default function Register() {
       }
     } catch (error) {
       safeLog.error('❌ Erreur géolocalisation:', error);
-    } finally {
-      setGeoLoading(false);
     }
   };
 
@@ -248,8 +272,11 @@ export default function Register() {
     setErrorKey('');
 
     // Validation de base
-    if (formData.password !== formData.confirmPassword) {
-      const errorMsg = t('passwordsDontMatch');
+    // Le nom complet est jugé ICI, avant l'envoi : le serveur sait le répartir,
+    // mais un nom d'un caractère n'est pas un nom, et un refus local garde la
+    // saisie (pas d'aller-retour réseau pour l'apprendre).
+    if ((formData.name || '').trim().length < 2) {
+      const errorMsg = pageT('fullNameRequired');
       setError(errorMsg);
       toast.error(errorMsg);
       setLoading(false);
@@ -294,12 +321,17 @@ export default function Register() {
     // Préparer les données utilisateur
     const userData = {
       ...formData,
+      name: formData.name.trim(),
+      // Le téléphone est FACULTATIF : vide, il part en `null` plutôt qu'en
+      // chaîne vide (le serveur traite les deux comme « pas de numéro », mais
+      // une charge utile qui dit la même chose de deux façons finit par être
+      // lue de travers).
+      phone: formData.phone.trim() || null,
       preferred_language: userSelectedLanguage, // Utiliser la langue choisie par l'utilisateur
       legal_documents_accepted_at: new Date().toISOString(),
       // Ajouter la photo si sélectionnée
       profile_photo_base64: profilePhoto?.base64 || null
     };
-    delete userData.confirmPassword;
 
     // Rediriger d'abord vers la vérification email
     devLog.info('📝 Redirection vers la vérification email...');
@@ -350,6 +382,15 @@ export default function Register() {
       // entre directement. Les comptes de paiement ne sont plus un passage
       // obligatoire à l'inscription (22/10/2026) — ils se demandent là où ils
       // servent, et le tableau de bord le rappelle à qui n'en a pas.
+      //
+      // Le canal est DIT : sans ça, l'entonnoir d'inscription ne distinguerait
+      // pas le formulaire email (deux étapes) de Google (une seule), et le taux
+      // de vérification de code se calculerait sur une base faussée.
+      trackFunnel(EVENEMENTS_FUNNEL.inscription, {
+        user_type: formData.user_type || 'client',
+        country: formData.country,
+        signup_method: 'google',
+      });
       toast.success(pageT('googleSuccess'));
       navigate('/dashboard', { replace: true });
       return;
@@ -406,16 +447,17 @@ export default function Register() {
   // à remplir ICI.
   //
   // Elle ne compte que les champs EXIGÉS, et le consentement légal en est un
-  // (l'envoi le refuse sans lui). Le téléphone est compté sur le NUMÉRO, jamais
-  // sur le préfixe : la géolocalisation le pré-remplit avec « +223 » seul, et un
-  // préfixe n'est pas une réponse.
+  // (l'envoi le refuse sans lui).
+  //
+  // Changé le 26/10/2026 en même temps que le formulaire : le NOM compte pour
+  // UN (il n'y a plus deux champs, et une confirmation de mot de passe ne se
+  // demande plus), et le TÉLÉPHONE n'y est plus — une jauge qui compterait un
+  // champ facultatif resterait bloquée sous 100 % en accusant la personne de
+  // n'avoir pas rempli quelque chose qu'on ne lui demande pas.
   const champsExiges = [
-    formData.first_name,
-    formData.last_name,
+    formData.name,
     formData.email,
-    stripPhonePrefix(formData.phone, activePhonePrefix),
     formData.password,
-    formData.confirmPassword,
     formData.country,
     formData.user_type,
     formData.legal_documents_accepted ? 'ok' : '',
@@ -475,22 +517,17 @@ export default function Register() {
           </p>
           
           {/* Information sur le processus avec géolocalisation.
-              Les TROIS états partagent la boîte DÉCLARÉE au plan
-              (`geoStatusBoxClass`, lue aussi par la coquille
-              vite-plugins/prerender/shells-routes.js) : elle réserve la hauteur
-              du plus haut des trois, si bien que le passage « détection en
-              cours » → « pays détecté / non détecté » ne déplace plus les
-              pastilles d'étape ni le formulaire (mesuré : 14 px, CLS 0,0088).
-              Seules les COULEURS restent propres à chaque état. */}
+              Les DEUX états (pays détecté / position non détectée) partagent la
+              boîte DÉCLARÉE au plan (`geoStatusBoxClass`, lue aussi par la
+              coquille `vite-plugins/prerender/shells-routes.js`) : elle réserve
+              la hauteur du plus haut des deux, si bien que la détection qui
+              aboutit ne déplace ni les pastilles d'étape ni le formulaire.
+              L'état d'ATTENTE a disparu le 26/10/2026 : la coquille, sans
+              JavaScript, ne peut peindre que l'état final, et un premier rendu
+              différent de la coquille se déplace à l'hydratation. Seules les
+              COULEURS restent propres à chaque état. */}
           <div className="mt-6 bg-orange-50 border border-orange-200 rounded-lg p-4">
-            {geoLoading ? (
-              <div className={`${pagePlan.geoStatusBoxClass} border-transparent`}>
-                <div className="flex items-center justify-center py-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-500 mr-2"></div>
-                  <span className="text-xs text-blue-700">{t('detectingLocation')}</span>
-                </div>
-              </div>
-            ) : detectedCountry ? (
+            {detectedCountry ? (
               <div className={`${pagePlan.geoStatusBoxClass} bg-green-50 border-green-200`}>
                 <p className="text-sm text-green-800">
                   <span className="font-medium"><MapPin className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {pageT('positionDetected')}:</span> <CountryDisplay countryCode={detectedCountry.code} className="inline-flex align-middle" />
@@ -501,15 +538,41 @@ export default function Register() {
               </div>
             ) : (
               <div className={`${pagePlan.geoStatusBoxClass} bg-yellow-50 border-yellow-200`}>
+                {/* Pas de pastille de position ici (26/10/2026) : la coquille
+                    pré-rendue peint cet ÉTAT FINAL sans JavaScript, et un SVG
+                    en ligne dans ce paragraphe change la hauteur de ligne
+                    (mesuré : 2,21 px sur TOUT ce qui suit, et 11,6 px en X sur
+                    le texte) — donc deux peintures pour un même état, refusées
+                    par `e2e/geometrie-coquille-react.spec.js`. Le glyphe reste
+                    sur l'état « pays détecté », que la coquille ne peint pas. */}
                 <p className="text-xs text-yellow-700">
-                  <MapPin className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {pageT('positionNotDetected')}
+                  {pageT('positionNotDetected')}
                 </p>
+                {/* Le seul chemin qui DEMANDE la position de l'appareil : un
+                    geste, donc une permission comprise. La détection par IP a
+                    déjà échoué (on est dans cette branche) — la relance est
+                    ici plutôt qu'automatique. */}
+                <button
+                  type="button"
+                  disabled={geoLoading}
+                  onClick={async () => {
+                    setGeoLoading(true);
+                    try {
+                      await detectUserLocationAndSetDefaults({ sansGps: false });
+                    } finally {
+                      setGeoLoading(false);
+                    }
+                  }}
+                  className="mt-2 inline-flex items-center gap-2 rounded-lg border border-stone-300 fond-papier px-3 py-2 text-xs font-semibold text-stone-700 transition-colors hover:border-orange-500 hover:text-orange-700 disabled:opacity-60"
+                >
+                  {t('useMyPosition')}
+                </button>
               </div>
             )}
             
             <div className="flex flex-wrap items-center justify-center gap-3 pb-1 text-xs sm:text-sm">
               <div className="flex items-center">
-                <div className="w-6 h-6 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-medium">
+                <div className="w-6 h-6 bg-orange-700 text-white rounded-full flex items-center justify-center text-xs font-medium">
                   {t(pagePlan.step1NumberKey)}
                 </div>
                 <span className="ml-2 text-orange-600 font-medium whitespace-nowrap">{t(pagePlan.step1TitleKey)}</span>
@@ -588,7 +651,7 @@ export default function Register() {
                   <div className="w-full border-t border-gray-200" />
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="bg-white px-3 text-gray-400">{pageT('orSeparator') || 'ou'}</span>
+                  <span className="bg-white px-3 text-stone-500">{pageT('orSeparator') || 'ou'}</span>
                 </div>
               </div>
             )}
@@ -688,41 +751,24 @@ export default function Register() {
               )}
             </div>
 
-            {/* Names */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="first_name" className="block text-sm font-semibold text-stone-800 mb-2">
-                  {t('firstName')}
-                </label>
-                <input
-                  id="first_name"
-                  name="first_name"
-                  type="text"
-                  autoComplete="given-name"
-                  required
-                  className={pagePlan.champClass}
-                  placeholder={`${t('firstName')}...`}
-                  value={formData.first_name}
-                  onChange={handleChange}
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="last_name" className="block text-sm font-semibold text-stone-800 mb-2">
-                  {t('lastName')}
-                </label>
-                <input
-                  id="last_name"
-                  name="last_name"
-                  type="text"
-                  autoComplete="family-name"
-                  required
-                  className={pagePlan.champClass}
-                  placeholder={`${t('lastName')}...`}
-                  value={formData.last_name}
-                  onChange={handleChange}
-                />
-              </div>
+            {/* Le NOM, en un seul champ (26/10/2026) : le serveur répartit.
+                La classe du champ vient du plan (`champClass`), donc la
+                coquille pré-rendue peint le même élément et la même hauteur. */}
+            <div>
+              <label htmlFor="name" className="block text-sm font-semibold text-stone-800 mb-2">
+                {pageT('fullName')}
+              </label>
+              <input
+                id="name"
+                name="name"
+                type="text"
+                autoComplete="name"
+                required
+                className={pagePlan.champClass}
+                placeholder={`${pageT('fullName')}...`}
+                value={formData.name}
+                onChange={handleChange}
+              />
             </div>
             
             <div>
@@ -794,8 +840,17 @@ export default function Register() {
             </div>
 
             <div>
+              {/* FACULTATIF (26/10/2026) : le téléphone est un champ de CONTACT,
+                  jamais un identifiant — aucune connexion ni OTP par téléphone.
+                  L'exiger à l'inscription ajoutait une barrière sans contrepartie
+                  (et un numéro jamais vérifié ne prouvait rien). */}
               <label htmlFor="phone" className="block text-sm font-semibold text-stone-800 mb-2">
-                {t('phone')}
+                {t('phone')}{' '}
+                {/* Les PARENTHÈSES font partie du libellé traduit : ajoutées
+                    ici, elles formeraient un fragment « (optionnel) » que
+                    la coquille publie sans porteur (garde de provenance des
+                    textes). */}
+                <span className="font-normal text-stone-500">{pageT('phoneOptional')}</span>
               </label>
               <div className="flex">
                 <span className={pagePlan.champPrefixeClass}>
@@ -806,7 +861,6 @@ export default function Register() {
                   name="phone"
                   type="tel"
                   autoComplete="tel"
-                  required
                   className={pagePlan.champTelephoneClass}
                   placeholder={activePhoneExample}
                   value={stripPhonePrefix(formData.phone, activePhonePrefix)}
@@ -839,23 +893,6 @@ export default function Register() {
                 onChange={handleChange}
               />
               <p className="mt-1 text-xs text-gray-500">{t('passwordTooShort')}</p>
-            </div>
-
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-semibold text-stone-800 mb-2">
-                {t('confirmPassword')}
-              </label>
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                autoComplete="new-password"
-                required
-                className={pagePlan.champClass}
-                placeholder={t('passwordMasked')}
-                value={formData.confirmPassword}
-                onChange={handleChange}
-              />
             </div>
 
             {/* Code de parrainage (optionnel) — réservé aux TRAVAILLEURS :
@@ -899,7 +936,6 @@ export default function Register() {
             isManualSelection={manualCountrySelection}
             selectedLanguage={userSelectedLanguage}
             onLanguageSelect={setUserSelectedLanguage}
-            isLoading={geoLoading}
           />
 
           {/* Champs spécifiques aux travailleurs */}
@@ -914,7 +950,7 @@ export default function Register() {
 
           <div className="bloc-differe-legal rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-3">
             <div>
-              <h3 className="text-sm font-semibold text-orange-900"><IconePage nom={pagePlan.legalNoticeIcon} role="notice" /> {pageT('legalNoticeTitle')}</h3>
+              <h2 className="text-sm font-semibold text-orange-900"><IconePage nom={pagePlan.legalNoticeIcon} role="notice" /> {pageT('legalNoticeTitle')}</h2>
               <p className="text-xs text-orange-800 mt-1">{pageT('legalConsentHelp')}</p>
             </div>
             <a

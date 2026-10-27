@@ -168,7 +168,7 @@ export default function JobReviews({ jobId }) {
             type="button"
             onClick={submit}
             disabled={submitting}
-            className="mt-3 rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
+            className="mt-3 rounded-xl bg-orange-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-800 disabled:opacity-60"
           >
             {submitting ? pageT('submitting') : pageT('submit')}
           </button>

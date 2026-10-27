@@ -302,7 +302,7 @@ export default function NotificationPanel() {
                   {/* Indicateur non-lu */}
                   <div className="shrink-0 mt-1">
                     {!notif.is_read && (
-                      <span className="block w-2 h-2 rounded-full bg-orange-500" aria-hidden="true" />
+                      <span className="block w-2 h-2 rounded-full bg-orange-700" aria-hidden="true" />
                     )}
                     {notif.is_read && (
                       <span className="block w-2 h-2" aria-hidden="true" />

@@ -1,70 +1,143 @@
 /**
- * LA PREUVE SOCIALE NE S'INVENTE PAS — la règle de la bande de faits.
+ * LA PREUVE SOCIALE DE L'ACCUEIL : un seuil, un état d'attente, jamais un zéro.
  *
- * Trois défauts sont verrouillés ici, chacun mesuré un jour :
- *   1. un compteur FABRIQUÉ (« 1 000+ travailleurs ») a été publié jusqu'au
- *      07/10/2026 dans le HTML pré-rendu : une mesure absente doit laisser le
- *      texte déclaré, jamais un repli chiffré ;
- *   2. un ZÉRO mesuré est une mesure : le taire serait un mensonge par omission
- *      (même doctrine que les taux d'arbitrage du backend) ;
- *   3. le séparateur de milliers appartient à la LANGUE (`Intl`), pas à une
- *      chaîne recopiée — « 1 250 » en français, « 1,250 » en anglais.
+ * ── La classe de défaut que ce fichier ferme ───────────────────────────────
+ * Le 26/10/2026, l'accueil publiait « 0 mission terminée · 0 avis » : le
+ * compteur BRUT de `GET /api/public/stats`. Retirer les compteurs a corrigé le
+ * mensonge mais a laissé la bande sans aucune preuve de ce que la plateforme a
+ * fait. `utils/preuveSociale.js` rétablit la preuve à l'envers : un chiffre
+ * n'est publié que s'il PROUVE quelque chose, et en dessous du seuil la page
+ * publie l'état d'attente.
+ *
+ * ── Ce que ces cas mesurent ────────────────────────────────────────────────
+ *   • les deux seuils sont NÉCESSAIRES : trois missions sans deux avis ne
+ *     publient rien, deux avis sans trois missions non plus ;
+ *   • zéro n'est JAMAIS un état « mesure » — c'est le défaut du 26/10, et il
+ *     reviendrait par n'importe quelle régression de comparaison (`<=` au lieu
+ *     de `<`, un seuil à 0, un `parseInt` oublié) ;
+ *   • une valeur ILLISIBLE (absente, chaîne, `NaN`, négative, flottante) reste
+ *     en attente et ne devient pas un zéro : une panne ne se lit pas comme une
+ *     mesure ;
+ *   • le séparateur de milliers appartient à la LANGUE, par `Intl`.
+ *
+ * Ce que ce fichier ne prouve pas : le RENDU de la ligne (les trois états sont
+ * jugés dans `pages/__tests__/home-local-seo.test.jsx`) ni ce que la coquille
+ * pré-rendue peint (`scripts/check-prerender-shells.js`).
  */
 import { describe, it, expect } from 'vitest';
 import {
-  MESURES_DE_PREUVE,
-  nombreLisible,
-  valeurDePreuve,
+  ETAT_ATTENTE,
+  ETAT_MESURE,
+  SEUIL_AVIS,
+  SEUIL_MISSIONS_TERMINEES,
+  formaterCompteur,
+  preuvesDeLAccueil,
 } from '../preuveSociale';
 
-const TRAVAILLEURS = { labelKey: 'measuredWorkers', fallback: '—' };
-const PAYS = { labelKey: 'countriesCovered', fallback: '4' };
+/** Une réponse d'API au-dessus des deux seuils. */
+const AU_DESSUS = {
+  completed_jobs: SEUIL_MISSIONS_TERMINEES,
+  reviews: SEUIL_AVIS,
+};
 
-describe('preuve sociale — la valeur affichée', () => {
-  it('affiche la mesure formatée quand elle existe', () => {
-    expect(valeurDePreuve(TRAVAILLEURS, { workers: 1250 }, 'fr')).toBe(nombreLisible(1250, 'fr'));
+describe('preuve sociale — ce qui se publie, et ce qui attend', () => {
+  it('les seuils sont DÉCLARÉS ici, et le pluriel est toujours juste', () => {
+    // Un seuil n'est pas un réglage : il dit ce qu'on accepte d'appeler une
+    // preuve. Il est donc verrouillé, avec sa raison.
+    expect(SEUIL_MISSIONS_TERMINEES).toBe(3);
+    expect(SEUIL_AVIS).toBe(2);
+    // Les deux valeurs valent 2 ou plus : la phrase publiée est toujours au
+    // PLURIEL, dans les cinq langues, et aucune forme singulière n'est à
+    // écrire ni à traduire.
+    expect(SEUIL_MISSIONS_TERMINEES).toBeGreaterThanOrEqual(2);
+    expect(SEUIL_AVIS).toBeGreaterThanOrEqual(2);
   });
 
-  it('publie un ZÉRO mesuré : une mesure absente et un zéro ne se confondent pas', () => {
-    expect(valeurDePreuve(TRAVAILLEURS, { workers: 0 }, 'fr')).toBe('0');
+  it('aux seuils exactement, la mesure est publiable', () => {
+    expect(preuvesDeLAccueil(AU_DESSUS)).toEqual({
+      etat: ETAT_MESURE,
+      missions: SEUIL_MISSIONS_TERMINEES,
+      avis: SEUIL_AVIS,
+    });
   });
 
-  it('laisse le texte déclaré quand la mesure manque (pas de repli chiffré)', () => {
-    for (const mesures of [null, undefined, {}, { workers: null }, { workers: '1250' }, { workers: NaN }]) {
-      expect(valeurDePreuve(TRAVAILLEURS, mesures, 'fr')).toBe('—');
+  it('les DEUX seuils sont nécessaires : un seul franchi ne publie rien', () => {
+    // Trois missions terminées mais un seul avis : le fait existe, la preuve
+    // d'avis n'existe pas encore.
+    expect(
+      preuvesDeLAccueil({ completed_jobs: 40, reviews: SEUIL_AVIS - 1 }).etat
+    ).toBe(ETAT_ATTENTE);
+    // Deux avis mais deux missions terminées : le volume n'est pas encore là.
+    expect(
+      preuvesDeLAccueil({ completed_jobs: SEUIL_MISSIONS_TERMINEES - 1, reviews: 12 }).etat
+    ).toBe(ETAT_ATTENTE);
+  });
+
+  it('un ZÉRO n’est jamais une mesure — c’est le défaut du 26/10/2026', () => {
+    for (const stats of [
+      { completed_jobs: 0, reviews: 0 },
+      { completed_jobs: 0, reviews: 40 },
+      { completed_jobs: 40, reviews: 0 },
+    ]) {
+      const verdict = preuvesDeLAccueil(stats);
+      expect(
+        verdict.etat,
+        `« ${JSON.stringify(stats)} » a été jugé publiable : deux zéros alignés ` +
+          'ne mesurent pas la plateforme, ils la décrivent comme vide'
+      ).toBe(ETAT_ATTENTE);
     }
   });
 
-  it('une entrée qui n’est pas une mesure garde son texte déclaré', () => {
-    expect(valeurDePreuve(PAYS, { workers: 10 }, 'fr')).toBe('4');
-  });
+  it('une lecture ILLISIBLE reste en attente, elle ne devient pas un zéro', () => {
+    const illisibles = [
+      undefined,
+      null,
+      {},
+      { completed_jobs: 5 },
+      { reviews: 5 },
+      { completed_jobs: '5', reviews: 5 },
+      { completed_jobs: NaN, reviews: 5 },
+      { completed_jobs: -3, reviews: 5 },
+      { completed_jobs: 5.5, reviews: 5 },
+      'Erreur de connexion',
+    ];
 
-  it('un labelKey sans champ associé ne lit rien dans la réponse', () => {
-    expect(MESURES_DE_PREUVE.countriesCovered).toBeUndefined();
-    expect(valeurDePreuve({ labelKey: 'measuredReviews', fallback: '—' }, { reviews: 3 }, 'en'))
-      .toBe(nombreLisible(3, 'en'));
-  });
-});
-
-describe('preuve sociale — le nombre et sa langue', () => {
-  it('sépare les milliers selon la langue, pas selon une chaîne recopiée', () => {
-    expect(nombreLisible(1250, 'fr')).not.toBe(nombreLisible(1250, 'en'));
-    expect(nombreLisible(1250, 'en')).toBe('1,250');
-  });
-
-  it('formate dans les cinq langues du site', () => {
-    for (const langue of ['fr', 'en', 'wo', 'bm', 'mos']) {
-      expect(nombreLisible(42, langue), langue).toBe('42');
+    for (const stats of illisibles) {
+      const verdict = preuvesDeLAccueil(stats);
+      expect(verdict.etat, `« ${JSON.stringify(stats)} » a été publié`).toBe(ETAT_ATTENTE);
+      // Aucune valeur n'est FABRIQUÉE : ce qui n'a pas été lu reste `null` (le
+      // rendu n'a alors rien à afficher), et un entier lu reste celui qu'on a
+      // lu — jamais un zéro par défaut, jamais un `parseInt` qui aurait
+      // transformé « 5 » en 5.
+      const lu = (champ) =>
+        Number.isInteger(stats?.[champ]) && stats[champ] >= 0 ? stats[champ] : null;
+      expect(verdict.missions, `compteur retenu pour « ${JSON.stringify(stats)} »`).toBe(
+        lu('completed_jobs')
+      );
+      expect(verdict.avis).toBe(lu('reviews'));
     }
   });
 
-  it('une langue inconnue retombe sur le français au lieu de faire tomber la bande', () => {
-    expect(nombreLisible(1250, 'zz-inconnu')).toBe(nombreLisible(1250, 'fr'));
+  it('sous le seuil, les compteurs LUS restent disponibles pour le diagnostic', () => {
+    // Le fait est mesuré, il n'est simplement pas publié : c'est ce qui permet
+    // de distinguer « pas encore de preuve » de « pas de lecture du tout ».
+    expect(preuvesDeLAccueil({ completed_jobs: 2, reviews: 7 })).toEqual({
+      etat: ETAT_ATTENTE,
+      missions: 2,
+      avis: 7,
+    });
   });
 
-  it('refuse un non-nombre plutôt que d’afficher « NaN »', () => {
-    for (const valeur of [null, undefined, NaN, Infinity, '12', {}, []]) {
-      expect(nombreLisible(valeur, 'fr')).toBeNull();
-    }
+  it('le séparateur de milliers appartient à la LANGUE, et jamais au code', () => {
+    // `Intl` groupe selon les usages : le français met une espace insécable
+    // fine, l'anglais une virgule. Une constante recopiée ici se tromperait
+    // dans quatre langues sur cinq.
+    expect(formaterCompteur(1234, 'fr')).not.toBe('1234');
+    expect(formaterCompteur(1234, 'fr').replace(/\s/g, ' ')).toBe('1 234');
+    expect(formaterCompteur(1234, 'en')).toBe('1,234');
+    // Une valeur qui n'est pas un compteur n'est pas formatée en douce : elle
+    // est rendue telle quelle (le rendu, lui, ne l'appelle jamais).
+    expect(formaterCompteur(-1, 'fr')).toBe('-1');
+    expect(formaterCompteur(2.5, 'fr')).toBe('2.5');
   });
 });

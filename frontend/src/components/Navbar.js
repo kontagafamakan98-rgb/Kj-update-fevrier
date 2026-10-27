@@ -21,6 +21,55 @@ import {
   NAV_PWA_SUFFIXE,
 } from '../config/classes-chrome';
 
+// ── LE SURVOL DE LA BARRE VA JUSQU'AU BRUN, ET C'EST MESURÉ (26/10/2026) ────
+// La barre est du VERRE (`.verre-barre` : rgba(253, 250, 244, 0.78) + flou) : la
+// surface qu'un lien peint dépend donc de ce qui défile DERRIÈRE. Mesuré sur les
+// deux fonds de référence que le dépôt emploie déjà pour une vitre
+// (`scripts/verre-contraste.js`) : le sable de l'application (composé → #fcf8f2)
+// et l'encre du site (#ccc9c3, le pire cas plausible). Le survol était
+// `orange-600` (#ea580c) : **3,36:1** sur le verre posé sur le sable, **2,15:1**
+// sur le pire cas — sous le 4,5:1 du texte courant (WCAG 1.4.3). `orange-700`
+// (#c2410c) tenait le premier (4,89:1) mais pas le second (3,13:1), donc le
+// survol des entrées de bureau est monté avec les autres. `orange-900`
+// (#7c2d12, le brun de la marque) tient les deux : 8,86:1 et 5,67:1. Le lien de
+// profil, celui de connexion, le hamburger et les entrées du tiroir mobile
+// (posées sur `hover:bg-orange-50`, opaque : 8,83:1) portent le même jeton —
+// une seule encre de survol pour la barre, mesurée sur LES DEUX composites.
+// L'icône de la cloche garde `orange-700` : c'est un OBJET GRAPHIQUE (seuil
+// WCAG 1.4.11 de 3:1), et 3,13:1 sur le pire cas suffit là où du texte échoue.
+// Les deux boutons PLEINS de la barre (inscription, déconnexion) portaient du
+// texte BLANC sur `orange-600`, soit 3,56:1 — sous le seuil au repos. Ils sont
+// passés au jeton des autres boutons pleins du site le 26/10/2026 (`orange-700`
+// avec un survol `orange-800`) : 5,18:1 et 7,31:1. Ils sont donc MESURÉS comme
+// les autres entrées du tiroir, et non plus écartés.
+// Garde : `src/components/__tests__/Navbar.test.jsx` (la barre) et
+// `src/__tests__/boutons-pleins.test.js` (tout le site).
+
+/**
+ * Une entrée du menu de bureau, dans ses deux états.
+ *
+ * Le composant existe pour que les classes des DEUX variantes soient écrites
+ * dans une position de classe — celles du `className` du `<Link>` — plutôt que
+ * rendues par une fonction : `scripts/check-css-selecteurs-morts.js` lit les
+ * positions de classe, pas la valeur de retour d'un appel, et la variante
+ * inactive n'avait donc aucun porteur dès que la coquille de /register a cessé
+ * de l'écrire (13 pages servaient `.border-transparent` sans porteur).
+ */
+function LienDesktop({ to, actif, children }) {
+  return (
+    <Link
+      to={to}
+      className={`px-3 py-2 text-sm font-medium transition-colors border-b-2 ${
+        actif
+          ? 'border-orange-600 bg-orange-50 text-orange-700'
+          : 'border-transparent text-stone-700 hover:text-orange-900'
+      }`}
+    >
+      {children}
+    </Link>
+  );
+}
+
 export default function Navbar() {
   const { user, logout } = useAuth();
   const { t } = useLanguage();
@@ -105,21 +154,20 @@ export default function Navbar() {
   // règle de survol des liens (même épaisseur, même couleur).
   const estActif = (chemin) =>
     chemin === '/' ? location.pathname === '/' : location.pathname.startsWith(chemin);
-  // Le dessin d'une entrée de barre reste un UTILITAIRE : ce lien est rendu par
-  // une fonction (`className={lienDesktop('/dashboard')}`), donc la classe
-  // n'est jamais écrite en position de classe littérale — une classe de SITE y
-  // serait déclarée « nommée et jamais posée » par
-  // `scripts/check-css-selecteurs-mortes.js`, à juste titre. La mesure ne
-  // change pas (px-3 py-2, 14 px, filet de 2 px) ; l'entrée courante prend en
-  // plus un fond de crème, pour qu'on sache où l'on est sans lire le
-  // soulignement. Aucune hauteur ne bouge : la barre fait 65 px dans les deux
-  // canaux, et la coquille pré-rendue publie une barre VIDE.
-  const lienDesktop = (chemin) =>
-    `px-3 py-2 text-sm font-medium transition-colors border-b-2 ${
-      estActif(chemin)
-        ? 'border-orange-600 bg-orange-50 text-orange-700'
-        : 'border-transparent text-stone-700 hover:text-orange-700'
-    }`;
+  // Le dessin d'une entrée de barre reste un UTILITAIRE (px-3 py-2, 14 px,
+  // filet de 2 px) ; l'entrée courante prend en plus un fond de crème, pour
+  // qu'on sache où l'on est sans lire le soulignement. Aucune hauteur ne bouge :
+  // la barre fait 65 px dans les deux canaux, et la coquille pré-rendue publie
+  // une barre VIDE.
+  //
+  // Les deux variantes sont écrites DANS la position de classe, par
+  // `LienDesktop` ci-dessous — plus dans une fonction qui les rendait :
+  // `className={lienDesktop('/jobs')}` n'est pas une position de classe que
+  // `scripts/check-css-selecteurs-morts.js` sache suivre, donc la variante
+  // inactive n'avait de porteur QUE la coquille pré-rendue de /register, qui a
+  // cessé de l'écrire le 26/10/2026 — et le garde a alors mesuré 13 pages
+  // servant une règle sans porteur. Le porteur doit être là où la classe est
+  // PEINTE, pas chez une page qui ne s'en sert pas.
 
   return (
     <nav className={navbarClass}>
@@ -162,18 +210,18 @@ export default function Navbar() {
           <div className="hidden md:flex items-center space-x-6">
             {user ? (
               <>
-                <Link to="/dashboard" className={lienDesktop('/dashboard')}>
+                <LienDesktop to="/dashboard" actif={estActif('/dashboard')}>
                   {t('dashboard')}
-                </Link>
-                <Link to="/jobs" className={lienDesktop('/jobs')}>
+                </LienDesktop>
+                <LienDesktop to="/jobs" actif={estActif('/jobs')}>
                   {t('jobs')}
-                </Link>
-                <Link to="/messages" className={lienDesktop('/messages')}>
+                </LienDesktop>
+                <LienDesktop to="/messages" actif={estActif('/messages')}>
                   {t('messages')}
-                </Link>
-                <Link to={versSupport} className={lienDesktop('/support')}>
+                </LienDesktop>
+                <LienDesktop to={versSupport} actif={estActif('/support')}>
                   {t('support')}
-                </Link>
+                </LienDesktop>
               </>
             ) : (
               /* Visiteur NON connecté : la navigation publique. Sans elle, un
@@ -181,18 +229,18 @@ export default function Navbar() {
                  et ne pouvait atteindre les emplois, la page « Comment ça
                  marche ? » ou le contact que par le bas de page. */
               <>
-                <Link to="/jobs" className={lienDesktop('/jobs')}>
+                <LienDesktop to="/jobs" actif={estActif('/jobs')}>
                   {t('jobs')}
-                </Link>
-                <Link to="/how-it-works" className={lienDesktop('/how-it-works')}>
+                </LienDesktop>
+                <LienDesktop to="/how-it-works" actif={estActif('/how-it-works')}>
                   {t('howItWorksTitle')}
-                </Link>
-                <Link to="/about" className={lienDesktop('/about')}>
+                </LienDesktop>
+                <LienDesktop to="/about" actif={estActif('/about')}>
                   {t('aboutTitle')}
-                </Link>
-                <Link to="/contact" className={lienDesktop('/contact')}>
+                </LienDesktop>
+                <LienDesktop to="/contact" actif={estActif('/contact')}>
                   {t('contactTitle')}
-                </Link>
+                </LienDesktop>
               </>
             )}
           </div>
@@ -209,19 +257,19 @@ export default function Navbar() {
                     chacun avec son écouteur de clic extérieur — c'est ce
                     nombre qui faisait disparaître l'appui avant le `click`. */}
                 <NotificationBell />
-                <Link to="/profile" className="text-gray-700 hover:text-orange-600 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                <Link to="/profile" className="text-gray-700 hover:text-orange-900 px-3 py-2 rounded-md text-sm font-medium transition-colors">
                   {t('profile')}
                 </Link>
-                <button onClick={handleLogout} className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                <button onClick={handleLogout} className="bg-orange-700 hover:bg-orange-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                   {t('logout')}
                 </button>
               </div>
             ) : (
               <div className="flex items-center space-x-4">
-                <Link to="/login" className="text-gray-700 hover:text-orange-600 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                <Link to="/login" className="text-gray-700 hover:text-orange-900 px-3 py-2 rounded-md text-sm font-medium transition-colors">
                   {t('login')}
                 </Link>
-                <Link to="/register" className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                <Link to="/register" className="bg-orange-700 hover:bg-orange-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                   {t('register')}
                 </Link>
               </div>
@@ -247,7 +295,7 @@ export default function Navbar() {
                  fond, et le seul moyen de refermer le menu était de toucher une
                  zone grise sans commande. Le bouton reste sous le tiroir
                  (`z-50` tous les deux) : il ne passe pas devant son contenu. */
-              className="relative z-50 min-h-[44px] min-w-[44px] text-gray-700 hover:text-orange-600 p-2 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-orange-500"
+              className="relative z-50 min-h-[44px] min-w-[44px] text-gray-700 hover:text-orange-900 p-2 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-orange-500"
             >
               {/* Le dessin vient du registre du chrome : c'est lui qui porte les
                   jointures, les bouts et `aria-hidden`. Deux tracés écrits ici
@@ -285,23 +333,23 @@ export default function Navbar() {
 
               {user ? (
                 <>
-                  <Link to="/dashboard" className="block rounded-xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/dashboard" className="block rounded-xl text-gray-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('dashboard')}
                   </Link>
-                  <Link to="/jobs" className="block rounded-xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/jobs" className="block rounded-xl text-gray-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('jobs')}
                   </Link>
-                  <Link to="/messages" className="block rounded-xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/messages" className="block rounded-xl text-gray-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('messages')}
                   </Link>
-                  <Link to="/profile" className="block rounded-xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/profile" className="block rounded-xl text-gray-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('profile')}
                   </Link>
-                  <Link to={versSupport} className="block rounded-xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to={versSupport} className="block rounded-xl text-gray-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('support')}
                   </Link>
                   <div className="pt-2">
-                    <button onClick={handleLogout} className="w-full rounded-xl bg-orange-600 hover:bg-orange-700 text-white px-4 py-3 text-base font-medium transition-colors">
+                    <button onClick={handleLogout} className="w-full rounded-xl bg-orange-700 hover:bg-orange-800 text-white px-4 py-3 text-base font-medium transition-colors">
                       {t('logout')}
                     </button>
                   </div>
@@ -311,25 +359,25 @@ export default function Navbar() {
                   {/* Les mêmes entrées publiques que sur grand écran : le menu
                       mobile d'un visiteur non connecté ne doit pas être plus
                       pauvre que la barre du haut. */}
-                  <Link to="/jobs" className="block rounded-xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/jobs" className="block rounded-xl text-gray-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('jobs')}
                   </Link>
-                  <Link to="/how-it-works" className="block rounded-xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/how-it-works" className="block rounded-xl text-gray-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('howItWorksTitle')}
                   </Link>
-                  <Link to="/about" className="block rounded-xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/about" className="block rounded-xl text-gray-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('aboutTitle')}
                   </Link>
-                  <Link to="/contact" className="block rounded-xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/contact" className="block rounded-xl text-gray-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('contactTitle')}
                   </Link>
-                  <Link to="/privacy" className="block rounded-xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/privacy" className="block rounded-xl text-gray-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('privacyTitle')}
                   </Link>
-                  <Link to="/login" className="block rounded-xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/login" className="block rounded-xl text-gray-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('login')}
                   </Link>
-                  <Link to="/register" className="block rounded-xl bg-orange-600 hover:bg-orange-700 text-white px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/register" className="block rounded-xl bg-orange-700 hover:bg-orange-800 text-white px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('register')}
                   </Link>
                 </>

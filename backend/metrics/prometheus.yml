@@ -1,0 +1,34 @@
+# Collecte Prometheus de GET /metrics (backend kojo-backend).
+#
+# Le CONTRAT de cette collecte est backend/METRIQUES.md : les familles exposées,
+# les trois réponses de la route (503 sans jeton configuré, 401 sans en-tête,
+# 200 avec), et la cadence choisie. Ce fichier est la configuration EXÉCUTABLE de
+# ce contrat — et il est comparé au bloc YAML du document par
+# backend/tests/test_metrics_scrape_config.py, pour que les deux ne puissent pas
+# diverger (une config promettant autre chose que la doc ferait collecter un
+# autre objet que celui qu'on croit mesurer).
+#
+# Usage (hôte qui collecte, le jeton n'est JAMAIS dans ce fichier) :
+#   prometheus --config.file=/etc/prometheus/kojo-metrics.yml
+# avec le jeton déposé dans le fichier déclaré par `credentials_file` :
+#   install -m 600 /dev/null /etc/prometheus/secrets/kojo-metrics-token
+#   printf '%s' "$METRICS_TOKEN" > /etc/prometheus/secrets/kojo-metrics-token
+
+global:
+  scrape_interval: 30s
+  scrape_timeout: 10s
+  external_labels:
+    service: kojo-api
+
+scrape_configs:
+  - job_name: kojo-api
+    scheme: https
+    metrics_path: /metrics
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    # Le jeton est lu dans un fichier hors du dépôt (jamais commité).
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/secrets/kojo-metrics-token
+    static_configs:
+      - targets: ["api.kojoforafrica.cc.cd"]

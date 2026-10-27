@@ -173,11 +173,12 @@ export default function Login() {
               avant ses champs avec le même séparateur (`orSeparator`) — deux
               pages de compte, deux ordres, pour la même décision.
 
-              Le séparateur coupe la ligne derrière son libellé avec la couleur
-              de la SURFACE (`fond-sable`) : /login est la seule page de compte
-              sans carte blanche, un `bg-white` y aurait peint un rectangle sur
-              le sable (c'est la seule différence avec celui de /register, et
-              elle tient à la surface, pas au goût). */}
+              Le séparateur coupe la ligne derrière son libellé avec SA propre
+              pastille. Depuis la carte du formulaire (17/10/2026, `carteClass`
+              du plan), cette pastille est posée sur la crème translucide de
+              la carte et non sur le sable : l'écart avec un blanc pur est de
+              3/255, donc invisible, et c'est la CARTE qui décide du contraste
+              — la surface la plus sombre des deux. */}
           {isGoogleAuthEnabled() && (
             <>
               <GoogleButton onClick={handleGoogle} label={pageT(pagePlan.googleLoginKey)} />
@@ -187,7 +188,14 @@ export default function Login() {
                   <div className="w-full border-t border-gray-200" />
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="bg-white px-3 text-sm text-stone-400">{t('orSeparator') || 'ou'}</span>
+                  {/* stone-500 et non stone-400 : le séparateur « ou » est du
+                      TEXTE, et stone-400 n'atteint pas le 4,5:1 du seuil AA
+                      (mesuré par Lighthouse sur /register, où le même
+                      séparateur était en gray-400 : 2,54:1). stone-500 tient
+                      4,80:1 sur la pastille et 4,56:1 sur la carte — la marge
+                      est mince, donc elle est MESURÉE par Login.test.jsx sur
+                      les deux surfaces, jamais supposée. */}
+                  <span className="bg-white px-3 text-sm text-stone-500">{t('orSeparator') || 'ou'}</span>
                 </div>
               </div>
             </>

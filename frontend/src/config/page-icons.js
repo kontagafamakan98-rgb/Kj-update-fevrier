@@ -259,6 +259,13 @@ export const CLASSES_ICONE = {
   paysChevron: 'h-3 w-3',
   // La carte « mission requise » de /payment (l'ancien `text-4xl text-center`).
   carteVide: 'h-12 w-12 text-gray-400',
+  // Le repère de la LANGUE SÉLECTIONNÉE de /register (25/10/2026) : le bloc
+  // vert publiait le CARACTÈRE « ✓ », un glyphe du produit sans domicile — ni
+  // clé de dictionnaire, ni config de page — donc refusé par
+  // `check-shell-text-provenance.js`. Il est désormais DESSINÉ (icône `check`
+  // du registre) et nommé par le plan (`selectedLanguageIcon`) : les deux
+  // canaux peignent le même tracé, avec la même teinte verte que le bloc.
+  langueSelectionnee: 'mr-2 h-5 w-5 shrink-0 text-green-600',
 };
 
 /**

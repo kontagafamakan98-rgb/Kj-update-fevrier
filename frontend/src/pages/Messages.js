@@ -386,7 +386,7 @@ export default function Messages() {
                     <p className="truncate text-xs text-stone-500">{stripJobMarkerFromMessage(conversation.last_message)}</p>
                   </div>
                   {Number(conversation.unread_count || 0) > 0 && (
-                    <span className="inline-flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-[3px] bg-orange-600 px-1.5 text-xs font-bold text-white">
+                    <span className="inline-flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-[3px] bg-orange-700 px-1.5 text-xs font-bold text-white">
                       {conversation.unread_count}
                     </span>
                   )}
@@ -491,7 +491,7 @@ export default function Messages() {
                     aria-label={pageT('sendMessageAria')}
                     type="submit"
                     disabled={!newMessage.trim()}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[3px] bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-50"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[3px] bg-orange-700 text-white hover:bg-orange-800 disabled:opacity-50"
                   >
                     <Send size={17} />
                   </button>

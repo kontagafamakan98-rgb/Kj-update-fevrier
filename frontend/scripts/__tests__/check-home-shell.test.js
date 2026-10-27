@@ -81,8 +81,8 @@ const SHELL_CSS =
   '.px-4{padding-left:1rem;padding-right:1rem}.text-center{text-align:center}' +
   '.text-2xl{font-size:1.5rem}.inline-flex{display:inline-flex}' +
   '.px-5{padding-left:1.25rem;padding-right:1.25rem}.py-2\\.5{padding:.625rem 1.25rem}' +
-  '.text-white{color:#fff}.bg-orange-600{background-color:#ea580c}' +
-  '.hover\\:bg-orange-700:hover{background-color:#c2410c}';
+  '.text-white{color:#fff}.bg-orange-700{background-color:#c2410c}' +
+  '.hover\\:bg-orange-800:hover{background-color:#9a3412}';
 
 function shellBody({ heroTitle = HERO_TITLE, words = FILLER, extra = '', countries = ['Mali'] } = {}) {
   return (
@@ -110,7 +110,7 @@ function shellBody({ heroTitle = HERO_TITLE, words = FILLER, extra = '', countri
     '<span class="text-2xl" aria-hidden="true">📍</span>' +
     // Le href est échappé comme le fait le build (`&` → `&amp;`) : le garde
     // compare la forme publiée, et la fixture doit donc publier la même.
-    `<a href="${CONTACT.mapsUrl.replace(/&/g, '&amp;')}" target="_blank" rel="noreferrer" title="${CARTE_TITRE}" class="inline-flex items-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700">${CARTE_LIBELLE}</a>` +
+    `<a href="${CONTACT.mapsUrl.replace(/&/g, '&amp;')}" target="_blank" rel="noreferrer" title="${CARTE_TITRE}" class="inline-flex items-center rounded-xl bg-orange-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-800">${CARTE_LIBELLE}</a>` +
     '</div>' +
     extra +
     '</div>'

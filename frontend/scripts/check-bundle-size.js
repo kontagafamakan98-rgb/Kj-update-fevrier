@@ -114,6 +114,26 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 // seul `Home` porte la règle. Le plafond passe donc à 131 Ko, avec 0,9 Ko de
 // marge : un relèvement de 1 Ko pour 56 o mesurés laisserait sinon le prochain
 // hachage de build décider à la place du développeur.
+// ── 26/10/2026 (soir) : ELLE REVIENT, SOUS SEUIL ET DANS UN NŒUD DÉJÀ PEINT ──
+// Le retrait ci-dessous a laissé la bande sans aucune preuve de ce que la
+// plateforme a FAIT. `utils/preuveSociale.js` revient, plus court qu'en octobre
+// (seuils + lecture + formatage, aucune phrase) : la page lit de nouveau
+// `GET /api/public/stats` APRÈS montage et n'écrit que le TEXTE de la ligne de
+// preuve, dans le nœud que la coquille a déjà peint. Mesuré : 132,0 Ko gzip des
+// sept chunks référencés, budget 133,0 — la marge tombe à 1,0 Ko, et ce chiffre
+// est publié ici pour que le prochain ajout sache qu'il n'y a plus de place
+// pour un import lourd dans le chunk d'accueil (le prochain levier est de
+// déplacer la lecture, pas de relever le plafond).
+// ── 26/10/2026 : la preuve sociale QUITTE l'accueil ───────────────────────
+// Rectification du paragraphe ci-dessus, qui n'est plus vrai : la bande de faits
+// n'appelle plus `GET /api/public/stats` et ne formate plus de compteur. Mesuré
+// en production, elle affichait « 0 mission terminée · 0 avis » ; les deux faits
+// qui restent sont déclarés et ne dépendent d'aucune donnée. Le module
+// `utils/preuveSociale.js` est supprimé, et le chunk d'accueil perd son appel
+// comme sa règle de formatage. Le plafond, lui, ne redescend pas dans ce
+// commit : on ne fait pas un budget sur un retrait d'une journée, et la marge
+// reste. Ce qui est refusé, en revanche, est écrit plus haut dans
+// `scripts/check-prerender-shells.js` : un ZÉRO publié comme preuve sociale.
 // ── 24/10/2026 : 131 → 132 Ko et 5,50 → 5,55 Mo, POUR LA MODÉRATION ───────
 // `/administration` donne au propriétaire le répertoire des comptes, leur état
 // (restreint/banni) et la lecture des fils : c'est une PAGE, et elle est
@@ -130,8 +150,20 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 // et 40 Ko de marge, pour la même raison qu'au 22/10 : laisser le prochain
 // hachage de build fixer le seuil, c'est laisser un hash décider à la place du
 // développeur.
+// ── 25/10/2026 : 132 → 133 Ko, POUR LE PARTAGE D'UNE MISSION ──────────────
+// Le bouton Partager ajoute une clé au dictionnaire GLOBAL (`shareJob`) : le
+// français est le dictionnaire par DÉFAUT, donc il vit dans `index` et la clé y
+// coûte ses octets (mesuré sur le chunk minifié : `shareJob:ng,` = 12 o bruts,
+// 7 o gzip — la valeur est déjà partagée par le minifieur). Les boutons, eux, ne
+// sont PAS dans le premier écran : la carte est dans le chunk `Jobs`, la fiche
+// dans `JobDetails`, tous deux paresseux. Mesure du jour : 135 189 o gzip des
+// sept chunks référencés, soit 21 o au-dessus de l'ancien plafond — dont 7 o de
+// cette clé ; la branche au moment de la mesure en portait 14 de plus, et c'est
+// ÉCRIT plutôt qu'attribué à ce seul bouton. Le plafond passe à 133 Ko avec
+// 1 Ko de marge, pour la raison du 22/10 : laisser le prochain hachage de build
+// fixer le seuil, c'est laisser un hash décider à la place du développeur.
 export const BUDGETS = {
-  initialGzip: 132 * 1024, // JS initial (chunks référencés par index.html), gzip
+  initialGzip: 133 * 1024, // JS initial (chunks référencés par index.html), gzip
   largestChunkGzip: 200 * 1024, // plus gros chunk JS, gzip
   totalRaw: 5.55 * 1024 * 1024, // build/ entier, brut (voir les deux mesures ci-dessus)
 };

@@ -293,7 +293,7 @@ export default function Jobs() {
               type="button"
               onClick={() => setViewMode('list')}
               aria-pressed={viewMode === 'list'}
-              className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${viewMode === 'list' ? 'bg-orange-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+              className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${viewMode === 'list' ? 'bg-orange-700 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
@@ -304,7 +304,7 @@ export default function Jobs() {
               type="button"
               onClick={() => setViewMode('map')}
               aria-pressed={viewMode === 'map'}
-              className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${viewMode === 'map' ? 'bg-orange-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+              className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${viewMode === 'map' ? 'bg-orange-700 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 4 3.5 6.5v13L9 17l6 2.5 5.5-2.5v-13L15 6.5 9 4z" />
@@ -314,7 +314,7 @@ export default function Jobs() {
             </button>
           </div>
           {user?.user_type === 'client' && (
-            <button onClick={() => setShowCreateModal(true)} className="rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white shadow-xs transition-colors hover:bg-orange-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2">
+            <button onClick={() => setShowCreateModal(true)} className="rounded-xl bg-orange-700 px-5 py-3 font-semibold text-white shadow-xs transition-colors hover:bg-orange-800 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2">
               {jobUi.createJob}
             </button>
           )}
@@ -675,7 +675,7 @@ export default function Jobs() {
             {filtresActifs ? (
               <button
                 onClick={effacerLesFiltres}
-                className="mt-4 inline-flex items-center rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-700"
+                className="mt-4 inline-flex items-center rounded-lg bg-orange-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-800"
               >
                 {pageT('clearFilters')}
               </button>

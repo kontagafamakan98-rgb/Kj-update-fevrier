@@ -238,7 +238,7 @@ const WorkerProfile = () => {
         <button
           type="button"
           onClick={charger}
-          className="mt-4 rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white hover:bg-orange-700"
+          className="mt-4 rounded-lg bg-orange-700 px-4 py-2 font-semibold text-white hover:bg-orange-800"
         >
           {t('retry')}
         </button>

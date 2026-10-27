@@ -115,6 +115,12 @@ import { PAGE_META } from '../src/config/page-meta.js';
 import { NOM_DU_GABARIT_APP } from '../vite-plugins/prerender/app-template.js';
 import { NOM_DE_LA_PAGE_404 } from '../vite-plugins/prerender/not-found.js';
 
+// Un ZÉRO publié comme preuve sociale : « 0 », « 0,0 », « 0 % » — la forme
+// seule, jamais un chiffre qui CONTIENT un zéro (« 10 », « 7j/7 »).
+// Partagée avec la bande de faits (voir 1ter-bis) : c'est la même règle qui
+// interdit à la coquille et à React de publier un compteur vide.
+const ZERO_PUBLIE = /^0([.,]\s?0+)?\s*(\+|%|\/7)?$/;
+
 // ── L'ALIGNEMENT NE SE CENTRE PLUS PAR HÉRITAGE : c'est la refonte ──────────
 // `.App { text-align: center }` a été RETIRÉE de src/App.css le 25/09/2026 : le
 // site est aligné à gauche par défaut, et chaque bloc qui doit être centré le
@@ -219,6 +225,86 @@ if (index) {
   }
 }
 
+// 1ter-bis. index.html : la BANDE DE FAITS du héros ne publie aucun compteur.
+//
+// Mesuré le 26/10/2026 : la bande portait « 3 travailleurs · 0 mission
+// terminée · 0 avis », et les deux zéros étaient peints par la coquille comme
+// par React. Un zéro publié au seuil d'un accueil qui vend la confiance ne
+// mesure pas la plateforme, il la décrit comme vide — et un compteur lu au
+// runtime ne peut pas être peint au BUILD, donc il ne pouvait que mentir d'un
+// côté ou diverger de l'autre.
+//
+// Ce garde tient les deux moitiés : une entrée dont la valeur est un ZÉRO est
+// refusée (le prochain qui réintroduit un compteur rougit ici, pas dans six
+// mois), et chaque fait DÉCLARÉ doit être réellement peint dans l'artefact —
+// sinon la liste et la coquille peuvent diverger en silence.
+if (index) {
+  const declarees = (PAGE_SECTIONS['/'].stats || []).map((fait) => ({ ...fait }));
+  // Les VALEURS PEINTES, lues dans l'artefact servi : le garde juge la coquille
+  // (ce qu'un crawler reçoit), pas seulement l'intention du plan. Une entrée
+  // ajoutée à la liste sans être peinte est donc vue, et un zéro posé dans le
+  // HTML est refusé même si le plan, lui, reste propre.
+  const figures = [...index.matchAll(/<span class="fait-cta-figure">[^]*?<\/svg>([^<]*)<\/span>/g)]
+    .map((occurrence) => occurrence[1].replace(/\s+/g, ' ').trim());
+
+  if (figures.length < 2) {
+    errors.push(
+      `index.html : la bande de faits du héros ne peint que ${figures.length} valeur(s) — ` +
+        'sous le plancher de 2, ce garde ne prouverait plus rien (la bande a été amputée)'
+    );
+  }
+  for (const valeur of figures) {
+    if (ZERO_PUBLIE.test(valeur)) {
+      errors.push(
+        `index.html : la bande de faits du héros publie « ${valeur} » — un ZÉRO présenté ` +
+          'comme preuve sociale est refusé (règle du 26/10/2026 : la bande ne publie que des faits vérifiables, ' +
+          'les chiffres de volume vivent dans le tableau de bord et /metrics)'
+      );
+    }
+  }
+  for (const fait of declarees) {
+    if (!figures.includes(String(fait.shellText))) {
+      errors.push(
+        `index.html : le fait « ${fait.labelKey} » est déclaré « ${fait.shellText} » mais ` +
+          'la coquille ne le peint pas (icône puis valeur) — la liste et la coquille ont divergé'
+      );
+    }
+  }
+
+  // LA LIGNE DE PREUVE (26/10/2026). La coquille ne connaît pas les compteurs
+  // (le build n'a pas d'accès à la base) : elle peint l'ÉTAT D'ATTENTE déclaré,
+  // et React remplace ce TEXTE dans ce nœud une fois la mesure jugée publiable
+  // (`utils/preuveSociale.js`). Deux choses sont donc jugées ici : la ligne
+  // EXISTE dans l'artefact — sans elle, React peindrait une phrase là où la
+  // coquille n'a rien peint, et c'est un déplacement, pas un détail —, et elle
+  // porte EXACTEMENT le texte déclaré (le dictionnaire français, celui que la
+  // coquille publie), jamais un chiffre figé au build qui vieillirait en
+  // silence. Un texte absent du dictionnaire est refusé : un garde qui
+  // comparerait `undefined` à `undefined` passerait sur une clé supprimée.
+  const cleAttente = PAGE_SECTIONS['/'].preuveAttenteKey;
+  const classePreuve = PAGE_SECTIONS['/'].preuveClass;
+  const texteAttente = cleAttente ? fr[cleAttente] : undefined;
+  const lignePreuve = new RegExp(`<p class="${classePreuve}">([^<]*)</p>`).exec(index);
+
+  if (typeof texteAttente !== 'string' || !texteAttente.trim()) {
+    errors.push(
+      `index.html : la ligne de preuve déclare la clé « ${cleAttente} », absente du ` +
+        'dictionnaire français — la coquille n’a rien à peindre et le garde n’aurait rien à comparer'
+    );
+  } else if (!lignePreuve) {
+    errors.push(
+      `index.html : la ligne de preuve (class="${classePreuve}") n’est pas peinte — ` +
+        'React insérerait un nœud que la coquille n’a pas réservé, donc la bande se déplacerait au montage'
+    );
+  } else if (lignePreuve[1].replace(/\s+/g, ' ').trim() !== texteAttente.trim()) {
+    errors.push(
+      `index.html : la ligne de preuve publie « ${lignePreuve[1].trim()} » au lieu de ` +
+        `« ${texteAttente.trim()} » (état d’attente déclaré) — un chiffre figé au build ` +
+        'serait faux dès la mission suivante'
+    );
+  }
+}
+
 // 1quater. 404.html : les textes de la page servie aux URL inconnues.
 // Elle n'appartenait à personne : ses textes n'existaient dans aucun
 // dictionnaire et aucun garde ne les regardait (check-spa-routes.js vérifie sa
@@ -238,6 +324,23 @@ if (notFound) {
     if (!notFound.includes(texte)) {
       errors.push(`404.html : « ${texte} » absent de la page d'une URL inconnue`);
     }
+  }
+  // Sa DESCRIPTION, avec la même exigence que les coquilles de route
+  // (section 4septies) : ce document était le seul du build à n'en publier
+  // aucune, et `check-page-meta.js` ne le lit pas — il ne compare que les routes
+  // de la table. Le texte attendu est celui de la page (`notFoundText`), lu au
+  // dictionnaire : il n'est pas recopié ici.
+  const description404 = metaContents(notFound, 'description');
+  if (description404.length !== 1) {
+    errors.push(
+      `404.html : ${description404.length} balise(s) <meta name="description"> — la page servie ` +
+        'à une URL inconnue doit en publier exactement une (aucun autre garde ne la lit)'
+    );
+  } else if (description404[0] !== fr.notFoundText) {
+    errors.push(
+      `404.html : description « ${description404[0]} », le dictionnaire dit « ${fr.notFoundText} » ` +
+        '(clé notFoundText) — la page et son extrait annonceraient deux textes'
+    );
   }
 }
 
@@ -335,10 +438,12 @@ if (register) {
     errors.push('register.html : bouton submit (classes du site) absent du shell');
   }
   // Champs du formulaire (les LCP/paint du formulaire complet avant React) :
-  // prénom/nom, email, téléphone doivent être peints dans le shell statique,
-  // pas seulement les boutons — sinon le LCP du formulaire register reste
-  // attendu du boot React.
-  for (const champ of [`${fr.firstName}...`, `${fr.lastName}...`, registerT('emailPlaceholder')]) {
+  // NOM, email, téléphone doivent être peints dans le shell statique, pas
+  // seulement les boutons — sinon le LCP du formulaire register reste attendu
+  // du boot React. Le NOM est UN champ depuis le 26/10/2026 (le serveur le
+  // répartit en prénom/nom) : la liste porte donc la clé du plan, jamais
+  // `fr.firstName`/`fr.lastName`, qui ne sont plus peints par la page.
+  for (const champ of [`${registerT('fullName')}...`, registerT('emailPlaceholder')]) {
     if (!register.includes(`placeholder="${champ}"`)) {
       errors.push(`register.html : champ de formulaire « ${champ} » ABSENT du shell`);
     }
@@ -417,8 +522,8 @@ if (forgot) {
   // Le bouton du formulaire prend l'orange de la marque (il était bleu, la
   // seule teinte du site qui n'appartenait à personne) — même forme, même
   // hauteur, seule la couleur change.
-  if (!forgot.includes('bg-orange-600 px-4 py-2 text-sm font-semibold text-white')) {
-    errors.push('forgot-password.html : bouton « Envoyer le code » (bg-blue-600) absent du shell');
+  if (!forgot.includes('bg-orange-700 px-4 py-2 text-sm font-semibold text-white')) {
+    errors.push('forgot-password.html : bouton « Envoyer le code » (bg-orange-700) absent du shell');
   }
   if (!/<link rel="modulepreload"[^>]*href="[^"]*ForgotPassword-[^"]*\.js"/.test(forgot)) {
     errors.push('forgot-password.html : modulepreload du chunk ForgotPassword absent');
@@ -586,6 +691,67 @@ for (const route of OG_CARD_ROUTES) {
         'dans la table de scripts/check-og-images.js)'
     );
   }
+}
+
+// 4septies. La DESCRIPTION de CHAQUE coquille pré-rendue (26/10/2026).
+//
+// `route-meta.js` la publie depuis un moment sur `name="description"`, et pas
+// seulement sur `og:description` : sans elle, les douze pages héritaient de la
+// description de l'accueil (un moteur lisait « trouvez un plombier… » sur
+// /login et /privacy). Ce garde des coquilles, lui, ne la lisait pas du tout :
+// seule la règle D de `check-page-meta.js` la comparait, et cette comparaison
+// porte sur la COHÉRENCE app ↔ coquille des routes de la table — une coquille
+// qui ne publierait AUCUNE description lui échappait par construction, et la 404
+// ne passait par aucun des deux. Le fait jugé ici est celui de l'ARTEFACT : ce
+// que le crawler reçoit, page par page.
+//
+// Le texte attendu n'est pas recopié : il vient de la table unique
+// (`src/config/page-meta.js`) résolue dans `src/i18n/fr.json`, la langue des
+// coquilles (`<html lang="fr">`). Une description juste ne peut donc pas être
+// « corrigée » ici sans l'être dans la table, et réciproquement.
+let descriptionsVerifiees = 0;
+for (const [route, keys] of Object.entries(PAGE_META)) {
+  const name = shellFileFor(route);
+  const html = read(name);
+  if (!html) continue; // read() a déjà refusé le fichier manquant
+  const attendue = keys.description ? fr[keys.description] : '';
+  if (!attendue) {
+    errors.push(
+      `${name} : la route « ${route} » ne déclare aucune description NON VIDE dans ` +
+        'src/config/page-meta.js — sa coquille ne peut donc rien publier, et un crawler ' +
+        'lirait la description de l’accueil, ou aucune'
+    );
+    continue;
+  }
+  const publiees = metaContents(html, 'description');
+  if (publiees.length === 0) {
+    errors.push(
+      `${name} : AUCUNE balise <meta name="description"> — cette coquille est servie TELLE ` +
+        'QUELLE à un crawler (aucun JavaScript ne l’exécute), qui lit alors la description de ' +
+        `l’accueil ou rien ; la table déclare « ${attendue} » pour ${route}`
+    );
+  } else if (publiees.length > 1) {
+    errors.push(
+      `${name} : ${publiees.length} balises <meta name="description"> — un moteur en choisit ` +
+        'une et les autres ne servent à rien : la coquille doit en publier exactement une'
+    );
+  } else if (publiees[0] !== attendue) {
+    errors.push(
+      `${name} : description publiée « ${publiees[0]} », la table dit « ${attendue} » pour ` +
+        `${route} — la coquille et la page annonceraient deux extraits différents`
+    );
+  } else {
+    descriptionsVerifiees += 1;
+  }
+}
+// Le PLANCHER : une description comparée ne prouve rien des douze pages, et une
+// table vidée (ou un `build/` sans coquilles) rendrait ce contrôle vert sans
+// avoir rien lu — c’est le seul faux vert que cette section peut produire.
+if (descriptionsVerifiees === 0) {
+  errors.push(
+    'aucune description de coquille comparée : la table des textes est vide, ou aucune de ses ' +
+      'routes n’a de coquille dans build/ — un vert dans cet état ne prouverait rien'
+  );
 }
 
 // 5. Fiches /jobs/:id : le pré-rendu HTML (méta OG de la mission + 404
@@ -823,7 +989,8 @@ if (errors.length) {
 }
 console.log(
   `✅ Pré-rendu par route intact : shell d'accueil dans index.html, shells statiques vérifiés, ` +
-    `les ${Object.keys(PAGE_META).length} pages pré-rendues aux balises ÉQUILIBRÉES, ` +
+    `les ${Object.keys(PAGE_META).length} pages pré-rendues aux balises ÉQUILIBRÉES et à la ` +
+    `DESCRIPTION égale à src/config/page-meta.js (${descriptionsVerifiees} comparée(s)), ` +
     `plus les ${NOM_DU_GABARIT_APP} et ${NOM_DE_LA_PAGE_404} (hors routes) lus avec la même règle, ` +
     `et les ${prerenderedPages.length} pages pré-rendues (${prerenderedPages.join(', ')}) ` +
     `sont routées par vercel.json (sans catch-all : URL inconnue → 404). Fiches /jobs/:id servies ` +

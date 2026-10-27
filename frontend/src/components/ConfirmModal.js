@@ -58,7 +58,7 @@ export default function ConfirmModal({
 
   const confirmClass =
     variant === 'primary'
-      ? 'bg-orange-600 hover:bg-orange-700'
+      ? 'bg-orange-700 hover:bg-orange-800'
       : 'bg-red-600 hover:bg-red-700';
 
   return (

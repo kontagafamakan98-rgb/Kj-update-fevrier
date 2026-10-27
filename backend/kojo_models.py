@@ -98,6 +98,64 @@ def validate_west_africa_phone(phone: str) -> str:
     )
 
 
+def repartir_nom_complet(nom_complet: str) -> "tuple[str, str]":
+    """Découpe un nom complet en (prénom, nom).
+
+    Le PREMIER mot est le prénom, le RESTE est le nom — la règle la plus simple
+    qui n'invente rien. Un nom d'UN SEUL mot donne un nom de famille VIDE plutôt
+    que dupliqué : afficher « Awa Awa » serait une donnée fausse, et les écrans
+    qui composent un nom (`kojo_shared.nom_complet`, fiches, messages) font déjà
+    `f"{prénom} {nom}".strip()`.
+    """
+    mots = str(nom_complet or "").split()
+    if not mots:
+        return "", ""
+    return mots[0], " ".join(mots[1:])
+
+
+def _noms_resolus(nom_complet, prenom, nom) -> "tuple[str, str, str]":
+    """Rend (nom complet, prénom, nom) définitifs, ou lève ValueError.
+
+    UNE règle, partagée par les deux modèles d'inscription (26/10/2026) : le
+    champ `name` fait foi s'il est fourni ; sinon les champs historiques
+    `first_name`/`last_name` restent acceptés — un ancien client, un script ou
+    l'app native ne doivent pas être cassés par l'allègement du formulaire.
+    """
+    complet = " ".join(str(nom_complet or "").split())
+    prenom = " ".join(str(prenom or "").split())
+    nom = " ".join(str(nom or "").split())
+
+    if complet:
+        prenom, nom = repartir_nom_complet(complet)
+    elif not prenom:
+        raise ValueError(
+            "Le nom est obligatoire : renseignez `name` (ou `first_name`/`last_name`)."
+        )
+
+    if len(prenom) < 2:
+        raise ValueError("Le prénom doit contenir au moins 2 caractères")
+
+    complet = complet or f"{prenom} {nom}".strip()
+    return complet[:101], prenom[:50], nom[:50]
+
+
+def _telephone_facultatif(valeur):
+    """Téléphone FACULTATIF (26/10/2026) : vide vaut None, fourni est validé.
+
+    Le numéro n'est pas un identifiant (aucune connexion par téléphone, aucun
+    OTP téléphone) : il ne sert qu'au contact et au rappel du client, donc son
+    absence n'empêche pas de créer un compte. En revanche, un numéro FOURNI et
+    illisible reste refusé — un contact faux ne vaut pas mieux que pas de
+    contact, et la contrainte d'argent vit au décaissement.
+    """
+    if valeur is None:
+        return None
+    texte = str(valeur).strip()
+    if not texte:
+        return None
+    return validate_west_africa_phone(texte)
+
+
 class User(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     email: EmailStr
@@ -109,7 +167,11 @@ class User(BaseModel):
     # None pour les comptes mot-de-passe classiques. Index unique côté DB.
     google_sub: Optional[str] = Field(default=None, max_length=255)
     first_name: str = Field(min_length=2, max_length=50, pattern=r'^[a-zA-ZÀ-ÿ\s\-\'0-9_\.]+$', description="Prénom")
-    last_name: str = Field(min_length=2, max_length=50, pattern=r'^[a-zA-ZÀ-ÿ\s\-\'0-9_\.]+$', description="Nom de famille")
+    # VIDE est autorisé depuis le 26/10/2026 : l'inscription accepte un nom en
+    # UN champ, et « Awa » (un seul mot) donne un nom de famille vide plutôt
+    # qu'un nom inventé. Le `*` du motif est ce qui distingue ce cas de refus
+    # d'un nom de famille illisible.
+    last_name: str = Field(default="", max_length=50, pattern=r'^[a-zA-ZÀ-ÿ\s\-\'0-9_\.]*$', description="Nom de famille")
     # Optionnel pour les comptes Google (SSO) : Google ne fournit pas de
     # téléphone. Rempli plus tard via l'onboarding / la mise à jour de profil.
     phone: Optional[str] = Field(default=None, description="Numéro de téléphone international")
@@ -523,9 +585,17 @@ class MarkReadRequest(BaseModel):
 class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=72, description="Mot de passe (8-72 caractères — limite bcrypt de 72 octets)")
-    first_name: str = Field(min_length=2, max_length=50)
-    last_name: str = Field(min_length=2, max_length=50)
-    phone: str
+    # ── LE NOM EN UN CHAMP (26/10/2026) ─────────────────────────────────────
+    # Deux champs obligatoires pour un prénom et un nom étaient la première
+    # friction mesurée du formulaire, et la règle haute (« prenom), basse
+    # (« nom ») n'est pas universelle : beaucoup de personnes écrivent leur nom
+    # d'un seul tenant. `name` porte le nom COMPLET ; `first_name`/`last_name`
+    # restent acceptés (clients antérieurs, app native) et sont dérivés.
+    name: Optional[str] = Field(default=None, min_length=2, max_length=101)
+    first_name: Optional[str] = Field(default=None, min_length=2, max_length=50)
+    last_name: Optional[str] = Field(default=None, max_length=50)
+    # FACULTATIF : le téléphone est un champ de contact, pas un identifiant.
+    phone: Optional[str] = None
     user_type: UserType
     country: Country
     preferred_language: Language
@@ -547,6 +617,14 @@ class UserRegister(BaseModel):
             raise ValueError("L'acceptation de la Politique de confidentialité et des conditions d'utilisation est obligatoire")
         return v
 
+    @model_validator(mode='after')
+    def nom_et_telephone(self):
+        self.name, self.first_name, self.last_name = _noms_resolus(
+            self.name, self.first_name, self.last_name
+        )
+        self.phone = _telephone_facultatif(self.phone)
+        return self
+
 class PaymentAccount(BaseModel):
     orange_money: Optional[str] = None     # Numéro de téléphone Orange Money
     wave: Optional[str] = None            # Numéro de téléphone Wave
@@ -562,9 +640,12 @@ class PaymentAccount(BaseModel):
 class UserWithPayment(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=72, description="Mot de passe (8-72 caractères — limite bcrypt de 72 octets)")
-    first_name: str = Field(min_length=2, max_length=50)
-    last_name: str = Field(min_length=2, max_length=50)
-    phone: str
+    # Le NOM en un champ, et le téléphone FACULTATIF — même règle que
+    # `UserRegister` (voir le commentaire de ce modèle).
+    name: Optional[str] = Field(default=None, min_length=2, max_length=101)
+    first_name: Optional[str] = Field(default=None, min_length=2, max_length=50)
+    last_name: Optional[str] = Field(default=None, max_length=50)
+    phone: Optional[str] = None
     user_type: UserType
     country: Country
     preferred_language: Language
@@ -596,6 +677,15 @@ class UserWithPayment(BaseModel):
         if v is not True:
             raise ValueError("L'acceptation de la Politique de confidentialité et des conditions d'utilisation est obligatoire")
         return v
+
+    @model_validator(mode='after')
+    def nom_et_telephone(self):
+        self.name, self.first_name, self.last_name = _noms_resolus(
+            self.name, self.first_name, self.last_name
+        )
+        self.phone = _telephone_facultatif(self.phone)
+        return self
+
     # Informations spécifiques aux travailleurs (optionnelles)
     worker_specialties: Optional[List[str]] = None
     worker_experience_years: Optional[int] = None

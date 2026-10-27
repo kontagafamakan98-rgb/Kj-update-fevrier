@@ -931,7 +931,7 @@ function ReferralCard({ referral, t, referredBy }) {
           <button
             type="button"
             onClick={copyCode}
-            className="rounded-[3px] bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
+            className="rounded-[3px] bg-orange-700 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-800"
           >
             {copied ? t('referralCopied') : t('referralCopy')}
           </button>

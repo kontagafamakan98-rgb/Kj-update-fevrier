@@ -241,6 +241,14 @@ const EDITORIAL_ACCUEIL = {
   faitClass: 'fait-cta',
   faitFigureClass: 'fait-cta-figure',
   faitLibelleClass: 'fait-cta-libelle',
+  // ── LA LIGNE DE PREUVE MESURÉE (26/10/2026) ──────────────────────────────
+  // Sous les deux faits, une ligne existe DANS LES DEUX CANAUX dès le premier
+  // paint : la coquille la peint vide de chiffres (elle écrit l'attente), React
+  // remplace son TEXTE dans ce même nœud quand `utils/preuveSociale.js` juge la
+  // mesure publiable. La classe est déclarée ici pour que les deux canaux la
+  // lisent au même endroit, et sa réserve de hauteur vit dans `index.css`.
+  preuveClass: 'faits-cta-preuve',
+  preuveAttenteKey: 'figuresToCome',
   ctaClass: 'cta-final',
   ctaInnerClass: 'cta-final-inner',
   ctaActionsClass: 'cta-actions',
@@ -495,21 +503,38 @@ export const PAGE_SECTIONS = {
     // textes qui l'énonçaient sont corrigés ensemble — un chiffre faux dans la
     // seule bande de faits d'une page est exactement ce que cette bande
     // interdit, et une phrase qui le contredit ailleurs le serait autant.
+    // ── DEUX FAITS, ET PLUS DE COMPTEURS MESURÉS (26/10/2026) ─────────────
+    // La bande a porté trois compteurs lus de `/api/public/stats` du
+    // 22/10 au 26/10 : « 3 travailleurs · 0 mission terminée · 0 avis ». La
+    // doctrine d'alors — « un zéro publié est une mesure » — est juste dans un
+    // tableau de bord, et fausse ici : sur un accueil qui vend la confiance,
+    // deux zéros alignés ne mesurent pas la plateforme, ils la décrivent comme
+    // vide. La bande redevient ce que sa grille de DEUX colonnes demande
+    // (`index.css`, `.faits-cta`) : deux faits VERIFIABLES, sans volume.
+    //
+    // ── LA PREUVE MESURÉE A UN SEUIL, ET UN ÉTAT D'ATTENTE (26/10/2026) ────
+    // Retirer les compteurs a réglé le mensonge, mais a laissé la bande sans
+    // aucune preuve de ce que la plateforme a RÉELLEMENT fait. Ce qui est publié
+    // est donc décidé par `utils/preuveSociale.js` : au-delà de trois missions
+    // terminées ET deux avis, la page écrit les deux chiffres réels lus de
+    // `GET /api/public/stats` dans la ligne de preuve ; en dessous — et sur
+    // toute lecture illisible — elle écrit l'état d'attente déclaré ici
+    // (`preuveAttenteKey`). Aucun zéro n'est jamais publié, et une panne ne se
+    // lit pas comme une mesure.
+    //
+    // La coquille pré-rendue ne connaît pas les compteurs : elle peint l'ÉTAT
+    // D'ATTENTE, et c'est le seul état qu'un build sans accès à la base puisse
+    // tenir. La ligne existe des deux côtés AVANT le montage (même classe, même
+    // réserve de hauteur) : React remplace son TEXTE dans le nœud déjà peint,
+    // il n'en insère jamais un — c'est la règle qui gardait le CLS à 0,0000 sur
+    // `/`. Conséquence ASSUMÉE : le HTML pré-rendu publie l'attente, les chiffres
+    // ne vivent que dans le document monté. La bande ne peut donc jamais
+    // publier un chiffre périmé ; elle perd en revanche la preuve chiffrée pour
+    // un moteur sans JavaScript, et ce prix est préféré à un nombre figé au
+    // build qui serait faux dès la mission suivante.
     stats: [
       { labelKey: 'countriesCovered', fallback: '4', shellText: '4', icone: 'countryGlobe' },
       { labelKey: 'customerSupport', fallback: '7j/7', shellText: '7j/7', icone: 'contactCall' },
-      // ── LA PREUVE MESURÉE (22/10/2026) ──────────────────────────────────
-      // Trois entrées de plus, et leur valeur publiée est « — » : le HTML
-      // pré-rendu ne peut pas appeler `/api/public/stats` (il est écrit au
-      // BUILD), donc il publie « pas mesuré ici » plutôt qu'un chiffre figé
-      // qui aurait l'air mesuré. React remplace ce tiret par la mesure dès
-      // que la route répond, DANS LE MÊME NŒUD (même boîte, même classe) :
-      // aucun décalage de mise en page, aucune seconde peinture de la bande.
-      // La règle de ce remplacement vit dans `utils/preuveSociale.js`, et
-      // elle n'invente jamais de repli chiffré.
-      { labelKey: 'measuredWorkers', fallback: '—', shellText: '—', icone: 'client' },
-      { labelKey: 'measuredCompletedJobs', fallback: '—', shellText: '—', icone: 'step3' },
-      { labelKey: 'measuredReviews', fallback: '—', shellText: '—', icone: 'check' },
     ],
     // Le bloc « séquestre » de l'accueil ouvre sur un glyphe que la page
     // (src/pages/Home.js) et sa coquille publiaient chacune en littéral — le
@@ -792,7 +817,7 @@ export const PAGE_SECTIONS = {
     // ── LE DESSIN DE L'ÉCRAN (17/10/2026) ───────────────────────────────────
     // /login était la dernière page publique restée au vocabulaire d'AVANT la
     // refonte : libellés `text-gray-700`, champs `rounded-md border-gray-300`,
-    // bouton `bg-orange-600`, encadré légal `bg-orange-50` — quatre familles de
+    // bouton `bg-orange-700`, encadré légal `bg-orange-50` — quatre familles de
     // chaînes qu'aucune autre page ne portait plus. Le formulaire devient une
     // CARTE du site (`.carte-editoriale` + `.carte-publique`), son bouton lit
     // `.bouton` comme les actions des écrans connectés, et son encadré légal
@@ -820,7 +845,15 @@ export const PAGE_SECTIONS = {
     // relevé au port du dessin le 17/10/2026. Le lien ne se coupe plus, et si
     // les deux ne tiennent pas, le lien passe à la ligne.
     ligneMotDePasseClass: 'flex flex-wrap items-center justify-between gap-x-3 gap-y-1',
-    lienMotDePasseClass: 'whitespace-nowrap text-sm font-semibold text-orange-700 underline underline-offset-2 hover:text-orange-600',
+    // LE SURVOL ASSOMBRIT, IL N'ÉCLAIRCIT PAS (26/10/2026) : le survol était
+    // `text-orange-600` (#ea580c), soit **3,39:1** sur la carte du formulaire
+    // (#fcf9f2) — sous le 4,5:1 du texte courant, donc un état peint qui devenait
+    // ILLISIBLE au moment précis où la personne le vise. `orange-800` (#9a3412)
+    // tient 6,95:1 sur la même surface. La règle vaut pour les deux liens orange
+    // de la carte : le lien d'inscription (`lienInscriptionClass`) portait le
+    // même jeton de survol. Mesuré par `src/pages/__tests__/Login.test.jsx`, qui
+    // juge les DEUX états sur la surface réellement peinte.
+    lienMotDePasseClass: 'whitespace-nowrap text-sm font-semibold text-orange-700 underline underline-offset-2 hover:text-orange-800',
     // La place de l'œil (quarante-quatre pixels à droite) s'ajoute au champ
     // partagé : c'est la seule différence, et elle est lisible ici.
     champMotDePasseClass: `${CHAMP} pr-11`,
@@ -835,7 +868,7 @@ export const PAGE_SECTIONS = {
     legalLienClass: 'inline-flex items-center text-sm font-medium text-orange-700 underline underline-offset-2 hover:text-orange-800',
     noAccountClass: 'text-center',
     noAccountTexteClass: 'text-sm text-stone-600',
-    lienInscriptionClass: 'font-semibold text-orange-700 hover:text-orange-600',
+    lienInscriptionClass: 'font-semibold text-orange-700 hover:text-orange-800',
     // Le glyphe du bloc légal est DESSINÉ (page-icons.js) : le plan nomme une
     // icône, pas une clé i18n d'emoji (`iconLegalNotice` reste au dictionnaire
     // comme valeur interdite pour les coquilles, cf. check-prerender-shells).
@@ -860,10 +893,13 @@ export const PAGE_SECTIONS = {
     boutonClass: 'relative bouton bouton-encre w-full',
     titleKey: 'title',
     subtitleKey: 'subtitle',
-    detectingLocationKey: 'detectingLocation',
+    // L'état d'ATTENTE (« Détection de votre position… ») n'est plus publié
+    // (26/10/2026) : sans JavaScript la coquille ne peut pas le faire aboutir,
+    // et un premier rendu qui diffère d'elle se déplace à l'hydratation.
     // ── La hauteur RÉSERVÉE du bloc d'état de géolocalisation ───────────────
-    // Les trois états ont des hauteurs NATURELLES différentes (mesuré à 412 ET
-    // 1350 px : 32 / 42,5 / 16 px de contenu) et le bloc des états FINAUX
+    // Les deux états ont des hauteurs NATURELLES différentes (mesuré à 412 ET
+    // 1350 px : 42,5 px pour « pays détecté », et l'état « position non
+    // détectée » qui porte désormais le bouton) et le bloc des états FINAUX
     // portait en plus un `mb-3` (12 px) que l'état de chargement n'avait pas :
     // quand la détection se terminait, les pastilles d'étape et tout le
     // formulaire descendaient de 14 px — CLS 0,0088 sur /register mobile et
@@ -925,6 +961,11 @@ export const PAGE_SECTIONS = {
     // formulaire (47 textes) était 1 px trop haut.
     countryGlobeIcon: 'countryGlobe',
     countryChevronIcon: 'countryChevron',
+    // Le repère du bloc « langue sélectionnée » : le CARACTÈRE « ✓ » y était
+    // publié sans domicile (aucune clé, aucune config) et le garde de provenance
+    // refusait la coquille. Dessiné par le registre, nommé ici, lu par les DEUX
+    // canaux : la page (RegistrationLanguageSelector) et la coquille.
+    selectedLanguageIcon: 'check',
     photoTipsTitleKey: 'tipsGoodPhoto',
     photoTipsKeys: ['useRecentPhoto', 'lookCamera', 'avoidGroup', 'neutralBackground'],
     // Le glyphe du bloc légal est DESSINÉ (page-icons.js) : le plan nomme une
@@ -939,21 +980,27 @@ export const PAGE_SECTIONS = {
     workerKey: 'worker',
     iAmWorkerKey: 'iAmWorker',
     countryKey: 'country',
-    firstNameKey: 'firstName',
-    lastNameKey: 'lastName',
+    // ── LE NOM EN UN CHAMP (26/10/2026) ───────────────────────────────────
+    // `firstNameKey`/`lastNameKey` ont disparu avec les deux champs qu'ils
+    // nommaient : le formulaire pose un seul `name` (le nom complet), et le
+    // serveur le répartit (`kojo_models._noms_resolus`). La coquille pré-rendue
+    // lit ce champ comme le reste de son corps déclaré — deux canaux, une clé.
+    fullNameKey: 'fullName',
     emailKey: 'email',
     emailPlaceholderKey: 'emailPlaceholder',
     phoneKey: 'phone',
+    phoneOptionalKey: 'phoneOptional',
     phoneFormatHintKey: 'phoneFormatHint',
     passwordKey: 'password',
     passwordTooShortKey: 'passwordTooShort',
-    confirmPasswordKey: 'confirmPassword',
+    // `confirmPasswordKey` est RETIRÉ avec le champ de confirmation : le mot de
+    // passe a déjà son révélateur (œil) et sa règle de 8 caractères, et une
+    // seconde saisie ne prouve rien de plus (elle se tape dans le même champ).
     profilePhotoOptionalKey: 'profilePhotoOptional',
     profilePhotoHelpsKey: 'profilePhotoHelps',
     addProfilePhotoKey: 'addProfilePhoto',
     clickToChooseOptionKey: 'clickToChooseOption',
     upToKey: 'upTo',
-    detectingLanguageKey: 'detectingLanguage',
     legalNoticeTitleKey: 'legalNoticeTitle',
     legalConsentHelpKey: 'legalConsentHelp',
     legalConsentLinkKey: 'legalConsentLink',
@@ -989,7 +1036,7 @@ export const PAGE_SECTIONS = {
     frameClass: 'min-h-full flex items-center justify-center fond-sable py-12 px-4 sm:px-6 lg:px-8',
     colonneClass: 'max-w-md w-full space-y-8',
     enteteClass: 'text-center',
-    badgeClass: 'mx-auto h-14 w-14 flex items-center justify-center rounded-lg bg-orange-600',
+    badgeClass: 'mx-auto h-14 w-14 flex items-center justify-center rounded-lg bg-orange-700',
     badgeTexteClass: 'text-white text-2xl font-bold',
     titleClass: 'mt-6 text-3xl font-bold text-stone-900',
     carteClass: 'carte-editoriale carte-publique space-y-6',
@@ -1000,7 +1047,7 @@ export const PAGE_SECTIONS = {
     labelClass: 'block text-sm font-medium text-gray-700',
     champClass: 'mt-1 block w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-hidden focus:ring-orange-500',
     aideClass: 'text-xs text-gray-500',
-    boutonClass: 'relative w-full rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-700',
+    boutonClass: 'relative w-full rounded-lg bg-orange-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-800',
     retourClass: 'text-center',
     lienRetourClass: 'text-sm font-medium text-orange-600 hover:text-orange-500',
   },
@@ -1325,7 +1372,7 @@ export const PAGE_SECTIONS = {
     mapFrameClass:
       'mt-6 w-full rounded-xl border border-stone-200 bg-white flex h-80 flex-col items-center justify-center gap-3 px-4 text-center',
     mapControlClass:
-      'inline-flex items-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700',
+      'inline-flex items-center rounded-xl bg-orange-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-800',
     // Une ligne de contact = une donnée (icône, libellé, destination, valeur
     // affichée, accent). `href` vient de src/config/contact.js : la règle `tel:`
     // et la règle `mailto:` (sujet compris) n'existent qu'à cet endroit, donc la

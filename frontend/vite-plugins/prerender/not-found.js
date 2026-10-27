@@ -24,6 +24,15 @@ export function buildNotFoundPage({ T, contact }) {
     '<meta name="viewport" content="width=device-width, initial-scale=1" />',
     '<meta name="robots" content="noindex, follow" />',
     `<title>${T('notFoundMetaTitle')}</title>`,
+    // La DESCRIPTION, comme sur les douze coquilles de route. C'est le seul
+    // document pré-rendu du build qui n'en portait aucune, et c'est un document
+    // qu'un crawler LIT (il reçoit le statut 404, mais il lit ce qu'on lui
+    // sert). Elle réutilise `notFoundText` — le paragraphe de la page, déjà
+    // traduit dans les cinq langues — plutôt que d'ajouter une sixième clé : la
+    // page est en `noindex`, donc cette description ne devient jamais un extrait
+    // de résultat qui devrait différer du texte visible, et une clé unique ne
+    // peut pas diverger d'elle-même.
+    `<meta name="description" content="${T('notFoundText')}" />`,
     '<style>',
     'body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:#f9fafb;color:#111827}',
     'main{max-width:640px;margin:0 auto;padding:4rem 1.5rem;text-align:center}',
