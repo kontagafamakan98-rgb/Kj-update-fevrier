@@ -26,17 +26,29 @@
  * l'ancienne teinte fait donc rougir ce test en le nommant, au lieu de le
  * laisser passer parce que le motif ne trouve plus rien.
  *
+ * ── LES ICÔNES AUSSI, À LEUR PROPRE SEUIL (27/10/2026) ────────────
+ * Ce fichier disait ne pas juger les icônes, qui relèvent de 1.4.11 (3:1, objets
+ * graphiques) et non du 4,5:1 du texte. Ce paragraphe était une limite, et la
+ * limite était un défaut : les inactives portaient `gray-400` (`#9ca3af`),
+ * **2,40:1** sur le sable et **1,54:1** au pire cas — sous les 3:1 du critère
+ * qui les concerne. Ils sont donc mesurés ici, à leur seuil : inactives
+ * `gray-600` (`#4b5563`, 7,14:1 et 4,57:1), actives `orange-700` sur le fond
+ * opaque `bg-orange-50` (4,88:1), et la cloche comme les inactives.
+ *
+ * La CLOCHE a deux objets, et le premier jet de ce fichier n'en mesurait aucun :
+ * son TRACÉ (`text-gray-600`, 1.4.11) et son LIBELLÉ « Notifications », qui
+ * hérite de l'encre du bouton — `text-gray-500`, 4,57:1 puis **2,93:1**, sous
+ * le seuil du texte. Les deux sont maintenant jugés, chacun au sien.
+ *
  * ── Ce que ce fichier ne prouve pas ───────────────────────────────────────
- * Les ICÔNES de la barre du bas (`orange-600` actif, `gray-400` inactif) : elles
- * relèvent de 1.4.11 (3:1, objets graphiques), pas du texte — c'est une décision
- * distincte, dite dans `MobileBottomNav.js`. Les classes COMPOSÉES à l'exécution
- * (`className={base + variante}`) échappent aussi à une lecture de source : la
- * présence du littéral est exigée, pas l'état final du DOM.
+ * Les classes COMPOSÉES à l'exécution (`className={base + variante}`) échappent
+ * à une lecture de source : la présence du littéral est exigée, pas l'état
+ * final du DOM.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { contrasteEntre, SEUIL_TEXTE } from '../../../scripts/contraste-jetons.js';
+import { contrasteEntre, SEUIL_GRAPHIQUE, SEUIL_TEXTE } from '../../../scripts/contraste-jetons.js';
 
 const FRONTEND = path.resolve(__dirname, '../../..');
 const CSS = fs.readFileSync(path.join(FRONTEND, 'src/index.css'), 'utf8');
@@ -71,12 +83,15 @@ const ENCRE = composer(VERRE, versRgb(jeton('--kojo-encre')));
 const SURFACES_VERRE = [SABLE, ENCRE];
 
 /**
- * Les teintes que ces deux surfaces emploient — et celle de la RÉGRESSION
- * (`orange-600`, `orange-800`, `gray-500`) pour qu'un retour en arrière soit
- * MESURÉ : une teinte inconnue serait refusée, ce qui dit qu'on ne sait pas et
- * non de combien on échoue.
+ * Les teintes que ces deux surfaces emploient — et celles de la RÉGRESSION
+ * (`orange-600`, `orange-800`, `gray-500`, `gray-400`) pour qu'un retour en
+ * arrière soit MESURÉ : une teinte inconnue serait refusée, ce qui dit qu'on ne
+ * sait pas et non de combien on échoue. `gray-400` n'est plus peinte nulle part
+ * ici : elle est la teinte d'icône d'AVANT le 27/10/2026, gardée pour que la
+ * régression rende son rapport (1,54:1) au lieu d'un refus muet.
  */
 const ENCRES = {
+  'gray-400': '#9ca3af',
   'gray-500': '#6b7280',
   'gray-600': '#4b5563',
   'gray-700': '#374151',
@@ -103,6 +118,30 @@ const ratio = (teinte, surface) => {
     );
   }
   return surface === 'verre' ? pireSurLeVerre(teinte) : contrasteEntre(ENCRES[teinte], ORANGE_50);
+};
+
+/**
+ * Le fond OPAQUE peint sous l'onglet ACTIF, lu sur le LIEN qui le porte.
+ *
+ * L'icône et le libellé de cet onglet sont des enfants : ils ne peignent rien
+ * eux-mêmes et héritent de cette surface. Les juger contre le verre
+ * certifierait un fond qu'ils recouvrent — la même erreur que mesurer l'encart
+ * de `/login` contre la carte au lieu de son propre fond. Le fond est cherché
+ * UNE fois pour les deux mesures (libellés, icônes) : deux recherches pour une
+ * même teinte finiraient par diverger.
+ */
+const surfaceDeLOngletActif = () => {
+  const classesActives = [...BARRE.matchAll(/isActive \? '([^']*)' :/g)].map(([, classes]) => classes);
+  const fond = classesActives.map((classes) => /bg-orange-(\d{2,3})/.exec(classes)).find(Boolean);
+  if (!fond) return 'verre';
+  const surface = FONDS_OPAQUES[`orange-${fond[1]}`];
+  if (!surface) {
+    throw new Error(
+      `la barre du bas peint « bg-orange-${fond[1]} » sans que ce fichier connaisse sa couleur — ` +
+        'la mesure refuse de conclure'
+    );
+  }
+  return surface;
 };
 
 /** La valeur d'une constante `PIED_*`, refusée nommément si elle a disparu. */
@@ -185,17 +224,9 @@ describe('pied de page et barre du bas — lisibilité sur la vitre', () => {
     // ENFANT, qui hérite de cette surface. Juger le span contre le verre
     // certifierait un fond que le survol ne laisse pas voir — la même erreur
     // que mesurer l'encart de `/login` contre la carte au lieu de son propre
-    // fond. La surface de l'état ACTIF est donc lue sur le lien, une fois.
-    const fondActif = paires
-      .map(([, classeActive]) => /bg-orange-(\d{2,3})/.exec(classeActive))
-      .find(Boolean);
-    const surfaceActive = fondActif ? FONDS_OPAQUES[`orange-${fondActif[1]}`] : 'verre';
-    if (fondActif && !surfaceActive) {
-      throw new Error(
-        `la barre du bas peint « bg-orange-${fondActif[1]} » sans que ce fichier connaisse sa couleur — ` +
-          'la mesure refuse de conclure'
-      );
-    }
+    // fond. La surface de l'état ACTIF est donc lue sur le lien, une fois
+    // (`surfaceDeLOngletActif`), et partagée avec la mesure des icônes.
+    const surfaceActive = surfaceDeLOngletActif();
 
     const mesures = [];
     for (const [, classeActive, classeInactive] of paires) {
@@ -214,6 +245,24 @@ describe('pied de page et barre du bas — lisibilité sur la vitre', () => {
       }
     }
 
+    // ── LA CLOCHE REND UN LIBELLÉ, DONC DU TEXTE ────────────────
+    // « Notifications » hérite de l'encre du BOUTON (`caseDeCloche`), qui vaut
+    // `text-gray-500` — 4,57:1 sur le sable puis **2,93:1** — : la cinquième
+    // case de la barre n'était mesurée par personne, parce qu'elle n'a pas de
+    // paire `isActive ? …` et que son tracé, lui, n'est pas du texte. Le seuil
+    // appliqué est donc celui du libellé, pas celui de l'icône.
+    const caseDeCloche = lire(
+      BARRE,
+      /const caseDeCloche =\s*`[^`]*?\b(text-[a-z]+-\d{2,3})\b/,
+      'l’encre du bouton de la cloche'
+    )[1].replace('text-', '');
+    mesures.push({
+      etat: 'de la cloche',
+      teinte: caseDeCloche,
+      ratio: ratio(caseDeCloche, 'verre'),
+      surface: 'le verre de la barre',
+    });
+
     const fautes = mesures
       .filter(({ ratio: valeur }) => valeur < SEUIL_TEXTE)
       .map(
@@ -222,5 +271,68 @@ describe('pied de page et barre du bas — lisibilité sur la vitre', () => {
           `seuil ${SEUIL_TEXTE}:1 (WCAG 1.4.3)`
       );
     expect(fautes, `libellé sous le seuil dans la barre du bas :\n  ${fautes.join('\n  ')}`).toEqual([]);
+  });
+
+  it('les icônes de la barre du bas tiennent 3:1, actives comme inactives', () => {
+    // Le seuil n'est pas celui du texte : un tracé d'icône relève de 1.4.11
+    // (3:1, objet graphique porteur d'information). Mesurer les icônes au 4,5:1
+    // du libellé qu'elles accompagnent demanderait une teinte qu'aucune n'a
+    // besoin d'atteindre ; mesurer les libellés à 3:1 laisserait le texte sous
+    // son propre seuil. Chaque objet est donc jugé au sien.
+    const paires = [...BARRE.matchAll(/active \? '([^']*)' : '([^']*)'/g)];
+    expect(
+      paires.length,
+      `la barre du bas ne déclare plus les deux états de ses icônes (${paires.length} paire(s) ` +
+        'lue(s)) : la mesure refuse de conclure sur un balayage vide'
+    ).toBeGreaterThanOrEqual(8);
+
+    // La CLOCHE est une icône de la barre comme les autres : son tracé est un
+    // objet graphique sur la même vitre, et son `iconClassName` est lu ici pour
+    // qu'une teinte plus claire ne passe pas par la porte de service.
+    const cloche = /iconClassName="([^"]*)"/.exec(BARRE);
+    expect(
+      cloche,
+      'la barre du bas ne déclare plus l’icône de la cloche : la mesure des icônes porterait sur trois cases sur quatre'
+    ).toBeTruthy();
+
+    const surfaceActive = surfaceDeLOngletActif();
+    const mesures = [];
+    const mesurer = (etat, classes, surface, ou) => {
+      for (const teinte of encresDe(classes).repos) {
+        if (!Object.hasOwn(ENCRES, teinte)) {
+          throw new Error(
+            `${ou} : la teinte « text-${teinte} » n'est pas dans la table de ce fichier — la mesure ` +
+              'refuse de conclure (l’ajouter à ENCRES, après l’avoir mesurée)'
+          );
+        }
+        mesures.push({
+          ou,
+          etat,
+          teinte,
+          ratio: surface === 'verre' ? pireSurLeVerre(teinte) : contrasteEntre(ENCRES[teinte], surface),
+          surface: surface === 'verre' ? 'le verre de la barre' : `#fff7ed (${surface})`,
+        });
+      }
+    };
+
+    for (const [, classeActive, classeInactive] of paires) {
+      mesurer('active', classeActive, surfaceActive, 'icône');
+      mesurer('inactive', classeInactive, 'verre', 'icône');
+    }
+    mesurer('inactive', cloche[1], 'verre', 'cloche');
+
+    expect(
+      mesures.length,
+      `seulement ${mesures.length} icône(s) mesurée(s) : la mesure refuse de conclure`
+    ).toBeGreaterThanOrEqual(9);
+
+    const fautes = mesures
+      .filter(({ ratio: valeur }) => valeur < SEUIL_GRAPHIQUE)
+      .map(
+        ({ ou, etat, teinte, ratio: valeur, surface }) =>
+          `barre du bas, ${ou} ${etat} : text-${teinte} = ${valeur.toFixed(2)}:1 sur ${surface}, ` +
+          `seuil ${SEUIL_GRAPHIQUE}:1 (WCAG 1.4.11)`
+      );
+    expect(fautes, `icône sous le seuil dans la barre du bas :\n  ${fautes.join('\n  ')}`).toEqual([]);
   });
 });
