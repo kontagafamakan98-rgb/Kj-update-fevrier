@@ -1739,7 +1739,26 @@ jobs:
     # ci-dessus. Le renommer ici sans changer la protection de main ferait
     # attendre un check que personne ne publie.
     name: E2E Playwright tests (Chromium)
-    runs-on: ubuntu-latest
+    # L'IMAGE EST ÉPINGLÉE, et pas par prudence de principe : c'est une mesure.
+    #
+    # Le 26/10/2026 à 23:46 (run 40420225135, `main`), ce job tournait sur
+    # Ubuntu 24.04 (noble, ICU 74) et les TROIS moteurs passaient. Le
+    # 27/10/2026 à 02:53 (run 40439331472, cette PR), le même job est tombé sur
+    # Ubuntu 26.04 (resolute, ICU 78) et les ONZE cas `webkit` ont échoué au
+    # LANCEMENT, en 2 ms chacun :
+    #
+    #   MiniBrowser: error while loading shared libraries:
+    #   libicudata.so.74: cannot open shared object file
+    #
+    # WebKit 2359 (celui de Playwright 1.63) est lié à l'ICU de 24.04 ;
+    # `--with-deps` installe ce que la distribution fournit, donc ICU 78, et se
+    # déclare satisfait. Aucun test n'a été jugé : un moteur qui ne démarre pas
+    # ne dit rien du code de la PR, et un `ubuntu-latest` qui change de version
+    # majeure entre deux runs fait exactement cela — un vert la veille, onze
+    # rouges le lendemain, pour une bibliothèque. Épingler l'image rend le fait
+    # LISIBLE au lieu de le subir ; le remède de fond est de suivre Playwright
+    # quand une version brutale pour resolute sortira.
+    runs-on: ubuntu-24.04
     # 20 → 30 min le 22/10/2026 : le cache des binaires est indexé sur
     # l'empreinte de `frontend/package-lock.json`, donc l'ajout d'UNE
     # dépendance de test (`@axe-core/playwright`) l'a invalidé et le job a payé
@@ -1826,19 +1845,46 @@ jobs:
       # moitié de la même installation.
       - name: Install Playwright browsers and system dependencies
         working-directory: frontend
-        # 2 × 300 s + 10 s de pause = 610 s au pire, sous le plafond de 12 min.
+        # 2 × 300 s + 10 s de pause + 90 s d'attente du verrou dpkg = 700 s au
+        # pire, sous le plafond de 12 min (l'attente n'existe que sur le chemin
+        # de reprise, et le commentaire plus bas dit pourquoi elle est née).
         timeout-minutes: 12
         env:
           # Défaut Playwright : 30 s. Écrit ici pour que la valeur soit LUE,
           # pas héritée d'une version d'outil.
           PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT: "30000"
         run: |
+          # L'ATTENTE DU VERROU DPKG, et pas un simple `sleep`.
+          #
+          # `timeout 300` tue le `npx`, pas le groupe : quand il tombe au milieu
+          # de l'`apt-get` de `--with-deps`, l'`apt-get` ENFANT lui survit et
+          # garde `/var/lib/dpkg/lock-frontend`. Mesuré le 27/10/2026 (PR #233,
+          # ce job) : la reprise a démarré 10 s après le kill et s'est arrêtée
+          # sur « Could not get lock /var/lib/dpkg/lock-frontend. It is held by
+          # process 2547 (apt-get) », donc le second essai ne POUVAIT pas
+          # réussir — le job est devenu rouge pour un fait qu'une attente
+          # aurait suffi à réparer. Tuer `apt-get` n'est pas la réponse : un dpkg
+          # interrompu laisserait la machine à réparer, et une reprise qui casse
+          # l'état qu'elle reprend n'est pas une reprise.
+          attendre_verrou_dpkg() {
+            for _ in $(seq 1 18); do
+              if ! command -v fuser > /dev/null 2>&1; then
+                return 0
+              fi
+              if ! fuser /var/lib/dpkg/lock-frontend > /dev/null 2>&1; then
+                return 0
+              fi
+              sleep 5
+            done
+            echo "::warning::le verrou dpkg est encore tenu après 90 s — la tentative suivante le dira au lieu de l'ignorer"
+          }
           for tentative in 1 2; do
             if timeout 300 npx playwright install --with-deps chromium firefox webkit; then
               exit 0
             fi
             echo "::warning::installation Playwright interrompue ou en échec (tentative ${tentative}/2), reprise dans 10 s"
             sleep 10
+            attendre_verrou_dpkg
           done
           echo "::error::les moteurs Playwright (chromium, firefox, webkit) n'ont pas pu être installés en deux tentatives — le job échoue ICI, pas dans les tests."
           exit 1

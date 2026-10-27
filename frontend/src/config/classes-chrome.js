@@ -117,10 +117,23 @@ export const PIED_CLASS = 'border-t verre-barre';
 export const PIED_INTERIEUR_CLASS = `${CONTENEUR_CLASS} py-4 space-y-3`;
 export const PIED_ADRESSE_CLASS =
   'not-italic flex flex-wrap items-center justify-center md:justify-end gap-x-4 gap-y-2 text-xs text-gray-600';
-export const PIED_LIEN_CLASS = 'hover:text-orange-700 underline underline-offset-2';
+// ── LES ENCRES DU PIED DE PAGE, MESURÉES SUR LA VITRE (27/10/2026) ────────
+// Le pied de page est du VERRE lui aussi (`PIED_CLASS` : `border-t verre-barre`),
+// donc ses liens ne sont pas posés sur du papier : la surface qu'ils peignent
+// dépend de ce qui défile derrière. Mesuré sur les deux composites de
+// `scripts/verre-contraste.js` (#fcf8f2 sur le sable, #ccc9c3 sur l'encre) :
+//   • l'encre de repos `orange-700` (`#c2410c`) valait 4,89:1 puis **3,13:1** —
+//     sous le seuil au pire cas, donc elle passe à `orange-900` (8,86:1 et 5,67:1) ;
+//   • le survol des liens de contact vers `orange-700` tombait sur la MÊME
+//     valeur (3,13:1) : il passe à `orange-900` ;
+//   • le survol des liens de navigation vers `orange-800` (`#9a3412`) valait
+//     6,91:1 puis **4,42:1** — sous le seuil : il passe à `orange-950`
+//     (`#431407`, 14,79:1 et 9,47:1), et reste distinct du repos.
+// Garde : `src/components/__tests__/pied-de-page-contraste.test.js`.
+export const PIED_LIEN_CLASS = 'hover:text-orange-900 underline underline-offset-2';
 export const PIED_LIEN_LONG_CLASS = `${PIED_LIEN_CLASS} break-all`;
-export const PIED_NAV_CLASS = 'flex flex-wrap items-center justify-center md:justify-end gap-4 text-sm text-orange-700';
-export const PIED_NAV_LIEN_CLASS = 'hover:text-orange-800 underline underline-offset-2';
+export const PIED_NAV_CLASS = 'flex flex-wrap items-center justify-center md:justify-end gap-4 text-sm text-orange-900';
+export const PIED_NAV_LIEN_CLASS = 'hover:text-orange-950 underline underline-offset-2';
 
 /**
  * Le relevé lu par le garde : les champs du domicile, nom → valeur. Le garde lit

@@ -204,6 +204,22 @@ export default function MobileBottomNav() {
   // au lieu d'être coupé. Le jeu de libellés est figé (cinq dictionnaires) et le
   // plus long — « Tableau de bord », « Notifications » — tient sur deux lignes
   // dans une case de 76,8 px.
+  // ── LES LIBELLÉS DE LA BARRE, MESURÉS SUR LEURS DEUX FONDS (27/10/2026) ────
+  // La barre est du VERRE (`.verre-barre`) : mesuré sur les composites de
+  // `scripts/verre-contraste.js`, le libellé inactif `gray-500` (`#6b7280`)
+  // valait 4,57:1 sur le sable et **2,93:1** sur le pire cas — sous le seuil.
+  // Il passe à `gray-700` (`#374151`, 9,74:1 et 6,24:1). L'onglet ACTIF peint,
+  // lui, `bg-orange-50` (OPAQUE) : son libellé `orange-600` (`#ea580c`) n'y
+  // tenait que **3,35:1**, il passe à `orange-700` (`#c2410c`, 4,88:1) — jugé sur
+  // ce fond-là, pas sur la vitre qu'il recouvre.
+  // Ce que ce fichier ne juge PAS : les ICÔNES. Elles relèvent de 1.4.11 (3:1,
+  // objets graphiques), pas du seuil de 4,5:1 du texte. L'icône active
+  // (`orange-600` sur `bg-orange-50`, 3,35:1) passe ; les inactives (`gray-400`,
+  // `#9ca3af`) valent 2,41:1 sur le sable et 1,53:1 au pire cas — donc SOUS les
+  // 3:1 du même critère. C'est un défaut CONNU, laissé à une décision distincte
+  // (éclaircir quatre icônes change l'aspect de la barre), dit ici plutôt que
+  // caché.
+  // Garde : `src/components/__tests__/pied-de-page-contraste.test.js`.
   const caseDeNav =
     'flex min-h-[72px] flex-col items-center justify-center rounded-2xl px-1 py-2 text-[11px] font-medium transition-colors';
   const caseDeCloche = `${caseDeNav} w-full text-gray-500 focus:outline-hidden focus:ring-2 focus:ring-orange-500`;
@@ -220,11 +236,11 @@ export default function MobileBottomNav() {
             <Link
               key={cle(item.path)}
               to={item.path}
-              className={`${caseDeNav} ${isActive ? 'bg-orange-50 text-orange-600' : 'text-gray-500'}`}
+              className={`${caseDeNav} ${isActive ? 'bg-orange-50 text-orange-700' : 'text-gray-700'}`}
               aria-current={isActive ? 'page' : undefined}
             >
               {item.icon(isActive)}
-              <span className={`mt-1 text-center leading-tight ${isActive ? 'text-orange-600' : 'text-gray-500'}`}>
+              <span className={`mt-1 text-center leading-tight ${isActive ? 'text-orange-700' : 'text-gray-700'}`}>
                 {item.label}
               </span>
             </Link>
