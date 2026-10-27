@@ -293,19 +293,55 @@ class TestUnSeulProprietaire:
 
         Les lignes de commentaire sont écartées : elles CITENT le mot pour dire
         qu'il a disparu, ce qui n'est pas l'écrire."""
+        import ast
         import inspect
 
         import kojo_core
+        import kojo_index_declares
 
-        fichier = inspect.getsourcefile(kojo_core.create_database_indexes)
-        source = Path(fichier).read_text(encoding="utf-8")
-        code = "\n".join(
-            ligne for ligne in source.splitlines()
-            if not ligne.strip().startswith("#")
+        def _duree_ecrite_en_clair(chemin):
+            """Les endroits où une DURÉE est ÉCRITE, pas ceux où son nom est LU.
+
+            L'ancien contrôle comparait le mot dans le texte : il refusait aussi
+            bien `create_index(expireAfterSeconds=86400)` — le défaut — que la
+            simple LECTURE du champ pour comparer un index à sa déclaration
+            (`spec_presente`), et il ignorait les docstrings. Un garde qui
+            confond les deux se fait contourner ou désactiver.
+            """
+            arbre = ast.parse(Path(chemin).read_text(encoding="utf-8"))
+            coupables = []
+            for noeud in ast.walk(arbre):
+                if isinstance(noeud, ast.Call):
+                    for mot in noeud.keywords:
+                        if mot.arg == "expireAfterSeconds":
+                            coupables.append(f"ligne {noeud.lineno} : create_index(expireAfterSeconds=…)")
+                if isinstance(noeud, ast.Dict):
+                    for cle in noeud.keys:
+                        if isinstance(cle, ast.Constant) and cle.value == "expireAfterSeconds":
+                            coupables.append(f"ligne {cle.lineno} : durée en clair dans un dict")
+            return coupables
+
+        creation = inspect.getsourcefile(kojo_core.create_database_indexes)
+        assert _duree_ecrite_en_clair(creation) == []
+
+        # Le 27/10/2026, les index (et leurs TTL) sont partis dans
+        # `kojo_index_declares`, lu par la création ET par la sonde. Le garde
+        # suit la DÉRIVATION au lieu de rester vert sur un fichier qui ne la
+        # porte plus : c'est la boucle TTL qui doit exister, où qu'elle vive.
+        code = Path(creation).read_text(encoding="utf-8")
+        assert "index_declares.declarations()" in code, (
+            "la création doit lire la déclaration unique, sinon le garde ne sait "
+            "plus d'où viennent les durées"
         )
 
-        assert "expireAfterSeconds" not in code
-        assert "for regle in RETENTION_RULES" in code
+        declaration = inspect.getsourcefile(kojo_index_declares.declarations)
+        assert _duree_ecrite_en_clair(declaration) == [], (
+            "une durée en clair dans la déclaration rendrait PRIVACY.md faux le "
+            "jour où quelqu'un la change d'un seul côté"
+        )
+        assert "for regle in RETENTION_RULES" in Path(declaration).read_text(
+            encoding="utf-8"
+        )
 
     @pytest.mark.asyncio
     async def test_chaque_regle_cree_son_index_et_rien_d_autre(self, monkeypatch):

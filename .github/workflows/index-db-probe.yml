@@ -1,0 +1,67 @@
+name: Index de la base (quotidien)
+
+# ─── Les index DÉCLARÉS sont-ils ceux que la base PORTE ? ──────────────────
+# Mesuré le 27/10/2026 : la création enveloppait ses ~70 index dans un seul
+# `try`. Le sixième échouait (`google_sub` en `unique`+`sparse` face aux `null`
+# écrits par l'inscription) et les 66 suivants — index texte de la recherche,
+# `2dsphere` du tri par distance, TTL de conservation — n'étaient JAMAIS créés.
+# L'échec partait dans un `logger.warning` à chaque démarrage : `/health` ne
+# publiait rien sur les index, et le repli `$regex` de la recherche répondait
+# 200, plus lentement. Aucune sonde ne pouvait le voir.
+#
+# Cette sonde lit la MÊME déclaration que la création
+# (`backend/kojo_index_declares.py`) et la compare à `list_indexes()` :
+#
+#   0 — tous les index déclarés sont présents, sous le bon nom, avec leurs
+#       options (unicité, filtre partiel, TTL, langue du texte) ;
+#   1 — au moins un écart : le run est ROUGE, et chaque ligne nomme l'index avec
+#       la valeur attendue et la valeur lue ;
+#   2 — impossible de juger (MONGO_URL absent, base injoignable, collection
+#       illisible, déclaration tronquée) : le run est ROUGE aussi, mais pour une
+#       PRÉMISSE nommée — une surface aveugle se déclare, elle ne vaut pas un vert.
+#
+# Secret requis (Settings → Secrets and variables → Actions) :
+#   MONGO_URL   chaîne de connexion qui LIT `kojo_db` (lecture seule suffit)
+# Tant qu'il manque, ce workflow est rouge PARCE QUE la sonde ne peut rien
+# juger — c'est volontaire, et le message le dit.
+on:
+  schedule:
+    # 06:50 UTC : après la sonde de santé (06:30) et celle des sauvegardes
+    # (06:45) — l'index est le troisième fait du matin, pas le premier.
+    - cron: '50 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: index-db-probe
+  cancel-in-progress: false
+
+jobs:
+  index-db:
+    name: Index de la base (déclarés vs présents)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.lock
+
+      # Le LOCK, pas les plages : une sonde qui juge la production s'installe
+      # avec les empreintes vérifiées, comme le déploiement qu'elle surveille.
+      - name: Installer les dépendances (pymongo, empreintes vérifiées)
+        working-directory: backend
+        run: pip install --require-hashes -r requirements.lock
+
+      - name: Comparer les index déclarés aux index présents
+        working-directory: backend
+        env:
+          MONGO_URL: ${{ secrets.MONGO_URL }}
+          DB_NAME: kojo_db
+        run: python scripts/check_index_db.py

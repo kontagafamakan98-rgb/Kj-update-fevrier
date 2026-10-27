@@ -43,6 +43,7 @@ DECLARATIONS = BACKEND / "requirements.txt"
 DOCKERFILE = BACKEND / "Dockerfile"
 CI = RACINE / ".github" / "workflows" / "ci.yml"
 BACKUP_CI = RACINE / ".github" / "workflows" / "backup-db.yml"
+INDEX_CI = RACINE / ".github" / "workflows" / "index-db-probe.yml"
 README = RACINE / "README.md"
 GENERATEUR = "scripts/maj_lock_requirements.py"
 
@@ -209,10 +210,17 @@ class TestLInstallationPasseParLeLock:
             "qui installe d'autres versions que la production juge autre chose"
         )
 
+    def test_la_sonde_des_index_installe_le_lock_avec_empreintes(self):
+        texte = INDEX_CI.read_text(encoding="utf-8")
+        assert "pip install --require-hashes -r requirements.lock" in texte, (
+            "index-db-probe.yml juge la base de PRODUCTION : son outillage "
+            "s'installe vérifié, comme le reste"
+        )
+
     def test_aucune_installation_ne_contourne_le_lock(self):
         """LE contrôle : un chemin oublié suffit, et c'est celui qu'on ne relit pas."""
         coupables = []
-        for chemin in (DOCKERFILE, CI, BACKUP_CI, README):
+        for chemin in (DOCKERFILE, CI, BACKUP_CI, INDEX_CI, README):
             for numero, ligne in enumerate(chemin.read_text(encoding="utf-8").splitlines(), 1):
                 if "pip install" not in ligne:
                     continue
