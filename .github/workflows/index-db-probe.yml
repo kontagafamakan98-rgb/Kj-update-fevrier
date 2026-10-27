@@ -64,4 +64,16 @@ jobs:
         env:
           MONGO_URL: ${{ secrets.MONGO_URL }}
           DB_NAME: kojo_db
+          # La sonde lit la déclaration PARTAGÉE avec la création
+          # (`kojo_index_declares.py`), qui importe les durées de
+          # conservation, donc `kojo_settings` — et celui-ci REFUSE de démarrer
+          # en production sans `JWT_SECRET` (fail-fast). Mesuré le 27/10/2026
+          # sur le premier run de ce workflow : sans ce profil, l'import levait
+          # un TRACEBACK et le run sortait en 1, c'est-à-dire « index non
+          # conformes » alors qu'aucun index n'avait été lu. Ce profil est celui
+          # de la suite de tests (`ci.yml`), pas une prétention sur
+          # l'environnement jugé : la sonde ne DÉMARRE pas l'application, elle
+          # lit des métadonnées d'index, et l'objet jugé est désigné par
+          # `MONGO_URL`. Aucun secret factice n'est posé pour autant.
+          APP_ENV: test
         run: python scripts/check_index_db.py

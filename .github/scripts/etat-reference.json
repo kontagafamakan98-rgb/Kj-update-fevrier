@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-27",
-    "motif": "cible de la mutation 'index-db: declaration tronquee acceptee' : l'empreinte fige le contenu que le rejeu mute, pour qu'une restauration ratee se voie sur cette sonde comme sur les autres gardes",
+    "motif": "Une declaration illisible est une premisse nommee (code 2) au lieu d'un traceback code 1, et le workflow donne le profil APP_ENV de la CI",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -144,7 +144,7 @@
       ".github/scripts/alerte_sondes.py": "35c6b645b431b932c6af1ed53704acc4f096da428a49e2f7461259358f137687",
       ".github/scripts/livrer.py": "7debdcaf504701b083b5c13575c41a2e2cdc2ae5b58e84d9cb62c5aadf4c8ba1",
       "backend/kojo_scheduler.py": "a66d11b182fca4236d91941b9319b3bd72577acd550f233df3afbc6551fabaf6",
-      "backend/scripts/check_index_db.py": "1e8c3a7d973fffd7d5b6c65653572aa006c3df9ea93cefe0403f5acca66b6951"
+      "backend/scripts/check_index_db.py": "ab9545fdb8e09f2cdabeed9865b2537f9216c4954c36ca7ea5fae656ac1212dd"
     }
   },
   "hors_perimetre": [
