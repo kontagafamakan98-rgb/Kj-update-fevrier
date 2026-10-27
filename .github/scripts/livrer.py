@@ -98,6 +98,22 @@ FRONTEND_DIR = REPO_ROOT / "frontend"
 BACKEND_DIR = REPO_ROOT / "backend"
 
 URL_FRONTEND_PROD = "https://kojoforafrica.cc.cd"
+
+# FENÊTRE DE BASCULE VERCEL (mesurée le 27/10/2026, deux livraisons de suite).
+# La sonde d'actifs est lancée juste après la fusion, pendant que Vercel remplace
+# l'artefact : deux refus ont porté sur une production CORRECTE — à 08:25 le HTML
+# était celui de l'ancien build avec le manifeste du nouveau (`annoncé ≠ servi`),
+# à 09:07 deux chunks lazy rendaient 404. Les deux écarts ont été mesurés en HTTP
+# réel quelques minutes plus tard : `CreateJob-C_ntOy7f.js` et
+# `HowItWorks-Lm1RwtdI.js` rendaient 200, et la sonde rendait vert sur 73 actifs.
+# La révision servie a sa fenêtre depuis le 21/10/2026 ; les actifs n'en avaient
+# pas, donc la livraison refusait en code 2 une production qui n'avait rien de
+# faux — et un refus qui tombe sur une bascule apprend à relancer sans lire.
+# Ce n'est PAS un assouplissement : les mesures sont espacées (pas une boucle
+# serrée), le nombre de tentatives est PUBLIÉ, et un écart qui survit à la
+# dernière est refusé en le nommant.
+ACTIFS_TENTATIVES = 3
+ACTIFS_ATTENTE_SECONDES = 20
 URL_BACKEND_HEALTH = os.environ.get("KOJO_BACKEND_HEALTH_URL", "https://api.kojoforafrica.cc.cd/health").strip()
 
 REPO_OWNER = "kontagafamakan98-rgb"
@@ -709,21 +725,39 @@ def verifier_actifs_production() -> bool:
         f"Contrôle des ACTIFS et CONTENUS servis par VERCEL (JS, CSS, polices, images, "
         f"cartes OG) sur {URL_FRONTEND_PROD}..."
     )
-    res = subprocess.run(
-        ["node", "scripts/check-deployed-assets.js"],
-        cwd=str(FRONTEND_DIR),
-        capture_output=False,
-    )
-    if res.returncode == 0:
-        log_succes("Vercel production : actifs conformes au manifeste de l'artefact !")
-        return True
-    if res.returncode == 2:
-        log_erreur(
-            "Vercel production : sonde d'actifs non exécutable (invocation impossible) — "
-            "aucun verdict rendu sur les actifs."
+    # La mesure peut tomber en pleine bascule Vercel (cf. ACTIFS_TENTATIVES) :
+    # chaque tentative est une MESURE complète et datée, jamais une relecture
+    # d'un cache. Un code 2 (invocation impossible) sort tout de suite : il ne
+    # dit rien des actifs, donc réessayer ne changerait pas ce qu'on sait.
+    for tentative in range(1, ACTIFS_TENTATIVES + 1):
+        res = subprocess.run(
+            ["node", "scripts/check-deployed-assets.js"],
+            cwd=str(FRONTEND_DIR),
+            capture_output=False,
         )
-        return False
-    log_erreur("Vercel production : actifs servis ≠ manifeste de l'artefact.")
+        if res.returncode == 0:
+            log_succes(
+                "Vercel production : actifs conformes au manifeste de l'artefact"
+                f" (tentative {tentative}/{ACTIFS_TENTATIVES}) !"
+            )
+            return True
+        if res.returncode == 2:
+            log_erreur(
+                "Vercel production : sonde d'actifs non exécutable (invocation impossible) — "
+                "aucun verdict rendu sur les actifs."
+            )
+            return False
+        if tentative < ACTIFS_TENTATIVES:
+            log(
+                f"  actifs pas encore ceux de l'artefact (tentative {tentative}/{ACTIFS_TENTATIVES})"
+                f" : bascule Vercel en cours, nouvelle mesure dans {ACTIFS_ATTENTE_SECONDES} s..."
+            )
+            time.sleep(ACTIFS_ATTENTE_SECONDES)
+    log_erreur(
+        "Vercel production : actifs servis ≠ manifeste de l'artefact après "
+        f"{ACTIFS_TENTATIVES} mesures espacées de {ACTIFS_ATTENTE_SECONDES} s — "
+        "ce n'est plus une bascule, un actif manque ou a été réécrit."
+    )
     return False
 
 
