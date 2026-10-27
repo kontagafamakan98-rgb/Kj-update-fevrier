@@ -87,7 +87,16 @@
     { "source": "/support/", "destination": "/support.html" },
     { "source": "/support-admin", "destination": "/app.html" },
     { "source": "/support-admin/", "destination": "/app.html" },
-    { "source": "/workers/(.*)", "destination": "https://api.kojoforafrica.cc.cd/api/og/workers/$1" }
+    { "source": "/workers/(.*)", "destination": "https://api.kojoforafrica.cc.cd/api/og/workers/$1" },
+    { "source": "/emplois", "destination": "/jobs.html" },
+    { "source": "/emplois/", "destination": "/jobs.html" },
+    { "source": "/emplois/(.*)", "destination": "https://api.kojoforafrica.cc.cd/api/pages/villes/$1" },
+    { "source": "/metiers", "destination": "/jobs.html" },
+    { "source": "/metiers/", "destination": "/jobs.html" },
+    { "source": "/metiers/(.*)", "destination": "https://api.kojoforafrica.cc.cd/api/pages/metiers/$1" },
+    { "source": "/guides", "destination": "/how-it-works.html" },
+    { "source": "/guides/", "destination": "/how-it-works.html" },
+    { "source": "/guides/(.*)", "destination": "https://api.kojoforafrica.cc.cd/api/pages/guides/$1" }
   ],
   "headers": [
     {
