@@ -622,7 +622,8 @@ async def get_page_ville(slug: str):
     """Page indexable d'une ville (/emplois/{slug}).
 
     Returns:
-        Response: HTML 200, ou 404 `noindex` si la ville n'est pas déclarée.
+        Response: HTML 200, ou 404 portant l'en-tête X-Robots-Tag à noindex si
+        la ville n'est pas déclarée.
     """
     page = pages_metier.trouver_ville(slug)
     base = _site_base()
@@ -659,7 +660,8 @@ async def get_page_guide(slug: str):
     """Guide éditorial (`/guides/{slug}`).
 
     Returns:
-        Response: HTML 200, ou 404 `noindex` si le guide n'est pas déclaré.
+        Response: HTML 200, ou 404 portant l'en-tête X-Robots-Tag à noindex si
+        le guide n'est pas déclaré.
     """
     page = pages_guides.trouver_guide(slug)
     base = _site_base()
@@ -696,7 +698,8 @@ async def get_page_metier(slug: str):
     """Page indexable d'un métier (/metiers/{slug}).
 
     Returns:
-        Response: HTML 200, ou 404 `noindex` si le métier n'est pas déclaré.
+        Response: HTML 200, ou 404 portant l'en-tête X-Robots-Tag à noindex si
+        le métier n'est pas déclaré.
     """
     page = pages_metier.trouver_metier(slug)
     base = _site_base()
