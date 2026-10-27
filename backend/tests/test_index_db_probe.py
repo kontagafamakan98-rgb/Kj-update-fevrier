@@ -53,6 +53,9 @@ def _document(declare, nom_module):
         "partialFilterExpression",
         "expireAfterSeconds",
         "default_language",
+        # Les CHAMPS d'un index texte sont portés par `weights` : sans lui, le
+        # fixture d'un index texte conforme serait jugé « champs texte … ≠ [] ».
+        "weights",
     ):
         if champ in spec:
             document[champ] = spec[champ]
