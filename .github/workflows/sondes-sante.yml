@@ -1,0 +1,60 @@
+name: Alerte des sondes de production (quotidienne)
+
+# ─── LE DESTINATAIRE DES SONDES ─────────────────────────────────────────────
+# Mesuré le 27/10/2026 : `POST /api/support/robot/chat` rendait 502 en une
+# seconde, cinq fois sur cinq — l'assistant de `/support` et du canal WhatsApp
+# était muet. Le dépôt le SAVAIT : `ai-assistant-probe` était rouge depuis le
+# 26/10 14:31. Ce qui a manqué n'est ni un test ni une sonde : c'est quelqu'un
+# qui l'apprenne. Treize crons mesuraient la production, aucun ne parlait.
+#
+# Ce workflow est le maillon qui manquait, et il est volontairement SILENCIEUX :
+#   * tout est vert → il n'écrit RIEN (ni issue, ni commentaire, ni coche) ;
+#   * une sonde est rouge → il ouvre UNE issue, ou met à jour celle qui existe
+#     déjà (même panne = même empreinte = aucune réécriture) ;
+#   * tout est revenu vert et une issue est ouverte → il la ferme en le disant.
+#
+# La liste des sondes n'est PAS recopiée ici : `alerte_sondes.py` lit les
+# workflows qui portent un `schedule:` — une sonde ajoutée demain est surveillée
+# sans qu'on touche à ce fichier, et une sonde retirée cesse d'être attendue.
+#
+# Trois sorties, jamais deux : 0 = verdict rendu (rouge signalé, ou tout vert),
+# 2 = PRÉMISSE (jeton absent, API illisible, moins de huit sondes lues, aucun run
+# lu) — le run est alors ROUGE, parce qu'une surveillance aveugle qui se tait est
+# exactement la panne du 27/10, une couche plus haut.
+on:
+  schedule:
+    # 07:50 UTC : la dernière sonde planifiée démarre à 07:32 et a 10 min de
+    # budget — l'alerte lit donc des runs TERMINÉS, jamais un run en cours.
+    - cron: '50 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: read    # lire la conclusion des runs des sondes
+  issues: write    # n'écrire QUE l'issue d'alerte
+  contents: read   # checkout : lire la liste des workflows du dépôt
+
+concurrency:
+  group: alerte-sondes
+  cancel-in-progress: false
+
+jobs:
+  alerte:
+    name: Alerte des sondes de production
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Aucune neutralisation : la sortie du script est le verdict du run. Un 2
+      # (prémisse) DOIT rougir ce job — c'est le seul cas où la surveillance est
+      # muette, et un rouge est préférable à un silence.
+      - name: Lire l'état des sondes et n'écrire que si quelque chose casse
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python .github/scripts/alerte_sondes.py --branche "${{ github.event.repository.default_branch || 'main' }}"

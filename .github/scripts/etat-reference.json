@@ -34,8 +34,8 @@
     "Preuve : backend/tests/test_etat_reference.py"
   ],
   "reference": {
-    "etablie_le": "2026-10-26",
-    "motif": "L'attente des coquilles suit le jeton des boutons pleins : boutonClass et badgeClass passent de orange-600/orange-500 a orange-700, donc la coquille pre-rendue de /register que ce garde compare ne peut plus porter l'ancienne teinte.",
+    "etablie_le": "2026-10-27",
+    "motif": "nouvelle cible de la mutation declaree « sondes: run annule compte comme rouge » : son etat sert de reference au harnais, qui doit savoir a quoi restaurer",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -138,11 +138,12 @@
       "frontend/scripts/check-job-form-canari.js": "806fdaed94c92d1e1f2fc8040a4db9dba5f49b78006a1b5f81a0358cee25c797",
       "backend/kojo_routers_jobs_proposals.py": "513fa961889e9318173d989836c290c3c08556ff3289f62ba2ebb750563f43a4",
       ".github/scripts/livrer.py": "8e76ed3490d5d6244415bb54643e94b756572ef16f3c7f20e8a26b9adb646d42",
-      "backend/server.py": "9d06ecbe47ef4a930dcb9dfb4858d9e7aedc374ecde8bf4aabe01f4fbbb93c94",
       "frontend/scripts/check-funnel-events.js": "19b016ff1cd4a442ca8173e06dbbc5897d0bbb71b918835c638f0062e1879221",
       "frontend/scripts/check-cors-preflight.js": "10ef1c5f33a3e72d5e89f69a02d6d414513c0be06899edf4b53ce0ba86793cb8",
       "frontend/scripts/check-bundle-size.js": "530dee36deef474e233a1ecfece462de7d97f8b13aa1b3d303c327ef9ae3bd50",
-      "frontend/scripts/check-prerender-shells.js": "3ac51916663c3bf144220196cb68107c197e50611f3744174ce479946112b0fc"
+      "frontend/scripts/check-prerender-shells.js": "3ac51916663c3bf144220196cb68107c197e50611f3744174ce479946112b0fc",
+      "backend/server.py": "911c4d0c8d71aa1cf56dc268c71a823cc385df8d4f36c391b79a6c41c8730253",
+      ".github/scripts/alerte_sondes.py": "35c6b645b431b932c6af1ed53704acc4f096da428a49e2f7461259358f137687"
     }
   },
   "hors_perimetre": [

@@ -60,6 +60,10 @@ from kojo_payments import (
     paydunya_circuit_state,
     refresh_paydunya_circuit_from_db,
 )
+# L'état de l'assistant IA (cause classée du dernier appel) : publié par /health
+# à côté du circuit PayDunya, pour qu'une panne du gateway se diagnostique sans
+# accès aux journaux Fly (mesure du 27/10/2026 : 502 en 1 s, sans cause lisible).
+from kojo_ai_gateway import diagnostic as ai_gateway_diagnostic
 import kojo_live
 from kojo_scheduler import (
     clients_sans_proposition_loop,
@@ -167,6 +171,16 @@ async def _health_payload() -> dict:
     piloté par la DB — une panne PayDunya ne rend pas l'API « degraded »
     (les moniteurs ne redémarrent pas l'app à tort), le champ
     paydunya_circuit.state porte l'info.
+
+    L'ASSISTANT IA est exposé pour la même raison, et pour une raison de plus :
+    mesuré le 27/10/2026, sa route rendait 502 en une seconde cinq fois sur cinq
+    alors que la seule cause lisible vivait dans les journaux Fly. Le bloc
+    `ai_gateway` publie la cause CLASSÉE du dernier appel (statut HTTP, genre
+    d'échec, compteur consécutif) — jamais le jeton, jamais l'hôte, jamais le
+    corps d'erreur — pour que « renouveler le jeton », « recharger le crédit » et
+    « corriger le modèle » se distinguent depuis l'extérieur. Comme pour
+    PayDunya, il ne pilote PAS `status` : l'assistant est facultatif, et une API
+    en bonne santé avec un assistant muet ne doit pas faire redémarrer l'app.
     """
     db_available = await is_database_available()
     await refresh_paydunya_circuit_from_db()
@@ -187,6 +201,10 @@ async def _health_payload() -> dict:
             "failure_threshold": circuit["failure_threshold"],
             "remaining_cooldown_seconds": int(circuit["remaining_cooldown_seconds"]),
         },
+        # La cause de la dernière panne de l'assistant, classée (cf.
+        # kojo_ai_gateway.diagnostic). `state: "inconnu"` quand aucun appel n'a
+        # eu lieu depuis le démarrage : un silence n'est pas un vert.
+        "ai_gateway": ai_gateway_diagnostic(),
     }
 
 
