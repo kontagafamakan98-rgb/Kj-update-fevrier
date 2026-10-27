@@ -36,9 +36,12 @@ from kojo_email import (
     send_email_via_active_provider,
 )
 from kojo_models import NotificationType
-# Les durées de conservation ne sont pas recopiées ici : la purge demande à
-# chaque règle son filtre (kojo_retention), qui porte aussi l'index TTL.
-from kojo_retention import RETENTION_RULES
+# La PURGE DE CONSERVATION vit dans son propre module (kojo_purge_retention) :
+# le passage est importable et exécutable hors horloge, sans passer par une
+# boucle `while True`. Il est RÉEXPORTÉ ici à l'identique — c'est le MÊME
+# objet, pas une copie — pour que `from kojo_scheduler import
+# retention_purge_once` garde son sens, tests compris.
+from kojo_purge_retention import retention_purge_once
 from kojo_job_alerts import passage_digest
 from kojo_identifiants import identifiant_job_query, identifiants_query
 from kojo_job_completion import passage_liberations_auto
@@ -389,34 +392,13 @@ async def payout_stuck_sweeper_loop():
             logger.warning(f"⚠️ Erreur sweeper décaissements bloqués: {exc}")
 
 
-async def retention_purge_once(now: Optional[datetime] = None) -> dict:
-    """Un passage de purge : supprime ce que les règles de conservation
-    déclarent dû.
-
-    Le filtre vient de `RegleDeConservation.query_de_purge` — la même règle que
-    l'index TTL, donc la purge ne peut pas contredire la durée publiée. Un
-    échec sur une collection n'empêche pas les autres : borner une collection
-    ne doit pas dépendre de l'état d'une autre.
-
-    Retourne {collection: documents supprimés} et ne logge que les passages non
-    vides — un log quotidien qui dit « 0 » finit par être ignoré.
-    """
-    now = now or datetime.now(timezone.utc)
-    supprimes = {}
-    for regle in RETENTION_RULES:
-        try:
-            resultat = await db[regle.collection].delete_many(
-                regle.query_de_purge(now)
-            )
-        except Exception as exc:
-            logger.warning(f"⚠️ Purge de conservation impossible ({regle.collection}): {exc}")
-            continue
-        nombre = getattr(resultat, "deleted_count", 0) or 0
-        if nombre:
-            supprimes[regle.collection] = nombre
-    if supprimes:
-        logger.info(f"🧹 Purge de conservation: {supprimes}")
-    return supprimes
+# ---------------------------------------------------------------------------
+# PURGE DE CONSERVATION — le passage est dans `kojo_purge_retention`
+# ---------------------------------------------------------------------------
+# Ce qui reste ICI est la CADENCE : le sommeil, le bail partagé (deux instances
+# ne purgent pas deux fois la même chose), l'annulation au shutdown. Ce qui est
+# parti est le PASSAGE lui-même — il ne dépend ni de l'horloge du planificateur
+# ni d'une boucle, donc il s'importe et s'exécute tel quel.
 
 
 async def retention_purge_loop():
