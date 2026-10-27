@@ -480,6 +480,14 @@
       "motif": "refuse le HTML du backend qui ne ferme pas une balise (fiche mission et sa 404), en NOMMANT la balise : la même règle que le frontend (vite-plugins/prerender/balises.js), portée en Python et prouvée identique sur le même jeu de cas. Un document déséquilibré est invisible à un navigateur, qui le répare en silence ; il ne l'est pas pour un crawler de partage, qui lit le HTML tel quel"
     },
     {
+      "chemin": ".github/scripts/alerte_sondes.py",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "backend/tests/test_sondes_sante_workflow.py",
+      "runner": "pytest",
+      "motif": "lit la conclusion du dernier run de CHAQUE job PLANIFIE (la liste est lue des workflows, l'alerte s'excluant elle-meme par son propre script) et n'ECRIT que sur un rouge : une issue au marqueur stable, reecrite seulement si l'EMPREINTE des echecs change, refermee avec un commentaire date quand tout repasse au vert, et AUCUNE ecriture quand tout est vert sans issue ouverte — un canal qui parle tous les jours devient muet. Un run `cancelled` n'est pas un rouge ; une sonde jamais executee est publiee a part ; une PREMISSE (jeton absent, API illisible, moins de 8 sondes lues, aucun run lu) sort en 2 et n'ecrase jamais une alerte reelle deja ouverte"
+    },
+    {
       "chemin": ".github/scripts/check-email-auth.py",
       "role": "garde",
       "invoque_par": "ci",
@@ -1193,6 +1201,27 @@
     }
   ],
   "mutations": [
+    {
+      "id": "sondes: run annule compte comme rouge",
+      "garde": ".github/scripts/alerte_sondes.py",
+      "cible": ".github/scripts/alerte_sondes.py",
+      "trouve": "CONCLUSIONS_ECHEC = (\"failure\", \"startup_failure\", \"timed_out\")",
+      "remplace": "CONCLUSIONS_ECHEC = (\"failure\", \"startup_failure\", \"timed_out\", \"cancelled\")",
+      "runner": "python",
+      "preuve": "backend/tests/test_sondes_sante_workflow.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_sondes_sante_workflow.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_sondes_sante_workflow.py::TestVerdict::test_un_run_annule_n_est_pas_un_rouge"
+      ]
+    },
     {
       "id": "funnel: etape declaree sans emetteur toleree",
       "garde": "frontend/scripts/check-funnel-events.js",

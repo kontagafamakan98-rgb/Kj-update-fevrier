@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-27",
-    "motif": "server.py monte le bloc ai_gateway de /health (kojo_ai_gateway.diagnostic) : la cause classee du 502 de l'assistant est publiee, et le contrat de surface /health s'en trouve elargi",
+    "motif": "nouvelle cible de la mutation declaree « sondes: run annule compte comme rouge » : son etat sert de reference au harnais, qui doit savoir a quoi restaurer",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -142,7 +142,8 @@
       "frontend/scripts/check-cors-preflight.js": "10ef1c5f33a3e72d5e89f69a02d6d414513c0be06899edf4b53ce0ba86793cb8",
       "frontend/scripts/check-bundle-size.js": "530dee36deef474e233a1ecfece462de7d97f8b13aa1b3d303c327ef9ae3bd50",
       "frontend/scripts/check-prerender-shells.js": "3ac51916663c3bf144220196cb68107c197e50611f3744174ce479946112b0fc",
-      "backend/server.py": "911c4d0c8d71aa1cf56dc268c71a823cc385df8d4f36c391b79a6c41c8730253"
+      "backend/server.py": "911c4d0c8d71aa1cf56dc268c71a823cc385df8d4f36c391b79a6c41c8730253",
+      ".github/scripts/alerte_sondes.py": "35c6b645b431b932c6af1ed53704acc4f096da428a49e2f7461259358f137687"
     }
   },
   "hors_perimetre": [
