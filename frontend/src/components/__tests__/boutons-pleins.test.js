@@ -106,9 +106,13 @@ const CHAINES = /'([^'\n]{0,600})'|"([^"\n]{0,600})"|`([^`]{0,900})`/g;
  * Les fonds orange d'une chaîne de classes, rangés par ÉTAT.
  *
  * Un utilitaire ne suffit pas à dire l'état : c'est la VARIANTE qui le dit.
- * `hover:bg-orange-800` (et `group-hover:…`, même effet sous le curseur) est
- * l'état de survol ; `bg-orange-700`, `sm:bg-orange-700` ou `focus:bg-orange-700`
- * restent l'état au repos tel qu'il est peint à l'arrivée.
+ * Un fond sous préfixe `hover:` (ou `group-hover:`, même effet sous le curseur)
+ * est l'état de survol ; le même utilitaire sous une variante de rupture
+ * (`sm:`, `md:`) ou de focus reste l'état au repos tel qu'il est peint à
+ * l'arrivée. Les littéraux ne sont pas recopiés ici : Tailwind lit AUSSI la
+ * prose, et une classe d'exemple dans un commentaire est GÉNÉRÉE sans porteur —
+ * mesuré le 27/10/2026, `check-classes-sans-regle` a refusé deux règles nées de
+ * cette phrase (CI de la PR #233).
  *
  * Le découpage se fait sur les TOKENS, pas sur une expression qui chercherait
  * « bg-orange- » n'importe où : le motif d'avant comptait `hover:bg-orange-800`
