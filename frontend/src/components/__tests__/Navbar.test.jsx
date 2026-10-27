@@ -135,9 +135,20 @@ const ENCRES = {
   'text-white': '#ffffff',
 };
 
-/** Les fonds OPAQUES peints par la barre, rangés par leur teinte (`bg-…` / `hover:bg-…`). */
+/**
+ * Les fonds OPAQUES peints par la barre, rangés par leur teinte (`bg-…` / `hover:bg-…`).
+ *
+ * Les deux teintes de la RÉGRESSION (`orange-500`, `orange-600`) restent dans la
+ * table : c'est le fond que la barre peignait avant le 26/10/2026, et un retour
+ * en arrière doit être MESURÉ (blanc sur `orange-600` = 3,56:1, l'échec nommé
+ * avec son rapport) au lieu d'être refusé comme « fond inconnu » — un refus dit
+ * qu'on ne sait pas, pas de combien on échoue. Même règle que pour l'encre de
+ * survol, un peu plus haut.
+ */
 const FONDS = {
   'orange-50': '#fff7ed',
+  'orange-500': '#f97316',
+  'orange-600': '#ea580c',
   'orange-700': '#c2410c',
   'orange-800': '#9a3412',
 };
