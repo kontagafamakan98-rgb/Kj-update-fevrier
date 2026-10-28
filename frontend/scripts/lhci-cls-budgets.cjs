@@ -230,31 +230,30 @@ const CLS_BUDGETS = {
   // HAUTEUR DU PIED DE PAGE, et non par cette page. C'est fait dans
   // `src/config/liens-seo.js` : le bloc de maillage empilait trois groupes sur
   // desktop (titre au corps du texte, liens à la ligne suivante), 124 px ; il
-  // partage désormais UN flux (`md:contents`) au corps de son bloc d'adresse
-  // (`text-xs`), 76 px. Mesuré au même protocole, le même jour : pied de page
-  // 217 → **169 px** arrêté sur l'accueil, 228 → **180 px** à l'instant de
-  // l'insertion (la police n'est pas encore posée à t≈250 ms) ; CLS de /payment
-  // en 1350×940 **0,0611 → 0,0419** sur les DEUX branches, et 0,0543 → 0,0369
-  // pour le relâchement du chunk retenu (0,0505 → 0,0330 pour le pied de page
-  // seul). Le MOBILE ne bouge pas (bloc 412 px, 0,0496 et 0,0532) : ses liens ne
-  // partagent aucune ligne (13 villes y prennent 5 lignes, 23 guides 18). Le
-  // plafond de 0,06, qu'on avait dû relever faute de levier, est donc de
-  // nouveau tenu par la mesure : 1,43× de marge sur le pire relevé desktop,
-  // 1,21× sur le mobile.
+  // partage désormais UN flux, au corps de son bloc d'adresse, soit **64 px**.
+  // Mesuré au même protocole, le même jour : pied de page 217 → **157 px** arrêté
+  // sur l'accueil, 228 → **168 px** à l'instant de l'insertion (la police n'est
+  // pas encore posée à t≈250 ms) ; CLS de /payment en 1350×940 **0,0611 →
+  // 0,0376** sur les DEUX branches, et 0,0543 → 0,0331 pour le relâchement du
+  // chunk retenu (0,0505 → 0,0293 pour le pied de page seul). Le MOBILE ne bouge
+  // pas (bloc 412 px, 0,0496 et 0,0532) : ses liens ne partagent aucune ligne
+  // (13 villes y prennent 5 lignes, 23 guides 18). Le plafond de 0,06, qu'on
+  // avait dû relever faute de levier, est donc de nouveau tenu par la mesure :
+  // 1,60× de marge sur le pire relevé desktop, 1,21× sur le mobile.
   '/payment': {
     max: 0.06,
     pireMediane: 0.0496,
     mesure:
-      'MESURE DU 28/10/2026, APRÈS LE PIED DE PAGE RACCOURCI (bloc de maillage à UN flux en desktop, '
-      + '`md:contents` + `text-xs` dans src/config/liens-seo.js) : `main` 706 px, pied 180 px à l’insertion, '
-      + 'CLS **0,0419** sur les DEUX branches en 1350×940 (0,0611 avant), et 0,0369 pour le chunk retenu '
-      + '(dont 0,0330 de pied de page, 0,0505 avant) ; mobile INCHANGÉ — 0,0496 (mission requise), 0,0000 '
-      + '(mission), 0,0532 (chunk retenu), bloc à 412 px. Le mobile ne bouge pas parce que ses liens ne '
-      + 'partagent pas de ligne (13 villes y prennent 5 lignes, 23 guides 18). Ce qui reste nommé par la '
-      + 'sonde : `<footer>` 0×0 → 1350×180 à (0, 760) — le pied de page est INSÉRÉ quand le splash PWA rend '
-      + 'la main, sur une page de 706 px de `main` pour une fenêtre de 940 —, plus les deux groupes de la '
-      + 'barre (0,0039, mesuré sur toutes les routes connectées). Le plafond redescend de 0,07 à 0,06 : '
-      + '1,43× de marge sur le pire relevé desktop. '
+      'MESURE DU 28/10/2026, APRÈS LE PIED DE PAGE RACCOURCI (bloc de maillage à UN flux en desktop : '
+      + 'le groupe cesse de peindre sa boîte, le titre passe au rang de ses liens, corps du bloc d’adresse) : '
+      + '`main` 718 px, pied 168 px à l’insertion, CLS **0,0376** sur les DEUX branches en 1350×940 '
+      + '(0,0611 avant), et 0,0331 pour le chunk retenu (dont 0,0293 de pied de page, 0,0505 avant) ; '
+      + 'mobile INCHANGÉ — 0,0496 (mission requise), 0,0000 (mission), 0,0532 (chunk retenu), bloc à 412 px. '
+      + 'Le mobile ne bouge pas parce que ses liens ne partagent pas de ligne (13 villes y prennent 5 lignes, '
+      + '23 guides 18). Ce qui reste nommé par la sonde : `<footer>` 0×0 → 1350×168 à (0, 772) — le pied de '
+      + 'page est INSÉRÉ quand le splash PWA rend la main, sur une page de 718 px de `main` pour une fenêtre '
+      + 'de 940 —, plus les deux groupes de la barre (0,0039, mesuré sur toutes les routes connectées). Le '
+      + 'plafond redescend de 0,07 à 0,06 : 1,60× de marge sur le pire relevé desktop. '
       + 'MESURE PRÉCÉDENTE, SQUELETTE RÉDUIT À SA DESTINATION (28/10/2026, pied de 228 px) : la sonde des cadres rendait 0,0000 (mission, '
       + '412×823), 0,0496 (mission requise, 412×823) et 0,0611 (les deux branches, 1350×940). Ce qui reste n’est '
       + 'PLUS la page : les deux branches mesurent la MÊME valeur, et la branche qui ne peint aucun pulse la paie '
