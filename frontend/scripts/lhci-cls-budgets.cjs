@@ -56,7 +56,7 @@
  *   /support          prod          18  0,0000 ×18                  0,01
  *   /jobs             prod          27  0,0000 ×27                  0,01
  *   /dashboard        prod          27  0,0450 ×27                  0,06
- *   /payment          prod          18  0,0450 ×18                  0,06
+ *   /payment          prod          18  0,0450 ×18                  0,07  (mesure navigateur 0,0611)
  *   /profile          prod          27  0,0450 ×27                  0,06
  *   /about            repli local    3  0,0000 ×3                   0,01
  *   /contact          repli local    3  0,0000 ×3                   0,01
@@ -68,8 +68,13 @@
  *   • /login 0,02 — un run isolé sur 18 a mesuré 0,1762 (non reproduit ; la
  *     médiane des 3 runs est restée 0). Un cran au-dessus des pages mesurées à 0
  *     strictement, pour ne pas dépendre d'un run.
- *   • /dashboard, /payment, /profile 0,06 — mesurés à 0,0450 sur 27/27 runs
+ *   • /dashboard, /profile 0,06 — mesurés à 0,0450 sur 27/27 runs
  *     (valeur EXACTE, décalage fixe) : la marge est de 1,33×.
+ *   • /payment 0,07 — la sonde navigateur (le seul instrument qui mesure les
+ *     DEUX tailles) rend 0,0611 en 1350×940 et 0,0000-0,0496 en 412×823 depuis
+ *     le 28/10/2026 : le plancher de cette route n'est plus la page mais
+ *     l'insertion du pied de page au démarrage (voir le bloc ci-dessous), donc
+ *     0,06 est SOUS la mesure. 0,07 garde 1,15× sur le pire relevé.
  *
  * Le défaut /jobs du 16/09/2026 (0,1353, déplacement qu'aucun nœud n'expliquait)
  * n'apparaît plus : 0,0000 sur 27 runs depuis. Le plafond global de 0,15 le
@@ -207,10 +212,22 @@ const CLS_BUDGETS = {
   // Re-mesuré après correctif, même protocole : 0 décalage sur /payment,
   // /dashboard et /profile en 412×823 comme en 1350×940.
   '/payment': {
-    max: 0.1,
-    pireMediane: 0.0909,
+    max: 0.07,
+    pireMediane: 0.0611,
     mesure:
-      '0,0450 sur 18 runs de main ; source NOMMÉE le 09/10/2026 par la sonde des cadres : le pied de page, '
+      'MESURE DU 28/10/2026, SQUELETTE RÉDUIT À SA DESTINATION : la sonde des cadres rend 0,0000 (mission, '
+      + '412×823), 0,0496 (mission requise, 412×823) et 0,0611 (les deux branches, 1350×940). Ce qui reste n’est '
+      + 'PLUS la page : les deux branches mesurent la MÊME valeur, et la branche qui ne peint aucun pulse la paie '
+      + 'aussi. Source nommée par la sonde : `<footer>` 0×0 → 1350×228 à (0, 712) au démarrage, plus les deux '
+      + 'groupes de la barre (0,0039, déjà mesuré sur toutes les routes connectées) — le pied de page est INSÉRÉ '
+      + 'quand le splash PWA rend la main, et sur une page courte (658 px de `main` ici) il tombe dans l’écran. '
+      + 'Le coût suit sa hauteur au carré ((228/940)² ≈ 0,058) : 141 px de pied donnaient 0,0470 le 17/10, 228 px '
+      + 'donnent 0,0611. DEUX AUTRES ARCHITECTURES ONT ÉTÉ MESURÉES LE MÊME JOUR ET SONT PIRE : peindre la '
+      + 'coquille pendant le splash rend 0,1118 desktop / 0,6174 mobile (le pied de page devient VISIBLE à y=247 '
+      + 'puis il est chassé hors écran par le squelette) ; la variante « repli réduit » du 09/10 rendait 0,0801. '
+      + 'Le plafond ne peut donc pas redescendre à 0,06 : c’est SOUS la mesure, et le levier pour y arriver est la '
+      + 'HAUTEUR DU PIED DE PAGE (son bloc de maillage), pas cette page. 0,07 laisse 1,15× sur le pire relevé. '
+      + 'HISTORIQUE : 0,0450 sur 18 runs de main ; source NOMMÉE le 09/10/2026 par la sonde des cadres : le pied de page, '
       + 'qui entre dans l’écran au swap repli → page. Cause corrigée (l’état de chargement de la page réservait '
       + 'les cartes d’une branche qui ne les montre pas : 1 376,4 px de `main` pour une destination de 700,4 en '
       + 'mobile). Après correctif, l’état de chargement fait la hauteur de sa destination (700,38 / 765,38 mobile, '
@@ -248,10 +265,13 @@ const CLS_BUDGETS = {
       + '`.carte-publique`. Le plafond de 0,06 n’a PAS bougé : la marge tombe de 1,75× à 1,24×, et '
       + 'c’est ce chiffre-là que la prochaine retouche de cette page doit regarder avant d’en retirer '
       + 'de la hauteur. '
-      + 'MESURE DU 28/10/2026, APRÈS LE BLOC DE MAILLAGE DU PIED DE PAGE (voir le commentaire juste au-dessus) : '
-      + 'la branche « mission » vaut 0,0909 desktop (pied de 193 px au lieu de 141, destination 682 px, '
-      + '492 px de déplacement) et le plafond passe à 0,10 ; la redirection sans compte, qui valait 0,3770, '
-      + 'est CORRIGÉE (0 décalage) et non budgétée',
+      + 'PREMIÈRE MESURE DU 28/10/2026, APRÈS LE BLOC DE MAILLAGE DU PIED DE PAGE : la branche « mission » valait '
+      + '0,0909 desktop (pied de 193 px au lieu de 141, destination 682 px, 492 px de déplacement) et le plafond '
+      + 'avait été relevé à 0,10 ; la redirection sans compte, qui valait 0,3770, est CORRIGÉE (0 décalage) et non '
+      + 'budgétée. LE SQUELETTE N’ÉTAIT PAS LE COUPABLE DE CES 492 px : la page peignait le formulaire réel ET le '
+      + 'squelette qui le représente, donc l’état de chargement DOUBLAIT son contenu. Il le REMPLACE désormais '
+      + '(cf. src/pages/Payment.js et PaymentContentSkeleton, qui tient la grille `lg:grid-cols-3` de la page) — '
+      + 'mesuré : `main` 658 → 658 px (Δ 0,00) en desktop et 1 015,33 → 966,61 en mobile',
   },
   '/profile': { max: 0.06, pireMediane: 0.045, mesure: '0,0450 sur 27 runs' },
   // Route CONNECTÉE qu'AUCUNE passe Lighthouse n'audite (`/messages` n'est pas

@@ -747,15 +747,32 @@ export const MessagesSkeleton = () => {
 // Contenu de la page Paiement (cartes sous l'en-tête) — EXTRAIT de Payment.js :
 // la page n'a plus son propre squelette dupliqué, et le fallback Suspense de
 // /payment réutilise exactement ces hauteurs (aucun décalage au swap).
-// Carte quote (en-tête + 3 champs + bouton) puis carte paiements récents.
+//
+// ── LA GRILLE DE LA DESTINATION, PAS UNE PILE (mesuré le 28/10/2026) ──────
+// Ce contenu empilait ses deux cartes (`space-y-6`) là où la page les pose
+// CÔTE À CÔTE dès `lg` (sa grille est `lg:grid-cols-3`, le formulaire occupe
+// `lg:col-span-2`). Le squelette valait donc la SOMME des deux cartes pour une
+// destination qui vaut leur MAXIMUM, et sur la branche « mission » — la seule
+// qui le peint — ces deux cartes étaient de surcroît peintes EN PLUS du
+// formulaire réel (l'état de chargement doublait le contenu au lieu de le
+// remplacer) : `main` faisait 1 174,31 px pendant le chargement pour 682 px
+// à l'arrivée, et le pied de page (193 px depuis le maillage du 27/10)
+// entrait dans l'écran — CLS 0,0909 desktop, plafond relevé à 0,10 faute
+// d'avoir réduit cette réserve-là (cf. scripts/lhci-cls-budgets.cjs).
+// Les DEUX causes sont ici et dans `src/pages/Payment.js` (le squelette
+// REMPLACE la grille, il ne s'y ajoute pas), et la grille ci-dessous est
+// écrite à l'identique de celle de la page : `antiClsSkeletons.test.jsx`
+// compare les deux chaînes, donc une retouche d'un seul côté rougit.
 export const PaymentContentSkeleton = () => {
+  const plan = PAGE_SECTIONS['/payment'];
   return (
-    <div className="space-y-6">
-      {/* Carte quote : en-tête + 3 champs. Le rembourrage est celui de la carte
-          RÉELLE (`.carte-editoriale` + `.carte-publique`) : le squelette ne doit
-          pas seulement peindre le même nombre de blocs, il doit en tenir la
-          même boîte. */}
-      <div className="carte-editoriale carte-publique">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      {/* LE FORMULAIRE — la colonne large, comme la page (`lg:col-span-2`).
+          Carte quote : en-tête + 3 champs. Le rembourrage est celui de la carte
+          RÉELLE (`.carte-editoriale` + `.carte-publique`, lus dans le plan) : le
+          squelette ne doit pas seulement peindre le même nombre de blocs, il
+          doit en tenir la même boîte. */}
+      <div className={`${plan.carteClass} lg:col-span-2`}>
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <Skeleton className="h-6 w-40" />
           <Skeleton className="h-6 w-32 rounded-[3px]" />
@@ -778,8 +795,8 @@ export const PaymentContentSkeleton = () => {
         <Skeleton className="mt-6 h-13 w-48 rounded-[3px]" />
       </div>
 
-      {/* Carte paiements récents */}
-      <div className="carte-editoriale carte-publique">
+      {/* LES PAIEMENTS RÉCENTS — la colonne étroite de la même grille. */}
+      <div className={plan.carteClass}>
         <Skeleton className="h-6 w-56" />
         <div className="mt-3">
           <Skeleton className="h-16 w-full rounded-[3px]" />

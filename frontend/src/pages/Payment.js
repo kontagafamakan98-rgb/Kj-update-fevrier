@@ -87,6 +87,15 @@ const Payment = () => {
   // ici ET par `PaymentSkeleton`. Une règle écrite deux fois divergerait —
   // c'est exactement le défaut que ce relevé a mis au jour.
   const cartesDePaiementAttendues = !carteMissionRequise();
+  // ── LE SQUELETTE REMPLACE LA GRILLE, IL NE S'AJOUTE PAS À ELLE (28/10/2026)
+  // Il était peint À LA SUITE du formulaire réel : l'état de chargement doublait
+  // donc le contenu qu'il représente, et la branche « mission » valait 1 174,31 px
+  // de `main` pendant le chargement pour une destination de 682 px — le pied de
+  // page (193 px) entrait dans l'écran à l'arrivée des données (CLS 0,0909
+  // desktop, plafond relevé à 0,10 faute d'avoir réduit cette réserve). Le
+  // squelette tient maintenant la place de la grille : l'un OU l'autre, jamais
+  // les deux (cf. `PaymentContentSkeleton`).
+  const paiementEnChargement = loading && cartesDePaiementAttendues;
   const [form, setForm] = useState({
     // Plus de valeur "démo" (25000) codée en dur : sans contexte de mission,
     // le montant part de 0 plutôt que de suggérer un chiffre arbitraire qui
@@ -344,6 +353,11 @@ const Payment = () => {
               {t(pagePlan.noJobCtaKey)}
             </Link>
           </section>
+        ) : paiementEnChargement ? (
+          // L'ÉTAT DE CHARGEMENT DE LA BRANCHE « mission » : le squelette tient
+          // la grille de la destination (même grille, mêmes cartes, même boîte),
+          // donc l'arrivée des données ne déplace que le contenu À L'INTÉRIEUR.
+          <PaymentContentSkeleton />
         ) : (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <section className={`${pagePlan.carteClass} lg:col-span-2`} data-section="formulaire-paiement">
@@ -507,15 +521,6 @@ const Payment = () => {
           </div>
         )}
 
-        {/* État de chargement : squelette structuré répliquant la hauteur du
-            layout réel (bande d'identité + formulaire quote + carte paiements)
-            pour que l'arrivée des données async (providerConfig, quote,
-            payments) ne fasse pas bouger le footer — anti-CLS uniforme.
-            Il n'est peint QUE dans la branche qui le montre : la carte
-            « mission requise » ne porte aucune carte de paiement, donc les
-            réserver y faisait grandir l'état de chargement au-dessus de sa
-            destination (voir `cartesDePaiementAttendues`). */}
-        {loading && cartesDePaiementAttendues && <PaymentContentSkeleton />}
       </div>
     </div>
   );
