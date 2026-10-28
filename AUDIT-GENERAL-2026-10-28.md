@@ -270,9 +270,14 @@ Ce qui reste OUVERT, et pourquoi ce n'est pas fait ici :
   `test_guides_editoriaux` : budget absent, nul, négatif ou non numérique est
   HORS mesure, et une ville sans budget n'emprunte pas celui de sa voisine).
   Remplir ces pages par du code voudrait dire fabriquer la preuve — exactement
-  ce que la règle interdit. **Le correctif est le semis (§5.1 item 1)** ; le
-  levier logiciel qui reste (§6 item 7, un bouton d'alerte emploi par page
-  métier × ville) capture la demande sans mentir sur l'offre.
+  ce que la règle interdit. **Le correctif est le semis (§5.1 item 1)**.
+  Le levier logiciel qui restait (§6 item 7) est **FAIT** le 28/10 : les 22
+  pages ville et métier portent un bloc d'alerte dont le lien emporte leurs
+  critères (`/jobs?alerte=1&ville=Bamako`, `/jobs?alerte=1&category=plumbing`),
+  la carte d'alerte se préremplit sans écraser le champ que le lien ne porte
+  pas, et un visiteur sans compte y trouve les deux portes au lieu d'une page
+  filtrée sans la promesse qui l'a amené. Aucune offre n'est promise : le bloc
+  dit qu'une alerte écrit quand une mission CORRESPOND.
 - **§5.2 7 — le mobile Capacitor n'est pas re-vérifié.** Rien ne se mesure ici :
   il faut un artefact Capacitor à jour et un appareil. La décision (re-synchroniser
   ou cesser de suivre) reste ouverte, et rien dans ce push ne la préempte.

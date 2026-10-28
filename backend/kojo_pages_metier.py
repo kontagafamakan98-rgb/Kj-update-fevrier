@@ -57,6 +57,7 @@ import re
 import unicodedata
 from datetime import date, datetime
 from typing import Iterable, Optional
+from urllib.parse import quote
 
 from kojo_csp import balise_csp
 from kojo_geo_data import GEOGRAPHIC_DATABASE
@@ -426,6 +427,60 @@ def _liens_internes(genre: str, page: dict) -> str:
     )
 
 
+def titre_alerte(genre: str, page: dict) -> str:
+    """Le titre du bloc d'alerte — il nomme le MÉTIER ou la VILLE de la page.
+
+    « Recevoir les missions de plomberie par email » plutôt que « Créer une
+    alerte » : le lien dit ce qu'il ramène, et la page reste la même requête du
+    début à la fin.
+    """
+    if genre == "metier":
+        return f"Recevoir les missions de {page['nom'].lower()} par email"
+    return f"Recevoir les missions à {page['nom']} par email"
+
+
+def lien_alerte(genre: str, page: dict) -> str:
+    """L'URL d'alerte de CETTE page, critères compris.
+
+    `alerte=1` demande l'ouverture de la carte ; `category` est le slug que
+    filtre déjà `/jobs`, `ville` la ville TELLE QU'ELLE EST ÉCRITE dans la
+    page — la veille garde ce texte et le compare au nom de la mission, donc
+    envoyer le slug (« segou ») ferait une alerte qui ne correspondrait à
+    rien. Le `&` est écrit `&amp;` : c'est un attribut `href`.
+    """
+    if genre == "metier":
+        parametres = f"alerte=1&amp;category={quote(page['categorie'])}"
+    else:
+        parametres = f"alerte=1&amp;ville={quote(page['nom'])}"
+    return f"/jobs?{parametres}"
+
+
+def _bloc_alerte(genre: str, page: dict) -> str:
+    """Le bloc d'alerte emploi : un vrai lien, et ce qu'il ne promet PAS.
+
+    Les pages ville et métier disent honnêtement « aucune offre ouverte » les
+    jours creux — et s'arrêtaient là. Un visiteur venu chercher un plombier à
+    Bamako n'avait aucun moyen de laisser son intention, alors que l'alerte
+    emploi existe depuis le 24/10 (`/job-alerts`, une par compte travailleur)
+    et n'était montée que sur `/jobs`, connecté.
+
+    Le bloc ne prétend rien sur l'offre : il dit qu'une alerte ÉCRIT quand une
+    mission CORRESPOND, que l'adresse est celle du compte et qu'il en faut un.
+    La liste au-dessus reste la seule mesure de ce qui est ouvert.
+    """
+    return (
+        '<section class="alerte" aria-labelledby="alerte-titre">'
+        f'<h2 id="alerte-titre">{_esc(titre_alerte(genre, page))}</h2>'
+        "<p>Une alerte par compte travailleur : Kojo écrit à l’adresse du compte "
+        "dès qu’une mission correspond, et rien n’est promis sur le nombre "
+        "d’offres à venir — la liste ci-dessus est la seule mesure de l’offre."
+        "</p>"
+        f'<a class="cta alerte-cta" href="{lien_alerte(genre, page)}">'
+        "Créer mon alerte emploi</a>"
+        "</section>"
+    )
+
+
 def _json_ld(page: dict, genre: str, url: str, missions: Iterable[dict]) -> str:
     """`CollectionPage` + `ItemList` : ce que la page EST, et ce qu'elle liste.
 
@@ -491,6 +546,11 @@ ul.offres{list-style:none;padding:0;margin:0}
 footer{border-top:1px solid var(--trait);padding:1.5rem 1.25rem;font-size:.9rem;color:#57534e}
 footer a{color:var(--brun)}
 .vide{background:#fff;border:1px solid var(--trait);border-radius:.5rem;padding:1rem}
+.alerte{background:#fff;border:1px solid var(--trait);border-radius:.6rem;
+padding:1.25rem;margin:1.5rem 0}
+.alerte h2{margin:0 0 .5rem}
+.alerte p{margin:0 0 1rem;font-size:.95rem;color:#44403c}
+.alerte-cta{margin-bottom:0}
 """
 
 
@@ -561,6 +621,7 @@ def document(page: dict, genre: str, origine: str, missions: list) -> str:
         f'<p class="intro">{_esc(introduction_de(page, genre))}</p>\n'
         f'<a class="cta" href="/jobs">{_esc(compteur)} — voir les offres</a>\n'
         f"<h2>Offres ouvertes</h2>\n{liste}\n"
+        f"{_bloc_alerte(genre, page)}\n"
         f'<h2>Comment ça marche</h2>\n<div class="etapes">{etapes}</div>\n'
         f"{_liens_internes(genre, page)}\n"
         "</main>\n"

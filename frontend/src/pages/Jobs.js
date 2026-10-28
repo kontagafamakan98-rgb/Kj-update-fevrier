@@ -8,6 +8,9 @@ import JobCreateModal from '../components/JobCreateModal';
 // une mission correspond (backend/kojo_job_alerts.py). Montée ici parce que
 // c'est la page où un travailleur cherche — et seulement pour lui.
 import AlerteEmploi from '../components/AlerteEmploi';
+// Les liens internes du site passent par `LienVue` (transition de vue native,
+// silencieuse sans elle) — jamais par `Link` directement.
+import LienVue from '../components/LienVue';
 import { ListSkeleton } from '../components/SkeletonLoader';
 import { jobsAPI } from '../services/apiEndpoints';
 import { getLocaleForLanguage } from '../utils/pack2PageI18n/core';
@@ -113,6 +116,14 @@ export default function Jobs() {
   const pagePlan = PAGE_SECTIONS['/jobs'];
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchParams] = useSearchParams();
+  // ── UN LIEN DEPUIS UNE PAGE VILLE OU MÉTIER (28/10/2026) ────────────────
+  // Les pages servies par le backend ne démarrent pas React : leur bouton
+  // d'alerte arrive ici avec les critères (`?alerte=1&ville=Bamako`,
+  // `?alerte=1&category=plumbing`). `alerte=1` demande l'ouverture de la carte
+  // d'alerte, `ville` la préremplit — la veille garde un texte libre, donc on
+  // transmet le NOM de la ville, pas son slug.
+  const alerteDemandee = searchParams.get('alerte') === '1';
+  const villeAlerte = searchParams.get('ville') || '';
   const [filters, setFilters] = useState(() => ({
     category: searchParams.get('category') || '',
     // Le PAYS arrive par un LIEN (`/jobs?country=mali`), depuis le ruban de
@@ -392,7 +403,39 @@ export default function Jobs() {
           mêmes puces que les filtres ci-dessous (une seule liste), et le pays
           est celui du compte — la veille ne sort pas de son marché. */}
       {user?.user_type === 'worker' && (
-        <AlerteEmploi categories={categories} pays={user?.country || ''} />
+        <AlerteEmploi
+          categories={categories}
+          pays={user?.country || ''}
+          ouvrirAlerte={alerteDemandee}
+          categorieInitiale={filters.category || ''}
+          villeInitiale={villeAlerte}
+        />
+      )}
+
+      {/* ── LE MÊME LIEN, QUAND ON N'A PAS ENCORE DE COMPTE ────────────────
+          Une page ville/métier renvoie ici pour l'alerte ; un visiteur anonyme
+          n'en voit rien, puisque la carte n'existe que pour un travailleur
+          connecté. Il tomberait sur une page filtrée sans la promesse qui l'a
+          amené. Cette carte dit donc la seule chose vraie : l'alerte s'active
+          depuis un compte, et celui qui la veut doit en ouvrir un (ou se
+          connecter). Aucune clé i18n nouvelle : les trois textes existent déjà.
+          Un CLIENT connecté ne voit rien — une veille lui enverrait le
+          catalogue qu'il publie lui-même. */}
+      {alerteDemandee && !user && (
+        <section className="carte-publique carte-editoriale mb-6" aria-labelledby="alerte-invite-titre">
+          <h2 id="alerte-invite-titre" className="text-base font-semibold text-stone-900">
+            {t('jobAlertTitle')}
+          </h2>
+          <p className="mt-1 text-sm text-stone-600">{t('jobAlertIntro')}</p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <LienVue to="/register?type=worker" className="bouton bouton-encre">
+              {t('createAccount')}
+            </LienVue>
+            <LienVue to="/login" className="bouton bouton-clair">
+              {t('signIn')}
+            </LienVue>
+          </div>
+        </section>
       )}
 
       {/* ── Recherche et filtres : UNE carte, lisible d'un coup d'œil ───────

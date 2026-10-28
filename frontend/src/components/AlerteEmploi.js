@@ -18,14 +18,33 @@
  * Ce qu'elle n'affiche pas : l'adresse email. Elle n'est pas une préférence
  * réglable — l'alerte écrit celle du compte, et le backend ne la rend jamais.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { CHAMP, CHAMP_SELECTEUR } from '../config/classes-champ';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
 import { api } from '../services/api';
 
-const AlerteEmploi = ({ categories = [], pays = '' }) => {
+const AlerteEmploi = ({
+  categories = [],
+  pays = '',
+  // ── VENIR D'UNE PAGE VILLE OU MÉTIER (28/10/2026) ─────────────────────
+  // Les pages servies par le backend (`/emplois/{ville}`, `/metiers/{metier}`)
+  // ne démarrent pas React : leur bouton mène ici avec les critères dans
+  // l'URL (`?alerte=1&ville=Bamako`, `?alerte=1&category=plumbing`).
+  //
+  // Règle de préremplissage, et elle n'est pas symétrique :
+  //   * sans `ouvrirAlerte`, la VEILLE DU COMPTE gagne — on arrive sur
+  //     `/jobs` pour lire des missions, pas pour réécrire un réglage ;
+  //   * avec `ouvrirAlerte`, le LIEN gagne sur le champ qu'il porte, et
+  //     seulement celui-là : depuis la page d'Abidjan on veut Abidjan, mais
+  //     la catégorie enregistrée (Bamako/plomberie → Abidjan/plomberie) n'a
+  //     pas de raison d'être effacée. Une alerte par compte : écraser le
+  //     champ que le visiteur n'a pas cliqué serait une perte silencieuse.
+  categorieInitiale = '',
+  villeInitiale = '',
+  ouvrirAlerte = false,
+}) => {
   const { t } = useLanguage();
   const toast = useToast();
 
@@ -34,6 +53,7 @@ const AlerteEmploi = ({ categories = [], pays = '' }) => {
   const [categorie, setCategorie] = useState('');
   const [ville, setVille] = useState('');
   const [envoi, setEnvoi] = useState(false);
+  const carteRef = useRef(null);
 
   useEffect(() => {
     let vivant = true;
@@ -42,8 +62,10 @@ const AlerteEmploi = ({ categories = [], pays = '' }) => {
         const donnees = await api.get('/job-alerts');
         if (!vivant) return;
         setAlerte(donnees || { active: false });
-        setCategorie((donnees && donnees.category) || '');
-        setVille((donnees && donnees.city) || '');
+        setCategorie(
+          (ouvrirAlerte && categorieInitiale) || (donnees && donnees.category) || ''
+        );
+        setVille((ouvrirAlerte && villeInitiale) || (donnees && donnees.city) || '');
         setEtat('pret');
       } catch (_error) {
         // La carte n'est pas la page : une lecture impossible laisse le
@@ -54,7 +76,22 @@ const AlerteEmploi = ({ categories = [], pays = '' }) => {
     return () => {
       vivant = false;
     };
-  }, []);
+  }, [ouvrirAlerte, categorieInitiale, villeInitiale]);
+
+  // Le lien d'une page ville/métier vise CETTE carte : sans amener le regard
+  // dessus, il déposerait le visiteur en haut d'une page où l'alerte est plus
+  // bas, et le bouton aurait menti sur sa destination. `scrollIntoView` n'existe
+  // pas dans jsdom : le garde d'existence évite de faire tomber le test qui, lui,
+  // mesure le préremplissage.
+  useEffect(() => {
+    if (!ouvrirAlerte || etat !== 'pret' || !carteRef.current) return;
+    const carte = carteRef.current;
+    if (typeof carte.scrollIntoView === 'function') {
+      carte.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+    const premier = carte.querySelector('select');
+    if (premier) premier.focus({ preventScroll: true });
+  }, [ouvrirAlerte, etat]);
 
   const enregistrer = async (event) => {
     event.preventDefault();
@@ -104,7 +141,11 @@ const AlerteEmploi = ({ categories = [], pays = '' }) => {
   }
 
   return (
-    <section className="carte-publique carte-editoriale mb-6" aria-labelledby="alerte-emploi-titre">
+    <section
+      ref={carteRef}
+      className="carte-publique carte-editoriale mb-6"
+      aria-labelledby="alerte-emploi-titre"
+    >
       <h2 id="alerte-emploi-titre" className="text-base font-semibold text-stone-900">
         {t('jobAlertTitle')}
       </h2>

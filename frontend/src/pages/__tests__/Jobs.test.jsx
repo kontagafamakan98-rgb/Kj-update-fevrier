@@ -432,3 +432,31 @@ describe('Jobs — le premier paint ne dépend pas de la réponse de l’API', (
     expect(screen.getByText(jobsT('intro'))).toBeTruthy();
   });
 });
+
+describe('Jobs — un lien d’alerte venu d’une page ville ou métier', () => {
+  // Les pages `/emplois/{ville}` et `/metiers/{metier}` ne démarrent pas React :
+  // leur bouton d'alerte arrive ici avec `?alerte=1` et ses critères. Sans ce
+  // bloc, un visiteur anonyme y verrait une page filtrée SANS la promesse qui
+  // l'a amené (la carte d'alerte n'existe que pour un travailleur connecté) —
+  // le bouton aurait menti sur sa destination.
+  it('ouvre une carte d’alerte pour un visiteur sans compte, avec les deux portes', async () => {
+    SEARCH_PARAMS.current = new URLSearchParams('alerte=1&ville=Bamako');
+    jobsAPI.getAll.mockResolvedValue([JOB_A]);
+
+    render(<Jobs />);
+
+    expect(await screen.findByText(fr.jobAlertTitle)).toBeTruthy();
+    // Les deux portes, et les clés existantes : aucune promesse sur l'offre.
+    expect(screen.getByText(fr.createAccount)).toBeTruthy();
+    expect(screen.getByText(fr.signIn)).toBeTruthy();
+  });
+
+  it('sans le paramètre, aucune carte d’alerte n’est poussée à un visiteur anonyme', async () => {
+    jobsAPI.getAll.mockResolvedValue([]);
+
+    render(<Jobs />);
+
+    await screen.findByText(VIDE);
+    expect(screen.queryByText(fr.jobAlertTitle)).toBeNull();
+  });
+});
