@@ -39,6 +39,17 @@ import {
   PIED_NAV_CLASS,
   PIED_NAV_LIEN_CLASS,
 } from './config/classes-chrome';
+// Le maillage vers les pages ville, métier et guides : la MÊME déclaration que
+// l'accueil (src/pages/Home.js) et que les deux coquilles. Il vit dans le pied
+// de page parce que celui-ci est rendu sur TOUTES les routes : c'est le seul
+// endroit où une page de ville est citée depuis /login comme depuis /jobs.
+import {
+  GROUPES_LIENS_SEO,
+  LIENS_SEO_CLASS,
+  LIENS_SEO_GROUPE_CLASS,
+  LIENS_SEO_LIEN_CLASS,
+  LIENS_SEO_TITRE_CLASS,
+} from './config/liens-seo';
 import { isPWASupported, requestNotificationPermission } from "./utils/pwa";
 import { useNotifications } from './contexts/NotificationContext';
 
@@ -266,6 +277,27 @@ function LegalFooter() {
             {t('footerItinerary')}
           </a>
         </address>
+        {/* ── LE MAILLAGE VERS LES PAGES VILLE, MÉTIER ET GUIDES ────────────
+            Ces pages sont servies par le backend (`/emplois/{ville}`,
+            `/metiers/{metier}`, `/guides/{guide}`) et n'étaient citées par
+            aucune page : le sitemap était leur seul chemin, donc leur seul
+            texte de lien entrant n'existait pas. Le pied de page étant rendu
+            sur toutes les routes, c'est ici que le maillage porte le plus
+            loin. Liens `<a href>` et NON `Link` : il n'existe aucune route
+            React pour ces URL — un `Link` ferait peindre la 404 de
+            l'application par-dessus un contenu correct. */}
+        <div className={LIENS_SEO_CLASS}>
+          {GROUPES_LIENS_SEO.map((groupe) => (
+            <p key={groupe.cle} className={LIENS_SEO_GROUPE_CLASS}>
+              <span className={LIENS_SEO_TITRE_CLASS}>{t(groupe.titreKey)}</span>
+              {groupe.liens.map((lien) => (
+                <a key={lien.href} href={lien.href} className={LIENS_SEO_LIEN_CLASS}>
+                  {lien.nom}
+                </a>
+              ))}
+            </p>
+          ))}
+        </div>
         <div className={PIED_NAV_CLASS}>
           {/* Les trois pages de confiance, en LIEN INTERNE : un crawler sans
               JavaScript ne les trouve que par ici (et par le pied de page de la

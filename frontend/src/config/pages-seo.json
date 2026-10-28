@@ -1,0 +1,136 @@
+{
+  "villes": [
+    {
+      "slug": "bamako",
+      "nom": "Bamako"
+    },
+    {
+      "slug": "sikasso",
+      "nom": "Sikasso"
+    },
+    {
+      "slug": "segou",
+      "nom": "Ségou"
+    },
+    {
+      "slug": "mopti",
+      "nom": "Mopti"
+    },
+    {
+      "slug": "dakar",
+      "nom": "Dakar"
+    },
+    {
+      "slug": "thies",
+      "nom": "Thiès"
+    },
+    {
+      "slug": "kaolack",
+      "nom": "Kaolack"
+    },
+    {
+      "slug": "ouagadougou",
+      "nom": "Ouagadougou"
+    },
+    {
+      "slug": "bobo-dioulasso",
+      "nom": "Bobo-Dioulasso"
+    },
+    {
+      "slug": "koudougou",
+      "nom": "Koudougou"
+    },
+    {
+      "slug": "abidjan",
+      "nom": "Abidjan"
+    },
+    {
+      "slug": "yamoussoukro",
+      "nom": "Yamoussoukro"
+    },
+    {
+      "slug": "bouake",
+      "nom": "Bouaké"
+    }
+  ],
+  "metiers": [
+    {
+      "slug": "plomberie",
+      "nom": "Plomberie"
+    },
+    {
+      "slug": "electricite",
+      "nom": "Électricité"
+    },
+    {
+      "slug": "maconnerie",
+      "nom": "Maçonnerie et bâtiment"
+    },
+    {
+      "slug": "menage",
+      "nom": "Ménage et nettoyage"
+    },
+    {
+      "slug": "jardinage",
+      "nom": "Jardinage"
+    },
+    {
+      "slug": "cours-particuliers",
+      "nom": "Cours particuliers"
+    },
+    {
+      "slug": "mecanique",
+      "nom": "Mécanique automobile"
+    },
+    {
+      "slug": "menuiserie",
+      "nom": "Menuiserie"
+    },
+    {
+      "slug": "informatique",
+      "nom": "Informatique et dépannage"
+    }
+  ],
+  "guides": [
+    {
+      "slug": "prix-plomberie",
+      "nom": "Prix : plomberie"
+    },
+    {
+      "slug": "prix-electricite",
+      "nom": "Prix : électricité"
+    },
+    {
+      "slug": "prix-maconnerie",
+      "nom": "Prix : maçonnerie et bâtiment"
+    },
+    {
+      "slug": "prix-menage",
+      "nom": "Prix : ménage et nettoyage"
+    },
+    {
+      "slug": "prix-jardinage",
+      "nom": "Prix : jardinage"
+    },
+    {
+      "slug": "prix-cours-particuliers",
+      "nom": "Prix : cours particuliers"
+    },
+    {
+      "slug": "prix-mecanique",
+      "nom": "Prix : mécanique automobile"
+    },
+    {
+      "slug": "prix-menuiserie",
+      "nom": "Prix : menuiserie"
+    },
+    {
+      "slug": "prix-informatique",
+      "nom": "Prix : informatique et dépannage"
+    },
+    {
+      "slug": "choisir-un-artisan",
+      "nom": "Choisir un artisan"
+    }
+  ]
+}

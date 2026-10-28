@@ -66,6 +66,17 @@ import {
   PIED_NAV_CLASS,
   PIED_NAV_LIEN_CLASS,
 } from '../../src/config/classes-chrome.js'
+// Le maillage vers les pages ville, métier et guides : la MÊME déclaration que
+// src/App.js (pied de page React) et que src/pages/Home.js. Les libellés
+// viennent de `pages-seo.json`, que le backend relit dans un garde — la
+// coquille ne tient aucune seconde liste de villes ou de métiers.
+import {
+  GROUPES_LIENS_SEO,
+  LIENS_SEO_CLASS,
+  LIENS_SEO_GROUPE_CLASS,
+  LIENS_SEO_LIEN_CLASS,
+  LIENS_SEO_TITRE_CLASS,
+} from '../../src/config/liens-seo.js'
 
 // La page des CGU du pied de page : même valeur que src/App.js (son `<Link
 // to="/terms">`), donc aucune divergence possible entre les deux canaux. Le
@@ -178,8 +189,46 @@ export const FERMETURE_DE_L_APPLICATION = '</div></div>'
  *   clé de libellé disparue du dictionnaire CASSE le build ici plutôt que de
  *   publier une coquille dont le texte ne correspond plus à la page.
  */
+/**
+ * Le bloc de maillage — villes, métiers, guides — publié par le pied de page
+ * ET par le corps de l'accueil (voir `buildHomeShell`).
+ *
+ * Exporté pour que les deux coquilles publient le MÊME balisage : la bascule
+ * coquille → React ne doit déplacer ni un lien ni un libellé, et recopier cette
+ * chaîne dans `shells-home.js` aurait été la seconde écriture qu'on vient de
+ * supprimer côté pied de page.
+ */
+export function liensSeoHtml({ esc, T }) {
+  return (
+    `<div class="${LIENS_SEO_CLASS}">` +
+    GROUPES_LIENS_SEO.map(
+      (groupe) =>
+        `<p class="${LIENS_SEO_GROUPE_CLASS}">` +
+        `<span class="${LIENS_SEO_TITRE_CLASS}">${esc(T(groupe.titreKey))}</span>` +
+        groupe.liens
+          .map(
+            (lien) =>
+              `<a href="${esc(lien.href)}" class="${LIENS_SEO_LIEN_CLASS}">${esc(lien.nom)}</a>`
+          )
+          .join('') +
+        `</p>`
+    ).join('') +
+    `</div>`
+  )
+}
+
 export function piedDePage({ esc, T, socialLinks = [] }) {
-  const cles = ['contactWhatsapp', 'footerItinerary', 'footerAbout', 'contactTitle', 'footerPrivacy', 'footerTerms']
+  const cles = [
+    'contactWhatsapp',
+    'footerItinerary',
+    'footerAbout',
+    'contactTitle',
+    'footerPrivacy',
+    'footerTerms',
+    // Les trois titres du maillage : un dictionnaire amputé publierait le mot
+    // « undefined » à la place du groupe (« Villes », « Métiers », « Guides »).
+    ...GROUPES_LIENS_SEO.map((groupe) => groupe.titreKey),
+  ]
   for (const cle of cles) {
     if (!T(cle)) {
       throw new Error(
@@ -201,6 +250,7 @@ export function piedDePage({ esc, T, socialLinks = [] }) {
     // désignation cherchée par un audit de référencement local.
     `<a href="${esc(CONTACT.mapsUrl)}" target="_blank" rel="noreferrer" title="Google Maps" class="${PIED_LIEN_CLASS}">${esc(T('footerItinerary'))}</a>` +
     `</address>` +
+    liensSeoHtml({ esc, T }) +
     `<div class="${PIED_NAV_CLASS}">` +
     `<a href="/about" class="${PIED_NAV_LIEN_CLASS}">${esc(T('footerAbout'))}</a>` +
     `<a href="/contact" class="${PIED_NAV_LIEN_CLASS}">${esc(T('contactTitle'))}</a>` +
