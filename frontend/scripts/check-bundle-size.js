@@ -162,10 +162,31 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 // ÉCRIT plutôt qu'attribué à ce seul bouton. Le plafond passe à 133 Ko avec
 // 1 Ko de marge, pour la raison du 22/10 : laisser le prochain hachage de build
 // fixer le seuil, c'est laisser un hash décider à la place du développeur.
+// ── 27/10/2026 : 133 → 134 Ko et 5,55 → 5,63 Mo, POUR LE MAILLAGE SEO ─────
+// Les 32 pages ville, métier et guides n'étaient citées par AUCUNE page du
+// site (le sitemap était leur seul chemin) : l'accueil et le pied de page les
+// citent désormais par leur nom, et le pied de page est dans les DOUZE
+// documents pré-rendus. Ce n'est donc pas un chunk qui grossit mais le HTML
+// servi, et c'est le prix du texte de lien lui-même : 32 `<a href>` avec leur
+// libellé, publiés deux fois sur `/` (bloc d'accueil + pied de page) et une
+// fois sur les onze autres coquilles. Mesuré sur le build du jour, même arbre
+// à la même heure : `index.html` 132 790 → 141 825 o (+9 035), `login.html`
+// 105 333 → 109 812 o (+4 479), build entier 5 807 294 → 5 868 926 o des 149
+// fichiers, soit +61 632 o. Le JS initial paie 0,8 Ko gzip de plus (132,0 →
+// 132,8) parce que le pied de page vit dans `index` — les libellés et les href
+// des 32 pages, une fois, pas par route : les chunks paresseux ne bougent pas.
+// Les plafonds passent à 134 Ko et 5,63 Mo, avec 1,2 Ko et 34 Ko de marge, pour
+// la raison du 22/10 : laisser le prochain hachage de build fixer le seuil,
+// c'est laisser un hash décider à la place du développeur.
+//
+// Ce qui FERAIT baisser ce total, et qui n'est pas fait ici : les onze
+// coquilles hors accueil répètent le même bloc. Le sortir du HTML pré-rendu
+// rendrait le maillage invisible au crawler qui ne lit que le document servi
+// — c'est-à-dire précisément le cas que ce bloc existe pour couvrir.
 export const BUDGETS = {
-  initialGzip: 133 * 1024, // JS initial (chunks référencés par index.html), gzip
+  initialGzip: 134 * 1024, // JS initial (chunks référencés par index.html), gzip
   largestChunkGzip: 200 * 1024, // plus gros chunk JS, gzip
-  totalRaw: 5.55 * 1024 * 1024, // build/ entier, brut (voir les deux mesures ci-dessus)
+  totalRaw: 5.63 * 1024 * 1024, // build/ entier, brut (voir les deux mesures ci-dessus)
 };
 
 const ko = (bytes) => `${(bytes / 1024).toFixed(1)} Ko`;

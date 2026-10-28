@@ -39,6 +39,17 @@ import {
   PIED_NAV_CLASS,
   PIED_NAV_LIEN_CLASS,
 } from './config/classes-chrome';
+// Le maillage vers les pages ville, métier et guides : la MÊME déclaration que
+// l'accueil (src/pages/Home.js) et que les deux coquilles. Il vit dans le pied
+// de page parce que celui-ci est rendu sur TOUTES les routes : c'est le seul
+// endroit où une page de ville est citée depuis /login comme depuis /jobs.
+import {
+  GROUPES_LIENS_SEO,
+  LIENS_SEO_CLASS,
+  LIENS_SEO_GROUPE_CLASS,
+  LIENS_SEO_LIEN_CLASS,
+  LIENS_SEO_TITRE_CLASS,
+} from './config/liens-seo';
 import { isPWASupported, requestNotificationPermission } from "./utils/pwa";
 import { useNotifications } from './contexts/NotificationContext';
 
@@ -106,6 +117,30 @@ const Administration = lazy(() => import('./pages/Administration'));
 
 // Note: Axios configuration moved to /services/api.js for centralized management
 
+/**
+ * UNE REDIRECTION EST UN ÉTAT, PAS UNE PAGE — elle garde donc le pied de page
+ * HORS de l'écran, comme l'état de chargement ci-dessous.
+ *
+ * `Navigate` ne peint rien : `main.flex-1` s'effondre à la hauteur de son vide
+ * (289 px sur 412×823), donc le pied de page REMONTE dans l'écran — puis la
+ * page d'arrivée le renvoie à sa place. Mesuré le 28/10/2026, viewport 412×823,
+ * serveur de rewrites de vercel.json, /payment sans compte : pied de page peint
+ * à 343 px (469 px de haut), puis à 886 px à l'arrivée de /login — **CLS
+ * 0,3770** pour un plafond de 0,06 (`scripts/lhci-cls-budgets.cjs`), la même
+ * faute que le repli de /payment corrigé le 09/10/2026. Le bloc ci-dessous
+ * réserve la hauteur d'un écran : le pied de page reste sous la ligne de
+ * flottaison pendant la redirection, et son arrivée ne déplace plus rien.
+ *
+ * `aria-hidden` : ce n'est pas du contenu, seulement une réserve de hauteur.
+ */
+function RedirectionEnCours({ to, replace = true, state }) {
+  return (
+    <div className="min-h-screen" aria-hidden="true">
+      <Navigate to={to} replace={replace} state={state} />
+    </div>
+  );
+}
+
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
   const { t } = useLanguage();
@@ -133,7 +168,7 @@ function ProtectedRoute({ children }) {
   }
   
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <RedirectionEnCours to="/login" />;
   }
 
   // ── CE QUI BLOQUE L'ENTRÉE, ET CE QUI NE LA BLOQUE PAS (20/10/2026) ─────
@@ -159,7 +194,12 @@ function ProtectedRoute({ children }) {
   // jamais par le client ; il n'ouvre d'ailleurs aucun droit ici, il évite
   // seulement un écran qui ne le concerne pas.
   if (!user.email_verified && !user.is_owner) {
-    return <Navigate to="/payment-verification" replace state={{ resumeAfterLogin: true, userData: user }} />;
+    return (
+      <RedirectionEnCours
+        to="/payment-verification"
+        state={{ resumeAfterLogin: true, userData: user }}
+      />
+    );
   }
   
   return children;
@@ -173,7 +213,7 @@ function OwnerOnlyRoute({ children }) {
   }
 
   if (!user || !OwnerService.isOwnerSessionValid(user)) {
-    return <Navigate to="/dashboard" replace />;
+    return <RedirectionEnCours to="/dashboard" />;
   }
 
   return children;
@@ -195,7 +235,7 @@ function SupportDeskRoute({ children }) {
   }
 
   if (!user || !OwnerService.canManageSupport(user)) {
-    return <Navigate to="/dashboard" replace />;
+    return <RedirectionEnCours to="/dashboard" />;
   }
 
   return children;
@@ -266,6 +306,27 @@ function LegalFooter() {
             {t('footerItinerary')}
           </a>
         </address>
+        {/* ── LE MAILLAGE VERS LES PAGES VILLE, MÉTIER ET GUIDES ────────────
+            Ces pages sont servies par le backend (`/emplois/{ville}`,
+            `/metiers/{metier}`, `/guides/{guide}`) et n'étaient citées par
+            aucune page : le sitemap était leur seul chemin, donc leur seul
+            texte de lien entrant n'existait pas. Le pied de page étant rendu
+            sur toutes les routes, c'est ici que le maillage porte le plus
+            loin. Liens `<a href>` et NON `Link` : il n'existe aucune route
+            React pour ces URL — un `Link` ferait peindre la 404 de
+            l'application par-dessus un contenu correct. */}
+        <div className={LIENS_SEO_CLASS}>
+          {GROUPES_LIENS_SEO.map((groupe) => (
+            <p key={groupe.cle} className={LIENS_SEO_GROUPE_CLASS}>
+              <span className={LIENS_SEO_TITRE_CLASS}>{t(groupe.titreKey)}</span>
+              {groupe.liens.map((lien) => (
+                <a key={lien.href} href={lien.href} className={LIENS_SEO_LIEN_CLASS}>
+                  {lien.nom}
+                </a>
+              ))}
+            </p>
+          ))}
+        </div>
         <div className={PIED_NAV_CLASS}>
           {/* Les trois pages de confiance, en LIEN INTERNE : un crawler sans
               JavaScript ne les trouve que par ici (et par le pied de page de la

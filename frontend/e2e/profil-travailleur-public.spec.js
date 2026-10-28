@@ -49,7 +49,13 @@ test.describe('Parcours E2E — le profil public d’un travailleur', () => {
     // L'identité professionnelle, puis les preuves : une mission terminée et un
     // avis réel. Ce sont les trois choses qu'un client vient chercher.
     await expect(page.getByRole('heading', { name: 'Awa Diallo' })).toBeVisible();
-    await expect(page.getByText('plomberie')).toBeVisible();
+    // Le MÉTIER est cherché DANS LE CONTENU DE LA PAGE, jamais dans le document
+    // entier : depuis le 27/10/2026 le pied de page cite les pages métier
+    // (« Plomberie ») et les guides (« Prix : plomberie »), donc un
+    // `getByText('plomberie')` global résolvait TROIS éléments et le cas est
+    // devenu ambigu sans que rien ne soit cassé dans la page. Ce qui est jugé
+    // ici reste la compétence publiée sur le profil.
+    await expect(page.getByRole('main').getByText('plomberie')).toBeVisible();
     await expect(page.getByText('Travail impeccable.')).toBeVisible();
     // La note est formatée par `toLocaleString()` : le séparateur dépend de la
     // locale du navigateur. Ce qui est jugé, c'est la VALEUR publiée.
