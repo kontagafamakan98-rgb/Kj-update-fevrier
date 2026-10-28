@@ -1298,9 +1298,12 @@ la même page avec ses textes dans src/config/page-meta.js (donc PUBLIQUE)
     « /nouvelle-page.html » » — plus aucune demande de noindex
 
 la liste dérivée sur le dépôt réel
-  → /dashboard /messages /profile /create-job /photo-debug /email-verification
+  → /dashboard /messages /profile /create-job /email-verification
     /payment-verification /commission-dashboard /support-admin
     ← identique, dans l'ordre, aux neuf routes qui étaient recopiées à la main
+      (neuf jusqu'au 28/10/2026, date à laquelle `/photo-debug` a été retirée du
+      routage : la liste dérivée en compte HUIT depuis, et elle reste la seule
+      source de l'en-tête, du meta et du Disallow)
 ```
 
 Trois mutations rejouées sur `check-spa-routes.js` (restauré à l'octet, `cmp`) :

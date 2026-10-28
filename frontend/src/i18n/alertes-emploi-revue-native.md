@@ -221,6 +221,28 @@ Doutes, à trancher par un locuteur :
 23. **Les trois langues emploient « email » et « WhatsApp » tels quels** : ce
     sont des noms de service, donc l'emprunt est assumé.
 
+## Le titre de l'état vide porte la promesse (28/10/2026)
+
+Le titre était le FAIT seul (`noJobsAvailableNow`, clé globale) : « Aucun job
+disponible pour le moment. » L'audit du 28/10 l'a nommé comme la première phrase
+de la page la plus stratégique — honnête et décourageant. Il devient une clé du
+scope de page, `premierArrivantsTitle`, qui dit ce que la page OFFRE ; le fait
+n'a pas bougé, il ouvre le paragraphe (`premierArrivantsLead`). Les deux clés ont
+une valeur propre par langue, donc trois nouvelles chaînes à relire :
+
+24. **`wo`, « Jot liggéey yi njëkk »** (« recevez les missions en premier ») :
+    construit avec le verbe de `premierArrivantsWatch` (« Jot liggéey yi ci
+    email ») et l'adverbe d'antériorité `njëkk`. L'ordre est-il celui d'un
+    titre, ou faut-il le passif (les missions arrivent d'abord) ?
+25. **`bm`, « Baara sɔrɔ fɔlɔ »** (« obtenez le travail en premier ») : reprend
+    le verbe de `Baara sɔrɔ email la` et `fɔlɔ` déjà employé pour « première ».
+26. **`mos`, « Paam tʋʋm pipi »** : reprend le verbe de « Paam tʋʋm email la ».
+    `pipi` est-il bien l'adverbe d'antériorité attendu, ou un ordinal ?
+27. **Les trois paragraphes commencent par la phrase du vide** (celle de
+    `noJobsAvailableNow`) : elle est donc répétée telle quelle en `bm` et en
+    `mos`. Est-ce redondant à l'oral, ou faut-il une formule de constat plus
+    courte ?
+
 ## Comment contresigner
 
 Corriger directement les trois dictionnaires, puis remplacer le statut ci-dessus

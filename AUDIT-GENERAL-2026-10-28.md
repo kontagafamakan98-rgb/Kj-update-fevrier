@@ -214,9 +214,15 @@ C'est le levier de performance **réel** de ce dépôt : à instruire par A/B da
 même session (`mesure-lighthouse-locale.mjs --root`, un artefact élagué contre
 l'artefact de `main`), pas à corriger au jugé.
 
-**6. L'état vide de `/jobs` reste la première phrase de la page la plus
+**6. L'état vide de `/jobs` était la première phrase de la page la plus
 stratégique.** Honnête, et décourageant : la promesse (« soyez prévenu avant les
-autres ») n'est pas dans le titre.
+autres ») n'était pas dans le titre. **CORRIGÉ le 28/10/2026** : le titre devient
+la clé de PAGE `premierArrivantsTitle` (« Soyez prévenu avant les autres »), le
+fait n'a pas bougé d'un cran — il ouvre le paragraphe (« Aucune mission n'est
+ouverte aujourd'hui. ») — et les cinq langues portent leurs deux chaînes. Aucun
+chiffre, aucune mission n'est inventée : la promesse est une OPTION (alerte
+email, WhatsApp), pas un stock. Trois doutes de relecture par langue ajoutés au
+chantier `frontend/src/i18n/alertes-emploi-revue-native.md`.
 
 **7. Le mobile suivi n'est pas celui qui est servi.** Non re-vérifié aujourd'hui ;
 la décision (re-synchroniser les artefacts Capacitor, ou cesser de les suivre)
@@ -224,9 +230,18 @@ reste ouverte depuis le 26/10.
 
 ### 5.3 P2 — hygiène, dette, exploitation
 
-**8. `/photo-debug` est toujours une route de diagnostic dans le binaire client**
+**8. `/photo-debug` était une route de diagnostic dans le binaire client**
 (propriétaire seulement, donc pas une faille) : un chunk, une entrée de
-`vercel.json`, et une demi-douzaine de gardes qui la suivent.
+`vercel.json`, et une demi-douzaine de gardes qui la suivaient. **CORRIGÉ le
+28/10/2026** : la route est retirée du routage, la DÉCLARATION du `lazy()` est
+conditionnée à `import.meta.env.DEV` comme celle de `MobileTest` (un `lazy()` au
+niveau module fait émettre le chunk même si la route n'est pas montée), et les
+deux rewrites + l'en-tête `X-Robots-Tag` sortent de `vercel.json` (la liste des
+routes privées est DÉRIVÉE du routage : elle passe de neuf à huit entrées sans
+qu'aucune ne soit recopiée). `PhotoTest.js` rejoint les `@source not` de
+`src/index.css`, sinon sa seule classe propre (`max-h-96`) restait générée sans
+porteur livré — c'est `check-css-selecteurs-morts.js` qui l'a nommée sur
+`support.html` et `terms.html`.
 
 **9. Quatre gros fichiers :** `kojo_scheduler.py` **1 934** lignes,
 `index.css` **3 443**, `page-sections.js` **1 600**, `JobDetails.js` **1 236**.
@@ -238,6 +253,39 @@ remontée ; les erreurs backend ne vivent alors que dans les journaux Fly.
 **11. Les 5 langues ne sont pas relues par des natifs.** 976 clés à parité, et
 rien ne dit qu'un locuteur wolof/bambara/soninké a validé les chaînes (chantier
 ouvert : `frontend/src/i18n/alertes-emploi-revue-native.md`).
+
+### 5.4 Clos le 28/10/2026, et ce qui reste ouvert AVEC sa raison
+
+| Item | État | Preuve |
+|---|---|---|
+| §5.2 **5** — écart de performance | **clos** (#248, déjà sur `main`) | 5 runs sur le MÊME artefact `5b2e069f` : étendue 15 pts sur `/`, 20 sur `/jobs`. Le `−1` est retiré, la note revient à **10** ; le levier réel (1,5-2,4 s de style/layout sur le document pré-rendu de `/`) reste OUVERT et passe en §6 item 15. |
+| §5.2 **6** — état vide de `/jobs` | **corrigé** | `premierArrivantsTitle` (scope de page, 5 langues) est le titre ; « Aucune mission n'est ouverte aujourd'hui. » ouvre le paragraphe. `Jobs.test.jsx` juge les deux textes. |
+| §5.3 **8** — `/photo-debug` | **corrigé** | Mesuré sur le build du jour : `assets/PhotoTest-*.js` **absent**, `0` occurrence de `photo-debug` dans `build/`, `max-h-96` **plus émis** dans la feuille, aucune ligne « photo » dans `robots.txt`. `check-classes-coquilles`, `check-classes-sans-regle`, `check-css-selecteurs-morts` et `check-prerender-shells` verts. |
+
+Ce qui reste OUVERT, et pourquoi ce n'est pas fait ici :
+
+- **§5.2 4 — les 45 pages vides de preuves.** Ce n'est pas un défaut de code :
+  `/guides/prix-abidjan` dit « aucun budget annoncé » **parce qu'aucun budget
+  n'existe**, et `kojo_pages_guides` refuse d'inventer un montant (garde
+  `test_guides_editoriaux` : budget absent, nul, négatif ou non numérique est
+  HORS mesure, et une ville sans budget n'emprunte pas celui de sa voisine).
+  Remplir ces pages par du code voudrait dire fabriquer la preuve — exactement
+  ce que la règle interdit. **Le correctif est le semis (§5.1 item 1)** ; le
+  levier logiciel qui reste (§6 item 7, un bouton d'alerte emploi par page
+  métier × ville) capture la demande sans mentir sur l'offre.
+- **§5.2 7 — le mobile Capacitor n'est pas re-vérifié.** Rien ne se mesure ici :
+  il faut un artefact Capacitor à jour et un appareil. La décision (re-synchroniser
+  ou cesser de suivre) reste ouverte, et rien dans ce push ne la préempte.
+- **§5.3 9 — quatre gros fichiers.** Il n'existe toujours **aucun budget de
+  taille de module** ; découper `kojo_scheduler.py` (1 934 lignes de planificateur,
+  leases et reprises) est un chantier de 2 j qui mérite sa propre PR et ses propres
+  gardes, pas une fin de lot.
+- **§5.3 10 — Sentry optionnel.** C'est une DÉCISION déclarée
+  (`SENTRY_SETUP_GUIDE.md`, `SENTRY_DSN` absent = aucune remontée, rien ne casse),
+  pas un bug : l'item s'ouvre en « brancher Sentry », pas en « réparer ».
+- **§5.3 11 — pas de relecture native.** Il faut des locuteurs. Le chantier
+  `alertes-emploi-revue-native.md` en porte maintenant **27** doutes numérotés,
+  chacun avec la formule à trancher.
 
 ---
 

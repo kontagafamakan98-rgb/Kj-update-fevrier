@@ -99,8 +99,13 @@ export function PremiersArrivants({ t, textes }) {
       className="carte-editoriale flex min-h-[22rem] flex-col justify-center p-6 sm:p-8"
       aria-labelledby="premiers-arrivants-titre"
     >
+      {/* Le TITRE vient du scope `jobs` (`textes.title`) et dit ce que la page
+          OFFRE (« soyez prévenu avant les autres ») : il portait auparavant le
+          fait seul, en clé GLOBALE (`noJobsAvailableNow`) — la première phrase
+          de la page la plus stratégique annonçait donc le vide avant tout. Le
+          fait n'est pas caché pour autant : il ouvre le paragraphe. */}
       <h2 id="premiers-arrivants-titre" className="text-xl font-semibold text-stone-900">
-        {t('noJobsAvailableNow')}
+        {textes.title}
       </h2>
       <p className="mt-2 max-w-2xl text-sm text-stone-600">{textes.lead}</p>
       <div className="mt-6 flex flex-wrap gap-3">
