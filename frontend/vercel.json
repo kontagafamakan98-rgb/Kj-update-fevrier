@@ -73,8 +73,6 @@
     { "source": "/profile/", "destination": "/app.html" },
     { "source": "/create-job", "destination": "/app.html" },
     { "source": "/create-job/", "destination": "/app.html" },
-    { "source": "/photo-debug", "destination": "/app.html" },
-    { "source": "/photo-debug/", "destination": "/app.html" },
     { "source": "/email-verification", "destination": "/app.html" },
     { "source": "/email-verification/", "destination": "/app.html" },
     { "source": "/payment-verification", "destination": "/app.html" },
@@ -161,10 +159,6 @@
     },
     {
       "source": "/create-job",
-      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }]
-    },
-    {
-      "source": "/photo-debug",
       "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }]
     },
     {

@@ -95,7 +95,12 @@ const panneServeur = () => Object.assign(
 
 const RESEAU = jobsT('loadErrorNetwork');
 const SERVEUR = jobsT('loadErrorServer');
-const VIDE = fr.noJobsAvailableNow;
+// Le TITRE de l'état vide PUBLIC vit dans le scope `jobs` depuis le 28/10/2026
+// (il porte la promesse, cf. `premierArrivantsTitle`) : le fait (« aucune mission
+// ouverte ») est la première phrase du paragraphe, donc le cas qui l'exigeait
+// dans le titre vise le même message, un cran plus bas.
+const VIDE = jobsT('premierArrivantsTitle');
+const VIDE_FAIT = jobsT('premierArrivantsLead');
 const VIDE_FILTRE = 'Aucune mission ne correspond à ces filtres.';
 
 beforeEach(() => {
@@ -252,6 +257,9 @@ describe('Jobs — une panne se répare, une liste vide se dit', () => {
     const pageFr = makeJobsTranslator('fr', (key) => fr[key] || key);
 
     expect(await screen.findByText(VIDE)).toBeTruthy();
+    // Le FAIT n'a pas disparu : la promesse est le titre, le vide est la
+    // première phrase — et les deux textes viennent du scope de la page.
+    expect(VIDE_FAIT.startsWith('Aucune mission')).toBe(true);
     expect(screen.getByText(pageFr('premierArrivantsLead'))).toBeTruthy();
     // Les deux liens internes passent par `LienVue` (transition de vue native) :
     // rendus HORS routeur, ils n'ont pas de `href` à lire — c'est leur TEXTE

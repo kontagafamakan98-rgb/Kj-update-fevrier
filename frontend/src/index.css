@@ -31,11 +31,19 @@
 @source not "./config/marque-kojo.json";
 @source not "./config/social-networks.json";
 
-/* Les deux pages de DIAGNOSTIC ne sont pas livrées en production : `App.js`
+/* Les pages de DIAGNOSTIC ne sont pas livrées en production : `App.js`
    les importe derrière `import.meta.env.DEV`. Leurs classes ne doivent pas
-   peupler la feuille servie. */
+   peupler la feuille servie.
+
+   `PhotoTest.js` rejoint la liste le 28/10/2026, avec la route de production
+   `/photo-debug` qu'il servait : le chunk est sorti du build, donc `max-h-96`
+   — sa seule classe propre — restait GÉNÉRÉE par le scan de la source sans
+   aucun porteur livré. `check-css-selecteurs-morts.js` l'a nommée sur
+   `support.html` et `terms.html` : une règle servie sans poser est un octet
+   payé par toutes les pages pour un écran que personne ne peut ouvrir. */
 @source not "./pages/MobileTest.js";
 @source not "./components/MobilePhotoTest.js";
+@source not "./pages/PhotoTest.js";
 
 /* Les NOMS QUE LE SITE A DÉCIDÉ DE NE PLUS GÉNÉRER (ex-`blocklist` de v3, qui n'existe
    plus en v4). Ce sont de vrais utilitaires que la prose ou une variable font

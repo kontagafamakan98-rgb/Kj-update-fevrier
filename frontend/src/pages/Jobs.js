@@ -649,6 +649,7 @@ export default function Jobs() {
             // importer le scope laisserait ses clés invisibles du garde
             // d'hygiène, qui ne cherche les consommateurs que par import.
             textes={{
+              title: pageT('premierArrivantsTitle'),
               lead: pageT('premierArrivantsLead'),
               watch: pageT('premierArrivantsWatch'),
               whatsapp: pageT('premierArrivantsWhatsApp'),

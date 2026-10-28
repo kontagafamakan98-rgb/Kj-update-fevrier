@@ -460,7 +460,9 @@ export default function Dashboard() {
             {/* Liens de test réservés au dev : les routes /mobile-test et
                 /photo-test ne sont enregistrées qu'en développement
                 (import.meta.env.DEV dans App.js) — en prod elles 404.
-                /photo-debug est l'équivalent prod (owner-only). */}
+                Il n'existe PLUS de jumeau de production depuis le 28/10/2026 :
+                `/photo-debug` a été retiré du routage (une route de diagnostic
+                n'a pas à voyager dans le binaire servi). */}
             {import.meta.env.DEV && (
               <Link to="/mobile-test" className="bouton bouton-clair">
                 <Smartphone className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {t('testMobileFeatures')}

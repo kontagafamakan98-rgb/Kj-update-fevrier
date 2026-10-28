@@ -93,10 +93,14 @@ const CreateJob = lazy(() => import('./pages/CreateJob'));
 // MODULE fait ÉMETTRE le chunk en production — et ce chunk porte une origine
 // TIERCE (`picsum.photos`, ses images d'exemple). Conditionner la DÉCLARATION
 // retire le chunk du graphe de build : en prod, `MobileTest` vaut `null` et la
-// route n'est pas montée (la branche `import.meta.env.DEV &&` l'élimine). PhotoTest
-// reste inconditionnel : `/photo-debug` l'utilise en production (owner-only).
+// route n'est pas montée (la branche `import.meta.env.DEV &&` l'élimine).
+// PhotoTest suit la MÊME règle depuis le 28/10/2026 : sa route de production
+// (`/photo-debug`) a été retirée, il ne reste que `/photo-test` en développement,
+// donc la DÉCLARATION est conditionnée à son tour et le chunk sort du graphe de
+// build servi (mesuré : `assets/PhotoTest-*.js` présent tant que la déclaration
+// était inconditionnelle, absent après).
 const MobileTest = import.meta.env.DEV ? lazy(() => import('./pages/MobileTest')) : null;
-const PhotoTest = lazy(() => import('./pages/PhotoTest'));
+const PhotoTest = import.meta.env.DEV ? lazy(() => import('./pages/PhotoTest')) : null;
 const Payment = lazy(() => import('./pages/Payment'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const EmailVerificationPage = lazy(() => import('./pages/EmailVerificationPage'));
@@ -608,16 +612,18 @@ function AppRoutes() {
                 } />
               </>
             )}
-            {/* /photo-debug reste disponible en prod : déjà protégée par
-                OwnerOnlyRoute (accès admin uniquement), utile pour diagnostiquer
-                un souci d'upload photo en prod sans devoir redéployer. */}
-            <Route path="/photo-debug" element={
-              <ProtectedRoute>
-                <OwnerOnlyRoute>
-                  <PhotoTest />
-                </OwnerOnlyRoute>
-              </ProtectedRoute>
-            } />
+            {/* ── PAS DE ROUTE DE DIAGNOSTIC PHOTO EN PRODUCTION (28/10/2026) ──
+                `/photo-debug` était le jumeau prod de `/photo-test`, protégé par
+                `OwnerOnlyRoute`. Retiré : ce n'est pas une faille (l'accès était
+                admin), c'est une ROUTE DE DIAGNOSTIC dans le binaire servi — un
+                chunk livré, une entrée de `vercel.json`, un en-tête `noindex`, un
+                `Disallow` de robots.txt et une demi-douzaine de gardes qui la
+                suivaient, pour un écran qui n'a de sens que sur un poste de
+                développement. Le diagnostic photo vit donc là où il se répare :
+                `import.meta.env.DEV` (`/photo-test`), où le chunk n'entre pas
+                dans le build de production.
+                Mesure de succès de l'audit : absente de `vercel.json`, de
+                `robots.txt` (dérivé du routage) et du build. */}
             <Route path="/payment" element={
               <Suspense fallback={<PaymentSkeleton />}>
                 <ProtectedRoute>

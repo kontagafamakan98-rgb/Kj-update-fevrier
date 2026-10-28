@@ -194,10 +194,13 @@ cd frontend && npm test
   canonical statique « / » sur toutes : c'est du contenu dupliqué, et
   `check-spa-routes.js` échoue désormais dans ce cas ;
 - **les routes privées ne sont pas indexables** : `/dashboard`, `/profile`,
-  `/messages`, `/create-job`, `/photo-debug`, `/email-verification`,
+  `/messages`, `/create-job`, `/email-verification`,
   `/payment-verification`, `/commission-dashboard` et `/support-admin` portent
   `X-Robots-Tag: noindex` (vérifié : l'en-tête est absent → CI rouge). Un
-  tableau de bord dans les résultats de recherche est une page vide.
+  tableau de bord dans les résultats de recherche est une page vide. Cette
+  liste est DÉRIVÉE du routage : `/photo-debug` en est sortie le 28/10/2026 avec
+  la route elle-même (un diagnostic photo vit en développement, pas dans le
+  binaire servi).
 
 - **Variables d'env** (dashboard, onglet Settings → Environment Variables) :
   `VITE_API_URL=https://api.kojoforafrica.cc.cd/api`
