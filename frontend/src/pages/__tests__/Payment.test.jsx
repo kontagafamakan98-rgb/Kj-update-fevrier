@@ -88,7 +88,10 @@ describe('Payment — cohérence de la répartition quand le taux change', () =>
     render(<Payment />);
 
     // Saisie du montant → le quote (14%) est fetché et affiché.
-    fireEvent.change(screen.getByLabelText('Montant'), { target: { value: '1000' } });
+    // Le champ n'existe plus pendant le chargement : depuis le 28/10/2026 le
+    // squelette REMPLACE le formulaire au lieu de s'empiler par-dessus (c'était
+    // le défaut mesuré sur la branche « mission »), donc on attend qu'il soit peint.
+    fireEvent.change(await screen.findByLabelText('Montant'), { target: { value: '1000' } });
     // Répartition du quote backend affichée (140 XOF de commission).
     expect(await screen.findByText('140 XOF')).toBeInTheDocument();
     expect(screen.getByText('860 XOF')).toBeInTheDocument();
@@ -124,7 +127,10 @@ describe('Payment — cohérence de la répartition quand le taux change', () =>
     const hrefSetter = installLocationStub();
     render(<Payment />);
 
-    fireEvent.change(screen.getByLabelText('Montant'), { target: { value: '1000' } });
+    // Le champ n'existe plus pendant le chargement : depuis le 28/10/2026 le
+    // squelette REMPLACE le formulaire au lieu de s'empiler par-dessus (c'était
+    // le défaut mesuré sur la branche « mission »), donc on attend qu'il soit peint.
+    fireEvent.change(await screen.findByLabelText('Montant'), { target: { value: '1000' } });
     expect(await screen.findByText('140 XOF')).toBeInTheDocument();
 
     // Aucun changement de taux : le quote re-fetché est identique.
