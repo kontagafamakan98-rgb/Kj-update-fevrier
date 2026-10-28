@@ -129,6 +129,58 @@
       "nom": "Prix : informatique et dépannage"
     },
     {
+      "slug": "prix-bamako",
+      "nom": "Prix à Bamako"
+    },
+    {
+      "slug": "prix-sikasso",
+      "nom": "Prix à Sikasso"
+    },
+    {
+      "slug": "prix-segou",
+      "nom": "Prix à Ségou"
+    },
+    {
+      "slug": "prix-mopti",
+      "nom": "Prix à Mopti"
+    },
+    {
+      "slug": "prix-dakar",
+      "nom": "Prix à Dakar"
+    },
+    {
+      "slug": "prix-thies",
+      "nom": "Prix à Thiès"
+    },
+    {
+      "slug": "prix-kaolack",
+      "nom": "Prix à Kaolack"
+    },
+    {
+      "slug": "prix-ouagadougou",
+      "nom": "Prix à Ouagadougou"
+    },
+    {
+      "slug": "prix-bobo-dioulasso",
+      "nom": "Prix à Bobo-Dioulasso"
+    },
+    {
+      "slug": "prix-koudougou",
+      "nom": "Prix à Koudougou"
+    },
+    {
+      "slug": "prix-abidjan",
+      "nom": "Prix à Abidjan"
+    },
+    {
+      "slug": "prix-yamoussoukro",
+      "nom": "Prix à Yamoussoukro"
+    },
+    {
+      "slug": "prix-bouake",
+      "nom": "Prix à Bouaké"
+    },
+    {
       "slug": "choisir-un-artisan",
       "nom": "Choisir un artisan"
     }

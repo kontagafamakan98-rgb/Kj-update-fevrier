@@ -384,14 +384,26 @@ def _liens_internes(genre: str, page: dict) -> str:
     pages du catalogue), donc l'importer ici, au chargement, créerait un cycle.
     Les URLs restent déclarées là-bas — aucun `f"/guides/…"` recopié ici.
     """
-    from kojo_pages_guides import GUIDES_PRIX_SLUGS, SLUG_CHOISIR, chemin_guide
+    from kojo_pages_guides import (
+        GUIDES_PRIX_SLUGS,
+        SLUG_CHOISIR,
+        chemin_guide,
+        chemin_guide_prix_ville,
+    )
 
     if genre == "metier":
         guides = [(chemin_guide(f"prix-{page['slug']}"), f"Prix : {page['nom'].lower()}")]
         guides.append((chemin_guide(SLUG_CHOISIR), "Comment choisir un artisan"))
     else:
-        guides = [(chemin_guide(f"prix-{slug}"), f"Prix : {nom.lower()}")
-                  for slug, nom in GUIDES_PRIX_SLUGS]
+        # SON guide de prix d'abord : c'est le lien le plus proche de la
+        # question qui suit « emploi Abidjan » (« combien ça coûte ici ? »), et
+        # sans lui la page de la ville ne mènerait à son propre guide que par
+        # le hasard d'un maillage général.
+        guides = [(chemin_guide_prix_ville(page["slug"]), f"Prix à {page['nom']}")]
+        guides += [
+            (chemin_guide(f"prix-{slug}"), f"Prix : {nom.lower()}")
+            for slug, nom in GUIDES_PRIX_SLUGS
+        ]
         guides.append((chemin_guide(SLUG_CHOISIR), "Comment choisir un artisan"))
     liens_guides = "".join(
         f'<li><a href="{chemin}">{_esc(titre)}</a></li>' for chemin, titre in guides

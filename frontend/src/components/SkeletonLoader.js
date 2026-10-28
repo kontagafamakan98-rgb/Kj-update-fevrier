@@ -11,6 +11,10 @@ import CadrePage from './CadrePage';
 // classes. C'est la déclaration qui a un propriétaire, pas le squelette.
 import { PAGE_SECTIONS } from '../config/page-sections';
 import { REGLES_DE_CHARGEMENT } from '../config/app-cadres';
+// La variante Google de /login est une donnée de GÉOMÉTRIE (bouton 48 px +
+// séparateur 20 px) : le squelette lit la même condition que la page, sinon il
+// réserve la page sans son bouton là où la production le peint.
+import { isGoogleAuthEnabled } from '../utils/googleAuth';
 
 // Composant de base Skeleton.
 //
@@ -394,55 +398,89 @@ export const JobDetailsSkeleton = () => {
   );
 };
 
-// Skeleton de la page Login — réplique la structure ET la hauteur réelles du
-// formulaire (logo + titre, champs email/mot de passe, bouton de connexion,
-// bouton Google, encart légal, lien register) pour servir de fallback
-// Suspense à /login. Comme la page, il est en min-h-full (remplit le main
-// flex-1) : le swap chunk lazy → page ne fait bouger ni le footer ancré ni
-// le contenu — le fallback générique (PageSkeleton, blocs pleine largeur)
-// laissait un saut de hauteur au remplacement du formulaire.
+// Skeleton de la page Login — le fallback Suspense de /login, CALIBRÉ SUR LE
+// DOM RÉEL de sa destination (mesure du 28/10/2026, 1350×940, fr, client Google
+// présent et absent).
+//
+// ── Ce qui n'allait pas, et pourquoi ça n'avait pas rougi avant ─────────────
+// Le squelette peignait sa PROPRE enveloppe (`min-h-full … py-12`, colonne en
+// `space-y-8`, blocs `h-4`/`h-10`/`h-11`) là où la page peint la carte du site
+// (`carte-editoriale carte-publique`, rembourrage 28,65 px) : il valait 566 px
+// de carte pour une destination de 683,3, soit 139 px de `document` en moins —
+// le pied de page, poussé vers le bas à l'arrivée de la page, remontait de
+// 139 px pendant le chargement. Tant que le pied de page mesurait 141 px, ce
+// saut valait ~0,014 et passait sous le plafond de 0,02 ; le bloc de maillage
+// (pied de 217 px depuis le 27/10/2026) l'a porté à 0,0245, mesuré par
+// `e2e/cls-coquille-react.spec.js` sur /login — desktop. Le défaut était donc
+// ANTÉRIEUR au maillage, qui l'a seulement rendu visible.
+//
+// ── La règle : les MÊMES boîtes que la page, lues dans le plan ──────────────
+// Cadre, colonne, carte, formulaire, champs et encart viennent de
+// `PAGE_SECTIONS['/login']` — le plan que publient la page ET sa coquille —,
+// donc une retouche de l'enveloppe ne peut plus laisser le repli derrière. Les
+// hauteurs, elles, sont celles des éléments réels : marque 48 + titre 46 sous
+// `mt-6` (117,8 px d'en-tête), libellé 20, champ 48, bouton 52, encart 166,3
+// (deux lignes de 20 et un bloc de 48 dans son propre rembourrage), lien
+// d'inscription 24. Le bouton Google (48 px) et son séparateur (20 px) sont
+// peints sous la MÊME condition que la page : sinon la variante Google, celle
+// de la production, réservait 68 px de moins que sa destination.
 export const LoginSkeleton = () => {
+  const plan = PAGE_SECTIONS['/login'];
   return (
-    <div className="min-h-full flex items-center justify-center fond-sable py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <Skeleton className="mx-auto h-12 w-12 rounded-full" />
-          <Skeleton className="mx-auto mt-6 h-8 w-40" />
-        </div>
+    <div className={plan.frameClass}>
+      <div className={plan.colonneClass}>
+        <div className={plan.carteClass}>
+          <div>
+            <Skeleton className="mx-auto h-12 w-12 rounded-full" />
+            {/* Titre de page réel : 45,8 px (`.titre-page`). */}
+            <Skeleton className="mx-auto mt-6 h-[46px] w-40" />
+          </div>
 
-        <form className="mt-8 space-y-6">
-          <div className="space-y-4">
-            <div>
-              <Skeleton className="h-4 w-16" />
-              <Skeleton className="mt-1 h-10 w-full" />
-            </div>
-            <div>
-              <div className="flex items-center justify-between">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-4 w-28" />
+          <form className={plan.formClass}>
+            {isGoogleAuthEnabled() && (
+              <>
+                {/* Bouton Google réel : 48 px. */}
+                <Skeleton className="h-12 w-full" />
+                {/* Séparateur « ou » : une ligne de texte de 20 px. */}
+                <div className="relative flex justify-center text-sm">
+                  <Skeleton className="h-5 w-16" />
+                </div>
+              </>
+            )}
+
+            <div className={plan.champsClass}>
+              <div>
+                <Skeleton className="h-5 w-16" />
+                <Skeleton className="mt-1 h-12 w-full" />
               </div>
-              <Skeleton className="mt-1 h-10 w-full" />
+              <div>
+                <div className={plan.ligneMotDePasseClass}>
+                  <Skeleton className="h-5 w-24" />
+                  <Skeleton className="h-5 w-28" />
+                </div>
+                <Skeleton className="mt-1 h-12 w-full" />
+              </div>
             </div>
-          </div>
 
-          {/* Bouton de connexion */}
-          <Skeleton className="h-11 w-full" />
+            {/* Bouton de connexion réel (`.bouton`, 52 px). */}
+            <div>
+              <Skeleton className="h-[52px] w-full" />
+            </div>
 
-          {/* Bouton Google */}
-          <Skeleton className="h-11 w-full" />
+            {/* Encart légal : 20 + 20 + 48 px dans `.encart` (166,3 avec son
+                rembourrage), les trois lignes que la page y publie. */}
+            <div className={plan.encadreLegalClass}>
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-5 w-52" />
+              <Skeleton className="h-12 w-64" />
+            </div>
 
-          {/* Encart légal */}
-          <div className="space-y-2 rounded-xl border border-orange-200 bg-orange-50 p-4">
-            <Skeleton className="h-4 w-40" />
-            <Skeleton className="h-4 w-52" />
-            <Skeleton className="h-3 w-64" />
-          </div>
-
-          {/* Lien register */}
-          <div className="text-center">
-            <Skeleton className="mx-auto h-4 w-44" />
-          </div>
-        </form>
+            {/* Lien d'inscription (24 px). */}
+            <div className={plan.noAccountClass}>
+              <Skeleton className="mx-auto h-6 w-44" />
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
@@ -747,15 +785,32 @@ export const MessagesSkeleton = () => {
 // Contenu de la page Paiement (cartes sous l'en-tête) — EXTRAIT de Payment.js :
 // la page n'a plus son propre squelette dupliqué, et le fallback Suspense de
 // /payment réutilise exactement ces hauteurs (aucun décalage au swap).
-// Carte quote (en-tête + 3 champs + bouton) puis carte paiements récents.
+//
+// ── LA GRILLE DE LA DESTINATION, PAS UNE PILE (mesuré le 28/10/2026) ──────
+// Ce contenu empilait ses deux cartes (`space-y-6`) là où la page les pose
+// CÔTE À CÔTE dès `lg` (sa grille est `lg:grid-cols-3`, le formulaire occupe
+// `lg:col-span-2`). Le squelette valait donc la SOMME des deux cartes pour une
+// destination qui vaut leur MAXIMUM, et sur la branche « mission » — la seule
+// qui le peint — ces deux cartes étaient de surcroît peintes EN PLUS du
+// formulaire réel (l'état de chargement doublait le contenu au lieu de le
+// remplacer) : `main` faisait 1 174,31 px pendant le chargement pour 682 px
+// à l'arrivée, et le pied de page (193 px depuis le maillage du 27/10)
+// entrait dans l'écran — CLS 0,0909 desktop, plafond relevé à 0,10 faute
+// d'avoir réduit cette réserve-là (cf. scripts/lhci-cls-budgets.cjs).
+// Les DEUX causes sont ici et dans `src/pages/Payment.js` (le squelette
+// REMPLACE la grille, il ne s'y ajoute pas), et la grille ci-dessous est
+// écrite à l'identique de celle de la page : `antiClsSkeletons.test.jsx`
+// compare les deux chaînes, donc une retouche d'un seul côté rougit.
 export const PaymentContentSkeleton = () => {
+  const plan = PAGE_SECTIONS['/payment'];
   return (
-    <div className="space-y-6">
-      {/* Carte quote : en-tête + 3 champs. Le rembourrage est celui de la carte
-          RÉELLE (`.carte-editoriale` + `.carte-publique`) : le squelette ne doit
-          pas seulement peindre le même nombre de blocs, il doit en tenir la
-          même boîte. */}
-      <div className="carte-editoriale carte-publique">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      {/* LE FORMULAIRE — la colonne large, comme la page (`lg:col-span-2`).
+          Carte quote : en-tête + 3 champs. Le rembourrage est celui de la carte
+          RÉELLE (`.carte-editoriale` + `.carte-publique`, lus dans le plan) : le
+          squelette ne doit pas seulement peindre le même nombre de blocs, il
+          doit en tenir la même boîte. */}
+      <div className={`${plan.carteClass} lg:col-span-2`}>
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <Skeleton className="h-6 w-40" />
           <Skeleton className="h-6 w-32 rounded-[3px]" />
@@ -778,8 +833,8 @@ export const PaymentContentSkeleton = () => {
         <Skeleton className="mt-6 h-13 w-48 rounded-[3px]" />
       </div>
 
-      {/* Carte paiements récents */}
-      <div className="carte-editoriale carte-publique">
+      {/* LES PAIEMENTS RÉCENTS — la colonne étroite de la même grille. */}
+      <div className={plan.carteClass}>
         <Skeleton className="h-6 w-56" />
         <div className="mt-3">
           <Skeleton className="h-16 w-full rounded-[3px]" />

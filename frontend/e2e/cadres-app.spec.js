@@ -891,7 +891,11 @@ async function releverSousChunkRetenu(browser, chemin, viewport, motif) {
         ? { decalages: window.__kojoCls.decalages, fcp: window.__kojoCls.fcp }
         : { decalages: [], fcp: null }
     );
-    return { pendant, apres, retenues: retenues.length, fcp: brut.fcp, ...clsDesDecalages(brut.decalages) };
+    // `decalages` est REPORTÉ tel quel : `plusGrands` lit cette clé pour nommer
+    // les sources d'un décalage, et sans elle il rendait une liste VIDE sur une
+    // route qui mesurait 0,0611 — le chiffre était là, sa cause n'était nulle
+    // part (constaté le 28/10/2026 en cherchant quoi corriger).
+    return { pendant, apres, retenues: retenues.length, decalages: brut.decalages, fcp: brut.fcp, ...clsDesDecalages(brut.decalages) };
   } finally {
     for (const requete of retenues) {
       try {
@@ -1496,7 +1500,11 @@ async function releverLeRepliDedie(browser, chemin, viewport, motif) {
         ? { decalages: window.__kojoCls.decalages, fcp: window.__kojoCls.fcp }
         : { decalages: [], fcp: null }
     );
-    return { pendant, apres, retenues: retenues.length, fcp: brut.fcp, ...clsDesDecalages(brut.decalages) };
+    // `decalages` est REPORTÉ tel quel : `plusGrands` lit cette clé pour nommer
+    // les sources d'un décalage, et sans elle il rendait une liste VIDE sur une
+    // route qui mesurait 0,0611 — le chiffre était là, sa cause n'était nulle
+    // part (constaté le 28/10/2026 en cherchant quoi corriger).
+    return { pendant, apres, retenues: retenues.length, decalages: brut.decalages, fcp: brut.fcp, ...clsDesDecalages(brut.decalages) };
   } finally {
     for (const requete of retenues) {
       try {
@@ -1624,7 +1632,11 @@ async function releverLEtatDeChargementDeLaPage(browser, chemin, viewport) {
         ? { decalages: window.__kojoCls.decalages, fcp: window.__kojoCls.fcp }
         : { decalages: [], fcp: null }
     );
-    return { pendant, apres, retenues: retenues.length, fcp: brut.fcp, ...clsDesDecalages(brut.decalages) };
+    // `decalages` est REPORTÉ tel quel : `plusGrands` lit cette clé pour nommer
+    // les sources d'un décalage, et sans elle il rendait une liste VIDE sur une
+    // route qui mesurait 0,0611 — le chiffre était là, sa cause n'était nulle
+    // part (constaté le 28/10/2026 en cherchant quoi corriger).
+    return { pendant, apres, retenues: retenues.length, decalages: brut.decalages, fcp: brut.fcp, ...clsDesDecalages(brut.decalages) };
   } finally {
     retenir = false;
     for (const requete of retenues) {

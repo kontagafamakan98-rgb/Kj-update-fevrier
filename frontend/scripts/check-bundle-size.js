@@ -178,6 +178,18 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 // Les plafonds passent à 134 Ko et 5,63 Mo, avec 1,2 Ko et 34 Ko de marge, pour
 // la raison du 22/10 : laisser le prochain hachage de build fixer le seuil,
 // c'est laisser un hash décider à la place du développeur.
+// ── 28/10/2026 : 5,63 → 5,66 Mo, POUR LES GUIDES DE PRIX PAR VILLE ───────
+// Le point d'étape des guides de ville porte le maillage de 32 à 45 pages
+// (13 guides `prix-{ville}` de plus, un par ville du référentiel, publiés au
+// sitemap par la même déclaration). Mesuré sur le build du jour : `index.html`
+// 141 825 → 145 103 o (+3 278), `login.html` 109 812 → 111 446 o (+1 634),
+// build entier 5 868 926 → 5 890 956 o des 149 fichiers, soit +22 030 o — les
+// 149 fichiers sont le MÊME compte qu'avant : ces pages sont servies par le
+// backend, seule la liste de liens du HTML pré-rendu grandit. Le JS initial ne
+// bouge pas (132,8 → 133,0 Ko gzip, le libellé d'un guide est une constante du
+// module partagé). Plafond porté à 5,66 Mo, soit 44 Ko de marge, pour la raison
+// du 22/10 : laisser le prochain hachage de build fixer le seuil, c'est
+// laisser un hash décider à la place du développeur.
 //
 // Ce qui FERAIT baisser ce total, et qui n'est pas fait ici : les onze
 // coquilles hors accueil répètent le même bloc. Le sortir du HTML pré-rendu
@@ -186,7 +198,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 export const BUDGETS = {
   initialGzip: 134 * 1024, // JS initial (chunks référencés par index.html), gzip
   largestChunkGzip: 200 * 1024, // plus gros chunk JS, gzip
-  totalRaw: 5.63 * 1024 * 1024, // build/ entier, brut (voir les deux mesures ci-dessus)
+  totalRaw: 5.66 * 1024 * 1024, // build/ entier, brut (voir les mesures datées ci-dessus)
 };
 
 const ko = (bytes) => `${(bytes / 1024).toFixed(1)} Ko`;

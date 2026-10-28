@@ -30,7 +30,11 @@ CE QUE CE MODULE GARANTIT
     la sonde compare donc par NOM, et un index présent sous un autre nom est un
     index que les requêtes n'utilisent pas ;
   * les index TTL viennent de `kojo_retention.RETENTION_RULES` — la même règle
-    que PRIVACY.md publie : une durée écrite des deux côtés finit par diverger.
+    que PRIVACY.md publie : une durée écrite des deux côtés finit par diverger ;
+  * les index RÉSIDUELS connus sont déclarés à part (`RESIDUS_CONNUS`) pour
+    être RETIRÉS, jamais pour être créés : la sonde publie tout index non
+    déclaré en `[INFO]`, et un `[INFO]` qui revient à chaque run finit par ne
+    plus être lu. C'est le retrait qui fait taire la ligne, pas une exception.
 """
 from typing import Dict, Iterable, List, Optional, Tuple
 
@@ -181,6 +185,44 @@ INDEX_DECLARES: Tuple[Dict[str, object], ...] = (
     _declare("push_tokens", [("user_id", 1), ("active", 1)]),
     # ── revoked_tokens ──────────────────────────────────────────────────────
     _declare("revoked_tokens", "jti", unique=True),
+)
+
+
+# ── Les index RÉSIDUELS : connus, et RETIRÉS ────────────────────────────────
+# Un index présent dans la base mais absent de la déclaration est publié en
+# `[INFO]` par la sonde : c'est le bon verdict (un résidu n'est pas une panne),
+# mais il revient à CHAQUE run tant que le résidu est là — et un avertissement
+# permanent s'apprend à être ignoré, pendant que l'index continue de coûter à
+# chaque insertion.
+#
+# Trois façons de faire taire cette ligne. La DÉCLARER graverait pour toujours
+# un index mort, sur un champ que rien n'écrit. L'EXCEPTER dans la sonde ferait
+# disparaître un résidu qui reviendrait — l'angle mort que la sonde existe pour
+# fermer. Le RETIRER (`backend/scripts/retirer_index_residuels.py`) laisse une
+# base qui ne porte que la déclaration : il n'y a plus rien à publier.
+#
+# Règle du script : il REFUSE de retirer un nom qui est DÉCLARÉ ci-dessus. Un
+# résidu ne l'est que tant que personne ne le déclare ; le jour où un index de
+# ce nom devient utile, le script le dit et s'arrête au lieu de défaire la
+# déclaration.
+RESIDUS_CONNUS: Tuple[Dict[str, object], ...] = (
+    {
+        "collection": "messages",
+        # Clé, pas nom : le nom est calculé comme MongoDB le fait (`nom_index`),
+        # donc une faute de frappe ne peut pas désigner un index inexistant.
+        "cle": [("created_at", -1)],
+        "mesure": "27/10/2026",
+        "motif": (
+            "aucun chemin de code de `messages` n'écrit ni ne lit `created_at` : "
+            "le modèle (`kojo_models.Message`) écrit `timestamp`, les requêtes de "
+            "`kojo_routers_messages` trient `timestamp`, et le TTL de conservation "
+            "(`kojo_retention.RETENTION_RULES`) expire sur `timestamp` — cet index "
+            "n'indexe donc aucun champ écrit et ne sert aucune requête. C'est le "
+            "résidu d'un schéma antérieur. Le retirer ne touche AUCUNE donnée : un "
+            "document qui porterait encore le champ le garde, il n'est simplement "
+            "plus indexé"
+        ),
+    },
 )
 
 

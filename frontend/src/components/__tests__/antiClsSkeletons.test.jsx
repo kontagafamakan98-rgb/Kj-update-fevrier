@@ -91,7 +91,20 @@ describe('anti-CLS — les pages partagent leur squelette (pas de doublon)', () 
     // et le pied de page remontait DANS l'écran à l'arrivée des données
     // (CLS 0,0579, nommé sur `<footer>`). La condition est LUE, jamais
     // ré-écrite ici : `src/utils/paymentBranche.js` en est le propriétaire.
-    expect(src).toMatch(/\{loading && cartesDePaiementAttendues && <PaymentContentSkeleton \/>\}/);
+    // 28/10/2026 — LE SQUELETTE REMPLACE LA GRILLE, IL NE S'AJOUTE PLUS À ELLE.
+    // Il était peint à la SUITE du formulaire réel : l'état de chargement
+    // doublait le contenu qu'il représente, et la branche « mission » valait
+    // 1 174,31 px de `main` pendant le chargement pour une destination de
+    // 682 px (CLS 0,0909 desktop, mesuré : le pied de page de 193 px entrait
+    // dans l'écran). La forme ADDITIVE est donc refusée — c'est elle le défaut —
+    // et la forme qui la remplace est exigée, dans cet ordre : la branche
+    // « mission requise », puis l'état de chargement, puis la grille.
+    expect(
+      src,
+      'Payment.js peint de nouveau le squelette EN PLUS de la grille (étouffement du défaut du 28/10/2026)'
+    ).not.toMatch(/loading && cartesDePaiementAttendues && <PaymentContentSkeleton \/>/);
+    expect(src).toMatch(/const paiementEnChargement = loading && cartesDePaiementAttendues;/);
+    expect(src).toMatch(/\) : paiementEnChargement \? \([\s\S]{0,400}?<PaymentContentSkeleton \/>/);
     expect(src).toMatch(/import \{[^}]*carteMissionRequise[^}]*\} from '\.\.\/utils\/paymentBranche'/);
     expect(src).toMatch(/const cartesDePaiementAttendues = !carteMissionRequise\(\);/);
     // Le test de branche n'est écrit qu'UNE fois dans la page : le retour du
@@ -137,10 +150,28 @@ describe('anti-CLS — structure des squelettes (hauteurs du layout réel)', () 
     // n'est plus ce que les deux peignent. La boîte, elle, ne bouge pas : elle
     // portait déjà une bordure de 1 px, que la classe remplace sans changer le
     // rayon utile (le CLS ne dépend pas du rayon, mais l'œil si).
-    ['PaymentContentSkeleton', PaymentContentSkeleton, ['carte-editoriale', 'grid-cols-1', 'md:grid-cols-3']],
+    ['PaymentContentSkeleton', PaymentContentSkeleton, ['carte-editoriale', 'grid-cols-1', 'md:grid-cols-3', 'lg:col-span-2']],
     ['JobsSkeleton', JobsSkeleton, ['max-w-7xl']],
     ['JobDetailsSkeleton', JobDetailsSkeleton, ['max-w-7xl']],
-    ['LoginSkeleton', LoginSkeleton, []],
+    // 28/10/2026 : le repli de /login LIT l'enveloppe de sa page (cadre,
+    // colonne, CARTE du site) au lieu de peindre une colonne nue `space-y-8`.
+    // Mesuré : 566 px de carte pour une destination de 683,3 (139 px de
+    // document), le pied de page remontait de 139 px au swap — 0,0245 desktop
+    // une fois le pied passé à 217 px par le bloc de maillage. Les hauteurs
+    // attendues sont celles des éléments réels, mesurées sur le DOM.
+    [
+      'LoginSkeleton',
+      LoginSkeleton,
+      [
+        ...PAGE_SECTIONS['/login'].frameClass.split(/\s+/),
+        ...PAGE_SECTIONS['/login'].colonneClass.split(/\s+/),
+        ...PAGE_SECTIONS['/login'].carteClass.split(/\s+/),
+        'h-[46px]',
+        'h-[52px]',
+        'h-5',
+        'h-6',
+      ],
+    ],
     // Blocs calibrés sur le DOM réel de /forgot-password (probe CDP) : titre
     // text-3xl → h-9, sous-titre et aide text-sm/text-xs repliés sur 2 lignes
     // → h-10 / h-8, champ et bouton réels (48 px) → h-12, libellé text-sm →
@@ -165,6 +196,63 @@ describe('anti-CLS — structure des squelettes (hauteurs du layout réel)', () 
       }
     });
   }
+
+  // LE SQUELETTE TIENT LA GRILLE DE SA DESTINATION (28/10/2026). Le défaut
+  // mesuré n'était pas une hauteur écrite à la main mais une STRUCTURE qui
+  // différait : la page pose ses deux cartes côte à côte dès `lg`, le squelette
+  // les empilait. Sur la branche « mission », il valait donc la somme de deux
+  // cartes pour le maximum des mêmes deux cartes — et la grille ci-dessous est
+  // la seule chose que les deux surfaces doivent écrire pareil.
+  it('PaymentContentSkeleton tient la MÊME grille que la page (pas une pile)', () => {
+    const GRILLE = 'grid grid-cols-1 gap-6 lg:grid-cols-3';
+    const page = fs.readFileSync(path.resolve(__dirname, '../../pages/Payment.js'), 'utf8');
+    const squelettes = fs.readFileSync(path.resolve(__dirname, '../SkeletonLoader.js'), 'utf8');
+    expect(
+      page,
+      `la grille de /payment a changé de forme (« ${GRILLE} » absente) : c’est le squelette qu’il faut suivre`
+    ).toContain(GRILLE);
+    expect(
+      squelettes,
+      `PaymentContentSkeleton n’a plus la grille de sa destination (« ${GRILLE} » absente) — il empile ce que la page ` +
+        'pose côte à côte, et réserve la somme de deux cartes pour le maximum des mêmes (défaut du 28/10/2026)'
+    ).toContain(GRILLE);
+  });
+
+  // LE REPLI DE /login TIENT L'ENVELOPPE DE SA PAGE (28/10/2026). Le défaut
+  // mesuré n'était pas une hauteur écrite à la main, c'était une STRUCTURE :
+  // le repli peignait sa propre colonne (`space-y-8`) là où la page peint la
+  // carte du site, donc il réservait 139 px de moins que sa destination et le
+  // pied de page remontait au swap. Trois choses sont donc exigées ici : les
+  // champs du plan sont LUS (jamais recopiés), et la variante Google — 48 px
+  // de bouton + 20 px de séparateur, la variante de la production — est peinte
+  // sous la MÊME condition que la page.
+  it('LoginSkeleton lit l’enveloppe de /login et la variante Google du plan', () => {
+    const squelettes = fs.readFileSync(path.resolve(__dirname, '../SkeletonLoader.js'), 'utf8');
+    const debut = squelettes.indexOf('export const LoginSkeleton');
+    const fin = squelettes.indexOf('export const ForgotPasswordSkeleton');
+    expect(debut, 'LoginSkeleton introuvable dans SkeletonLoader.js').toBeGreaterThan(-1);
+    expect(fin, 'ForgotPasswordSkeleton introuvable (fin du bloc de LoginSkeleton)').toBeGreaterThan(debut);
+    const bloc = squelettes.slice(debut, fin);
+    for (const champ of [
+      'frameClass',
+      'colonneClass',
+      'carteClass',
+      'formClass',
+      'champsClass',
+      'encadreLegalClass',
+      'noAccountClass',
+    ]) {
+      expect(
+        bloc,
+        `LoginSkeleton n’utilise plus « plan.${champ} » : le repli et sa page ont de nouveau deux enveloppes`
+      ).toContain(`plan.${champ}`);
+    }
+    expect(
+      bloc,
+      'LoginSkeleton ne peint plus le bouton Google sous la condition de la page : la variante Google ' +
+        '(production) réserverait 68 px de moins que sa destination'
+    ).toContain('isGoogleAuthEnabled()');
+  });
 
   // CE CAS A DÉFENDU UN RETRAIT (09/10/2026). Une variante du repli — ne
   // réserver que l'en-tête sur la branche « pas de mission », celle que publie
@@ -264,8 +352,11 @@ describe('anti-CLS — la branche de /payment a un propriétaire unique', () => 
 //   • Un squelette DÉDIÉ (destination connue) fait l'inverse : il réplique
 //     exactement la hauteur de sa page, donc le footer peut rester visible,
 //     il ne BOUGE plus (c'est le cas de ForgotPasswordSkeleton ci-dessus).
-// Seul MobileLoader garde aussi min-h-screen pour une autre raison : il
-// REMPLACE tout le layout (App.js retourne tôt) — ni navbar ni footer.
+// MobileLoader, lui, n'est plus en 100vh du tout depuis le 28/10/2026 : il est
+// rendu en COUCHE FIXE (`fixed inset-0`) au-dessus d'une coquille peinte dès le
+// premier rendu, parce que remplacer le layout insérait le pied de page (228 px)
+// au démarrage — 0,0611 de CLS sur /payment en 1350×940, dont la source mesurée
+// était `<footer>` (0×0 → 1350×228 à (0, 712)).
 describe('anti-CLS — états de chargement génériques : footer hors écran (100vh)', () => {
   const componentBody = (rel, startMarker, endMarker) => {
     const source = fs.readFileSync(path.resolve(__dirname, rel), 'utf8');
