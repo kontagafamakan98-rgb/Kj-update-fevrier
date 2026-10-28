@@ -1069,7 +1069,28 @@ export const PAGE_SECTIONS = {
     // /payment ne passe PAS par `CadrePage` : ce composant sert les routes SANS
     // coquille (`src/config/app-cadres.js`), et le fond gris de celle-ci est une
     // décision de cette page-là, pas un pas de site.
-    frameClass: 'min-h-full bg-gray-50 py-8',
+    // ── LE CADRE REMPLIT L'ÉCRAN EN MOBILE (28/10/2026), ET C'EST UNE MESURE ──
+    // Le CLS du relâchement du chunk retenu de /payment valait **0,0532** en
+    // 412×823 (sonde des cadres), et la source nommée était `<footer>` qui
+    // entrait de 123,2 px. La cause n'était PAS la hauteur du pied de page :
+    // raccourcir son bloc de maillage de 565 à 457 px n'a pas bougé le chiffre
+    // d'un millième, parce qu'il n'est jamais entièrement visible à cette
+    // taille. La cause est le RÉTRÉCISSEMENT de la page : `main` mesurait
+    // **939,3 px** pendant le chargement (le repli réserve la branche la plus
+    // haute) et **645,8 px** après, donc le pied de page remontait de 293,5 px
+    // — et c'est ce déplacement, pas sa hauteur, que Chrome compte.
+    //
+    // Le cadre porte donc `min-h-screen` en mobile : la page courte fait la
+    // hauteur de la fenêtre, le pied de page s'arrête SOUS la ligne de
+    // flottaison (y=984 au lieu de 710,8) et le relâchement ne le déplace plus
+    // d'un pixel visible. `md:min-h-0` rend au desktop EXACTEMENT ce qu'il avait
+    // (`min-h-full` sur un parent de hauteur automatique vaut 0) : sa mesure du
+    // 28/10/2026 — pied à y=772, CLS 0,0331 — n'est pas touchée.
+    //
+    // Ce que ça change à l'écran, et c'est assumé : la carte « mission requise »
+    // laisse une bande de fond sous elle au lieu de laisser le pied de page
+    // dépasser dans l'écran. Le contenu de la page, lui, n'est pas retaillé.
+    frameClass: 'min-h-screen md:min-h-0 bg-gray-50 py-8',
     corpsClass: 'max-w-6xl mx-auto px-4 space-y-6',
     // ── LE VOCABULAIRE D'ÉCRAN (17/10/2026) ──────────────────────────────────
     // /payment était le dernier écran déclaré sans le vocabulaire des autres :

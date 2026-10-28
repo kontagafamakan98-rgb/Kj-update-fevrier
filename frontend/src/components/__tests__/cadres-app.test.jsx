@@ -39,6 +39,7 @@ import {
   REGLES_DE_CHARGEMENT,
   REGLES_DE_SQUELETTE,
 } from '../../config/app-cadres';
+import { PAGE_SECTIONS } from '../../config/page-sections';
 
 const ICI = path.dirname(fileURLToPath(import.meta.url));
 const SRC = path.resolve(ICI, '..', '..');
@@ -322,9 +323,26 @@ describe('/payment — le cadre à DEUX canaux reste chez son propriétaire', ()
   it('est déclaré dans page-sections.js, pas dans app-cadres.js', () => {
     // /payment a une COQUILLE : ses deux peintures doivent lire la même chaîne,
     // donc son propriétaire est le fichier que les deux canaux lisent déjà.
+    //
+    // La VALEUR est lue dans la déclaration, jamais recopiée ici : ce cas
+    // écrivait `frameClass: 'min-h-full bg-gray-50 py-8'` en dur, donc la
+    // déclaration a changé le 28/10/2026 (`min-h-screen md:min-h-0` en mobile,
+    // pour le CLS du chunk retenu) et ce garde est devenu rouge alors que le
+    // PROPRIÉTAIRE n'avait pas bougé — un garde juge l'appartenance, pas la
+    // valeur, sinon il n'est qu'une deuxième copie à maintenir.
     const plan = lire('config/page-sections.js');
-    expect(plan).toContain("frameClass: 'min-h-full bg-gray-50 py-8'");
-    expect(plan).toContain("corpsClass: 'max-w-6xl mx-auto px-4 space-y-6'");
+    const cadre = PAGE_SECTIONS['/payment'];
+    expect(cadre, 'PAGE_SECTIONS ne déclare pas /payment').toBeTruthy();
+    for (const cle of ['frameClass', 'corpsClass']) {
+      expect(cadre[cle], `/payment : ${cle} vide ou absent`).toMatch(/\S/);
+      expect(
+        plan,
+        `/payment : ${cle} n'est pas écrit dans page-sections.js — sa valeur est donc peinte ailleurs ` +
+          'que là où les deux canaux la lisent.'
+      ).toContain(`${cle}: '${cadre[cle]}'`);
+    }
+    // Le fond gris reste la décision de CETTE page, et non un pas de site.
+    expect(cadre.frameClass, '/payment : le fond de la page a quitté la déclaration').toContain('bg-gray-50');
     expect(Object.keys(CADRES_APP)).not.toContain('/payment');
   });
 

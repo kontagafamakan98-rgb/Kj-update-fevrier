@@ -240,11 +240,44 @@ const CLS_BUDGETS = {
   // (13 villes y prennent 5 lignes, 23 guides 18). Le plafond de 0,06, qu'on
   // avait dû relever faute de levier, est donc de nouveau tenu par la mesure :
   // 1,60× de marge sur le pire relevé desktop, 1,21× sur le mobile.
+  //
+  // ── LE MOBILE AUSSI, ET SON LEVIER N'ÉTAIT PAS LE PIED DE PAGE (28/10/2026) ──
+  // Le paragraphe ci-dessus concluait que le mobile ne bougeait pas « parce que
+  // ses liens ne partagent aucune ligne ». C'était une HYPOTHÈSE, et la mesure
+  // l'a démentie : en réduisant le corps de ce bloc à 12 px en mobile (pied de
+  // page 565 → 457 px, −108 px, −19 %), le CLS du chunk retenu est resté à
+  // **0,0532**, au millième près. Un pied de page n'est compté que pour la part
+  // qui EN ENTRE : à 412×823 il n'en montre jamais que 123,2 px (823 − y=699,8),
+  // donc sa hauteur au-delà de cette bande ne pèse rien.
+  //
+  // La cause est le RÉTRÉCISSEMENT DE LA PAGE, mesurée au même protocole :
+  // `main` valait **939,3 px** pendant le chunk retenu (le repli réserve la
+  // branche la plus haute) et **645,8 px** après — le pied de page remontait de
+  // **293,5 px**, et c'est ce déplacement que Chrome compte. Le cadre de la
+  // route porte donc `min-h-screen` en mobile (`src/config/page-sections.js`,
+  // `frameClass`, lu par la page ET par le repli) : la page courte fait la
+  // hauteur de la fenêtre, le pied s'arrête à y=984 — sous la ligne de
+  // flottaison — et le relâchement ne le déplace plus. Re-mesuré, même sonde :
+  // `/payment` mobile **0,0532 → 0,0000** (aucun décalage enregistré), branche
+  // « mission requise » **0,0496 → 0,0000**, branche « mission » 0,0000 ; le
+  // DESKTOP est intact (pied à y=772, 0,0331 pour le chunk retenu, 0,0376 pour
+  // les deux branches), parce que `md:min-h-0` lui rend exactement son ancien
+  // `min-h-full`. La feuille critique ne bouge pas d'un OCTET : le garde rend
+  // 83,93 Ko / 84,00 Ko et la MÊME empreinte, 1 158 règles — `min-h-screen` et
+  // `md:min-h-0` étaient déjà émis pour d'autres porteurs, donc cette correction
+  // ne coûte aucun octet de CSS critique.
   '/payment': {
     max: 0.06,
-    pireMediane: 0.0496,
+    pireMediane: 0.0376,
     mesure:
-      'MESURE DU 28/10/2026, APRÈS LE PIED DE PAGE RACCOURCI (bloc de maillage à UN flux en desktop : '
+      'MESURE DU 28/10/2026, APRÈS LE CADRE PLEIN ÉCRAN EN MOBILE (`min-h-screen` sur le cadre de la route, '
+      + '`md:min-h-0` rendant au desktop son ancien `min-h-full`) : chunk retenu **0,0532 → 0,0000** en 412×823 '
+      + '(aucun décalage enregistré ; `main` 919 px PENDANT et APRÈS, pied à y=984, sous la ligne de flottaison), '
+      + 'branche « mission requise » **0,0496 → 0,0000**, branche « mission » 0,0000 ; desktop INCHANGÉ — chunk '
+      + 'retenu 0,0331, branches 0,0376, pied 157 px à y=772. La cause était le RÉTRÉCISSEMENT de la page '
+      + '(`main` 939,3 → 645,8 px, soit 293,5 px de remontée du pied), PAS sa hauteur : ramener son bloc de '
+      + 'maillage de 565 à 457 px n’avait pas déplacé le chiffre d’un millième. '
+      + 'MESURE PRÉCÉDENTE, APRÈS LE PIED DE PAGE RACCOURCI (bloc de maillage à UN flux en desktop : '
       + 'le groupe cesse de peindre sa boîte, le titre passe au rang de ses liens, corps du bloc d’adresse) : '
       + '`main` 718 px, pied 168 px à l’insertion, CLS **0,0376** sur les DEUX branches en 1350×940 '
       + '(0,0611 avant), et 0,0331 pour le chunk retenu (dont 0,0293 de pied de page, 0,0505 avant) ; '
