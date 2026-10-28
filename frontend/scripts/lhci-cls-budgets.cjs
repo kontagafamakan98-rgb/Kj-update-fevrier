@@ -142,10 +142,20 @@ const CLS_BUDGETS = {
     mesure: '0,0088 sur 27 runs ; 0,0165 avant le correctif #19',
   },
   '/forgot-password': { max: 0.01, pireMediane: 0, mesure: '0,0000 sur 27 runs' },
+  // Le plafond n'a PAS bougé le 28/10/2026, et il n'avait pas à bouger : la
+  // sonde `e2e/cls-coquille-react.spec.js` a mesuré 0,0245 en desktop, nommé sa
+  // source (`<footer>` de 0 × 0 à 1350 × 223,7 : le repli `<LoginSkeleton>`
+  // valait 566 px de carte pour une destination de 683,3, donc le pied de page
+  // remontait de 139 px à l'arrivée de la page) puis rendu 0,0000 après
+  // recalibrage du repli sur les boîtes réelles — client Google présent COMME
+  // absent (~48 px de bouton et 20 px de séparateur en plus, la variante de la
+  // production). La cause était antérieure au bloc de maillage : le pied passé
+  // de 141 à 217 px a seulement fait franchir les 0,02 à un saut qui valait
+  // ~0,014.
   '/login': {
     max: 0.02,
     pireMediane: 0,
-    mesure: '0,0000 sur 17 runs, 0,1762 sur 1 (non reproduit)',
+    mesure: '0,0000 sur 17 runs, 0,1762 sur 1 (non reproduit) ; 0,0245 → 0,0000 le 28/10/2026 (repli recalibré)',
   },
   '/how-it-works': { max: 0.01, pireMediane: 0, mesure: '0,0000 sur 18 runs' },
   '/support': { max: 0.01, pireMediane: 0, mesure: '0,0000 sur 18 runs' },

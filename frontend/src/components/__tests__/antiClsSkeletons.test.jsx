@@ -153,7 +153,25 @@ describe('anti-CLS — structure des squelettes (hauteurs du layout réel)', () 
     ['PaymentContentSkeleton', PaymentContentSkeleton, ['carte-editoriale', 'grid-cols-1', 'md:grid-cols-3', 'lg:col-span-2']],
     ['JobsSkeleton', JobsSkeleton, ['max-w-7xl']],
     ['JobDetailsSkeleton', JobDetailsSkeleton, ['max-w-7xl']],
-    ['LoginSkeleton', LoginSkeleton, []],
+    // 28/10/2026 : le repli de /login LIT l'enveloppe de sa page (cadre,
+    // colonne, CARTE du site) au lieu de peindre une colonne nue `space-y-8`.
+    // Mesuré : 566 px de carte pour une destination de 683,3 (139 px de
+    // document), le pied de page remontait de 139 px au swap — 0,0245 desktop
+    // une fois le pied passé à 217 px par le bloc de maillage. Les hauteurs
+    // attendues sont celles des éléments réels, mesurées sur le DOM.
+    [
+      'LoginSkeleton',
+      LoginSkeleton,
+      [
+        ...PAGE_SECTIONS['/login'].frameClass.split(/\s+/),
+        ...PAGE_SECTIONS['/login'].colonneClass.split(/\s+/),
+        ...PAGE_SECTIONS['/login'].carteClass.split(/\s+/),
+        'h-[46px]',
+        'h-[52px]',
+        'h-5',
+        'h-6',
+      ],
+    ],
     // Blocs calibrés sur le DOM réel de /forgot-password (probe CDP) : titre
     // text-3xl → h-9, sous-titre et aide text-sm/text-xs repliés sur 2 lignes
     // → h-10 / h-8, champ et bouton réels (48 px) → h-12, libellé text-sm →
@@ -198,6 +216,42 @@ describe('anti-CLS — structure des squelettes (hauteurs du layout réel)', () 
       `PaymentContentSkeleton n’a plus la grille de sa destination (« ${GRILLE} » absente) — il empile ce que la page ` +
         'pose côte à côte, et réserve la somme de deux cartes pour le maximum des mêmes (défaut du 28/10/2026)'
     ).toContain(GRILLE);
+  });
+
+  // LE REPLI DE /login TIENT L'ENVELOPPE DE SA PAGE (28/10/2026). Le défaut
+  // mesuré n'était pas une hauteur écrite à la main, c'était une STRUCTURE :
+  // le repli peignait sa propre colonne (`space-y-8`) là où la page peint la
+  // carte du site, donc il réservait 139 px de moins que sa destination et le
+  // pied de page remontait au swap. Trois choses sont donc exigées ici : les
+  // champs du plan sont LUS (jamais recopiés), et la variante Google — 48 px
+  // de bouton + 20 px de séparateur, la variante de la production — est peinte
+  // sous la MÊME condition que la page.
+  it('LoginSkeleton lit l’enveloppe de /login et la variante Google du plan', () => {
+    const squelettes = fs.readFileSync(path.resolve(__dirname, '../SkeletonLoader.js'), 'utf8');
+    const debut = squelettes.indexOf('export const LoginSkeleton');
+    const fin = squelettes.indexOf('export const ForgotPasswordSkeleton');
+    expect(debut, 'LoginSkeleton introuvable dans SkeletonLoader.js').toBeGreaterThan(-1);
+    expect(fin, 'ForgotPasswordSkeleton introuvable (fin du bloc de LoginSkeleton)').toBeGreaterThan(debut);
+    const bloc = squelettes.slice(debut, fin);
+    for (const champ of [
+      'frameClass',
+      'colonneClass',
+      'carteClass',
+      'formClass',
+      'champsClass',
+      'encadreLegalClass',
+      'noAccountClass',
+    ]) {
+      expect(
+        bloc,
+        `LoginSkeleton n’utilise plus « plan.${champ} » : le repli et sa page ont de nouveau deux enveloppes`
+      ).toContain(`plan.${champ}`);
+    }
+    expect(
+      bloc,
+      'LoginSkeleton ne peint plus le bouton Google sous la condition de la page : la variante Google ' +
+        '(production) réserverait 68 px de moins que sa destination'
+    ).toContain('isGoogleAuthEnabled()');
   });
 
   // CE CAS A DÉFENDU UN RETRAIT (09/10/2026). Une variante du repli — ne
