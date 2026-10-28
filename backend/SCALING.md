@@ -233,6 +233,94 @@ compte) coûte 4 trames, pas 800. Ce sont les **événements par seconde** qui
 saturent une machine qui tient des centaines de flux — d'où le bus plutôt que
 des machines plus grosses dès que `WEB_CONCURRENCY > 1`.
 
+### Le prix du `resync` quand Redis bat de l'aile — MESURÉ
+
+Le `resync` n'est pas un événement de plus : c'est une TRAME par flux local,
+que chaque client traduit en une relecture de sa source de vérité. À 400 flux,
+un seul `resync` vaut donc 400 requêtes. Sa cadence est bornée par
+`RESYNC_MIN_INTERVAL_SECONDS` — **30 s, la parité avec le sondage remplacé**
+(2 req/min par session) —, avec une relecture différée pour la dernière
+fenêtre d'une rafale. Banc : `scripts/charge/mesure_resync.py` (relevé du
+19/10/2026).
+
+**1. La cadence.** 400 flux, un serveur pub/sub arrêté pour de vrai 2 s puis
+relancé 2 s pendant 183 s — socket et client `redis-py` réels, même double que
+`mesure_panne_redis.py` (§5) — soit 45 fenêtres aveugles (`reprises` = 45),
+deux passages identiques :
+
+| Passage | Fenêtres | Relectures | /min | 1 fenêtre sur | Trames `resync` | /min | Sondage remplacé | Parité |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 (183,2 s) | 45 | 7 | 2,3 | 6,4 relues | 2 800 | 917,0 | 800 | 1,15× |
+| 2 (182,9 s) | 45 | 7 | 2,3 | 6,4 relues | 2 800 | 918,7 | 800 | 1,15× |
+
+Un Redis qui bat en continu produit **2,3 relectures/min**, pas une par
+fenêtre : **918 requêtes/min** à 400 flux, contre **800** pour les 2 req/min
+par session que le flux a remplacées. La parité est celle du plancher (une
+relecture toutes les 30 s = 2,0/min, soit 800 req/min) ; l'écart de 15 % est
+l'unique relecture de RATTRAPAGE de la rafale. Il ne dépend pas du nombre de
+flux (les deux termes sont proportionnels) et ne grandit pas avec la durée du
+flap : c'est une relecture par rafale, pas un taux. Le coût propre du fan-out
+reste négligeable (0,5 à 3,2 ms pour 400 flux, soit 1 à 8 µs/flux, synchrone
+dans la boucle).
+
+**Pourquoi pas 10 s.** Le même banc, au plancher précédent, donnait 15
+fenêtres en 60,9 s → 7 relectures, soit **6,9/min et 2 767 requêtes/min** :
+3,5× le sondage remplacé, et 46 req/s (≈54 % du débit d'une machine à 85 rps)
+pour un seul Redis instable. C'est ce relevé qui a fixé le plancher à 30 s,
+celui que `RESYNC_MIN_INTERVAL_SECONDS` porte et que
+`.github/scripts/check-resync-parite.py` rejuge dans `workflow-lint`.
+
+**2. Le p99.** La rafale est REJOUÉE contre le vrai `server.app`
+(`serveur_mesure.py`, base en mémoire à 1 ms/op) : 400 requêtes
+`/api/notifications/unread-count` — un appel par flux — espacées du plancher
+du produit (le banc DÉRIVE la durée de phase de `RESYNC_MIN_INTERVAL_SECONDS`
+pour y contenir trois rafales), sous une charge constante. Les 400 flux du banc
+ne vivent pas dans ce serveur ; c'est leur RAFALE qui est rejouée, pas le
+`publish`.
+
+| Phase | Requêtes stables | p50 | p95 | p99 |
+|---|---:|---:|---:|---:|
+| 66 s sans relecture | 4 057 (61,5 rps) | 583 ms | 1 281 ms | **2 489 ms** |
+| 79 s avec 3 relectures | 2 522 (31,9 rps) | 578 ms | 5 418 ms | **12 769 ms** |
+| 66 s sans relecture (2ᵉ) | 4 521 (68,5 rps) | 559 ms | 832 ms | **1 142 ms** |
+| 79 s avec 3 relectures (2ᵉ) | 2 802 (35,5 rps) | 574 ms | 5 247 ms | **12 418 ms** |
+
+Chaque rafale de 400 requêtes met **12,8 à 14,1 s** à se résorber (p99 des
+trois rafales de chaque passage), et le débit stable tombe de ~65 à ~34 rps
+pendant la phase avec relectures (~−48 %). La rafale seule, serveur au repos,
+dure **12,6 à 13,1 s**, ses 400 départs étalés sur 0,75 à 0,83 s : ce n'est
+donc pas le générateur qui plafonne, c'est le serveur qui fait la queue.
+
+Le p99 de REPOS de ce relevé (1,1 à 2,5 s) est plus haut que celui du premier
+passage au plancher de 10 s (0,12 à 0,25 s, même harnais, hôte moins chargé) :
+le RAPPORT entre les deux phases n'est donc pas le chiffre transférable — la
+file de 12 à 13 s, elle, se retrouve dans les deux relevés. C'est cette file
+que 30 s rendent trois fois plus rare (2,3 rafales/min au lieu de 6,9).
+
+**3. Ce que cela dit du contrat.** 30 s est la parité, pas une marge : à 400
+flux, 2,3 relectures/min valent 918 req/min, contre 800 pour les 2 req/min par
+session retirées. Ce qui se paie encore est la RAFALE, pas le taux : 400
+relectures simultanées font la queue 12 à 13 s et font tomber le débit stable
+de moitié. À 30 s d'espacement elle arrive 2,3 fois/min, contre 6,9 à 10 s —
+c'est là que se joue la latence des autres clients, et c'est pourquoi le
+plancher n'est pas descendu plus bas : la réparation serait plus rapide, au
+prix d'une rafale toutes les 10 s.
+
+Ce que ce banc ne mesure pas : le coût d'une relecture dans le NAVIGATEUR (la
+rafale ne compte qu'un appel par flux ; un client qui relit notifications,
+conversations et messages en émet plusieurs, donc 918/min est une **borne
+basse**), le RTT d'un vrai Redis, et la production elle-même (machine
+partagée, générateur local : les p99 absolus sont pessimistes, la cadence et
+la file sont les chiffres transférables).
+
+```
+cd backend && python scripts/charge/mesure_resync.py     # cadence (180 s) + p99
+python scripts/charge/mesure_resync.py --sans-http        # cadence seule
+python scripts/charge/mesure_resync.py --http-seul        # la rafale seule
+python scripts/charge/mesure_resync.py --controle-seul    # le générateur plafonne-t-il ?
+# sans backend/.env : APP_ENV=development (le fail-fast JWT_SECRET refuse la production)
+```
+
 ### La projection, recalculée
 
 | Scénario | Sondages AVANT | Sondages APRÈS | + navigation | Total avant | Total après | Machines à 85 rps |
@@ -423,6 +511,7 @@ la RAM fait rougir le test (vérifié en sens inverse le 18/10 : 800/256 →
 | `tests/test_dimensionnement_machine.py` | garde : la config ne promet pas plus que `base + hard_limit × coût_pire ≤ RAM × 0,75` |
 | `scripts/charge/mesure_push.py` | banc : débit et p95 avec/sans 200 connexions ouvertes, flux muets ou publiés, bus actif ou non (§5) |
 | `scripts/charge/mesure_panne_redis.py` | banc : panne de Redis pendant la fenêtre de reconnexion (socket et client `redis-py` réels, serveur pub/sub minimal) — enveloppes reçues, comptées perdues, pertes MUETTES |
+| `scripts/charge/mesure_resync.py` | banc : cadence des relectures `resync` à 400 flux (Redis arrêté/relancé pour de vrai) et effet de la rafale de 400 relectures sur le p99, contrôle du générateur compris (§5) |
 | `scripts/charge/serveur_mesure.py` | `--bus memoire` (pub/sub en mémoire, protocole `redis.asyncio`), `POST /_mesure/publier`, `GET /_mesure/bus` (§5) |
 
 Non corrigé, volontairement listé : bornage des avis (§6.4), index texte pour
@@ -447,5 +536,8 @@ produit, pas un correctif mécanique.
   de Redis joignable sur la machine de mesure : le protocole et le fan-out sont
   ceux de la production, l'aller-retour réseau ne l'est pas. Les chiffres sont
   une borne basse, et le fan-out inter-process n'est pas jugé ici.
+- La rafale de `resync` (§5) compte **un appel par flux** : c'est le minimum
+  qu'un client fait en relisant, pas ce qu'il fait réellement (rendu, appels
+  multiples) — le coût mesuré des relectures est donc une borne basse.
 - Les projections du §5 sont des **hypothèses de trafic**, explicitées comme
   telles — pas des mesures.
