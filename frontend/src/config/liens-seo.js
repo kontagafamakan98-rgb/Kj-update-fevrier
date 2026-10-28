@@ -57,9 +57,68 @@ export const GROUPES_LIENS_SEO = [
 // 27/10/2026 (voir src/config/classes-chrome.js) : les répéter ici plutôt que
 // les importer garde ce module lisible par les deux canaux sans dépendre du
 // chrome, et les valeurs sont les MÊMES.
-export const LIENS_SEO_CLASS = 'space-y-2';
+// ── LA HAUTEUR DU BLOC, PARCE QU'ELLE COÛTE UN CLS ──────────────────────────
+// Ce bloc est peint dans le pied de page, donc sur TOUTES les routes, et le pied
+// de page est INSÉRÉ quand le splash PWA rend la main : sur une page courte comme
+// /payment (706 px de `main` en desktop pour une fenêtre de 940), ce qui entre
+// dans l'écran À CE MOMENT-LÀ déplace le document, et le coût suit la HAUTEUR du
+// pied de page. Mesuré le 28/10/2026 par `e2e/cadres-app.spec.js` (branches
+// « mission requise » et « mission », 1350×940) : pied de 228 px à l'insertion →
+// **0,0611**, sous un plafond de 0,07 que la mesure du 28/10 avait déjà dû
+// relever ; un pied SANS ce bloc (141 px, 17/10) valait 0,0470. Après ce
+// raccourcissement, le même protocole rend **0,0376** (et 0,0331 pour le
+// relâchement du chunk retenu) : le plafond de /payment redescend à 0,06.
+//
+// DESKTOP SEULEMENT, et voici pourquoi : le bloc empilait trois groupes (titre au
+// corps du texte, puis ses liens à la ligne suivante) — **124 px** sur desktop,
+// dont 16 px de pas vertical entre groupes et trois lignes de titres qui ne
+// portent qu'un mot. Au-delà de `md`, les trois groupes partagent donc UN flux :
+// la classe `md:contents` retire la boîte du groupe, son titre et ses liens
+// deviennent des éléments du même rang, et le titre (gras, `stone-800`) reste ce
+// qui distingue les familles — d'autant mieux qu'il n'occupe plus une ligne à lui
+// seul. Le corps passe à `text-xs`, celui que le pied de page emploie DÉJÀ pour
+// son bloc d'adresse (`PIED_ADRESSE_CLASS`) : il n'y a pas de corps « de
+// maillage » à inventer, ces 45 liens sont des liens secondaires. Mesuré après
+// coup : **64 px** (quatre lignes), pied de page **217 → 157 px** arrêté et
+// 228 → 168 px à l'insertion. Ce que la mesure interdit n'est pas de réduire,
+// c'est de réduire SOUS la destination — ce bloc n'en réserve aucune, il EST son
+// propre contenu.
+//
+// Le MOBILE NE CHANGE PAS : il empile les groupes et garde le corps des liens de
+// navigation, ses liens ne partageant pas de ligne de toute façon (13 villes y
+// prennent cinq lignes).
+//
+// ── CE QUE CE BLOC COÛTE EN CSS CRITIQUE, ET COMMENT ON L'A PAYÉ MOINS CHER ──
+// Toute classe utilisée ici devient une règle de CSS CRITIQUE INLINÉ, lue AVANT
+// le premier paint et recopiée dans les 13 documents pré-rendus. Le garde
+// `scripts/check-css-inline-budget.js` a REFUSÉ le premier jet (+199 o sur
+// 86 016, mesuré le 28/10/2026), et la correction n'a pas été de relever le
+// budget : c'est la mise en page elle-même qui payait des règles inutiles.
+//   1. L'espacement entre les éléments se paie sur l'ÉLÉMENT (une marge à droite
+//      portée par le titre et par le lien, donc UNE règle) au lieu de deux
+//      gouttières sur le conteneur : c'est deux règles de moins, et l'interligne
+//      des lignes repliées reste celui du texte.
+//   2. `space-y-2`, qui espace les groupes empilés sur mobile, n'a pas à être
+//      neutralisé en desktop : ses marges tombent sur des enfants devenus des
+//      boîtes du flux flexible, mais une seule règle de marge les couvre — voir
+//      le point 1, la gouttière de ligne ayant disparu.
+//   3. **Tailwind v4 lit aussi les COMMENTAIRES** : un nom d'utilitaire cité dans
+//      cette prose est émis dans la feuille, qu'il soit posé ou non. Mesuré le
+//      28/10/2026 en comparant les deux builds : +11 règles ajoutées, dont SIX
+//      que le code n'utilisait plus. C'est pourquoi ce paragraphe décrit les
+//      utilitaires au lieu de les nommer.
+export const LIENS_SEO_CLASS = 'space-y-2 md:flex md:flex-wrap md:justify-center';
+// Le CORPS vit sur le GROUPE et pas sur le conteneur, et c'est une mesure, pas un
+// goût : un élément au mode d'affichage partagé ne peint pas de boîte mais
+// transmet TOUJOURS ses propriétés héritées. Mesuré le 28/10/2026 : le corps posé
+// sur le conteneur calculait bien 12 px / 16 px pendant que les LIENS restaient à
+// 14 px / 20 px — le bloc restait à cinq lignes de 20 px.
 export const LIENS_SEO_GROUPE_CLASS =
-  'flex flex-wrap items-baseline justify-center gap-x-3 gap-y-1 text-sm';
-export const LIENS_SEO_TITRE_CLASS = 'font-semibold text-stone-800';
+  'flex flex-wrap items-baseline justify-center gap-x-3 gap-y-1 text-sm md:contents md:text-xs';
+// L'espacement horizontal du flux desktop se paie sur l'ÉLÉMENT et non sur le
+// conteneur : une SEULE règle pour le titre et pour les liens, puisqu'ils portent
+// la même. C'est ce qui remplace une gouttière de colonne ET une gouttière de
+// ligne — deux règles — pour le même résultat visible.
+export const LIENS_SEO_TITRE_CLASS = 'font-semibold text-stone-800 md:mr-2';
 export const LIENS_SEO_LIEN_CLASS =
-  'text-orange-900 underline underline-offset-2 hover:text-orange-950';
+  'text-orange-900 underline underline-offset-2 hover:text-orange-950 md:mr-2';
