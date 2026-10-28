@@ -117,6 +117,30 @@ const Administration = lazy(() => import('./pages/Administration'));
 
 // Note: Axios configuration moved to /services/api.js for centralized management
 
+/**
+ * UNE REDIRECTION EST UN ÉTAT, PAS UNE PAGE — elle garde donc le pied de page
+ * HORS de l'écran, comme l'état de chargement ci-dessous.
+ *
+ * `Navigate` ne peint rien : `main.flex-1` s'effondre à la hauteur de son vide
+ * (289 px sur 412×823), donc le pied de page REMONTE dans l'écran — puis la
+ * page d'arrivée le renvoie à sa place. Mesuré le 28/10/2026, viewport 412×823,
+ * serveur de rewrites de vercel.json, /payment sans compte : pied de page peint
+ * à 343 px (469 px de haut), puis à 886 px à l'arrivée de /login — **CLS
+ * 0,3770** pour un plafond de 0,06 (`scripts/lhci-cls-budgets.cjs`), la même
+ * faute que le repli de /payment corrigé le 09/10/2026. Le bloc ci-dessous
+ * réserve la hauteur d'un écran : le pied de page reste sous la ligne de
+ * flottaison pendant la redirection, et son arrivée ne déplace plus rien.
+ *
+ * `aria-hidden` : ce n'est pas du contenu, seulement une réserve de hauteur.
+ */
+function RedirectionEnCours({ to, replace = true, state }) {
+  return (
+    <div className="min-h-screen" aria-hidden="true">
+      <Navigate to={to} replace={replace} state={state} />
+    </div>
+  );
+}
+
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
   const { t } = useLanguage();
@@ -144,7 +168,7 @@ function ProtectedRoute({ children }) {
   }
   
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <RedirectionEnCours to="/login" />;
   }
 
   // ── CE QUI BLOQUE L'ENTRÉE, ET CE QUI NE LA BLOQUE PAS (20/10/2026) ─────
@@ -170,7 +194,12 @@ function ProtectedRoute({ children }) {
   // jamais par le client ; il n'ouvre d'ailleurs aucun droit ici, il évite
   // seulement un écran qui ne le concerne pas.
   if (!user.email_verified && !user.is_owner) {
-    return <Navigate to="/payment-verification" replace state={{ resumeAfterLogin: true, userData: user }} />;
+    return (
+      <RedirectionEnCours
+        to="/payment-verification"
+        state={{ resumeAfterLogin: true, userData: user }}
+      />
+    );
   }
   
   return children;
@@ -184,7 +213,7 @@ function OwnerOnlyRoute({ children }) {
   }
 
   if (!user || !OwnerService.isOwnerSessionValid(user)) {
-    return <Navigate to="/dashboard" replace />;
+    return <RedirectionEnCours to="/dashboard" />;
   }
 
   return children;
@@ -206,7 +235,7 @@ function SupportDeskRoute({ children }) {
   }
 
   if (!user || !OwnerService.canManageSupport(user)) {
-    return <Navigate to="/dashboard" replace />;
+    return <RedirectionEnCours to="/dashboard" />;
   }
 
   return children;

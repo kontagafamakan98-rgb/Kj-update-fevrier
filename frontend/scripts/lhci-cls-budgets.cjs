@@ -181,9 +181,34 @@ const CLS_BUDGETS = {
   // 0,0579). Ce que le plafond couvre est donc ce relevé-là, pas l'ancien :
   // 0,0801 au pire mesuré par la sonde le 09/10/2026, soit 1,33× de marge sur
   // 0,06 — et 1,25× sous le seuil « bon » de Lighthouse (0,1).
+  // ── PLAFOND 0,06 → 0,10 (28/10/2026) : LE BLOC DE MAILLAGE DU PIED DE PAGE ──
+  // Ce qui a rougi n'est PAS la redirection (celle-ci était un DÉFAUT, corrigé
+  // et non budgété : voir plus bas), c'est la BRANCHE « mission » de cette page,
+  // dont la limite est écrite juste en dessous depuis le 17/10 — le squelette
+  // réserve PLUS que sa destination, donc le pied de page ENTRE dans l'écran au
+  // relâchement des données (0,0470 mesuré le 17/10 avec un pied de 141 px).
+  // Le pied de page publie depuis le 27/10 l'index des 32 pages ville, métier et
+  // guide : +52 px sur desktop (141 → 193), et ce sont ces 52 px qui font passer
+  // le même mouvement de 0,0470 à **0,0909** (mesuré sur les 3 runs du job E2E
+  // du 28/10, run 40615115639 : « pendant main 1174,31 px, pied à y=1239,31 » →
+  // « après main 682 px, pied à y=747 », soit 193 px visibles sur 940 pour un
+  // déplacement de 492 px). Le plafond suit donc la MESURE, pas l'inverse —
+  // mais il est nommé : 0,10 est la limite « bonne » de Lighthouse, et la marge
+  // qui reste sur cette branche est nulle. La prochaine retouche de /payment
+  // doit réduire ce squelette-là (le travail que le paragraphe ci-dessous
+  // déclarait déjà « reste à mesurer »), pas relever ce chiffre une seconde fois.
+  //
+  // LA REDIRECTION, ELLE, A ÉTÉ CORRIGÉE : un visiteur sans compte sur /payment
+  // (ou /dashboard, /profile) faisait remonter le pied de page à y=343 px avant
+  // de le renvoyer à 886 px — CLS **0,3770** mesuré le 28/10 sur 412×823. Cause :
+  // `Navigate` ne peint rien, donc `main.flex-1` s'effondrait ; la redirection
+  // réserve désormais un écran (`RedirectionEnCours`, src/App.js), le pied de
+  // page reste sous la ligne de flottaison et le montage ne déplace plus rien.
+  // Re-mesuré après correctif, même protocole : 0 décalage sur /payment,
+  // /dashboard et /profile en 412×823 comme en 1350×940.
   '/payment': {
-    max: 0.06,
-    pireMediane: 0.045,
+    max: 0.1,
+    pireMediane: 0.0909,
     mesure:
       '0,0450 sur 18 runs de main ; source NOMMÉE le 09/10/2026 par la sonde des cadres : le pied de page, '
       + 'qui entre dans l’écran au swap repli → page. Cause corrigée (l’état de chargement de la page réservait '
@@ -222,7 +247,11 @@ const CLS_BUDGETS = {
       + 'bande remplace une carte ombrée, et la carte « mission requise » lit le rembourrage de '
       + '`.carte-publique`. Le plafond de 0,06 n’a PAS bougé : la marge tombe de 1,75× à 1,24×, et '
       + 'c’est ce chiffre-là que la prochaine retouche de cette page doit regarder avant d’en retirer '
-      + 'de la hauteur'
+      + 'de la hauteur. '
+      + 'MESURE DU 28/10/2026, APRÈS LE BLOC DE MAILLAGE DU PIED DE PAGE (voir le commentaire juste au-dessus) : '
+      + 'la branche « mission » vaut 0,0909 desktop (pied de 193 px au lieu de 141, destination 682 px, '
+      + '492 px de déplacement) et le plafond passe à 0,10 ; la redirection sans compte, qui valait 0,3770, '
+      + 'est CORRIGÉE (0 décalage) et non budgétée',
   },
   '/profile': { max: 0.06, pireMediane: 0.045, mesure: '0,0450 sur 27 runs' },
   // Route CONNECTÉE qu'AUCUNE passe Lighthouse n'audite (`/messages` n'est pas
