@@ -212,6 +212,9 @@ const CLS_BUDGETS = {
   // qui reste sur cette branche est nulle. La prochaine retouche de /payment
   // doit réduire ce squelette-là (le travail que le paragraphe ci-dessous
   // déclarait déjà « reste à mesurer »), pas relever ce chiffre une seconde fois.
+  // (Ce plafond est depuis REDESCENDU à 0,06 : voir « CE LEVIER-LÀ A ÉTÉ TIRÉ »
+  // plus bas — le squelette n'y était pour rien, c'est le pied de page qui a
+  // raccourci.)
   //
   // LA REDIRECTION, ELLE, A ÉTÉ CORRIGÉE : un visiteur sans compte sur /payment
   // (ou /dashboard, /profile) faisait remonter le pied de page à y=343 px avant
@@ -221,22 +224,49 @@ const CLS_BUDGETS = {
   // page reste sous la ligne de flottaison et le montage ne déplace plus rien.
   // Re-mesuré après correctif, même protocole : 0 décalage sur /payment,
   // /dashboard et /profile en 412×823 comme en 1350×940.
+  //
+  // ── CE LEVIER-LÀ A ÉTÉ TIRÉ LE 28/10/2026 : PLAFOND 0,07 → 0,06 ────────────
+  // Le paragraphe ci-dessus disait que descendre sous 0,06 passait par la
+  // HAUTEUR DU PIED DE PAGE, et non par cette page. C'est fait dans
+  // `src/config/liens-seo.js` : le bloc de maillage empilait trois groupes sur
+  // desktop (titre au corps du texte, liens à la ligne suivante), 124 px ; il
+  // partage désormais UN flux (`md:contents`) au corps de son bloc d'adresse
+  // (`text-xs`), 76 px. Mesuré au même protocole, le même jour : pied de page
+  // 217 → **169 px** arrêté sur l'accueil, 228 → **180 px** à l'instant de
+  // l'insertion (la police n'est pas encore posée à t≈250 ms) ; CLS de /payment
+  // en 1350×940 **0,0611 → 0,0419** sur les DEUX branches, et 0,0543 → 0,0369
+  // pour le relâchement du chunk retenu (0,0505 → 0,0330 pour le pied de page
+  // seul). Le MOBILE ne bouge pas (bloc 412 px, 0,0496 et 0,0532) : ses liens ne
+  // partagent aucune ligne (13 villes y prennent 5 lignes, 23 guides 18). Le
+  // plafond de 0,06, qu'on avait dû relever faute de levier, est donc de
+  // nouveau tenu par la mesure : 1,43× de marge sur le pire relevé desktop,
+  // 1,21× sur le mobile.
   '/payment': {
-    max: 0.07,
-    pireMediane: 0.0611,
+    max: 0.06,
+    pireMediane: 0.0496,
     mesure:
-      'MESURE DU 28/10/2026, SQUELETTE RÉDUIT À SA DESTINATION : la sonde des cadres rend 0,0000 (mission, '
+      'MESURE DU 28/10/2026, APRÈS LE PIED DE PAGE RACCOURCI (bloc de maillage à UN flux en desktop, '
+      + '`md:contents` + `text-xs` dans src/config/liens-seo.js) : `main` 706 px, pied 180 px à l’insertion, '
+      + 'CLS **0,0419** sur les DEUX branches en 1350×940 (0,0611 avant), et 0,0369 pour le chunk retenu '
+      + '(dont 0,0330 de pied de page, 0,0505 avant) ; mobile INCHANGÉ — 0,0496 (mission requise), 0,0000 '
+      + '(mission), 0,0532 (chunk retenu), bloc à 412 px. Le mobile ne bouge pas parce que ses liens ne '
+      + 'partagent pas de ligne (13 villes y prennent 5 lignes, 23 guides 18). Ce qui reste nommé par la '
+      + 'sonde : `<footer>` 0×0 → 1350×180 à (0, 760) — le pied de page est INSÉRÉ quand le splash PWA rend '
+      + 'la main, sur une page de 706 px de `main` pour une fenêtre de 940 —, plus les deux groupes de la '
+      + 'barre (0,0039, mesuré sur toutes les routes connectées). Le plafond redescend de 0,07 à 0,06 : '
+      + '1,43× de marge sur le pire relevé desktop. '
+      + 'MESURE PRÉCÉDENTE, SQUELETTE RÉDUIT À SA DESTINATION (28/10/2026, pied de 228 px) : la sonde des cadres rendait 0,0000 (mission, '
       + '412×823), 0,0496 (mission requise, 412×823) et 0,0611 (les deux branches, 1350×940). Ce qui reste n’est '
       + 'PLUS la page : les deux branches mesurent la MÊME valeur, et la branche qui ne peint aucun pulse la paie '
       + 'aussi. Source nommée par la sonde : `<footer>` 0×0 → 1350×228 à (0, 712) au démarrage, plus les deux '
       + 'groupes de la barre (0,0039, déjà mesuré sur toutes les routes connectées) — le pied de page est INSÉRÉ '
       + 'quand le splash PWA rend la main, et sur une page courte (658 px de `main` ici) il tombe dans l’écran. '
       + 'Le coût suit sa hauteur au carré ((228/940)² ≈ 0,058) : 141 px de pied donnaient 0,0470 le 17/10, 228 px '
-      + 'donnent 0,0611. DEUX AUTRES ARCHITECTURES ONT ÉTÉ MESURÉES LE MÊME JOUR ET SONT PIRE : peindre la '
+      + 'donnent 0,0611 — le levier était la HAUTEUR DU PIED DE PAGE, et il a été tiré le même jour. DEUX AUTRES ARCHITECTURES ONT ÉTÉ MESURÉES LE MÊME JOUR ET SONT PIRE : peindre la '
       + 'coquille pendant le splash rend 0,1118 desktop / 0,6174 mobile (le pied de page devient VISIBLE à y=247 '
       + 'puis il est chassé hors écran par le squelette) ; la variante « repli réduit » du 09/10 rendait 0,0801. '
       + 'Le plafond ne peut donc pas redescendre à 0,06 : c’est SOUS la mesure, et le levier pour y arriver est la '
-      + 'HAUTEUR DU PIED DE PAGE (son bloc de maillage), pas cette page. 0,07 laisse 1,15× sur le pire relevé. '
+      + 'HAUTEUR DU PIED DE PAGE (son bloc de maillage), pas cette page. 0,07 laissait 1,15× sur le pire relevé. '
       + 'HISTORIQUE : 0,0450 sur 18 runs de main ; source NOMMÉE le 09/10/2026 par la sonde des cadres : le pied de page, '
       + 'qui entre dans l’écran au swap repli → page. Cause corrigée (l’état de chargement de la page réservait '
       + 'les cartes d’une branche qui ne les montre pas : 1 376,4 px de `main` pour une destination de 700,4 en '
