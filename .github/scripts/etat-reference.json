@@ -34,8 +34,8 @@
     "Preuve : backend/tests/test_etat_reference.py"
   ],
   "reference": {
-    "etablie_le": "2026-10-27",
-    "motif": "Une declaration illisible est une premisse nommee (code 2) au lieu d'un traceback code 1, et le workflow donne le profil APP_ENV de la CI",
+    "etablie_le": "2026-10-28",
+    "motif": "Les 32 liens du maillage SEO (villes, metiers, guides) sont publies par les 12 documents pre-rendus : le build passe de 5 807 294 a 5 868 926 o (+61 632) et le JS initial de 132,0 a 132,8 Ko gzip, donc les plafonds de ce garde passent a 134 Ko et 5,63 Mo — le paragraphe date du fichier dit la mesure et pourquoi on ne baisse pas ce total en sortant le bloc des coquilles.",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -138,13 +138,13 @@
       "backend/kojo_routers_jobs_proposals.py": "513fa961889e9318173d989836c290c3c08556ff3289f62ba2ebb750563f43a4",
       "frontend/scripts/check-funnel-events.js": "19b016ff1cd4a442ca8173e06dbbc5897d0bbb71b918835c638f0062e1879221",
       "frontend/scripts/check-cors-preflight.js": "10ef1c5f33a3e72d5e89f69a02d6d414513c0be06899edf4b53ce0ba86793cb8",
-      "frontend/scripts/check-bundle-size.js": "530dee36deef474e233a1ecfece462de7d97f8b13aa1b3d303c327ef9ae3bd50",
       "frontend/scripts/check-prerender-shells.js": "3ac51916663c3bf144220196cb68107c197e50611f3744174ce479946112b0fc",
       "backend/server.py": "911c4d0c8d71aa1cf56dc268c71a823cc385df8d4f36c391b79a6c41c8730253",
       ".github/scripts/alerte_sondes.py": "35c6b645b431b932c6af1ed53704acc4f096da428a49e2f7461259358f137687",
       ".github/scripts/livrer.py": "7debdcaf504701b083b5c13575c41a2e2cdc2ae5b58e84d9cb62c5aadf4c8ba1",
       "backend/kojo_scheduler.py": "a66d11b182fca4236d91941b9319b3bd72577acd550f233df3afbc6551fabaf6",
-      "backend/scripts/check_index_db.py": "ab9545fdb8e09f2cdabeed9865b2537f9216c4954c36ca7ea5fae656ac1212dd"
+      "backend/scripts/check_index_db.py": "ab9545fdb8e09f2cdabeed9865b2537f9216c4954c36ca7ea5fae656ac1212dd",
+      "frontend/scripts/check-bundle-size.js": "aee242082a8ebb21590e3b6d51e4b4b624b940d328b71dbcb03eb07505b05b98"
     }
   },
   "hors_perimetre": [
