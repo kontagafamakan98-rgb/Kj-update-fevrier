@@ -846,10 +846,11 @@ export const PaymentContentSkeleton = () => {
 };
 
 // Skeleton complet de la page Paiement (fallback Suspense de /payment) :
-// réplique l'enveloppe réelle (min-h-full bg-gray-50 py-8 + conteneur
-// max-w-6xl) et la carte de titre, puis le contenu ci-dessus — le swap
-// chunk → page ne déplace ni le footer ancré (flex-1, cf. App.js) ni les
-// cartes.
+// réplique l'enveloppe réelle — son cadre vient du PLAN de la route
+// (`PAGE_SECTIONS['/payment']` : `min-h-screen md:min-h-0 bg-gray-50 py-8` et le
+// conteneur `max-w-6xl`), jamais d'une copie écrite ici — et la carte de titre,
+// puis le contenu ci-dessus — le swap chunk → page ne déplace ni le footer
+// ancré (flex-1, cf. App.js) ni les cartes.
 //
 // ── CE QUE CE REPLI RÉSERVE, ET POURQUOI IL LE RÉSERVE ENTIÈREMENT ────────
 // Il est peint AVANT que la page existe, donc sans savoir dans laquelle de ses
@@ -884,6 +885,19 @@ export const PaymentContentSkeleton = () => {
 // aux deux tailles (1019 pour 823 ; 1004 pour 940) et le relâchement passe de
 // 0,0148 à 0,0132 en desktop, en restant à 0,0218 en mobile (où la réserve est
 // sans effet : le contenu du repli, 794 px, dépasse déjà les 758 px du plancher).
+//
+// ── LE MOBILE A AUSSI ÉTÉ MESURÉ, ET LA CAUSE N'ÉTAIT PAS ICI (28/10/2026) ──
+// Le CLS du chunk retenu de /payment valait 0,0532 en 412×823 — 0,0496 sur la
+// branche « mission requise » — pour un plafond de 0,06, et la sonde nommait
+// `<footer>` entrant de 123,2 px. Raccourcir son bloc de maillage de 565 à
+// 457 px n'a pas bougé le chiffre d'un millième, et c'est la mesure qui
+// l'explique : un pied de page n'est compté que pour la part qui ENTRE dans
+// l'écran, le reste n'est jamais peint. La cause était le RÉTRÉCISSEMENT de la
+// page (ce repli réserve la branche la plus haute) : `main` mesurait 939,3 px
+// pendant le chargement et 645,8 px après, donc le pied de page remontait de
+// 293,5 px. Le cadre de la route porte donc `min-h-screen` en mobile (lu dans le
+// plan, ci-dessus) et le relâchement mesure 0,0000 sur les deux branches ; le
+// desktop est inchangé, `md:min-h-0` lui rendant son ancien `min-h-full`.
 export const PaymentSkeleton = () => {
   const plan = PAGE_SECTIONS['/payment'];
   const { hauteurClass } = REGLES_DE_CHARGEMENT['/payment'];
