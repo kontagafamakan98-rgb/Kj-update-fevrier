@@ -128,7 +128,7 @@ const RELEVE_ATTEIGNABILITE = () => {
  * premier écran.
  *
  * La coquille n'a de la barre de navigation qu'un PLACEHOLDER (65 px réservés,
- * aucun lien) — c'est le chrome partagé — et ces quatre pages sont du TEXTE :
+ * aucun lien) — c'est le chrome partagé — et ces pages sont du TEXTE :
  * à la taille notée, leur premier écran n'offre rien à appuyer. La propriété
  * « aucune commande n'est recouverte » y est vraie PAR VACUITÉ, et on le
  * DÉCLARE ici plutôt que de laisser un vert muet : le relevé a bel et bien
@@ -144,11 +144,26 @@ const RELEVE_ATTEIGNABILITE = () => {
  * lien ou un champ — fait ROUGIR le cas, et il faut alors l'en sortir, donc la
  * mesurer comme les autres. Une exemption qu'on n'ose plus retirer est une
  * exemption qui ment.
+ *
+ * ── /payment@mobile EST ENTRÉ ICI LE 28/10/2026, ET C'EST UNE CONSÉQUENCE ──
+ * La coquille de /payment ne publie, dans son corps, ni lien ni champ : sa
+ * carte « mission requise » est du TEXTE et son appel est un `<div>` (voulu — un
+ * visiteur sans JavaScript ne peut pas payer). La SEULE commande que son
+ * premier écran mobile offrait était un lien du PIED DE PAGE, qui commençait
+ * vers y≈700 pour une fenêtre de 823. Le cadre de la route porte désormais
+ * `min-h-screen` en mobile (`PAGE_SECTIONS['/payment']`, pour le CLS du chunk
+ * retenu) : la page courte remplit la fenêtre, le pied de page commence donc
+ * SOUS la ligne de flottaison (y=984) et le premier écran ne contient plus rien
+ * à appuyer. Mesuré par ce même cas dans la CI de la PR #247 : `releve.length`
+ * vaut 0, aucune commande n'étant RECOUVERTE (le second constat reste vide).
+ * Si un jour la carte publie un vrai appel, ce couple rougira ici et devra en
+ * sortir.
  */
 const COQUILLE_SANS_COMMANDE = [
   '/about@mobile',
   '/how-it-works@mobile',
   '/how-it-works@desktop',
+  '/payment@mobile',
   '/privacy@mobile',
   '/privacy@desktop',
   '/terms@mobile',
