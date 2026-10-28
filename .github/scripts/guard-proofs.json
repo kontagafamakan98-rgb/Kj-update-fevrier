@@ -161,6 +161,15 @@
       "hors_mutation": "aucune mutation ne peut rougir : le script ne lit pas le dépôt pour le juger, il ÉCRIT un fichier à partir du réseau. Sa seule défaillance utile — écrire un lock non épinglé ou sans empreinte — est refusée par la preuve sur le fichier LIVRÉ (pins, empreintes sha256, complétude contre requirements.txt), qui ne dépend pas de ce script : remplacer sa boucle d'écriture par un `pass` laisse le lock du commit intact et la preuve verte. La mutation qui aurait un sens (un lock faux) se rejoue en éditant le lock, pas l'outil"
     },
     {
+      "chemin": "backend/scripts/retirer_index_residuels.py",
+      "role": "outil",
+      "invoque_par": "aucun",
+      "preuve": "backend/tests/test_retirer_index_residuels.py",
+      "runner": "pytest",
+      "motif": "outil de NETTOYAGE, pas un garde : il retire de la BASE les index résiduels déclarés dans `kojo_index_declares.RESIDUS_CONNUS` (mesuré le 27/10/2026 : `messages.created_at_-1`, sur un champ qu'aucun code n'écrit ni ne lit) et ne prononce aucun verdict sur le dépôt. Ce qui juge la base LIVRÉE est backend/scripts/check_index_db.py, lancé par le cron index-db-probe : lui accorder un rôle de garde ferait croire que la CI nettoie la production, alors qu'il faut le lancer à la main avec `--appliquer`",
+      "hors_mutation": "aucune mutation du dépôt ne le fait rougir : il ÉCRIT dans MongoDB, pas dans l'arbre, et la CI ne l'invoque pas. Ce qu'il pourrait casser sans qu'une mutation le dise — retirer un index DÉCLARÉ, ou annoncer « retiré » sans relire `list_indexes()` — est tenu par sa preuve sur les fonctions pures (`planifier`, `appliquer`) et sur une fausse base : remplacer le corps du script par un `pass` laisserait la base intacte et la preuve rouge, mais une mutation du harnais ne saurait pas distinguer un retrait réel d'un retrait annoncé, faute de base dans la CI"
+    },
+    {
       "chemin": "frontend/scripts/mesure-alignement-app.mjs",
       "role": "outil",
       "invoque_par": "aucun",

@@ -683,6 +683,14 @@ async def get_page_guide(slug: str):
             pages_metier.requete_metier(page["metier"]),
             limite=pages_guides.MAX_MISSIONS_LUES,
         )
+    elif page["type"] == "prix_ville":
+        # Le guide de ville lit les missions DE LA VILLE, toutes catégories :
+        # c'est ce qui lui permet de publier une ligne par métier du catalogue.
+        # Le filtre est celui de la page ville, pas une regex de circonstance.
+        missions = await _missions_de_page(
+            pages_metier.requete_ville(page["ville"]),
+            limite=pages_guides.MAX_MISSIONS_LUES,
+        )
     return _reponse_page(
         exiger_balises_equilibrees(
             f"le guide {page['slug']}",
