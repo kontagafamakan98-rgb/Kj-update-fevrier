@@ -17,13 +17,18 @@ Ce que ces tests tiennent, et pourquoi chacun existe :
   5. le contenu écrit par un utilisateur est ÉCHAPPÉ : un titre de mission
      n'écrit jamais de balisage ;
   6. la page d'une ville ne publie que SES missions ouvertes — les pages
-     vivent d'un filtre, pas d'une liste recopiée.
+     vivent d'un filtre, pas d'une liste recopiée ;
+  7. chaque page porte le LIEN D'ALERTE de son métier ou de sa ville
+     (28/10/2026) : c'étaient les pages qui disaient honnêtement « aucune
+     offre ouverte » et ne laissaient rien à faire au visiteur, alors que
+     l'alerte emploi existait déjà — et le bloc ne promet aucune offre.
 
 Les mutations qui doivent rougir (rejouées à la main le 27/10/2026) :
 retirer la dérivation des villes, retirer l'échappement d'un titre, laisser
 `numberOfItems` figé à 0, et supprimer `status: open` du filtre de ville.
 """
 import re
+from urllib.parse import quote
 
 import pytest
 from httpx import AsyncClient
@@ -176,6 +181,60 @@ class TestLeDocument:
         assert '<meta name="robots" content="noindex, follow" />' in doc
         assert "<h1>Cette page n'existe pas</h1>" in doc
         assert "CollectionPage" not in doc
+
+
+class TestLeLienDalerteEmploi:
+    """Le lien d'alerte : le seul chemin de RETOUR de ces pages (28/10/2026).
+
+    Les 22 pages disaient honnêtement « aucune offre ouverte » et s'arrêtaient
+    là : un visiteur venu chercher un plombier à Bamako n'avait aucun moyen de
+    laisser son intention, alors que l'alerte emploi existe (`/job-alerts`,
+    une par compte travailleur) et n'était montée que sur `/jobs`, connecté.
+
+    Ce qui est jugé ici : le lien porte les critères de SA page, il traverse
+    une route qui existe, et le bloc ne prétend jamais qu'une offre est
+    disponible.
+    """
+
+    def test_la_page_metier_vise_sa_categorie(self):
+        doc = pages.document(pages.trouver_metier("plomberie"), "metier", ORIGINE, [])
+        assert 'href="/jobs?alerte=1&amp;category=plumbing"' in doc
+        assert "Recevoir les missions de plomberie par email" in doc
+
+    def test_la_page_ville_transmet_le_nom_de_la_ville(self):
+        # Le NOM, pas le slug : la veille garde un texte libre comparé au nom de
+        # la mission — « segou » ne correspondrait à aucune mission de Ségou.
+        doc = pages.document(pages.trouver_ville("bamako"), "ville", ORIGINE, [])
+        assert 'href="/jobs?alerte=1&amp;ville=Bamako"' in doc
+        assert "Recevoir les missions à Bamako par email" in doc
+
+    def test_une_ville_accentuee_est_encodee_dans_le_lien(self):
+        doc = pages.document(pages.trouver_ville("segou"), "ville", ORIGINE, [])
+        assert "ville=S%C3%A9gou" in doc
+
+    def test_le_bloc_ne_promet_aucune_offre(self):
+        doc = pages.document(pages.trouver_ville("bamako"), "ville", ORIGINE, [])
+        bloc = doc.split('<section class="alerte"', 1)[1].split("</section>", 1)[0]
+        assert "Créer mon alerte emploi" in bloc
+        assert "rien n’est promis" in bloc
+        # Aucun chiffre : le nombre d'offres appartient à la liste au-dessus.
+        assert not re.search(r"\d+\s+offre", bloc)
+
+    def test_chaque_page_declare_l_alerte_de_son_sujet(self):
+        for page in pages.PAGES_VILLES:
+            assert pages.lien_alerte("ville", page) == (
+                f"/jobs?alerte=1&amp;ville={quote(page['nom'])}"
+            ), page
+        for page in pages.PAGES_METIERS:
+            assert pages.lien_alerte("metier", page) == (
+                f"/jobs?alerte=1&amp;category={quote(page['categorie'])}"
+            ), page
+
+    def test_le_lien_mene_a_une_route_servie(self):
+        """`/jobs` est une route de l'application, pas une page inventée."""
+        for genre, page in (("ville", pages.PAGES_VILLES[0]), ("metier", pages.PAGES_METIERS[0])):
+            chemin = pages.lien_alerte(genre, page).split("?", 1)[0]
+            assert chemin == "/jobs", chemin
 
 
 @pytest.mark.asyncio

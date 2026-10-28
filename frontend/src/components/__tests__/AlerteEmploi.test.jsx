@@ -121,6 +121,53 @@ describe('AlerteEmploi', () => {
     expect(screen.queryByText('jobAlertActive')).not.toBeInTheDocument();
   });
 
+  it('un lien venu d’une page ville pose SA ville sans effacer la catégorie du compte', async () => {
+    // Une alerte par compte : écraser la catégorie que le visiteur n'a pas
+    // cliquée serait une perte silencieuse. La ville du lien, elle, gagne —
+    // c'est ce qu'il est venu demander.
+    api.get.mockResolvedValue({
+      active: true,
+      category: 'plumbing',
+      city: 'Bamako',
+      country: 'mali',
+    });
+
+    render(
+      <AlerteEmploi
+        categories={CATEGORIES}
+        pays="mali"
+        ouvrirAlerte
+        villeInitiale="Abidjan"
+      />
+    );
+
+    const ville = await screen.findByLabelText('jobAlertCity');
+    await waitFor(() => expect(ville).toHaveValue('Abidjan'));
+    expect(screen.getByLabelText('jobAlertCategory')).toHaveValue('plumbing');
+  });
+
+  it('sans lien, la veille enregistrée gagne : /jobs n’écrase pas un réglage en s’ouvrant', async () => {
+    api.get.mockResolvedValue({
+      active: true,
+      category: 'plumbing',
+      city: 'Bamako',
+      country: 'mali',
+    });
+
+    render(
+      <AlerteEmploi
+        categories={CATEGORIES}
+        pays="mali"
+        categorieInitiale="electrical"
+        villeInitiale="Dakar"
+      />
+    );
+
+    const ville = await screen.findByLabelText('jobAlertCity');
+    await waitFor(() => expect(ville).toHaveValue('Bamako'));
+    expect(screen.getByLabelText('jobAlertCategory')).toHaveValue('plumbing');
+  });
+
   it('une lecture impossible est DITE, et ne casse pas la page', async () => {
     api.get.mockRejectedValue(new Error('HTTP 500'));
 
