@@ -22,11 +22,13 @@ import {
   runCspContractCheck,
 } from '../check-csp-contract.js';
 import { construireCsp } from '../../src/config/csp.js';
+import { POSTHOG_API_HOST, POSTHOG_ASSETS_HOST } from '../../src/config/posthog.js';
 
 const POLITIQUE = construireCsp({
   apiOrigin: CAS_DOCUMENTS.api_origin,
   plausibleDomain: CAS_DOCUMENTS.plausible_domain,
   gaMeasurementId: CAS_DOCUMENTS.ga_measurement_id,
+  posthogKey: CAS_DOCUMENTS.posthog_key,
 });
 
 const document = (csp) =>
@@ -48,6 +50,7 @@ const POLITIQUES_JS = CAS_REFERENCE.map((entree) =>
     apiOrigin: entree.api_origin,
     plausibleDomain: entree.plausible_domain,
     gaMeasurementId: entree.ga_measurement_id,
+    posthogKey: entree.posthog_key,
   })
 );
 
@@ -92,6 +95,27 @@ describe('contrat CSP — les deux copies de la politique', () => {
     const erreurs = comparerPolitiques({ politiquesJs, politiquesPy: politiquesJs });
 
     expect(erreurs[0]).toContain('politique VIDE');
+  });
+});
+
+describe('contrat CSP — les origines PostHog suivent la FORME de la clé', () => {
+  it('ouvre le CDN au script-src ET l’ingestion au connect-src', () => {
+    const politique = construireCsp({ posthogKey: 'phc_test123' });
+
+    expect(politique).toContain(`script-src 'self' https://accounts.google.com ${POSTHOG_ASSETS_HOST}`);
+    expect(politique).toContain(POSTHOG_API_HOST);
+  });
+
+  it('n’ouvre RIEN avec un jeton personnel, une valeur vide ou une chaîne quelconque', () => {
+    for (const cle of ['phx_personnel123', '', '   ', 'phc_']) {
+      const politique = construireCsp({ posthogKey: cle });
+      expect(politique, `clé ${JSON.stringify(cle)}`).not.toContain('posthog.com');
+    }
+  });
+
+  it('n’ouvre aucune origine PostHog quand aucune clé n’est posée', () => {
+    // Le cas par défaut : la politique nue de tous les autres cas du contrat.
+    expect(construireCsp({})).not.toContain('posthog.com');
   });
 });
 
@@ -143,6 +167,7 @@ describe('contrat CSP — le plugin du build', () => {
       apiOrigin,
       plausibleDomain: env.VITE_PLAUSIBLE_DOMAIN,
       gaMeasurementId: env.VITE_GA_MEASUREMENT_ID,
+      posthogKey: env.VITE_POSTHOG_KEY,
     });
   const pluginFactice = ({ cspPour = politiqueAttendue, dev = '<html></html>' } = {}) => ({
     env,
@@ -304,6 +329,7 @@ describe('contrat CSP — le verdict', () => {
       BACKEND_PUBLIC_URL: 'https://api.kojo.test',
       PLAUSIBLE_DOMAIN: 'site.kojo.test',
       GA_MEASUREMENT_ID: 'G-ABC123',
+      POSTHOG_KEY: 'phc_test123',
     });
     expect(POLITIQUE).toContain(ENV_DOCUMENTS.BACKEND_PUBLIC_URL);
   });

@@ -210,6 +210,25 @@ export const CLASSEMENT_ORIGINES = [
       'présente dans le bundle mais le script n’est jamais injecté',
     preuve: 'src/utils/analytics.js + vite-plugins/inject-production-csp.js',
   },
+  {
+    origine: 'https://eu-assets.i.posthog.com',
+    sorte: SORTES.CONDITIONNEL,
+    motif:
+      'SDK PostHog (`/static/array.js`), injecté par `src/utils/analytics.js` SEULEMENT si ' +
+      '`VITE_POSTHOG_KEY` porte la forme d’une clé de projet ; la CSP de production n’ouvre ' +
+      '`script-src` à ce CDN que dans ce même cas. Sans la variable, la chaîne est présente ' +
+      'dans le bundle mais aucun script n’est jamais créé',
+    preuve: 'src/config/posthog.js (`POSTHOG_SCRIPT_URL`) + src/utils/analytics.js',
+  },
+  {
+    origine: 'https://eu.i.posthog.com',
+    sorte: SORTES.CONDITIONNEL,
+    motif:
+      'hôte d’INGESTION du même SDK (`api_host` des options d’init) : c’est une destination ' +
+      'de requête, ouverte au `connect-src` sous la même condition de clé. Aucune requête ' +
+      'ne part sans consentement (`initAnalyticsIfConsented`), ni sans clé',
+    preuve: 'src/config/posthog.js (`POSTHOG_API_HOST`) + src/utils/analytics.js',
+  },
   // `https://picsum.photos` (la photo factice de `/mobile-test`) N'EST PLUS ICI :
   // son import est désormais conditionné à `import.meta.env.DEV` dans `src/App.js`,
   // donc le chunk n'est plus ÉMIS en production et l'origine a disparu des

@@ -118,6 +118,34 @@ export const CAS_REFERENCE = [
     plausible_domain: 'site.kojo.test',
     ga_measurement_id: 'g-xyz9',
   },
+  {
+    // PostHog est le SEUL fournisseur qui ouvre deux directives : ce cas
+    // vérifie que la copie Python ajoute le CDN au `script-src` ET l'hôte
+    // d'ingestion au `connect-src`, et au même rang que la déclaration.
+    label: 'PostHog seul (deux directives)',
+    api_origin: 'https://api.kojo.test',
+    plausible_domain: '',
+    ga_measurement_id: '',
+    posthog_key: 'phc_test123',
+  },
+  {
+    // Le cas le plus large : trois fournisseurs à la fois, dans l'ordre où ils
+    // s'ajoutent. Une source ajoutée d'un côté seulement rougit ici.
+    label: 'les trois analytiques',
+    api_origin: 'https://api.kojo.test',
+    plausible_domain: 'site.kojo.test',
+    ga_measurement_id: 'G-ABC123',
+    posthog_key: 'phc_test123',
+  },
+  {
+    // Un jeton personnel (`phx_…`) n'est PAS une clé de projet : il ne doit
+    // ouvrir aucune des deux origines, des deux côtés du contrat.
+    label: 'clé PostHog invalide (jeton personnel)',
+    api_origin: 'https://api.kojo.test',
+    plausible_domain: '',
+    ga_measurement_id: '',
+    posthog_key: 'phx_personnel123',
+  },
 ];
 
 /**
@@ -241,6 +269,7 @@ export const ENV_DOCUMENTS = {
   BACKEND_PUBLIC_URL: 'https://api.kojo.test',
   PLAUSIBLE_DOMAIN: 'site.kojo.test',
   GA_MEASUREMENT_ID: 'G-ABC123',
+  POSTHOG_KEY: 'phc_test123',
 };
 
 /** Le cas correspondant, pour calculer la politique attendue. */
@@ -248,6 +277,7 @@ export const CAS_DOCUMENTS = {
   api_origin: ENV_DOCUMENTS.BACKEND_PUBLIC_URL,
   plausible_domain: ENV_DOCUMENTS.PLAUSIBLE_DOMAIN,
   ga_measurement_id: ENV_DOCUMENTS.GA_MEASUREMENT_ID,
+  posthog_key: ENV_DOCUMENTS.POSTHOG_KEY,
 };
 
 /**
@@ -326,8 +356,12 @@ export const comparerPlugin = ({ plugin = injectProductionCspPlugin } = {}) => {
   const configurations = [
     { label: 'sans analytique', env: {}, apiOrigin: 'https://api.kojo.test' },
     {
-      label: 'les deux analytiques',
-      env: { VITE_PLAUSIBLE_DOMAIN: 'site.kojo.test', VITE_GA_MEASUREMENT_ID: 'G-ABC123' },
+      label: 'les trois analytiques',
+      env: {
+        VITE_PLAUSIBLE_DOMAIN: 'site.kojo.test',
+        VITE_GA_MEASUREMENT_ID: 'G-ABC123',
+        VITE_POSTHOG_KEY: 'phc_test123',
+      },
       apiOrigin: 'https://api.kojo.test',
     },
   ];
@@ -341,6 +375,7 @@ export const comparerPlugin = ({ plugin = injectProductionCspPlugin } = {}) => {
       apiOrigin,
       plausibleDomain: env.VITE_PLAUSIBLE_DOMAIN,
       gaMeasurementId: env.VITE_GA_MEASUREMENT_ID,
+      posthogKey: env.VITE_POSTHOG_KEY,
     });
     if (!publiee) {
       erreurs.push(
@@ -420,6 +455,7 @@ export const runCspContractCheck = (options = {}) => {
       apiOrigin: entree.api_origin,
       plausibleDomain: entree.plausible_domain,
       gaMeasurementId: entree.ga_measurement_id,
+      posthogKey: entree.posthog_key,
     })
   );
   if (erreurPolitiques) {
@@ -444,6 +480,7 @@ export const runCspContractCheck = (options = {}) => {
     apiOrigin: CAS_DOCUMENTS.api_origin,
     plausibleDomain: CAS_DOCUMENTS.plausible_domain,
     gaMeasurementId: CAS_DOCUMENTS.ga_measurement_id,
+    posthogKey: CAS_DOCUMENTS.posthog_key,
   });
   const { documents, error: erreurDocuments } = executerDocuments({ python, root });
   if (erreurDocuments) {

@@ -17,10 +17,23 @@
 //
 // Les domaines d'analytique sont CONDITIONNELS : une origine tierce ouverte
 // sans besoin est une surface d'attaque gratuite. Le backend reçoit donc les
-// mêmes réglages (`PLAUSIBLE_DOMAIN`, `GA_MEASUREMENT_ID`) et les deux
-// calculs doivent rendre la MÊME chaîne pour les mêmes entrées — c'est ce que
-// le contrat hors ligne exige, et la sonde de production refuse la divergence
-// entre ce que le site sert et ce que les documents pré-rendus servent.
+// mêmes réglages (`PLAUSIBLE_DOMAIN`, `GA_MEASUREMENT_ID`, `POSTHOG_KEY`) et
+// les deux calculs doivent rendre la MÊME chaîne pour les mêmes entrées — c'est
+// ce que le contrat hors ligne exige, et la sonde de production refuse la
+// divergence entre ce que le site sert et ce que les documents pré-rendus
+// servent.
+//
+// POSTHOG est le seul fournisseur qui ouvre DEUX directives, et c'est ce qui le
+// distingue des deux autres : son SDK est un script tiers (`script-src`) qui
+// parle ensuite à son hôte d'ingestion (`connect-src`). Les deux origines
+// viennent de `src/config/posthog.js`, que `src/utils/analytics.js` lit pour SON
+// injection : la politique ne peut donc pas autoriser autre chose que ce que le
+// code charge, ni manquer une origine qu'il demande.
+
+// Les deux origines PostHog et la forme de sa clé : une seule déclaration
+// (`src/config/posthog.js`), lue ici pour la POLITIQUE et par
+// `src/utils/analytics.js` pour l'INJECTION.
+import { POSTHOG_API_HOST, POSTHOG_ASSETS_HOST, estClePosthog } from './posthog.js';
 
 /** Forme d'un identifiant GA4 utilisable — un `UA-…` n'ouvre RIEN. */
 export const GA_MOTIF = /^G-[A-Z0-9]+$/i;
@@ -48,13 +61,23 @@ export const normaliserOrigine = (valeur) =>
  * @param {string} [options.apiOrigin] Origine du backend (`connect-src`).
  * @param {string} [options.plausibleDomain] Domaine Plausible déclaré, ou ''.
  * @param {string} [options.gaMeasurementId] Identifiant GA4 (`G-…`), ou ''.
+ * @param {string} [options.posthogKey] Clé de projet PostHog (`phc_…`), ou ''.
  * @returns {string} Politique prête pour `content` d'une meta CSP.
  */
-export function construireCsp({ apiOrigin = '', plausibleDomain = '', gaMeasurementId = '' } = {}) {
+export function construireCsp({
+  apiOrigin = '',
+  plausibleDomain = '',
+  gaMeasurementId = '',
+  posthogKey = '',
+} = {}) {
   const origine = normaliserOrigine(apiOrigin);
   const plausible = String(plausibleDomain ?? '').trim();
   const ga = String(gaMeasurementId ?? '').trim();
   const gaActif = GA_MOTIF.test(ga);
+  // Même règle que pour GA : une clé qui n'a pas la bonne FORME n'ouvre rien.
+  // Un `phx_…` (jeton personnel) dans la variable de build ne produirait aucune
+  // mesure, mais ouvrirait deux origines tierces pour rien.
+  const posthogActif = estClePosthog(posthogKey);
 
   // Le SDK Google Identity Services (bouton SSO) est chargé depuis
   // accounts.google.com/gsi/client : sans cette entrée, le bouton Google
@@ -74,6 +97,10 @@ export function construireCsp({ apiOrigin = '', plausibleDomain = '', gaMeasurem
   // sonde de production ne pouvait pas le voir : elle compare le site et les
   // documents, et les deux étaient d'accord pour bloquer.
   if (gaActif) scriptSrc.push('https://www.googletagmanager.com');
+  // PostHog : le SDK lui-même est chargé depuis son CDN d'actifs
+  // (`/static/array.js`), donc `script-src` — c'est la différence avec
+  // Plausible (un seul fichier) et avec GA (un seul fichier aussi).
+  if (posthogActif) scriptSrc.push(POSTHOG_ASSETS_HOST);
 
   // Géolocalisation 100 % centralisée derrière le backend Kojo : détection IP,
   // reverse geocoding et base villes passent toutes par l'origine de l'API.
@@ -89,6 +116,10 @@ export function construireCsp({ apiOrigin = '', plausibleDomain = '', gaMeasurem
       'https://www.google.com',
     );
   }
+  // L'hôte d'INGESTION de PostHog (`api_host`) : sans lui, le SDK se charge
+  // puis ses envois sont refusés en silence — « Refused to connect » que seule
+  // la console du visiteur montrerait.
+  if (posthogActif) connectSrc.push(POSTHOG_API_HOST);
 
   const imgSrc = [
     "'self'",
