@@ -21,7 +21,35 @@ const languageLoaders = {
 
 const LanguageContext = createContext(null);
 
+// ── LA LANGUE DEMANDÉE PAR L'ADRESSE (`?lang=en`) ────────────────────────────
+// Les 45 pages servies par le backend (villes, métiers, guides) publient les
+// cinq langues du site dans leur en-tête, et leur lien mène ici : ce paramètre
+// est ce qui rend ce lien VRAI. Sans lui, le choix affiché sur ces pages
+// n'aurait rien changé — une commande qui ne fait rien est pire que rien.
+//
+// Une valeur inconnue est IGNORÉE, jamais traduite en « la première langue » :
+// l'adresse est une demande, pas une garantie, et `?lang=de` ne doit pas faire
+// parler le site dans une langue qu'il n'a pas.
+const langueDemandeeParLUrl = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const demandee = new URLSearchParams(window.location.search).get('lang');
+    return demandee && LANGUAGES.includes(demandee) ? demandee : null;
+  } catch (error) {
+    return null;
+  }
+};
+
+/**
+ * La langue au démarrage : l'ADRESSE d'abord, le réglage gardé ensuite.
+ *
+ * L'ordre est une décision, pas un hasard : quelqu'un qui a cliqué « English »
+ * sur une page de ville a dit ce qu'il voulait, une fois. Un stockage refusé
+ * (navigation privée, quota) ne fait pas échouer la lecture de l'adresse.
+ */
 const getStoredOrFallbackLanguage = () => {
+  const depuisLUrl = langueDemandeeParLUrl();
+  if (depuisLUrl) return depuisLUrl;
   try {
     const savedLanguage = localStorage.getItem('language');
     return savedLanguage && LANGUAGES.includes(savedLanguage) ? savedLanguage : 'fr';
@@ -47,6 +75,19 @@ export function LanguageProvider({ children }) {
   const [currentLanguage, setCurrentLanguage] = useState(getStoredOrFallbackLanguage);
   // Seules les traductions chargées sont en mémoire ; fr est toujours présent.
   const [translations, setTranslations] = useState({ fr });
+
+  // Une langue demandée par l'ADRESSE est gardée comme un choix fait dans la
+  // barre : sans cela, la page suivante visitée repartirait en français, et le
+  // lien de la page de ville n'aurait servi qu'une fois.
+  useEffect(() => {
+    const depuisLUrl = langueDemandeeParLUrl();
+    if (!depuisLUrl) return;
+    try {
+      localStorage.setItem('language', depuisLUrl);
+    } catch (error) {
+      safeLog.warn('⚠️ Langue de l’adresse non enregistrée — la page la parle quand même', error);
+    }
+  }, []);
 
   // Charge la langue sélectionnée à la demande (une seule fois par langue).
   useEffect(() => {

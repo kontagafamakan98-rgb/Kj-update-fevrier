@@ -47,8 +47,8 @@ import {
   GROUPES_LIENS_SEO,
   LIENS_SEO_CLASS,
   LIENS_SEO_GROUPE_CLASS,
+  LIENS_SEO_SOMMAIRE_CLASS,
   LIENS_SEO_LIEN_CLASS,
-  LIENS_SEO_TITRE_CLASS,
 } from './config/liens-seo';
 import { isPWASupported, requestNotificationPermission } from "./utils/pwa";
 import { useNotifications } from './contexts/NotificationContext';
@@ -319,16 +319,25 @@ function LegalFooter() {
             loin. Liens `<a href>` et NON `Link` : il n'existe aucune route
             React pour ces URL — un `Link` ferait peindre la 404 de
             l'application par-dessus un contenu correct. */}
+        {/* Un DÉPLIANT par famille (29/10/2026) : 45 liens dépliés faisaient
+            quatre lignes ici et dix-huit en mobile, et personne ne lit un index
+            de 45 entrées traversé en bas de page. Fermé, le bloc montre les
+            trois familles ; ouvert, il montre les liens. `<details>` est NATIF :
+            aucun état React, donc la coquille pré-rendue publie le même
+            balisage sans rien simuler. Les liens restent DANS le document
+            fermé — un dépliant masque, il ne retire pas. */}
         <div className={LIENS_SEO_CLASS}>
           {GROUPES_LIENS_SEO.map((groupe) => (
-            <p key={groupe.cle} className={LIENS_SEO_GROUPE_CLASS}>
-              <span className={LIENS_SEO_TITRE_CLASS}>{t(groupe.titreKey)}</span>
-              {groupe.liens.map((lien) => (
-                <a key={lien.href} href={lien.href} className={LIENS_SEO_LIEN_CLASS}>
-                  {lien.nom}
-                </a>
-              ))}
-            </p>
+            <details key={groupe.cle}>
+              <summary className={LIENS_SEO_SOMMAIRE_CLASS}>{t(groupe.titreKey)}</summary>
+              <p className={LIENS_SEO_GROUPE_CLASS}>
+                {groupe.liens.map((lien) => (
+                  <a key={lien.href} href={lien.href} className={LIENS_SEO_LIEN_CLASS}>
+                    {lien.nom}
+                  </a>
+                ))}
+              </p>
+            </details>
           ))}
         </div>
         <div className={PIED_NAV_CLASS}>

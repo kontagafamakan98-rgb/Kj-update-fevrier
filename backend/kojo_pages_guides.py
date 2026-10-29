@@ -790,7 +790,12 @@ def document(page: dict, origine: str, missions: list) -> str:
         f"<style>{STYLE}{GUIDES_STYLE}</style>\n"
         f'<script type="application/ld+json">{_json_ld(page, url)}</script>\n'
         "</head>\n<body>\n"
-        f'<header><a href="/">{MARQUE}</a></header>\n'
+        # L'en-tête vient de `kojo_pages_metier` : la marque et les langues du
+        # site sont écrites UNE fois pour les 45 pages servies par le backend
+        # (villes, métiers, guides), sinon la moitié aurait un logo et l'autre
+        # pas — c'est exactement le défaut que ce module a déjà fermé pour les
+        # classes et les libellés.
+        f"{pages_metier._en_tete()}"
         "<main>\n"
         f"<h1>{_esc(h1)}</h1>\n"
         f'<p class="intro">{_esc(_intro(page, stats))}</p>\n'
@@ -819,7 +824,7 @@ def document_introuvable(origine: str) -> str:
         f'<link rel="canonical" href="{_esc(base)}/jobs" />\n'
         f"{pages_metier.balise_csp()}<style>{STYLE}</style>\n"
         "</head>\n<body>\n"
-        f'<header><a href="/">{MARQUE}</a></header>\n<main>\n'
+        f"{pages_metier._en_tete()}<main>\n"
         "<h1>Ce guide n'existe pas</h1>\n"
         '<p class="intro">Aucun guide ne porte ce nom sur Kojo. Les offres '
         'ouvertes sont <a href="/jobs">ici</a>.</p>\n'

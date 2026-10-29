@@ -28,6 +28,7 @@ retirer la dérivation des villes, retirer l'échappement d'un titre, laisser
 `numberOfItems` figé à 0, et supprimer `status: open` du filtre de ville.
 """
 import re
+from pathlib import Path
 from urllib.parse import quote
 
 import pytest
@@ -39,6 +40,10 @@ from kojo_geo_data import GEOGRAPHIC_DATABASE
 from kojo_job_categories import _CATEGORY_GROUPS
 
 ORIGINE = "https://kojoforafrica.cc.cd"
+RACINE = Path(__file__).resolve().parents[2]
+# La déclaration des langues de l'APPLICATION : c'est elle que l'en-tête de ces
+# pages doit publier, et ce fichier la lit au lieu de la recopier.
+LANGUES_JS = RACINE / "frontend" / "src" / "config" / "languages.js"
 
 
 def mission(identifiant: str, titre: str, **champs) -> dict:
@@ -303,3 +308,75 @@ class TestLesRoutes:
         assert f"<loc>{ORIGINE}/login</loc>" not in body
         assert f"<loc>{ORIGINE}/register</loc>" not in body
         assert f"<loc>{ORIGINE}/terms</loc>" in body
+
+
+class TestLEnTeteDesPages:
+    """La marque et les langues du site, en tête des 45 pages du backend.
+
+    POURQUOI (29/10/2026) : ces pages n'ont ni barre de navigation ni sélecteur
+    de langue. Leur en-tête ne portait que le mot « Kojo » — pas la marque
+    dessinée du site — et pas une seule porte vers les quatre autres langues que
+    l'application parle. Un visiteur arrivé d'un moteur de recherche sur
+    `/emplois/abidjan` n'avait donc aucun chemin de retour lisible, et aucun
+    moyen de lire le site dans sa langue.
+
+    Quatre choses, et chacune a son rouge :
+
+      * l'ICÔNE de la marque (le même dessin que la barre, servi par le site) ;
+      * les CINQ langues, comparées à `frontend/src/config/languages.js` dans les
+        deux sens — une langue ajoutée à l'application rougit ici au lieu de
+        rester absente de 45 pages, et un libellé retouché d'un côté seulement
+        rougit aussi ;
+      * le lien de chaque langue mène à `/?lang=<code>`, le paramètre que lit
+        `LanguageContext` : c'est ce qui rend le choix VRAI ;
+      * la langue de la page est MARQUÉE — cinq liens identiques ne disent pas
+        laquelle est servie.
+    """
+
+    def test_l_en_tete_porte_la_marque_dessinee(self):
+        doc = pages.document(pages.PAGES_VILLES[0], "ville", ORIGINE, [])
+        assert '<a href="/" class="marque">' in doc
+        assert f'<img src="{pages.ICONE_MARQUE}"' in doc
+        # Une image sans dimensions connues fait danser la mise en page pendant
+        # son chargement : les deux sont écrites, et ce fichier les tient.
+        assert 'width="28" height="28"' in doc
+        # Décorative : le nom accessible du lien est le mot « Kojo » qui
+        # l'accompagne (comme dans la barre, où le tracé est `aria-hidden`).
+        assert 'alt=""' in doc
+
+    def test_les_langues_publiees_sont_celles_de_l_application(self):
+        assert LANGUES_JS.exists(), "la déclaration des langues de l'application est introuvable"
+        paires = re.findall(
+            r"\{\s*code:\s*'([a-z]+)',\s*name:\s*'([^']*)',\s*nativeName:\s*'([^']*)'\s*\}",
+            LANGUES_JS.read_text(encoding="utf-8"),
+        )
+        assert len(paires) >= 5, (
+            f"seulement {len(paires)} langue(s) lue(s) dans languages.js : "
+            "la comparaison ne porterait sur rien"
+        )
+        attendu = [(code, natif) for code, _, natif in paires]
+        assert [(langue["code"], langue["nom"]) for langue in pages.LANGUES_SITE] == attendu
+
+    def test_chaque_langue_est_un_lien_vers_l_application(self):
+        doc = pages.document(pages.PAGES_METIERS[0], "metier", ORIGINE, [])
+        morceaux = doc.split('<nav class="langues"', 1)
+        assert len(morceaux) == 2, "l'en-tête ne publie plus les langues du site"
+        bloc = morceaux[1].split("</nav>", 1)[0]
+        for langue in pages.LANGUES_SITE:
+            assert f'href="/?lang={langue["code"]}"' in bloc
+            # Le libellé est dans SA langue : « English », « Wolof », « Bamanankan ».
+            assert f'lang="{langue["code"]}"' in bloc
+            assert langue["nom"] in bloc
+        assert 'aria-current="true"' in bloc
+
+    def test_les_guides_et_les_pages_introuvables_portent_le_meme_en_tete(self):
+        import kojo_pages_guides as guides
+
+        documents = {
+            "un guide": guides.document(guides.PAGES_GUIDES[0], ORIGINE, []),
+            "une ville inconnue": pages.document_introuvable(ORIGINE),
+            "un guide inconnu": guides.document_introuvable(ORIGINE),
+        }
+        for quoi, doc in documents.items():
+            assert '<a href="/" class="marque">' in doc, quoi
+            assert '<nav class="langues"' in doc, quoi

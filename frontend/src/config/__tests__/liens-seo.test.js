@@ -115,7 +115,7 @@ describe('maillage SEO — lisibilité sur le papier et sur le verre', () => {
   it('mesure les encres que le module peint RÉELLEMENT, au repos comme au survol', () => {
     const mesures = [];
     for (const [ou, nom] of [
-      ['le titre du groupe', 'LIENS_SEO_TITRE_CLASS'],
+      ['le déclencheur du dépliant', 'LIENS_SEO_SOMMAIRE_CLASS'],
       ['le lien', 'LIENS_SEO_LIEN_CLASS'],
     ]) {
       const classes = constante(nom);

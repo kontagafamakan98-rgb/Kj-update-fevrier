@@ -30,7 +30,7 @@ import {
   LIENS_SEO_CLASS,
   LIENS_SEO_GROUPE_CLASS,
   LIENS_SEO_LIEN_CLASS,
-  LIENS_SEO_TITRE_CLASS,
+  LIENS_SEO_SOMMAIRE_CLASS,
 } from '../config/liens-seo';
 import { CONTACT, SOCIAL_LINKS, mailtoHref, telHref } from '../config/contact';
 import MapEmbed from '../components/MapEmbed';
@@ -793,14 +793,16 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className={LIENS_SEO_CLASS}>
             {GROUPES_LIENS_SEO.map((groupe) => (
-              <p key={groupe.cle} className={LIENS_SEO_GROUPE_CLASS}>
-                <span className={LIENS_SEO_TITRE_CLASS}>{t(groupe.titreKey)}</span>
-                {groupe.liens.map((lien) => (
-                  <a key={lien.href} href={lien.href} className={LIENS_SEO_LIEN_CLASS}>
-                    {lien.nom}
-                  </a>
-                ))}
-              </p>
+              <details key={groupe.cle}>
+                <summary className={LIENS_SEO_SOMMAIRE_CLASS}>{t(groupe.titreKey)}</summary>
+                <p className={LIENS_SEO_GROUPE_CLASS}>
+                  {groupe.liens.map((lien) => (
+                    <a key={lien.href} href={lien.href} className={LIENS_SEO_LIEN_CLASS}>
+                      {lien.nom}
+                    </a>
+                  ))}
+                </p>
+              </details>
             ))}
           </div>
         </div>

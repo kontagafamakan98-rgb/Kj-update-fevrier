@@ -74,8 +74,8 @@ import {
   GROUPES_LIENS_SEO,
   LIENS_SEO_CLASS,
   LIENS_SEO_GROUPE_CLASS,
+  LIENS_SEO_SOMMAIRE_CLASS,
   LIENS_SEO_LIEN_CLASS,
-  LIENS_SEO_TITRE_CLASS,
 } from '../../src/config/liens-seo.js'
 
 // La page des CGU du pied de page : même valeur que src/App.js (son `<Link
@@ -199,19 +199,24 @@ export const FERMETURE_DE_L_APPLICATION = '</div></div>'
  * supprimer côté pied de page.
  */
 export function liensSeoHtml({ esc, T }) {
+  // Un DÉPLIANT par famille, comme les deux rendus React : `<details>` est natif
+  // donc la coquille n'a rien à simuler, et les liens sont DANS le document
+  // publié même fermé — un dépliant masque, il ne retire pas.
   return (
     `<div class="${LIENS_SEO_CLASS}">` +
     GROUPES_LIENS_SEO.map(
       (groupe) =>
+        `<details>` +
+        `<summary class="${LIENS_SEO_SOMMAIRE_CLASS}">${esc(T(groupe.titreKey))}</summary>` +
         `<p class="${LIENS_SEO_GROUPE_CLASS}">` +
-        `<span class="${LIENS_SEO_TITRE_CLASS}">${esc(T(groupe.titreKey))}</span>` +
         groupe.liens
           .map(
             (lien) =>
               `<a href="${esc(lien.href)}" class="${LIENS_SEO_LIEN_CLASS}">${esc(lien.nom)}</a>`
           )
           .join('') +
-        `</p>`
+        `</p>` +
+        `</details>`
     ).join('') +
     `</div>`
   )
