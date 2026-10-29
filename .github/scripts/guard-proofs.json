@@ -481,6 +481,14 @@
       "motif": "les DEUX moitiés d'un même invariant, jugées dans le même passage parce qu'un seul marqueur (`isNativeShell`) les décide. WEB : la SEULE sonde du dépôt qui juge l'EXPOSITION d'un jeton sur le domaine web servi — elle se connecte par le formulaire servi avec le compte CI, recharge la page, puis relit DANS la page ce qu'un script de la page lirait (clé de stockage nommée comme un justificatif, valeur en FORME de JWT en stockage, cookie lisible ou URL, en-tête Authorization). NATIF : le MÊME bundle sous les marqueurs Capacitor, où le jeton DOIT être écrit et SURVIVRE à un redémarrage — contexte neuf avec le seul stockage du premier, aucun cookie (la WebView native n'en a pas de fiable), et la session doit revenir par GET /auth/me 200 porté par le jeton. Le relevé web est pris à DEUX instants, parce que l'application purge elle-même au démarrage les clés héritées (`purgeWebSessionTokens`, AuthContext.js) : premier instant du document puis après amorçage — mesurer le seul second rendait vert un jeton hérité pourtant lisible pendant tout le chargement, constaté sur l'origine servie le 16/10/2026. Neuf refus, jamais une note : chaque exposition nomme le réservoir, la clé et la PHASE, et JAMAIS la valeur (un jeton journalisé est un jeton publié) ; une surface ILLISIBLE (réservoir, document.cookie) est un refus, un relevé d'avant amorçage non déposé aussi, et sans session ouverte la sonde refuse de conclure ; côté natif, un contexte où RIEN n'a été écrit est un refus (elle jugerait le web en croyant juger le natif), un redémarrage porteur de cookies aussi (il ne prouverait pas que le jeton suffit), une application muette au redémarrage, une session restaurée SANS en-tête Authorization, un jeton disparu et un 401. Ce qu'elle ne peut pas juger, écrit plutôt que tu : le parcours observé est l'amorçage (pas les mutations d'un utilisateur réel), les relevés sont des instants datés, et le shell natif est le CONTRAT du bundle servi sous marqueurs — pas une application installée (la persistance réelle du stockage dans la WebView n'est pas mesurée d'ici)."
     },
     {
+      "chemin": "frontend/scripts/check-typo-pages-production.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-typo-pages-production.test.js",
+      "runner": "vitest",
+      "motif": "les deux gardes HORS LIGNE de la typographie disent ce que le CODE déclare et ce que le build a écrit ; aucun des deux ne peut dire ce que le DÉPLOIEMENT sert, et c'est exactement là que la panne est muette : un backend Fly en retard sert encore `system-ui`, un rewrite Vercel perdu sert la coquille React à la place de la page, et dans les deux cas le document reste conforme à ce qu'on a relu. La sonde lit donc la PRODUCTION — 46 pages (13 villes, 9 métiers, 23 guides, dérivées de `src/config/liens-seo.js`, jamais recopiées) plus la 404 — et juge par page le statut attendu, les deux `@font-face`, les deux familles EMPLOYÉES (la PREMIÈRE d'une pile est celle qui est peinte, donc un corps qui commence par `system-ui` rougit même si `'Inter'` suit), un préchargement par famille avec `crossorigin` (sans lui le navigateur l'ignore en silence) et chaque fichier cité sous `/fonts/` ; puis demande une seule fois chaque fichier de police au total (200, `content-type` de police, taille minimale — un serveur peut répondre 200 avec du HTML sur le chemin d'une police). Un refus qui n'est pas de forme : un rewrite perdu servirait le SPA, qui déclare les deux familles dans son bundle, donc la marque lue est le point de montage React — sans quoi la sonde serait verte sur le mauvais objet. Trois sorties, jamais deux : 1 pour un refus nommé, et 2 = PRÉMISSE (corpus vide, aucune page lisible) qui rougit le run sans jamais valoir un vert ; le coût de la passe est publié sur le vert comme sur le rouge. Ce qu'elle ne dit pas, écrit : les faces de REPLI à `size-adjust` restent propres au build, et la police réellement PEINTE n'est pas lue — seuls le fichier servi et la déclaration qui l'emploie sont mesurés"
+    },
+    {
       "chemin": "backend/kojo_balises.py",
       "role": "garde",
       "invoque_par": "test",
@@ -6932,6 +6940,26 @@
       "cwd": "frontend",
       "attend": [
         "juge un profil monté, peint depuis son bloc, et un geste SPA"
+      ]
+    },
+    {
+      "id": "typo pages: le corps peint n'est plus comparé",
+      "garde": "frontend/scripts/check-typo-pages-production.js",
+      "cible": "frontend/scripts/check-typo-pages-production.js",
+      "trouve": "  if (corps !== FAMILLES.corps) {",
+      "remplace": "  if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-typo-pages-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-typo-pages-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse un corps peint dans la police de l’hôte"
       ]
     }
   ]
