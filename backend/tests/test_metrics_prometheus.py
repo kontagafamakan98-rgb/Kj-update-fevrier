@@ -21,6 +21,7 @@ Ce qui est mesuré ici, et pourquoi chaque cas existe :
 """
 from datetime import datetime, timezone
 from pathlib import Path
+import re
 
 import pytest
 from httpx import AsyncClient
@@ -201,7 +202,15 @@ class TestFormat:
         )
         assert _valeur(texte, "kojo_rate_limit_alerte_envoyee_timestamp_seconds") == "1792485000"
         assert "2026-10-20T" not in texte
-        assert "{" not in texte, "aucune famille ne doit porter d'étiquette libre"
+        # UNE seule famille porte des étiquettes : les provenances d'alerte, dont
+        # le vocabulaire est FIXE (quatre valeurs déclarées). Une date n'y entre
+        # jamais, et aucune autre famille ne s'en voit pousser une — c'est la
+        # différence entre une étiquette à cardinalité bornée et une étiquette
+        # libre, celle qui fabrique une série par document.
+        etiquettes = sorted(re.findall(r'{\s*origine="([^"]*)"\s*}', texte))
+        assert len(etiquettes) == len(set(etiquettes)) == 4, etiquettes
+        assert set(etiquettes) == {"ville", "metier", "directe", "inconnue"}
+        assert texte.count("{") == 4, "aucune autre famille ne doit porter d'étiquette"
 
     async def test_une_date_illisible_vaut_jamais_pas_maintenant(
         self, client: AsyncClient, monkeypatch
@@ -459,3 +468,122 @@ class TestCollecteDeclaree:
         # Le secret, et ce qu'il advient quand il manque (503 nommée).
         assert "METRICS_TOKEN" in doc
         assert "503" in doc and "401" in doc
+
+
+class TestProvenanceDesAlertesEmploi:
+    """Ce que les pages ville et métier PRODUISENT, publié et verrouillé.
+
+    Ces pages n'existent que pour poser une veille emploi, et rien ne disait
+    combien elles en produisent : le champ `origin` était écrit par
+    `$setOnInsert` sans que personne ne le lise. Les quatre séries sont donc
+    publiées, et ce que ces cas empêchent est nommé un par un :
+
+      • une provenance qui DISPARAÎT à zéro (on croirait qu'elle n'existe pas) ;
+      • deux provenances fondues dans la même série ;
+      • une valeur écrite de travers repliée dans « inconnue », ce qui ferait
+        passer une donnée fausse pour une absence ;
+      • une lecture en panne qui publierait quatre zéros (un échec de lecture se
+        lirait comme un échec d'acquisition) ;
+      • une liste d'étiquettes RECOPIÉE ici, qui divergerait du module
+        propriétaire dès qu'une provenance serait ajoutée.
+    """
+
+    @staticmethod
+    def _series(texte: str) -> dict:
+        """Les séries `kojo_alertes_emploi{origine=…}`, dans l'ordre publié."""
+        series = {}
+        for ligne in texte.splitlines():
+            if not ligne.startswith("kojo_alertes_emploi{"):
+                continue
+            etiquette = ligne.split("{", 1)[1].split("}", 1)[0]
+            assert etiquette.startswith('origine="'), etiquette
+            valeur = ligne.rsplit(" ", 1)[1]
+            series[etiquette[len('origine="'):-1]] = valeur
+        return series
+
+    async def test_les_quatre_provenances_sortent_toujours_et_dans_l_ordre(
+        self, client: AsyncClient, monkeypatch
+    ):
+        from kojo_job_alerts import ORIGINE_ABSENTE, ORIGINES_ALERTE, ORIGINES_COMPTEES
+
+        monkeypatch.setattr(kojo_metrics, "METRICS_TOKEN", JETON)
+        texte = await _lire(client, ENTETE)
+
+        series = self._series(texte)
+        # L'ORDRE est celui de la déclaration : c'est lui qui rend un scrape
+        # lisible d'une fois sur l'autre, et une étiquette ajoutée au module
+        # apparaît ici sans qu'on touche au test.
+        assert list(series) == list(ORIGINES_COMPTEES)
+        assert set(series) == set(ORIGINES_ALERTE) | {ORIGINE_ABSENTE}
+        # Aucune série n'est omise quand la base n'a rien : quatre zéros, pas
+        # une famille muette.
+        assert set(series.values()) == {"0"} or all(v.isdigit() for v in series.values())
+
+    async def test_chaque_provenance_se_compte_sans_se_melanger(
+        self, client: AsyncClient, monkeypatch
+    ):
+        monkeypatch.setattr(kojo_metrics, "METRICS_TOKEN", JETON)
+        from tests.conftest import db_insert
+
+        await db_insert("job_alerts", {"id": "v1", "user_id": "u1", "origin": "ville"})
+        await db_insert("job_alerts", {"id": "v2", "user_id": "u2", "origin": "ville"})
+        await db_insert("job_alerts", {"id": "m1", "user_id": "u3", "origin": "metier"})
+        await db_insert("job_alerts", {"id": "d1", "user_id": "u4", "origin": "directe"})
+
+        series = self._series(await _lire(client, ENTETE))
+
+        assert series["ville"] == "2"
+        assert series["metier"] == "1"
+        assert series["directe"] == "1"
+        assert series["inconnue"] == "0"
+
+    async def test_un_client_muet_va_dans_inconnue_et_jamais_dans_directe(
+        self, client: AsyncClient, monkeypatch
+    ):
+        monkeypatch.setattr(kojo_metrics, "METRICS_TOKEN", JETON)
+        from tests.conftest import db_insert
+
+        # Le cas que le champ existe pour distinguer : une veille écrite avant
+        # que le client ne déclare sa provenance.
+        await db_insert("job_alerts", {"id": "ancienne", "user_id": "u5"})
+
+        series = self._series(await _lire(client, ENTETE))
+
+        assert series["inconnue"] == "1"
+        assert series["directe"] == "0"
+
+    async def test_une_valeur_hors_vocabulaire_n_est_pas_repliee(
+        self, client: AsyncClient, monkeypatch
+    ):
+        monkeypatch.setattr(kojo_metrics, "METRICS_TOKEN", JETON)
+        from tests.conftest import db_insert
+
+        await db_insert("job_alerts", {"id": "etrange", "user_id": "u6", "origin": "email"})
+
+        texte = await _lire(client, ENTETE)
+
+        series = self._series(texte)
+        # Ni une étiquette inventée (« email »), ni une ligne ajoutée à
+        # « inconnue » : la valeur fausse se publie dans sa propre jauge.
+        assert "email" not in series
+        assert series["inconnue"] == "0"
+        assert _valeur(texte, "kojo_alertes_emploi_hors_vocabulaire") == "1"
+
+    async def test_une_lecture_en_panne_omet_la_famille_sans_inventer_zero(
+        self, client: AsyncClient, monkeypatch
+    ):
+        monkeypatch.setattr(kojo_metrics, "METRICS_TOKEN", JETON)
+        import server as serveur
+
+        async def _panne(*args, **kwargs):
+            raise RuntimeError("base injoignable")
+
+        monkeypatch.setattr(serveur, "compter_alertes_par_origine", _panne)
+
+        texte = await _lire(client, ENTETE)
+
+        assert "kojo_alertes_emploi{" not in texte
+        assert "kojo_alertes_emploi_hors_vocabulaire" not in texte
+        # Le reste de l'exposition reste publié : une panne de base ne rend pas
+        # la route muette.
+        assert "kojo_live_bus_publies_total" in texte

@@ -260,6 +260,31 @@ export function auditerSources(sources, options = {}) {
           return;
         }
 
+        // Le SECOND fournisseur (PostHog, SDK CDN) a le même domicile unique :
+        // `trackFunnel`. Le garde ne jugeait que `gtag` ; ajouter le relais
+        // sans étendre la règle aurait laissé un `posthog.capture('sign_up',
+        // { email })` dans une page contourner la liste blanche chez l'autre
+        // fournisseur, sans qu'aucune ligne de ce garde ne change.
+        const estPosthog =
+          callee.type === 'MemberExpression' &&
+          !callee.computed &&
+          callee.property?.name === 'capture' &&
+          (callee.object?.name === 'posthog' ||
+            (callee.object?.type === 'MemberExpression' &&
+              !callee.object.computed &&
+              callee.object.object?.name === 'window' &&
+              callee.object.property?.name === 'posthog'));
+
+        if (estPosthog) {
+          if (fichier === proprietaireFunnel) return;
+          refus.push(
+            `${ou} : \`posthog.capture(…)\` écrit DIRECTEMENT — les événements passent ` +
+              `par \`trackFunnel\` (src/utils/funnel.js), sinon la liste blanche des clés ` +
+              `est contournée chez le second fournisseur.`
+          );
+          return;
+        }
+
         if (callee.type !== 'Identifier' || !lieux.appels.has(callee.name)) return;
 
         appels += 1;

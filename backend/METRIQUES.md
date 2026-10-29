@@ -199,6 +199,16 @@ redémarrage.
 | Série | Type | Sens |
 |---|---|---|
 | `kojo_missions_ouvertes` | gauge | Missions `open` en base, non supprimées. **0 = place de marché vide**, donc aucun effet de réseau, aucune fiche à indexer et un revenu nul |
+| `kojo_alertes_emploi{origine="ville\|metier\|directe\|inconnue"}` | gauge | Veilles emploi actives par provenance. Les quatre séries sont **toujours** publiées, zéro compris : une série qui disparaîtrait à zéro se lirait comme une provenance qui n'existe pas |
+| `kojo_alertes_emploi_hors_vocabulaire` | gauge | Veilles dont `origin` n'appartient pas au vocabulaire déclaré (`ORIGINES_ALERTE` + `inconnue`). Comptées **à part**, jamais repliées dans `inconnue` : ce serait faire passer une donnée écrite de travers pour une absence |
+
+Les deux familles de veilles viennent aussi de la BASE, lues par la route dans la
+même passe que le corpus : `kojo_job_alerts.compter_par_origine()` lit `origin`
+de chaque veille (une par compte, donc borné par le nombre de comptes en veille),
+une valeur inconnue ne crée **pas** d'étiquette — l'étiquette est une constante,
+donc la cardinalité est de quatre — et une lecture en panne **omet** la famille
+plutôt que de publier quatre zéros, qui se liraient comme un échec d'acquisition
+alors que c'en est un de lecture.
 
 C'est la seule famille qui vient de la BASE : la route fait un `count_documents`
 indexé au moment du scrape (une lecture toutes les 30 s), et `kojo_metrics`

@@ -111,6 +111,24 @@ export const pousse = () =>
     expect(refus).toContain('trackFunnel');
   });
 
+  it('refuse `posthog.capture(…)` dans une page : le second fournisseur aussi', () => {
+    // La règle ne jugeait que `gtag` : le relais PostHog ajouté le 29/10/2026
+    // aurait eu la même échappatoire, un jour plus tard.
+    const refus = refusDe(
+      sources({
+        'pages/Relais.js': `
+export const pousse = () =>
+  window.posthog.capture('sign_up', { email: 'quelquun@example.com' });
+`,
+      })
+    );
+
+    expect(refus).toContain('pages/Relais.js');
+    expect(refus).toContain('posthog.capture');
+    expect(refus).toContain('DIRECTEMENT');
+    expect(refus).toContain('trackFunnel');
+  });
+
   it('refuse un SECOND propriétaire de `page_view` (l’exception est bornée)', () => {
     const refus = refusDe(
       sources({

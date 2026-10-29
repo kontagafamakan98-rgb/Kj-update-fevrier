@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-29",
-    "motif": "cible de la mutation qui prouve le VERDICT de la sonde typographique (comparaison du corps neutralisee) ; le fichier entre au perimetre avec cette mutation, donc son etat de reference est adopte ici, au commit qui le declare",
+    "motif": "/metrics publie la provenance des veilles emploi (29/10/2026) : la route lit `compter_par_origine()` du module propriétaire et le passe au rendu. Une lecture en panne omet la famille au lieu de publier quatre zéros, donc la surface de la route ne change pas — seule son corps de réponse s'étend.",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -132,10 +132,8 @@
       "frontend/scripts/check-job-page-production.js": "bb458b61d1fe9ad0ee7a3d14651cb3dbbfb3d44e071cfd7622381e2e55ea225e",
       "frontend/scripts/check-job-form-canari.js": "806fdaed94c92d1e1f2fc8040a4db9dba5f49b78006a1b5f81a0358cee25c797",
       "backend/kojo_routers_jobs_proposals.py": "513fa961889e9318173d989836c290c3c08556ff3289f62ba2ebb750563f43a4",
-      "frontend/scripts/check-funnel-events.js": "19b016ff1cd4a442ca8173e06dbbc5897d0bbb71b918835c638f0062e1879221",
       "frontend/scripts/check-cors-preflight.js": "10ef1c5f33a3e72d5e89f69a02d6d414513c0be06899edf4b53ce0ba86793cb8",
       "frontend/scripts/check-prerender-shells.js": "3ac51916663c3bf144220196cb68107c197e50611f3744174ce479946112b0fc",
-      "backend/server.py": "911c4d0c8d71aa1cf56dc268c71a823cc385df8d4f36c391b79a6c41c8730253",
       ".github/scripts/alerte_sondes.py": "35c6b645b431b932c6af1ed53704acc4f096da428a49e2f7461259358f137687",
       ".github/scripts/livrer.py": "7debdcaf504701b083b5c13575c41a2e2cdc2ae5b58e84d9cb62c5aadf4c8ba1",
       "backend/kojo_scheduler.py": "a66d11b182fca4236d91941b9319b3bd72577acd550f233df3afbc6551fabaf6",
@@ -145,7 +143,9 @@
       "frontend/scripts/check-csp-documents-production.js": "d0310634de2010955d71d445bae8a6428a2334bf78acb24c470094d3032081bc",
       "frontend/scripts/check-css-inline-budget.js": "9a20c6bdb6815dd23bd2ae02f1222290dacc954e74d1b1b99de1ccf1c3ac4127",
       "frontend/scripts/classes-coquilles.js": "637ad61448db97c272dd4ba7ac17c292614796a079b7dd334629ba5336142651",
-      "frontend/scripts/check-typo-pages-production.js": "d361b6e0bbff8db6b6855f0fdfe9d1661c1ffbda02bee7bf36ecba38d25a0e8c"
+      "frontend/scripts/check-typo-pages-production.js": "d361b6e0bbff8db6b6855f0fdfe9d1661c1ffbda02bee7bf36ecba38d25a0e8c",
+      "frontend/scripts/check-funnel-events.js": "55591cf344697b0cd16d495baf47c54d7c95eecbfb1fb31b570c6374bf3ac05f",
+      "backend/server.py": "8e6faf9fb0ce120afa1baaf89aec78e9fb9929a894b3e495086d7bf6dc9aeee8"
     }
   },
   "hors_perimetre": [

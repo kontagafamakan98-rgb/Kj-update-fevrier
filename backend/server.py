@@ -119,6 +119,10 @@ from kojo_routers_payments import router as payments_router
 # Alertes emploi (kojo_job_alerts) : le résumé périodique qui ramène un
 # travailleur sur une mission publiée après sa visite.
 from kojo_routers_job_alerts import router as job_alerts_router
+# Le comptage par provenance est servi par `/metrics` : il vit dans le module
+# propriétaire de l'écriture (`$setOnInsert`), donc la mesure et le document ne
+# peuvent pas décrire deux vocabulaires différents.
+from kojo_job_alerts import compter_par_origine as compter_alertes_par_origine
 from kojo_routers_public import router as public_router
 from kojo_routers_reviews import router as reviews_router
 from kojo_routers_support import router as support_router
@@ -547,6 +551,15 @@ async def metrics_prometheus(authorization: Optional[str] = Header(default=None)
         corpus["missions_ouvertes"] = await compter_missions_ouvertes()
     except Exception as exc:  # pragma: no cover - dépend du client Mongo
         logger.warning("⚠️ Métriques : comptage des missions ouvertes impossible (%s)", exc)
+
+    # Provenance des veilles emploi : les pages ville et métier n'existent que
+    # pour en produire, et rien ne disait combien. Même règle que ci-dessus —
+    # une lecture en panne OMET la famille, elle n'invente pas quatre zéros (qui
+    # se liraient comme « aucune veille », donc comme un échec d'acquisition).
+    try:
+        corpus["alertes_emploi"] = await compter_alertes_par_origine()
+    except Exception as exc:  # pragma: no cover - dépend du client Mongo
+        logger.warning("⚠️ Métriques : comptage des veilles par provenance impossible (%s)", exc)
 
     return Response(
         content=render_metrics(corpus=corpus),

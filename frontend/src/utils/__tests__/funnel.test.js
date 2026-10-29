@@ -183,3 +183,63 @@ describe('la déclaration elle-même', () => {
     expect(CLES_FUNNEL.country).toBe(PAYS_KOJO);
   });
 });
+
+// ── PostHog : le SECOND fournisseur, et le MÊME filtre ──────────────────────
+// Les cinq étapes partent aussi chez PostHog (SDK CDN, `config/posthog.js`),
+// chargé seulement après consentement. Ce que ces cas empêchent : qu'un relais
+// ajouté après coup contourne la liste blanche, ou qu'un fournisseur muet fasse
+// croire que l'étape n'a pas été émise du tout.
+describe('trackFunnel — PostHog reçoit la même liste blanche que GA4', () => {
+  /** Installe un SDK PostHog espion (forme réelle : `window.posthog.capture`). */
+  const avecPosthog = () => {
+    const capture = vi.fn();
+    window.posthog = { capture };
+    return capture;
+  };
+
+  const sansPosthog = () => {
+    delete window.posthog;
+  };
+
+  it('relaie le nom et les paramètres filtrés, à l’identique de GA4', () => {
+    const gtag = avecGtag();
+    const capture = avecPosthog();
+    expect(
+      trackFunnel(EVENEMENTS_FUNNEL.paiementLance, {
+        payment_method: 'Wave',
+        email: 'quelquun@example.com',
+        job_id: 'job-42',
+      })
+    ).toBe(true);
+
+    expect(envois(gtag)[0].parametres).toEqual({ payment_method: 'wave' });
+    expect(capture.mock.calls).toEqual([['begin_checkout', { payment_method: 'wave' }]]);
+    sansPosthog();
+    sansGtag();
+  });
+
+  it('part quand SEUL PostHog est chargé — GA4 absent n’est pas « non émis »', () => {
+    sansGtag();
+    const capture = avecPosthog();
+    expect(trackFunnel(EVENEMENTS_FUNNEL.inscription, { user_type: 'worker' })).toBe(true);
+    expect(capture.mock.calls).toEqual([['sign_up', { user_type: 'worker' }]]);
+    sansPosthog();
+  });
+
+  it('refuse un nom non déclaré même quand le SDK est là', () => {
+    const gtag = avecGtag();
+    const capture = avecPosthog();
+    expect(trackFunnel('custom_click', { user_type: 'client' })).toBe(false);
+    expect(capture).not.toHaveBeenCalled();
+    expect(gtag).not.toHaveBeenCalled();
+    sansPosthog();
+    sansGtag();
+  });
+
+  it('ne donne pas à PostHog une valeur que la liste blanche écarte', () => {
+    const capture = avecPosthog();
+    trackFunnel(EVENEMENTS_FUNNEL.inscription, { user_type: 'administrateur', country: 'ZZ' });
+    expect(capture.mock.calls).toEqual([['sign_up', {}]]);
+    sansPosthog();
+  });
+});

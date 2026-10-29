@@ -122,7 +122,46 @@ SITE_PAR_DEFAUT = "https://kojoforafrica.cc.cd"
 # sait pas » qu'un chiffre inventé.
 ORIGINES_ALERTE = ("ville", "metier", "directe")
 ORIGINE_ABSENTE = "inconnue"
+# La MÊME liste pour l'EXPOSITION (`/metrics`) : les trois valeurs déclarables
+# plus la colonne « on ne sait pas ». Une série par valeur, jamais une par
+# document — c'est la règle de cardinalité de `kojo_metrics`.
+ORIGINES_COMPTEES = ORIGINES_ALERTE + (ORIGINE_ABSENTE,)
 ORIGINE_MAX = 20
+
+
+# Où se lit ce que les pages ville et métier ont produit : quatre séries fixes,
+# plus le nombre de valeurs HORS vocabulaire. `origin` est écrit par
+# `$setOnInsert` (régler une veille ne réécrit pas son acquisition), donc une
+# provenance ne peut pas être réécrite par une visite ultérieure ; elle ne peut
+# donc que venir d'une écriture hors de ce module (migration, correction à la
+# main), et c'est pour ça qu'elle est comptée À PART au lieu d'être repliée
+# dans « inconnue » — replier ferait passer une donnée fausse pour une absence.
+async def compter_par_origine() -> dict:
+    """Nombre de veilles par provenance, et nombre de provenances inconnues.
+
+    Lit chaque document de `job_alerts` une fois (`origin` seul) : une veille
+    par compte, donc le corpus est borné par le nombre de comptes en veille. Le
+    champ absent — une version du client d'avant le champ — va dans
+    ``inconnue`` ; une valeur qui n'appartient PAS au vocabulaire ne va nulle
+    part dans les quatre séries et se publie à part.
+
+    Returns:
+        dict: ``{"par_origine": {origine: n, …}, "hors_vocabulaire": n}``, avec
+            les QUATRE origines TOUJOURS présentes, à 0 comprises — une série
+            qui disparaîtrait à zéro se lirait comme une provenance qui
+            n'existe pas, alors que c'est justement la question posée.
+    """
+    comptes = {origine: 0 for origine in ORIGINES_COMPTEES}
+    hors = 0
+    async for document in db[COLLECTION].find({}, {"origin": 1}):
+        origine = _texte(document.get("origin"), ORIGINE_MAX).lower()
+        if not origine:
+            comptes[ORIGINE_ABSENTE] += 1
+        elif origine in comptes:
+            comptes[origine] += 1
+        else:
+            hors += 1
+    return {"par_origine": comptes, "hors_vocabulaire": hors}
 
 
 def _base_publique() -> str:
