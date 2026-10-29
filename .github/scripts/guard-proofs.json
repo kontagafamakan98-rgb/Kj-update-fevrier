@@ -1196,6 +1196,24 @@
       "preuve": "frontend/scripts/__tests__/check-worker-og-contract.test.js",
       "runner": "vitest",
       "motif": "contrat app ↔ pré-rendu de /jobs/:id ET /workers/:id, jugé hors ligne : il exécute le module de production de chaque page et compare les octets annoncés par jobSeo.js / workerSeo.js ; une divergence (titre, description coupée en points de code, cartes OG, canonical) sort en 1. L'absence d'interpréteur Python est une ERREUR en CI, un simple avis hors CI"
+    },
+    {
+      "chemin": "frontend/scripts/mesure-cycle.mjs",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/mesure-cycle.test.js",
+      "runner": "vitest",
+      "motif": "l'état d'une passe de mesure (pid, ports, horodatage, verdict d'occupation) et les règles d'arrêt qui vont avec : refus de mesurer sur la pile d'une passe précédente en nommant les pid, effacement de l'état à la sortie, sortie sur SIGINT/SIGTERM/SIGHUP. Il ne juge PAS le dépôt — il empêche un chiffre de performance d'être celui de l'hôte : mesuré le 28/10/2026, deux piles qui mesuraient ensemble rendaient 2 445 ms de tâche longue là où une seule en rend 417 à 793",
+      "hors_mutation": "aucun verdict du dépôt à muter : le module ne lit pas le dépôt pour le juger, et ses règles sont verrouillées par 23 cas directs (refus nommant les pid, état réellement écrit puis effacé, sortie sur signal, état illisible préservé). Neutraliser une de ses règles fait rougir SON test, pas une preuve de garde du dépôt — c'est pourquoi il reste `role: \"outil\"`, sans verdict"
+    },
+    {
+      "chemin": "frontend/scripts/mesure-veille.mjs",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/mesure-veille.test.js",
+      "runner": "vitest",
+      "motif": "le processus DÉTACHÉ qui démonte la pile d'une passe morte sur un poste où `kill -TERM` ne livre aucun signal (Windows/TerminateProcess) : il interroge la vie de la passe une fois par seconde, arrête les pid(s) que l'état nomme quand elle a disparu, et sort sans rien détruire si l'état est illisible. Il n'écrit aucun chiffre et ne juge rien",
+      "hors_mutation": "aucune mutation ne peut rougir : la veille ne lit pas le dépôt, elle lit l'état d'une passe. Ses trois branches (passe morte + état présent → arrêt et retrait, état disparu → sortie, état illisible → rien détruit) sont verrouillées par ses 7 cas, et modifier l'outil ne change aucun verdict du dépôt"
     }
   ],
   "rejeux": [
