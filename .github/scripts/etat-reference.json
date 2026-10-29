@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-29",
-    "motif": "la 404 statique du 29/10/2026 : check-css-inline-budget porte son budget (1,43 Ko / 14 regles pour 2,00 Ko, feuille critique partagee inchangee d'un octet) et classes-coquilles declare ses six noms de composants (carte, marque, actions, bouton encre, bouton clair, liens) — page servie sans bundle donc sans Tailwind, ses matieres sont des regles CSS, aucun jumeau React par construction",
+    "motif": "cible de la mutation qui prouve le VERDICT de la sonde typographique (comparaison du corps neutralisee) ; le fichier entre au perimetre avec cette mutation, donc son etat de reference est adopte ici, au commit qui le declare",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -144,7 +144,8 @@
       "frontend/scripts/check-csp-contract.js": "71c1929d340956cc0c4eaeb37296f140af58afe0b575b6eb6f61b1cd6841f145",
       "frontend/scripts/check-csp-documents-production.js": "d0310634de2010955d71d445bae8a6428a2334bf78acb24c470094d3032081bc",
       "frontend/scripts/check-css-inline-budget.js": "9a20c6bdb6815dd23bd2ae02f1222290dacc954e74d1b1b99de1ccf1c3ac4127",
-      "frontend/scripts/classes-coquilles.js": "637ad61448db97c272dd4ba7ac17c292614796a079b7dd334629ba5336142651"
+      "frontend/scripts/classes-coquilles.js": "637ad61448db97c272dd4ba7ac17c292614796a079b7dd334629ba5336142651",
+      "frontend/scripts/check-typo-pages-production.js": "d361b6e0bbff8db6b6855f0fdfe9d1661c1ffbda02bee7bf36ecba38d25a0e8c"
     }
   },
   "hors_perimetre": [

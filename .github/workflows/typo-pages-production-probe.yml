@@ -1,0 +1,87 @@
+name: Typographie des pages servies par le backend (daily)
+
+# ─── Pourquoi cette sonde existe ────────────────────────────────────────────
+# Les 45 pages ville, métier et guide — écrites par le BACKEND, servies sous les
+# rewrites `/emplois/(.*)`, `/metiers/(.*)`, `/guides/(.*)` de
+# `frontend/vercel.json` — et la 404 peignaient `system-ui` jusqu'au 29/10/2026 :
+# la police d'AUCUNE autre page du site, qui sert Inter au corps et Cormorant
+# Garamond aux titres. Les deux familles sont désormais déclarées UNE fois
+# (`backend/kojo_pages_metier.py` : `POLICES`, importé par les guides ;
+# `vite-plugins/prerender/not-found.js` pour la 404), et tenues hors ligne des
+# deux côtés : `backend/tests/test_pages_metier_seo.py`
+# (`TestLaTypographieDesPages`) et `frontend/scripts/__tests__/check-coquilles-equilibrees.test.js`.
+#
+# Ce qu'aucun de ces gardes ne peut dire : que le DÉPLOIEMENT sert bien ces
+# modules, et que les FICHIERS cités existent sur l'origine du site. Un `.woff2`
+# qui répond 404 ne casse rien de visible — `font-display: swap` fait retomber la
+# page sur la police de l'hôte, en silence : le document est conforme, le
+# visiteur lit une autre police. C'est ce fait-là, et lui seul, que cette sonde
+# de production tranche.
+#
+# Trois sorties, jamais deux :
+#   0 — les 46 pages servent les deux familles, les emploient, préchargent leurs
+#       fichiers cités (crossorigin compris), et ces fichiers RÉPONDENT ;
+#   1 — refus nommé (statut inattendu, coquille React servie à la place de la
+#       page, famille absente ou non employée, préchargement manquant, fichier
+#       cité qui ne répond pas) ;
+#   2 — prémisse : aucune page n'a pu être lue (origine injoignable, réseau).
+#       Une prémisse n'est jamais un vert, et elle rougit ce run.
+#
+# Le corpus n'est pas recopié : la sonde lit `src/config/liens-seo.js`, qui est
+# le propriétaire des URL du maillage, lui-même confronté aux déclarations du
+# backend et au sitemap par `backend/tests/test_pages_seo_maillage.py`. Une ville
+# ajoutée au référentiel géographique est donc jugée le lendemain, sans qu'on
+# touche à ce fichier.
+on:
+  schedule:
+    # 07:36 UTC : après les sondes de document (07:04 profil, 07:10 fiche,
+    # 07:16 montage, 07:22 CSP, 07:26 interactif, 07:32 assistant), hors des
+    # heures pleines.
+    - cron: '36 7 * * *'
+  workflow_dispatch:
+    inputs:
+      site:
+        description: "Origine à juger (défaut : vide = production)"
+        required: false
+        default: ""
+      page:
+        description: "Chemin d'une seule page à juger (défaut : vide = les 45 déclarées + la 404)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Typographie des pages ville, métier, guide et 404 (production)
+    runs-on: ubuntu-latest
+    # Plafond : la sonde fait ~50 requêtes HTTP et n'installe aucun navigateur.
+    # Une sonde qui ne conclut pas doit rougir, pas patienter jusqu'à l'abandon.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # La sonde n'importe que des modules du dépôt (`liens-seo.js`, `site-meta.js`) :
+      # aucune dépendance n'est installée, et la passe reste à ~50 requêtes.
+      - name: Mesurer la typographie servie
+        working-directory: frontend
+        env:
+          SITE_A_JUGER: ${{ inputs.site }}
+          PAGE_A_JUGER: ${{ inputs.page }}
+        run: |
+          arguments=()
+          if [ -n "$SITE_A_JUGER" ]; then
+            arguments+=(--base "$SITE_A_JUGER")
+          fi
+          if [ -n "$PAGE_A_JUGER" ]; then
+            arguments+=(--page "$PAGE_A_JUGER")
+          fi
+          node scripts/check-typo-pages-production.js ${arguments[@]+"${arguments[@]}"}
