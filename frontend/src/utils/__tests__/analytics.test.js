@@ -362,6 +362,34 @@ describe('initAnalytics — PostHog, conditionnel et une seule vue par navigatio
     });
   });
 
+  it('ne demande NI flags NI configuration distante : seule la capture reste', async () => {
+    // Mesuré en production le 29/10/2026, consentement donné : la console
+    // portait QUATRE erreurs qui ne parlaient d'aucune vue — `POST /flags/`
+    // 401, `GET /array/<clé>/config.js` 404, puis le repli JSON du SDK vers
+    // `/array/<clé>/config` refusé deux fois par `connect-src` (cette origine
+    // n'y est ouverte que pour `script-src`). Le site n'a ni feature flag ni
+    // configuration distante : le SDK les demandait par défaut.
+    //
+    // L'option est celle du SDK (`advanced_disable_flags`, l'ancien nom
+    // `advanced_disable_decide` étant déprécié) : son `load()` de
+    // l'extension `remote-config` sort tôt, donc le `config.js` n'est même
+    // plus demandé. Le test regarde l'OBJET RÉELLEMENT donné au SDK, pas la
+    // constante du module — c'est lui que le SDK lit.
+    const { initAnalytics } = await import('../analytics.js');
+    initAnalytics();
+
+    const sdk = sdkFactice();
+    chargerLeSdk();
+    const [, options] = sdk.init.mock.calls[0];
+
+    expect(options.advanced_disable_flags).toBe(true);
+    // Ce qu'on garde : la capture. Ni vue automatique, ni clic, ni session —
+    // donc aucun autre appel que `/e/` ne peut partir.
+    expect(options.capture_pageview).toBe(false);
+    expect(options.autocapture).toBe(false);
+    expect(options.disable_session_recording).toBe(true);
+  });
+
   it('publie la vue d’ARRIVÉE une seule fois, même si le repli du titre a déjà tourné', async () => {
     const { initAnalytics, TRACKED_TITLE_FALLBACK_MS } = await import('../analytics.js');
     initAnalytics();

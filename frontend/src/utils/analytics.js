@@ -328,6 +328,28 @@ const POSTHOG_OPTIONS = Object.freeze({
   disable_session_recording: true,
   person_profiles: 'identified_only',
   persistence: 'localStorage',
+  // ── NI FLAGS, NI CONFIGURATION DISTANTE (29/10/2026) ────────────────────
+  // Mesuré sur la production, consentement donné, console OUVERTE (navigation
+  // vers `/` puis `/metiers/plomberie`) : QUATRE erreurs, toutes pour des
+  // choses que ce produit n'utilise pas —
+  //   • `POST https://eu.i.posthog.com/flags/?v=2&compression=base64` → 401 ;
+  //   • `GET https://eu-assets.i.posthog.com/array/<clé>/config.js` → 404 ;
+  //   • puis le REPLI du SDK vers `/array/<clé>/config` (JSON), que
+  //     `connect-src` refuse — `eu-assets` n'y est ouvert que pour
+  //     `script-src` — d'où DEUX erreurs CSP (« Refused to connect »).
+  // Aucune de ces requêtes ne porte une vue : la capture, elle, part sur
+  // `/e/` en 200. Le site n'a ni feature flag ni configuration distante : le
+  // SDK les demandait par défaut, et leur échec était le seul bruit.
+  //
+  // `advanced_disable_flags` est le commutateur du SDK lui-même (l'ancien nom,
+  // `advanced_disable_decide`, est déprécié et migré vers celui-ci). Vérifié
+  // dans le bundle : le `load()` de l'extension `remote-config` sort par
+  // `Qu()` — qui lit cette option — en publiant « Remote config is disabled.
+  // Falling back to local config. », donc le `config.js` n'est même pas
+  // demandé, et la requête de flags ne part plus. Une seule option coupe les
+  // deux ; aucune politique CSP n'est élargie pour faire taire une erreur
+  // qu'il suffisait de ne pas provoquer.
+  advanced_disable_flags: true,
 });
 
 /**
