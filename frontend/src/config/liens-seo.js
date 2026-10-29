@@ -5,8 +5,8 @@
 // atteignables que par le sitemap. Le sitemap est un plan de découverte, pas un
 // maillage : une page qu'aucune page du site ne cite n'a aucun texte de lien
 // entrant, et c'est ce texte que lit un moteur pour comprendre ce que la page
-// répond. L'accueil et le pied de page — présents sur TOUTES les routes — les
-// citent donc désormais par leur nom.
+// répond. Le pied de page — rendu sur TOUTES les routes — les cite donc
+// désormais par leur nom.
 //
 // Les DONNÉES (slugs, libellés) vivent dans `pages-seo.json`, que le backend
 // relit dans `backend/tests/test_pages_seo_maillage.py` : la liste des villes y
@@ -20,11 +20,21 @@
 // elles — un `Link` ferait peindre la 404 de l'application par-dessus un contenu
 // correct (c'est la règle qui a fait écrire le CTA des pages ville vers /jobs).
 //
-// Les quatre rendus qui publient ce bloc — accueil React (src/pages/Home.js),
-// coquille de l'accueil (vite-plugins/prerender/shells-home.js), pied de page
-// React (src/App.js) et pied de page des coquilles
-// (vite-plugins/prerender/app-chrome.js) — importent CE module : la bascule
-// coquille → React ne peut ni déplacer un lien, ni en changer le libellé.
+// Les DEUX rendus qui publient ce bloc — le pied de page React (src/App.js) et
+// le pied de page des coquilles (vite-plugins/prerender/app-chrome.js) —
+// importent CE module : la bascule coquille → React ne peut ni déplacer un
+// lien, ni en changer le libellé.
+//
+// UN SEUL DOMAINE PAR DOCUMENT (29/10/2026). L'accueil (src/pages/Home.js) et
+// sa coquille publiaient EN PLUS leur propre section de maillage, juste
+// au-dessus du pied de page, qui publie la même. Mesuré sur l'artefact servi
+// (`build/index.html` et la production) : « / » portait le bloc DEUX fois —
+// les trois mêmes « Villes / Métiers / Guides » dans le même écran, celui du
+// pied de page suivant immédiatement l'autre —, /jobs et /login une seule.
+// Cette section-là a été retirée : le pied de page est rendu sur toutes les
+// routes, il n'y avait rien à ajouter ailleurs. Le garde
+// `backend/tests/test_pages_seo_maillage.py` refuse qu'un troisième rendu
+// réapparaisse.
 import PAGES_SEO from './pages-seo.json' with { type: 'json' };
 
 const CHEMIN = {
@@ -48,8 +58,9 @@ export const GROUPES_LIENS_SEO = [
 ];
 
 // ── LES CLASSES, MESURÉES SUR LES DEUX SURFACES ────────────────────────────
-// Le même bloc est peint sur `--kojo-papier` (la section de l'accueil) et sur le
-// VERRE du pied de page (`rgba(253, 250, 244, 0.78)` sur le sable ou sur l'encre).
+// Le bloc est peint sur le VERRE du pied de page (`rgba(253, 250, 244, 0.78)` sur
+// le sable ou sur l'encre) : depuis le 29/10/2026 c'est sa SEULE surface, la
+// section de l'accueil qui le peignait aussi sur le papier ayant été retirée.
 // `orange-900` (#7c2d12) tient 8,86:1 sur le verre posé sur le sable et 5,67:1
 // au pire cas, et davantage sur le papier ; son survol `orange-950` (#431407)
 // monte à 14,79:1 et 9,47:1. Le titre `stone-800` (#292524) dépasse 9:1 sur le
@@ -112,9 +123,9 @@ export const GROUPES_LIENS_SEO = [
 //
 // Le prix assumé, écrit noir sur blanc plutôt que passé sous silence : un moteur
 // peut accorder moins de poids à un lien masqué qu'à un lien peint. Le bloc
-// reste donc sur les deux surfaces où il a été mesuré utile (l'accueil et le
-// pied de page, ce dernier rendu sur toutes les routes), et les trois titres de
-// famille restent VISIBLES, fermés compris — c'est eux qu'un lecteur pressé lit,
+// reste donc sur la surface où il a été mesuré utile (le pied de page, rendu sur
+// toutes les routes), et les trois titres de famille restent VISIBLES, fermés
+// compris — c'est eux qu'un lecteur pressé lit,
 // et le dépliant ne les cache jamais.
 //
 // ── CE QUE CE BLOC COÛTE EN CSS CRITIQUE, ET COMMENT ON L'A PAYÉ MOINS CHER ──

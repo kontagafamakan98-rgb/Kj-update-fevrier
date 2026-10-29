@@ -21,17 +21,6 @@ import { usePageMeta } from '../utils/seo';
 // src/config/page-sections.js, que le build lit pour écrire la coquille
 // pré-rendue. Ce composant en DÉRIVE au lieu de tenir sa propre liste.
 import { PAGE_SECTIONS, couperLeTitre } from '../config/page-sections';
-// Le maillage vers les pages ville, métier et guides : LA MÊME déclaration que
-// le pied de page (src/App.js) et que les deux coquilles. Les liens de ce bloc
-// sont de vrais `<a href>` — ces pages sont servies par le backend, il n'existe
-// aucune route React pour elles (voir src/config/liens-seo.js).
-import {
-  GROUPES_LIENS_SEO,
-  LIENS_SEO_CLASS,
-  LIENS_SEO_GROUPE_CLASS,
-  LIENS_SEO_LIEN_CLASS,
-  LIENS_SEO_SOMMAIRE_CLASS,
-} from '../config/liens-seo';
 import { CONTACT, SOCIAL_LINKS, mailtoHref, telHref } from '../config/contact';
 import MapEmbed from '../components/MapEmbed';
 // La photo du héros — et son alternance. Ses chemins, ses dimensions et son
@@ -781,32 +770,13 @@ export default function Home() {
       </section>
     </div>
 
-      {/* ── LE MAILLAGE VERS LES PAGES VILLE, MÉTIER ET GUIDES ──────────────
-          Ces 32 pages n'étaient citées par AUCUNE page du site : un moteur ne
-          les découvrait que par le sitemap, et le texte du lien — celui qui dit
-          de quoi la page parle — manquait. C'est le pied de page qui les porte
-          sur toutes les routes ; ce bloc les porte sur l'accueil, à leur place
-          éditoriale : après le contact, comme un index. Les libellés sont les
-          NOMS publiés par le backend (`pages-seo.json`, relu par un garde),
-          jamais une seconde écriture. */}
-      <section className={`${sectionClass} ${paperClass}`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className={LIENS_SEO_CLASS}>
-            {GROUPES_LIENS_SEO.map((groupe) => (
-              <details key={groupe.cle}>
-                <summary className={LIENS_SEO_SOMMAIRE_CLASS}>{t(groupe.titreKey)}</summary>
-                <p className={LIENS_SEO_GROUPE_CLASS}>
-                  {groupe.liens.map((lien) => (
-                    <a key={lien.href} href={lien.href} className={LIENS_SEO_LIEN_CLASS}>
-                      {lien.nom}
-                    </a>
-                  ))}
-                </p>
-              </details>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* ── PAS DE MAILLAGE ICI (29/10/2026) ────────────────────────────────
+          L'accueil peignait ce bloc-là PUIS celui du pied de page, qui le suit
+          immédiatement : mesuré sur l'artefact servi, le document de « / »
+          portait le bloc DEUX fois (« Villes / Métiers / Guides » deux fois
+          dans le même écran), /jobs et /login une seule. Le pied de page le
+          publie sur TOUTES les routes, il n'y avait donc rien à ajouter ici —
+          la déclaration et son garde vivent dans src/config/liens-seo.js. */}
     </>
   );
 }

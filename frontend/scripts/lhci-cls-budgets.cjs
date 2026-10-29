@@ -260,17 +260,36 @@ const CLS_BUDGETS = {
   // flottaison — et le relâchement ne le déplace plus. Re-mesuré, même sonde :
   // `/payment` mobile **0,0532 → 0,0000** (aucun décalage enregistré), branche
   // « mission requise » **0,0496 → 0,0000**, branche « mission » 0,0000 ; le
-  // DESKTOP est intact (pied à y=772, 0,0331 pour le chunk retenu, 0,0376 pour
-  // les deux branches), parce que `md:min-h-0` lui rend exactement son ancien
-  // `min-h-full`. La feuille critique ne bouge pas d'un OCTET : le garde rend
+  // DESKTOP était alors intact (pied à y=772, 0,0331 pour le chunk retenu,
+  // 0,0376 pour les deux branches), `md:min-h-0` lui rendant son ancien
+  // `min-h-full` — ce n'était pas une mesure suffisante : ce reliquat de 0,0274
+  // a été mesuré puis supprimé le 29/10/2026 (voir l’en-tête de l’entrée). La feuille critique ne bouge pas d'un OCTET : le garde rend
   // 83,93 Ko / 84,00 Ko et la MÊME empreinte, 1 158 règles — `min-h-screen` et
   // `md:min-h-0` étaient déjà émis pour d'autres porteurs, donc cette correction
   // ne coûte aucun octet de CSS critique.
+  // ── LE CADRE PLEIN ÉCRAN VAUT AUSSI EN DESKTOP (29/10/2026), DONC LE PLAFOND
+  //    DESCEND DE 0,06 À 0,02 ──
+  // Le `md:min-h-0` rendait au desktop son ancien `min-h-full`, et le décalage y
+  // survivait : 1350×940, fixture, compte travailleur, artefact servi, CLS
+  // **0,0274** source `<footer>`. La mesure au marqueur dit pourquoi : React
+  // re-crée le pied de page à 1 005 px (le repli du chunk est plus haut que la
+  // page) puis `main.flex-1` le ramène à 815 px, où il est collé au bas de la
+  // fenêtre — ses 125 px sont donc visibles en permanence, et son insertion
+  // compte toujours. Retirer la réserve d'écran du repli ne change RIEN
+  // (0,0274) : ce n'est pas elle. Le cadre de la route porte donc `min-h-screen`
+  // aux deux tailles : **0,0274 → 0,0039** (le reste est la pastille de la barre
+  // du haut, qui change de largeur quand la session arrive), pied de page à
+  // y=1 005 pour une fenêtre de 940. 0,02 et non 0,01 : c'est un plafond de
+  // RÉGRESSION — la valeur d'avant (0,0274) doit rougir —, pas encore la marge
+  // serrée des routes à 0,0039.
   '/payment': {
-    max: 0.06,
-    pireMediane: 0.0376,
+    max: 0.02,
+    pireMediane: 0.0039,
     mesure:
-      'MESURE DU 28/10/2026, APRÈS LE CADRE PLEIN ÉCRAN EN MOBILE (`min-h-screen` sur le cadre de la route, '
+      'MESURE DU 29/10/2026, CADRE PLEIN ÉCRAN AUX DEUX TAILLES : en 1350×940, CLS **0,0274 → 0,0039** sur les '
+      + 'DEUX branches de l’URL (6 runs mesurés sur l’artefact servi, pied de page à y=1 005 pour une fenêtre de '
+      + '940) ; le mobile est inchangé (0,0000, pied à y=1 004,33). '
+      + 'MESURE DU 28/10/2026, APRÈS LE CADRE PLEIN ÉCRAN EN MOBILE (`min-h-screen` sur le cadre de la route, '
       + '`md:min-h-0` rendant au desktop son ancien `min-h-full`) : chunk retenu **0,0532 → 0,0000** en 412×823 '
       + '(aucun décalage enregistré ; `main` 919 px PENDANT et APRÈS, pied à y=984, sous la ligne de flottaison), '
       + 'branche « mission requise » **0,0496 → 0,0000**, branche « mission » 0,0000 ; desktop INCHANGÉ — chunk '

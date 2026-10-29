@@ -212,6 +212,17 @@ export const REGLES_DE_SQUELETTE = {
 export const REGLES_DE_CHARGEMENT = {
   '/payment': {
     regle: REGLES_DE_SQUELETTE.PIED_HORS_ECRAN,
+    // CETTE RÉSERVE N'EST PLUS LE LEVIER DU DESKTOP (29/10/2026), ET C'EST UNE
+    // MESURE NÉGATIVE : retirée au-dessus du point de rupture
+    // (`min-height:0` posé sur `.reserve-pied-hors-ecran`), le CLS de /payment
+    // en 1350×940 rend le MÊME 0,0274 — source `<footer>`. Le décalage ne
+    // venait pas d'ici mais du CADRE de la route, qui colle le pied de page au
+    // bas de la fenêtre (`main.flex-1`) : ses 125 px sont donc visibles en
+    // permanence et son insertion compte toujours. Le levier est
+    // `PAGE_SECTIONS['/payment'].frameClass`, passé à `min-h-screen` aux deux
+    // tailles (0,0274 → 0,0039). La réserve reste : elle ne coûte rien et elle
+    // est ce qui garde le pied de page hors écran quand le repli est peint
+    // court.
     hauteurClass: HAUTEUR_PIED_HORS_ECRAN,
     pourquoi:
       'sa hauteur dépend de la BRANCHE de l’URL (formulaire et cartes de paiement avec `job_id`, ' +

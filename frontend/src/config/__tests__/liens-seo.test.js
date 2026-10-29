@@ -2,20 +2,23 @@
  * LE MAILLAGE SEO SE LIT SUR DEUX SURFACES, PAS SUR UNE.
  *
  * ── Pourquoi ce fichier existe ─────────────────────────────────────────────
- * Le bloc de liens `src/config/liens-seo.js` est peint à DEUX endroits qui
- * n'ont pas le même fond :
- *   • l'accueil, sur le PAPIER (`--kojo-papier` → `#fffdf9`) ;
- *   • le pied de page, sur du VERRE (`.verre-barre` :
- *     `rgba(253, 250, 244, 0.78)` + flou), donc sur un composite qui dépend de
- *     ce qui défile derrière — `#fcf8f2` sur le sable, `#ccc9c3` sur l'encre.
- * Une teinte choisie pour la première surface peut tomber sous le seuil sur la
- * seconde : c'est le défaut qu'a produit `orange-700` sur le verre du pied de
- * page (3,13:1), mesuré et corrigé le 27/10/2026. Le module emploie donc les
- * encres DÉJÀ mesurées de ce pied de page (`orange-900`, survol `orange-950`,
- * titre `stone-800`), et ce fichier le vérifie au lieu de le commenter.
+ * Le bloc de liens `src/config/liens-seo.js` est peint sur du VERRE
+ * (`.verre-barre` : `rgba(253, 250, 244, 0.78)` + flou), donc sur un composite
+ * qui dépend de ce qui défile DERRIÈRE le pied de page — `#fcf8f2` sur le sable,
+ * `#ccc9c3` sur l'encre. Une teinte choisie sur un fond clair peut tomber sous
+ * le seuil sur l'autre : c'est le défaut qu'a produit `orange-700` sur ce verre
+ * (3,13:1), mesuré et corrigé le 27/10/2026. Le module emploie donc les encres
+ * DÉJÀ mesurées de ce pied de page (`orange-900`, survol `orange-950`, titre
+ * `stone-800`), et ce fichier le vérifie au lieu de le commenter.
  *
- * La mesure RETIENT LA PIRE des trois surfaces : une encre qui ne tient que sur
- * le papier n'a pas tenu, puisque le même lien est peint sur la vitre.
+ * La mesure RETIENT LE PIRE des deux composites : le lien est peint sur la même
+ * vitre quelle que soit la section qui défile derrière.
+ *
+ * JUSQU'AU 29/10/2026 IL Y AVAIT UNE SECONDE SURFACE : la section de maillage
+ * de l'accueil, sur le PAPIER (`--kojo-papier` → `#fffdf9`). Elle a été
+ * retirée — le pied de page publie le même bloc juste en dessous, donc le
+ * document de « / » le portait deux fois. Mesurer ce papier serait désormais
+ * juger une surface que plus rien ne peint.
  *
  * Les teintes de la RÉGRESSION (`orange-600`, `orange-700`, `orange-800`,
  * `stone-500`, `stone-600`) restent dans la table pour être MESURÉES : une
@@ -25,7 +28,7 @@
  * ── Ce que ce fichier ne prouve pas ────────────────────────────────────────
  * Il lit les CLASSES déclarées par le module, pas le DOM calculé : une classe
  * composée à l'exécution (`className={base + variante}`) lui échapperait. Les
- * quatre rendus qui publient ce bloc lisent tous ce module (gardé côté serveur
+ * deux rendus qui publient ce bloc lisent tous ce module (gardé côté serveur
  * par `backend/tests/test_pages_seo_maillage.py`), donc la classe mesurée est
  * bien celle qu'ils peignent.
  */
@@ -65,9 +68,7 @@ const VERRE = lire(
   .split(',')
   .map((valeur) => Number(valeur.trim()));
 
-const PAPIER = jeton('--kojo-papier');
 const SURFACES = {
-  'le papier de l’accueil': PAPIER,
   'le verre du pied de page (sur sable)': composer(VERRE, versRgb(jeton('--kojo-sable'))),
   'le verre du pied de page (sur encre)': composer(VERRE, versRgb(jeton('--kojo-encre'))),
 };
@@ -100,7 +101,7 @@ const encresDe = (classes) => {
   return { repos, survol };
 };
 
-/** Le pire rapport d'une encre sur les trois surfaces que ce bloc traverse. */
+/** Le pire rapport d'une encre sur les deux composites que ce bloc traverse. */
 const pireContraste = (teinte) => {
   if (!Object.hasOwn(ENCRES, teinte)) {
     throw new Error(
@@ -111,7 +112,7 @@ const pireContraste = (teinte) => {
   return Math.min(...Object.values(SURFACES).map((fond) => contrasteEntre(ENCRES[teinte], fond)));
 };
 
-describe('maillage SEO — lisibilité sur le papier et sur le verre', () => {
+describe('maillage SEO — lisibilité sur le verre du pied de page', () => {
   it('mesure les encres que le module peint RÉELLEMENT, au repos comme au survol', () => {
     const mesures = [];
     for (const [ou, nom] of [
@@ -142,7 +143,7 @@ describe('maillage SEO — lisibilité sur le papier et sur le verre', () => {
       .filter(({ ratio }) => ratio < SEUIL_TEXTE)
       .map(
         ({ ou, etat, teinte, ratio }) =>
-          `maillage, ${ou} ${etat} : text-${teinte} = ${ratio.toFixed(2)}:1 au pire des trois fonds ` +
+          `maillage, ${ou} ${etat} : text-${teinte} = ${ratio.toFixed(2)}:1 au pire des deux composites ` +
           `(${Object.values(SURFACES).join(', ')}), seuil ${SEUIL_TEXTE}:1 (WCAG 1.4.3)`
       );
     expect(fautes, `encre sous le seuil dans le maillage :\n  ${fautes.join('\n  ')}`).toEqual([]);
