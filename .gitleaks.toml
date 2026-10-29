@@ -119,3 +119,32 @@ targetRules = ["jwt", "generic-api-key"]
 description = "jeton de fixture du test du rapporteur de secrets (valeur factice, jamais émise par un service)"
 paths = ['''^backend/tests/test_secret_scan_workflow\.py$''']
 targetRules = ["github-pat", "generic-api-key"]
+
+# ── 6. Cas NÉGATIF de PostHog : `phx_…` refusé par la forme ────────────────
+# Le contrat CSP (`frontend/scripts/check-csp-contract.js`) et son test
+# (`frontend/src/utils/__tests__/analytics.test.js`) portaient tous deux la
+# MÊME fausse valeur, `phx_personnel123`, pour prouver qu'un jeton PERSONNEL
+# n'ouvre ni le CDN ni l'hôte d'ingestion. Les deux fixtures ont depuis été
+# réduites au seul préfixe (`phx_`) : un cas négatif a besoin de la forme qu'il
+# refuse, pas d'un corps qui ressemble à un secret.
+#
+# L'exception reste, bornée au COMMIT qui porte l'ancienne valeur et aux DEUX
+# chemins, parce qu'un détecteur de secrets relit l'histoire de la branche :
+# réécrire le fichier au HEAD ne retire pas la valeur du commit qui l'a
+# introduite, et une branche non fusionnée n'a pas d'autre voie honnête que de
+# DÉCLARER la fixture. Une valeur de cette famille déposée dans un autre
+# fichier, ou dans un commit neuf, reste refusée.
+[[allowlists]]
+description = "fixture `phx_personnel123` du cas négatif PostHog (jeton personnel factice, refusé par la forme)"
+condition = "AND"
+commits = ["d0e9b754318f60639bf04812ae06220539585ad9"]
+paths = [
+  '''^frontend/scripts/check-csp-contract\.js$''',
+  '''^frontend/src/utils/__tests__/analytics\.test\.js$''',
+]
+# Les deux chemins ci-dessus portent un antislash DEVANT LE POINT : `paths` est
+# une expression régulière relue par gitleaks, donc `\.` y désigne le point du
+# nom de fichier. C'est cette exception-là qui a été REJOUÉE avant livraison :
+# sans elle, `gitleaks git --log-opts="origin/main..HEAD"` rend 2 constats (les
+# deux fichiers, au commit d0e9b754), et avec elle aucun.
+targetRules = ["generic-api-key"]

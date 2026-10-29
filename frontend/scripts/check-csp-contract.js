@@ -139,12 +139,14 @@ export const CAS_REFERENCE = [
   },
   {
     // Un jeton personnel (`phx_…`) n'est PAS une clé de projet : il ne doit
-    // ouvrir aucune des deux origines, des deux côtés du contrat.
+    // ouvrir aucune des deux origines, des deux côtés du contrat. Le corps est
+    // laissé vide EXPRÈS : c'est le PRÉFIXE que `POSTHOG_MOTIF` refuse, et un
+    // faux jeton complet est exactement ce qu'un détecteur de secrets signale.
     label: 'clé PostHog invalide (jeton personnel)',
     api_origin: 'https://api.kojo.test',
     plausible_domain: '',
     ga_measurement_id: '',
-    posthog_key: 'phx_personnel123',
+    posthog_key: 'phx_',
   },
 ];
 
