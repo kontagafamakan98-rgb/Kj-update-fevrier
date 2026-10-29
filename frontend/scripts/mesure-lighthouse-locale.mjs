@@ -100,6 +100,8 @@
  *        --preset desktop --sans-build --out <dossier des LHR>
  *   node scripts/mesure-lighthouse-locale.mjs --routes / --runs 30 --sans-build
  *        # MÊME artefact : 30 runs, la dispersion de l'hôte pour cette page
+ *   node scripts/mesure-lighthouse-locale.mjs --nettoyer
+ *        # démonte la pile d'une passe interrompue (état nommé, pid(s) arrêtés)
  *
  * Les LHR complets sont écrits dans `--out` (défaut :
  * `<temp>/kojo-mesure-locale`) : chaque chiffre imprimé est relisible.
@@ -107,6 +109,28 @@
  * `--root <dossier>` sert à A/B deux artefacts SANS rebuild (ex. `build` contre
  * une copie élaguée) : c'est lui qui permet de dire ce qu'une réduction du
  * document rapporte, sur le même hôte, dans la même session.
+ *
+ * ── CE QUE LA MESURE EXIGE DE L'HÔTE (28/10/2026) ────────────────────────────
+ * Une seule pile à la fois. Le module `mesure-cycle.mjs` porte l'état de la
+ * passe, arrête les pid(s) sur SIGINT/SIGTERM/SIGHUP — un `finally` n'est
+ * JAMAIS atteint sur un signal — et REFUSE de démarrer si l'état d'une passe
+ * précédente est encore là, en nommant les pid(s) à arrêter (`--nettoyer` les
+ * arrête et retire l'état).
+ *
+ * Pourquoi cette règle est écrite ici, et pas seulement dans le module : elle
+ * est née d'un chiffre FAUX publié comme attribué. Tuée à 14 s en pleine passe,
+ * la mesure laissait 10 à 11 processus Chrome et les deux serveurs vivants
+ * (mesuré deux fois, 10 puis 11), et la passe suivante mesurait À CÔTÉ de la
+ * précédente. Sur le même artefact
+ * (`build` de `main`, `/`, mobile ×4) : une pile rend 417 à 793 ms de Style &
+ * Layout et des tâches longues de 112 à 272 ms ; deux piles ensemble ont rendu
+ * 2 528, puis 3 540 à 4 295 ms, avec un Speed Index étendu de 3 822 ms. Le
+ * « 1 511 à 2 445 ms de tâche longue sur / » qui a circulé décrivait donc
+ * l'hôte, pas le document pré-rendu.
+ *
+ * Conséquence sur la lecture : la dispersion du Style & Layout est publiée à
+ * côté de sa moyenne (bloc « Étendue du Style & Layout »), et un A/B sur
+ * artefacts élagués ne conclut que si l'écart dépasse cette étendue.
  */
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -121,6 +145,19 @@ import lighthouse, { defaultConfig, desktopConfig } from 'lighthouse';
 // écrits deux fois finissent par diverger de `playwright.config.js`.
 import budgets from './lhci-cls-budgets.cjs';
 import { DEFAULT_PORT } from './vercel-rewrite-server.js';
+// Le cycle de la mesure : état sur disque, arrêt des pids, dispersion. Importé
+// plutôt que recopié — ces règles se testent sans lancer Chrome (voir
+// scripts/__tests__/mesure-cycle.test.js), et une seconde écriture de
+// l'arrêt finirait par diverger de celle-ci.
+import {
+  arreterPids,
+  brancherArret,
+  dispersionDe,
+  ecrireEtat,
+  effacerEtat,
+  etatAnterieur,
+} from './mesure-cycle.mjs';
+import { lancerVeille } from './mesure-veille.mjs';
 
 const ICI = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND = path.resolve(ICI, '..');
@@ -197,6 +234,7 @@ const motifCorrespond = (motif, url) =>
 async function lancerChrome() {
   const chrome = await launch({ chromePath: CHROME, chromeFlags: DRAPEAUX_CI });
   return {
+    pid: chrome.pid,
     port: chrome.port,
     relacher: async () => {
       try { await chrome.kill(); } catch { /* EPERM au nettoyage : ignoré */ }
@@ -273,6 +311,60 @@ function portLibre(port) {
 const serveurs = [];
 let chrome = null;
 let sortie = 0;
+// Ce que cette passe a lancé, pour pouvoir le DÉMONTER même si elle n'atteint
+// jamais son `finally` (SIGTERM, erreur non rattrapée).
+const etat = { pid: process.pid, chrome: null, serveurs: [] };
+const persisterEtat = () => ecrireEtat(etat);
+
+// ── CE QU'UNE PASSE PRÉCÉDENTE A LAISSÉ (28/10/2026) ─────────────────────────
+// Un `finally` n'est atteint que si le processus va au bout : tuée en pleine
+// passe, la mesure laissait 10 Chrome et les deux serveurs vivants (mesuré).
+// Deux piles qui mesurent alors EN MÊME TEMPS rendent des chiffres qui décrivent
+// l'hôte — 2 528 à 4 295 ms de Style & Layout au lieu de 417 à 793 sur le même
+// artefact. La mesure refuse donc de démarrer sur une pile qu'elle n'a pas
+// montée, comme elle refuse déjà un port occupé : c'est la même règle, un cran
+// plus tôt et avec les pid(s) nommés.
+const anterieur = etatAnterieur();
+if (anterieur) {
+  if (!present('nettoyer')) {
+    console.error(`::error::${anterieur.refus}`);
+    process.exit(1);
+  }
+  const arretes = arreterPids(anterieur.pids);
+  effacerEtat();
+  console.log(`  nettoyage    : pid(s) arrêté(s) [${arretes.join(', ') || 'aucun'}] — état précédent retiré`);
+}
+
+// L'état est écrit AVANT la première brique : s'il existe encore au prochain
+// lancement, c'est que cette passe-là n'a pas été jusqu'au bout.
+persisterEtat();
+
+// ── LA VEILLE DÉTACHÉE (28/10/2026) ─────────────────────────────────────────
+// Les signaux ci-dessous ne suffisent pas : sur Windows, `kill -TERM` passe par
+// `TerminateProcess`, qui ne livre AUCUN signal (mesuré : 10 à 11 Chrome et
+// deux serveurs survivants, aucune ligne d'arrêt). Un processus séparé et détaché
+// — donc hors du groupe de la console — interroge la vie de cette passe une
+// fois par seconde et démonte ce que l'état nomme si elle disparaît sans lui.
+// Il sort de lui-même dès que l'état est retiré (fin normale).
+const veille = lancerVeille(process.pid, { cwd: FRONTEND });
+
+// Un signal n'exécute pas le `finally` : il démonte donc ici, et il le dit.
+const debrancherSignaux = brancherArret((signal) => {
+  const pids = [etat.chrome, ...serveurs.map((serveur) => serveur.enfant.pid)].filter(Boolean);
+  const arretes = arreterPids(pids);
+  for (const serveur of serveurs) {
+    try {
+      serveur.enfant.kill();
+    } catch {
+      /* déjà mort */
+    }
+  }
+  effacerEtat();
+  console.log(
+    `\n::warning::${signal} reçu : mesure interrompue, pile démontée (pid(s) arrêté(s) [${arretes.join(', ') || 'aucun'}]) — aucun chiffre n'est publié`
+  );
+  process.exit(signal === 'SIGINT' ? 130 : 143);
+});
 
 try {
   console.log(`Pile locale fidèle à la CI (preset ${PRESET})`);
@@ -324,6 +416,8 @@ try {
       {}
     )
   );
+  etat.serveurs = serveurs.map((serveur) => serveur.enfant.pid).filter(Boolean);
+  persisterEtat();
   console.log(`  racine servie: ${RACINE}`);
   console.log(`  fixture API  : http://127.0.0.1:${PORT_FIXTURE} (scripts/playtest-api-server.mjs)`);
   console.log(`  rewrites     : http://127.0.0.1:${PORT_PILE} → backend http://127.0.0.1:${PORT_FIXTURE} (vercel.json)`);
@@ -351,6 +445,8 @@ try {
     const ligne = { route, runs: [] };
     for (let i = 1; i <= RUNS; i += 1) {
       chrome = await lancerChrome();
+      etat.chrome = chrome.pid;
+      persisterEtat();
       let lhr = null;
       try {
         const resultat = await lighthouse(
@@ -367,6 +463,8 @@ try {
       } finally {
         await chrome.relacher();
         chrome = null;
+        etat.chrome = null;
+        persisterEtat();
       }
       if (!lhr) {
         console.error(`::error::${route} : le run ${i} n'a produit aucun rapport`);
@@ -478,6 +576,27 @@ try {
     );
   }
 
+  // ── L'ÉTENDUE DU STYLE & LAYOUT, PUBLIÉE AVEC LA MOYENNE (28/10/2026) ─────
+  // La moyenne du tableau ci-dessus ne dit pas si l'écart entre deux artefacts
+  // est mesurable. Mesuré ce jour-là : `/` a rendu 279, 696 et 277 ms de Style &
+  // Layout en trois runs du MÊME artefact (étendue 419 ms), alors qu'un écart
+  // entre `/` et `/jobs` valait ~200 ms — donc dans l'étendue. Et sur un hôte où
+  // deux piles mesuraient en même temps, la MÊME page a rendu 2 528 à 4 295 ms.
+  // Un chiffre pareil attribué au document a coûté une journée de recherche d'un
+  // « levier de performance » qui n'existait pas : l'étendue se publie donc à
+  // côté de la moyenne, pas seulement celle du Speed Index.
+  console.log('\nÉtendue du Style & Layout — MÊME artefact, aucun rebuild entre les runs :');
+  console.log('route         n    min  médiane    max  étendue');
+  for (const { route, runs } of table) {
+    const d = dispersionDe(runs.map((r) => r.styleLayout));
+    if (!d) continue;
+    console.log(
+      `${route.padEnd(12)} ${String(d.n).padStart(3)}  ${String(Math.round(d.min)).padStart(6)}  ` +
+        `${String(Math.round(d.mediane)).padStart(7)}  ${String(Math.round(d.max)).padStart(6)}  ${String(Math.round(d.etendue)).padStart(7)}`
+    );
+  }
+  console.log("Une différence plus PETITE que cette étendue ne s'attribue pas à l'artefact : elle décrit l'hôte.");
+
   // ── La VARIANCE, chiffrée — la moitié du relevé qui manquait ───────────────
   // Un minimum et une médiane ne se distinguent pas d'un effet réel tant qu'on
   // ne connaît pas la DISPERSION : c'est elle qui dit si un écart de quelques
@@ -531,9 +650,14 @@ try {
   console.error(`::error::${erreur.message}`);
   sortie = 1;
 } finally {
+  debrancherSignaux();
+  // La veille sort d'elle-même dès que l'état disparaît ; on la sollicite quand
+  // même, pour qu'un poste qui n'a pas vu le fichier ne garde pas un dormeur.
+  try { veille.kill(); } catch { /* déjà sortie */ }
   if (chrome) await chrome.relacher();
   for (const serveur of serveurs) {
     try { serveur.enfant.kill(); } catch { /* déjà mort */ }
   }
+  effacerEtat();
 }
 process.exit(sortie);
