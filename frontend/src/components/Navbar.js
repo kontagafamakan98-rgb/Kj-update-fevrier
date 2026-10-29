@@ -71,7 +71,7 @@ function LienDesktop({ to, actif, children }) {
 }
 
 export default function Navbar() {
-  const { user, logout, loading, sessionProbable } = useAuth();
+  const { user, logout } = useAuth();
   const { t } = useLanguage();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const menuRef = useRef(null);
@@ -149,45 +149,6 @@ export default function Navbar() {
   // support_role), jamais deviné.
   const versSupport = user?.is_owner || user?.support_role === 'agent' ? '/support-admin' : '/support';
 
-  // ── LA BARRE RÉSERVE LA DISPOSITION DE LA SESSION PENDANT L'AMORÇAGE ──────
-  // (29/10/2026) Une session est PROBABLE (trace locale, `AuthContext`) mais son
-  // profil n'est pas encore arrivé : la barre peignait alors les deux groupes
-  // d'un VISITEUR, puis les remplaçait par ceux d'un utilisateur connecté. Le
-  // second groupe passait de 365 à 406 px et la navigation de 0 à 451 px, donc
-  // les deux se déplaçaient SOUS le curseur du visiteur — mesuré à la sonde des
-  // cadres en 1350×940 : c'était la source des 0,0039 de CLS qui restaient sur
-  // /payment après le réglage de son cadre.
-  //
-  // Le remède est de peindre la disposition CONNECTÉE tout de suite, invisible :
-  // `visibility: hidden` occupe sa place sans se peindre, donc l'arrivée du
-  // profil ne fait que la RÉVÉLER — aucun déplacement, et rien à réécrire dans
-  // la géométrie quand un libellé change de langue. Les deux groupes sont
-  // réservés en même temps parce que les deux bougent.
-  //
-  // Ce que la réserve ne fait pas : elle ne clique pas (`visibility: hidden` sort
-  // du parcours de focus et des lecteurs d'écran, d'où l'`aria-hidden` qui dit
-  // la même chose en clair) et elle n'appelle rien — la cloche lit un contexte
-  // qui ne sonde le serveur QUE pour un utilisateur connu
-  // (`NotificationContext` : `if (!user) return`).
-  //
-  // Cas assumé, et c'est le seul : une trace qui ne vaut plus rien (session
-  // expirée, 401). La disposition réservée devient alors celle du visiteur, et
-  // ce remplacement-là est un DÉCALAGE RÉEL de l'état — le taire aurait voulu
-  // dire peindre un visiteur connecté.
-  const reserveLaBarreConnectee = !user && sessionProbable;
-  const commeConnecte = Boolean(user) || reserveLaBarreConnectee;
-  // ── UNE CLASSE COLLÉE À `${}` DISPARAÎT DE LA FEUILLE (mesuré le 29/10/2026) ──
-  // Tailwind lit le TEXTE des sources pour décider quels utilitaires émettre.
-  // Écrite `...space-x-6${sansPeinture}`, la classe devenait le candidat
-  // `space-x-6${sansPeinture}` — invalide — et `.space-x-6` n'était plus émise :
-  // les quatre entrées de la navigation se touchaient (379 px au lieu de
-  // 451 px, mesuré à la sonde des cadres) sans qu'aucun test de CLS ne le voie,
-  // puisque le CLS, lui, était parfaitement vert. D'où l'écriture en littéral
-  // COMPLET suivi d'une concaténation : le candidat reste `… space-x-6`.
-  // Garde : `scripts/check-classes-sans-regle.js` (une classe employée sans
-  // règle dans la feuille rougit) — il faut le lancer APRÈS le build.
-  const sansPeinture = reserveLaBarreConnectee ? ' invisible' : '';
-
   // L'entrée de menu est SOULIGNÉE quand on est déjà dessus : sans ce repère, un
   // visiteur qui navigue ne sait pas où il se trouve. Le soulignement reprend la
   // règle de survol des liens (même épaisseur, même couleur).
@@ -246,8 +207,8 @@ export default function Navbar() {
             </Link>
           </div>
 
-          <div className={'hidden md:flex items-center space-x-6' + sansPeinture} aria-hidden={reserveLaBarreConnectee || undefined}>
-            {commeConnecte ? (
+          <div className="hidden md:flex items-center space-x-6">
+            {user ? (
               <>
                 <LienDesktop to="/dashboard" actif={estActif('/dashboard')}>
                   {t('dashboard')}
@@ -287,8 +248,8 @@ export default function Navbar() {
           <div className="hidden md:flex items-center space-x-4">
             <LanguageSelector showDropdown={true} showFlags={true} className="mr-4" />
 
-            {commeConnecte ? (
-              <div className={'flex items-center space-x-4' + sansPeinture} aria-hidden={reserveLaBarreConnectee || undefined}>
+            {user ? (
+              <div className="flex items-center space-x-4">
                 {/* Cloche notifications — le BOUTON seulement : le panneau du
                     centre de notifications est monté une seule fois pour tout
                     le site (App.js) et se rend dans le conteneur de la cloche

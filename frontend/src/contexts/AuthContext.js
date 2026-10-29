@@ -16,24 +16,6 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ── UNE SESSION EST-ELLE ATTENDUE ? (29/10/2026) ─────────────────────────
-  // `hasSessionTrace()` répond AVANT tout appel réseau, et il est lu UNE fois
-  // (au montage) : c'est ce qui permet au chrome de peindre la disposition
-  // d'un utilisateur connecté pendant que le profil arrive, au lieu de peindre
-  // celle d'un visiteur puis de la remplacer — le remplacement déplaçait les
-  // deux groupes de la barre du haut (mesuré : 137 px pour la navigation,
-  // 40 px pour les commandes) et c'était la source des 0,0039 de CLS qui
-  // restaient sur /payment en 1350×940, une fois le cadre de la page réglé.
-  //
-  // Ce n'est PAS une promesse d'authentification : la trace ne prouve rien
-  // (voir `loadUser`), un 401 laisse `sessionProbable` sans effet (le profil
-  // reste nul, la disposition redevient celle du visiteur) et la valeur n'est
-  // vraie QUE pendant l'amorçage (`loading`) — jamais après un login ou un
-  // logout, où `loading` vaut déjà faux. Un visiteur sans trace ne paie donc
-  // rien : `false` au premier rendu, aucune disposition réservée.
-  const [traceInitiale] = useState(() => hasSessionTrace());
-  const sessionProbable = loading && traceInitiale;
-
   // NOTE AUTH (web) : la session est UNIQUEMENT le cookie httpOnly posé par le
   // backend. Aucun jeton n'est stocké dans localStorage ni sessionStorage, et
   // aucun en-tête Authorization n'est envoyé depuis le web : un script ne peut
@@ -574,7 +556,6 @@ export function AuthProvider({ children }) {
   const value = {
     user,
     loading,
-    sessionProbable,
     login,
     loginWithGoogle,
     linkGoogleAccount,
