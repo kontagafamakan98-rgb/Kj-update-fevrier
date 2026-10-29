@@ -114,6 +114,10 @@ function showUpdateNotification() {
 
   const notification = document.createElement('div');
   notification.id = 'kojo-sw-update-notification';
+  // La police du bandeau est CELLE DE LA PAGE, pas celle du système : il vit
+  // dans le document, donc hériter lui donne le dessin que tout le reste
+  // peint. C'était le seul morceau d'interface qui déclarait encore
+  // `system-ui`.
   notification.style.cssText = `
     position: fixed;
     bottom: 80px;
@@ -125,7 +129,7 @@ function showUpdateNotification() {
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     z-index: 10000;
-    font-family: system-ui, -apple-system, sans-serif;
+    font-family: inherit;
     display: flex;
     align-items: center;
     gap: 12px;

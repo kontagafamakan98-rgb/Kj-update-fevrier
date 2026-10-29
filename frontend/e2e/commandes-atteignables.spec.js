@@ -158,12 +158,23 @@ const RELEVE_ATTEIGNABILITE = () => {
  * vaut 0, aucune commande n'étant RECOUVERTE (le second constat reste vide).
  * Si un jour la carte publie un vrai appel, ce couple rougira ici et devra en
  * sortir.
+ *
+ * ── /payment@desktop SUIT LE 29/10/2026, POUR LA MÊME RAISON ──
+ * Le cadre de /payment porte désormais `min-h-screen` aux DEUX tailles : le CLS
+ * de son relâchement en 1350×940 valait 0,0274, source `<footer>` (`main.flex-1`
+ * colle le pied de page au bas de la fenêtre, donc ses 125 px sont visibles en
+ * permanence et son insertion par React compte), et il vaut 0,0039 une fois le
+ * cadre plein écran — le pied de page commence alors à y=1005, sous une fenêtre
+ * de 940. Le lien du pied de page, seule commande de ce premier écran, disparaît
+ * donc de la mesure en desktop comme il avait disparu en mobile. Conséquence
+ * assumée et écrite dans `PAGE_SECTIONS['/payment']`.
  */
 const COQUILLE_SANS_COMMANDE = [
   '/about@mobile',
   '/how-it-works@mobile',
   '/how-it-works@desktop',
   '/payment@mobile',
+  '/payment@desktop',
   '/privacy@mobile',
   '/privacy@desktop',
   '/terms@mobile',

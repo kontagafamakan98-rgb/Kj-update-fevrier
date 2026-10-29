@@ -688,7 +688,7 @@ text-transform:uppercase;letter-spacing:.02em;color:#57534e}
 .prix tbody tr:last-child th,.prix tbody tr:last-child td{border-bottom:0}
 .bloc{background:#fff;border:1px solid var(--trait);border-radius:.5rem;
 padding:1rem 1.15rem;margin:0 0 1rem}
-.bloc h3{margin:0 0 .35rem;font-size:1rem}
+.bloc h3{margin:0 0 .35rem;font-size:1.2rem}
 .bloc p{margin:0;font-size:.95rem;color:#44403c}
 """
 
@@ -786,7 +786,7 @@ def document(page: dict, origine: str, missions: list) -> str:
         '<meta name="twitter:card" content="summary_large_image" />\n'
         f'<meta name="twitter:title" content="{_esc(titre)}" />\n'
         f'<meta name="twitter:description" content="{_esc(description)}" />\n'
-        f"{pages_metier.balise_csp()}"
+        f"{pages_metier.balise_csp()}{pages_metier.ENTETES_POLICES}"
         f"<style>{STYLE}{GUIDES_STYLE}</style>\n"
         f'<script type="application/ld+json">{_json_ld(page, url)}</script>\n'
         "</head>\n<body>\n"
@@ -822,7 +822,7 @@ def document_introuvable(origine: str) -> str:
         "<title>Page introuvable — Kojo</title>\n"
         '<meta name="robots" content="noindex, follow" />\n'
         f'<link rel="canonical" href="{_esc(base)}/jobs" />\n'
-        f"{pages_metier.balise_csp()}<style>{STYLE}</style>\n"
+        f"{pages_metier.balise_csp()}{pages_metier.ENTETES_POLICES}<style>{STYLE}</style>\n"
         "</head>\n<body>\n"
         f"{pages_metier._en_tete()}<main>\n"
         "<h1>Ce guide n'existe pas</h1>\n"

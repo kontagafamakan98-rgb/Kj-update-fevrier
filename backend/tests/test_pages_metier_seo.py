@@ -21,7 +21,12 @@ Ce que ces tests tiennent, et pourquoi chacun existe :
   7. chaque page porte le LIEN D'ALERTE de son métier ou de sa ville
      (28/10/2026) : c'étaient les pages qui disaient honnêtement « aucune
      offre ouverte » et ne laissaient rien à faire au visiteur, alors que
-     l'alerte emploi existait déjà — et le bloc ne promet aucune offre.
+     l'alerte emploi existait déjà — et le bloc ne promet aucune offre ;
+  8. la TYPOGRAPHIE est celle du site (29/10/2026) : Inter au corps et
+     Cormorant Garamond aux titres, servies depuis `/fonts/*`. Ces pages
+     peignaient `system-ui`, la police d'aucune autre page — un visiteur
+     passait de `/jobs` à `/emplois/abidjan` en changeant de site sans
+     changer d'URL.
 
 Les mutations qui doivent rougir (rejouées à la main le 27/10/2026) :
 retirer la dérivation des villes, retirer l'échappement d'un titre, laisser
@@ -203,14 +208,14 @@ class TestLeLienDalerteEmploi:
 
     def test_la_page_metier_vise_sa_categorie(self):
         doc = pages.document(pages.trouver_metier("plomberie"), "metier", ORIGINE, [])
-        assert 'href="/jobs?alerte=1&amp;category=plumbing"' in doc
+        assert 'href="/jobs?alerte=1&amp;category=plumbing&amp;origine=metier"' in doc
         assert "Recevoir les missions de plomberie par email" in doc
 
     def test_la_page_ville_transmet_le_nom_de_la_ville(self):
         # Le NOM, pas le slug : la veille garde un texte libre comparé au nom de
         # la mission — « segou » ne correspondrait à aucune mission de Ségou.
         doc = pages.document(pages.trouver_ville("bamako"), "ville", ORIGINE, [])
-        assert 'href="/jobs?alerte=1&amp;ville=Bamako"' in doc
+        assert 'href="/jobs?alerte=1&amp;ville=Bamako&amp;origine=ville"' in doc
         assert "Recevoir les missions à Bamako par email" in doc
 
     def test_une_ville_accentuee_est_encodee_dans_le_lien(self):
@@ -228,12 +233,41 @@ class TestLeLienDalerteEmploi:
     def test_chaque_page_declare_l_alerte_de_son_sujet(self):
         for page in pages.PAGES_VILLES:
             assert pages.lien_alerte("ville", page) == (
-                f"/jobs?alerte=1&amp;ville={quote(page['nom'])}"
+                f"/jobs?alerte=1&amp;ville={quote(page['nom'])}&amp;origine=ville"
             ), page
         for page in pages.PAGES_METIERS:
             assert pages.lien_alerte("metier", page) == (
-                f"/jobs?alerte=1&amp;category={quote(page['categorie'])}"
+                f"/jobs?alerte=1&amp;category={quote(page['categorie'])}&amp;origine=metier"
             ), page
+
+    def test_chaque_origine_emise_appartient_au_vocabulaire_du_serveur(self):
+        """Le lien d'une page ne peut pas déclarer une provenance que la veille refuse.
+
+        Les deux applications sont déployées séparément : ce n'est pas un import
+        partagé, c'est le TEST qui les tient ensemble. Si l'une des deux listes
+        bouge seule, la veille née d'un lien serait refusée en 422 — un visiteur
+        qui clique un bouton du site ne verrait plus sa carte s'enregistrer.
+        """
+        from kojo_job_alerts import ORIGINES_ALERTE
+
+        paires = (
+            ("ville", pages.PAGES_VILLES[0]),
+            ("metier", pages.PAGES_METIERS[0]),
+        )
+        emises = set()
+        for genre, page in paires:
+            lien = pages.lien_alerte(genre, page)
+            marqueur = f"&amp;origine={genre}"
+            assert marqueur in lien, (
+                f"le lien d'une page {genre} ne déclare pas sa provenance : {lien}"
+            )
+            assert genre in ORIGINES_ALERTE, (
+                f"la page déclare « {genre} », absent de ORIGINES_ALERTE {ORIGINES_ALERTE}"
+            )
+            emises.add(genre)
+        # Les deux pages déclarent leur provenance, et ce ne sont pas les mêmes :
+        # une valeur recopiée des deux côtés ne mesurerait qu'une seule source.
+        assert emises == {"ville", "metier"}
 
     def test_le_lien_mene_a_une_route_servie(self):
         """`/jobs` est une route de l'application, pas une page inventée."""
@@ -380,3 +414,86 @@ class TestLEnTeteDesPages:
         for quoi, doc in documents.items():
             assert '<a href="/" class="marque">' in doc, quoi
             assert '<nav class="langues"' in doc, quoi
+
+
+class TestLaTypographieDesPages:
+    """Les deux polices du site sur les quarante-cinq pages du backend.
+
+    POURQUOI (29/10/2026) : ces pages étaient les seules à peindre `system-ui`,
+    alors que l'application sert Inter au corps et Cormorant Garamond aux titres
+    (`frontend/src/index.css`). Le passage de `/jobs` à `/emplois/abidjan`
+    changeait donc de site sans changer d'URL.
+
+    Ce qui est jugé, et pourquoi :
+
+      * les DEUX familles sont déclarées, avec les fichiers que le build sert —
+        un chemin recopié de travers répondrait 404, `font-display: swap` ne
+        dirait rien, et la page retomberait en silence sur la police de l'hôte ;
+      * le corps et les titres ne prennent PAS la même famille : c'est la
+        hiérarchie du site, et une seule des deux suffirait à la perdre ;
+      * les deux fichiers sont PRÉCHARGÉS, une fois chacun, `crossorigin`
+        compris — sans cet attribut le préchargement est ignoré en silence ;
+      * les guides ne redéclarent aucune famille : `STYLE` en est propriétaire,
+        et une seconde déclaration lui ferait reprendre la page.
+    """
+
+    def test_les_deux_familles_du_site_sont_declarees(self):
+        assert "font-family:'Inter'" in pages.STYLE
+        assert "font-family:'Cormorant Garamond'" in pages.STYLE
+        assert "system-ui" not in pages.STYLE, (
+            "la pile de remplacement ne doit plus citer la famille d'un autre site"
+        )
+
+    def test_chaque_famille_pointe_un_fichier_que_le_build_sert(self):
+        fichiers = [
+            "inter-variable-latin.woff2",
+            "inter-variable-latin-ext.woff2",
+            "cormorant-garamond-variable-latin.woff2",
+            "cormorant-garamond-variable-latin-ext.woff2",
+        ]
+        for nom in fichiers:
+            assert f"/fonts/{nom}" in pages.STYLE, nom
+            chemin = RACINE / "frontend" / "public" / "fonts" / nom
+            assert chemin.exists(), (
+                f"`{nom}` est déclaré dans la feuille mais absent de "
+                "frontend/public/fonts : la page retomberait sur la police de l'hôte"
+            )
+
+    def test_le_corps_et_les_titres_ne_prennent_pas_la_meme_famille(self):
+        assert "--police-texte:" in pages.STYLE
+        assert "--police-titre:" in pages.STYLE
+        corps = re.search(r"body\{[^}]*\}", pages.STYLE).group(0)
+        assert "font-family:var(--police-texte)" in corps
+        titres = re.search(r"h1,h2,h3\{[^}]*\}", pages.STYLE).group(0)
+        assert "font-family:var(--police-titre)" in titres
+
+    def test_les_deux_polices_sont_prechargees_une_fois(self):
+        import kojo_pages_guides as guides
+
+        documents = {
+            "une ville": pages.document(pages.PAGES_VILLES[0], "ville", ORIGINE, []),
+            "un métier": pages.document(pages.PAGES_METIERS[0], "metier", ORIGINE, []),
+            "un guide": guides.document(guides.PAGES_GUIDES[0], ORIGINE, []),
+            "une ville inconnue": pages.document_introuvable(ORIGINE),
+            "un guide inconnu": guides.document_introuvable(ORIGINE),
+        }
+        for quoi, doc in documents.items():
+            tetes = doc.split("</head>", 1)[0]
+            liens = re.findall(r'<link rel="preload"[^>]*>', tetes)
+            assert len(liens) == 2, f"{quoi} : {len(liens)} préchargement(s)"
+            for famille in ("inter", "cormorant-garamond"):
+                fichier = [lien for lien in liens if f"/fonts/{famille}-variable-latin.woff2" in lien]
+                assert len(fichier) == 1, f"{quoi} : {famille}"
+                assert 'as="font"' in fichier[0] and "crossorigin" in fichier[0], quoi
+
+    def test_les_guides_ne_redeclarent_aucune_famille(self):
+        """Une seule déclaration pour les 45 pages : celle de `pages_metier`."""
+        import kojo_pages_guides as guides
+
+        assert "font-family" not in guides.GUIDES_STYLE, (
+            "la feuille des guides redéclare une famille : elle écraserait celle "
+            "que les pages ville et métier peignent, sur le même site"
+        )
+        doc = guides.document(guides.PAGES_GUIDES[0], ORIGINE, [])
+        assert "font-family:var(--police-texte)" in doc
+        assert "font-family:var(--police-titre)" in doc

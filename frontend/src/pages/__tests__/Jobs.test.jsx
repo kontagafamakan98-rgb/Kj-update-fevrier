@@ -19,11 +19,18 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 
 // Paramètres d'URL mutables d'un cas à l'autre (hoistés : les fabriques de
 // vi.mock s'exécutent avant le corps du module).
-const { SEARCH_PARAMS, TOASTS } = vi.hoisted(() => ({
+const { SEARCH_PARAMS, TOASTS, AUTH, ALERTE } = vi.hoisted(() => ({
   SEARCH_PARAMS: { current: new URLSearchParams() },
   // Le refus de géolocalisation n'a que le toast pour le dire : sans un espion
   // STABLE d'un cas à l'autre, ce refus ne serait vérifiable nulle part.
   TOASTS: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
+  // Le compte : mutable, parce que la carte d'alerte n'est montée que pour un
+  // TRAVAILLEUR — le cas de provenance a besoin de ce rôle-là, les autres de
+  // personne du tout.
+  AUTH: { current: { user: null } },
+  // Ce que la page transmet à la carte : la provenance est un fait que `/jobs`
+  // LIT dans l'URL, et c'est ce passage-là qu'on mesure ici.
+  ALERTE: { current: [] },
 }));
 
 vi.mock('react-router-dom', () => ({
@@ -39,7 +46,13 @@ vi.mock('../../contexts/LanguageContext', async () => {
   return { useLanguage: () => ({ currentLanguage: 'fr', t: (key) => fr[key] || key }) };
 });
 
-vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: null }) }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => AUTH.current }));
+vi.mock('../../components/AlerteEmploi', () => ({
+  default: (props) => {
+    ALERTE.current.push(props);
+    return <div data-testid="alerte-emploi" />;
+  },
+}));
 vi.mock('../../contexts/CountryContext', () => ({
   useCountry: () => ({ currentCountry: 'mali', changeUserCountry: vi.fn(), isOwner: false }),
 }));
@@ -105,6 +118,8 @@ const VIDE_FILTRE = 'Aucune mission ne correspond à ces filtres.';
 
 beforeEach(() => {
   SEARCH_PARAMS.current = new URLSearchParams();
+  AUTH.current = { user: null };
+  ALERTE.current = [];
   TOASTS.success.mockReset();
   TOASTS.error.mockReset();
   TOASTS.info.mockReset();
@@ -458,5 +473,61 @@ describe('Jobs — un lien d’alerte venu d’une page ville ou métier', () =>
 
     await screen.findByText(VIDE);
     expect(screen.queryByText(fr.jobAlertTitle)).toBeNull();
+  });
+});
+
+describe('Jobs — la PROVENANCE transmise à la carte d’alerte', () => {
+  // `/jobs` est la page d'ARRIVÉE de tous les liens d'alerte : elle ne peut pas
+  // deviner d'où vient le visiteur. C'est le lien qui le déclare (`&origine=`,
+  // écrit par les pages ville et métier), et ce que la page en fait — le
+  // transmettre, ou retomber sur « directe » — décide de ce qui sera enregistré
+  // à la CRÉATION de la veille, donc de la seule mesure qui dira si ces pages
+  // produisent des alertes.
+  const monterPourUnTravailleur = () => {
+    AUTH.current = { user: { id: 'worker-1', user_type: 'worker', country: 'mali' } };
+    jobsAPI.getAll.mockResolvedValue([JOB_A]);
+  };
+
+  it('transmet l’origine déclarée par une page ville', async () => {
+    monterPourUnTravailleur();
+    SEARCH_PARAMS.current = new URLSearchParams('alerte=1&ville=Bamako&origine=ville');
+
+    render(<Jobs />);
+
+    await waitFor(() => expect(ALERTE.current.length).toBeGreaterThan(0));
+    const props = ALERTE.current[ALERTE.current.length - 1];
+    expect(props.origine).toBe('ville');
+    // Les critères du lien continuent de passer : la provenance s'y AJOUTE.
+    expect(props.villeInitiale).toBe('Bamako');
+    expect(props.ouvrirAlerte).toBe(true);
+  });
+
+  it('transmet l’origine déclarée par une page métier', async () => {
+    monterPourUnTravailleur();
+    SEARCH_PARAMS.current = new URLSearchParams('alerte=1&category=plumbing&origine=metier');
+
+    render(<Jobs />);
+
+    await waitFor(() => expect(ALERTE.current.length).toBeGreaterThan(0));
+    expect(ALERTE.current[ALERTE.current.length - 1].origine).toBe('metier');
+  });
+
+  it('sur /jobs sans lien, la provenance est « directe »', async () => {
+    monterPourUnTravailleur();
+
+    render(<Jobs />);
+
+    await waitFor(() => expect(ALERTE.current.length).toBeGreaterThan(0));
+    expect(ALERTE.current[ALERTE.current.length - 1].origine).toBe('directe');
+  });
+
+  it('une origine inconnue n’est pas relayée : le serveur refuserait la création', async () => {
+    monterPourUnTravailleur();
+    SEARCH_PARAMS.current = new URLSearchParams('alerte=1&ville=Bamako&origine=facebook');
+
+    render(<Jobs />);
+
+    await waitFor(() => expect(ALERTE.current.length).toBeGreaterThan(0));
+    expect(ALERTE.current[ALERTE.current.length - 1].origine).toBe('directe');
   });
 });

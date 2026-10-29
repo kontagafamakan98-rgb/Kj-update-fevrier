@@ -69,9 +69,18 @@ async def enregistrer_alerte_emploi(
 ):
     """Crée ou règle la veille du compte (une seule par compte).
 
-    Body: {category?, city?, country?, active?}. Une catégorie inconnue est
-    refusée en 422 : la ramener à « general » (ce que fait la normalisation des
-    missions) enverrait toutes les missions générales pour une faute de frappe.
+    Body: {category?, city?, country?, active?, origin?}. Une catégorie
+    inconnue est refusée en 422 : la ramener à « general » (ce que fait la
+    normalisation des missions) enverrait toutes les missions générales pour une
+    faute de frappe.
+
+    `origin` dit la page de DÉPART (`ville`, `metier`, `directe`) et n'est
+    écrite qu'à la CRÉATION : régler une veille existante ne réécrit pas d'où
+    elle vient. Une provenance hors vocabulaire est refusée en 422 — un client
+    qui se trompe de colonne fausserait exactement la mesure que ce champ
+    existe pour produire. Absent, le corps n'est pas une faute : la veille est
+    enregistrée avec `inconnue`, parce qu'une version d'avant le champ ne dit
+    rien et qu'on ne peut pas le lui faire dire.
 
     La veille est réservée aux TRAVAILLEURS : un client recevrait le catalogue
     qu'il publie lui-même.

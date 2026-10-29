@@ -44,6 +44,11 @@ const AlerteEmploi = ({
   categorieInitiale = '',
   villeInitiale = '',
   ouvrirAlerte = false,
+  // La page de DÉPART, telle que son lien la déclare (`ville`, `metier`, ou
+  // `directe` sur `/jobs`). Elle n'est pas devinée ici : cette carte est montée
+  // par `/jobs` dans tous les cas, donc la page d'arrivée ne dit rien de la
+  // provenance — c'est le lien qui la porte (`src/config/provenance-alerte.js`).
+  origine = 'directe',
 }) => {
   const { t } = useLanguage();
   const toast = useToast();
@@ -102,6 +107,10 @@ const AlerteEmploi = ({
         city: ville.trim() || null,
         country: pays || null,
         active: true,
+        // `origin` est le SEUL champ de provenance, et le serveur ne l'écrit
+        // qu'à la création : régler une veille existante ne réécrit pas la
+        // page d'où elle est née.
+        origin: origine,
       });
       setAlerte(donnees || { active: true });
       setEtat('pret');

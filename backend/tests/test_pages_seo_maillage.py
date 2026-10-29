@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Le maillage des pages ville, métier et guides : une seule liste, quatre rendus.
+"""Le maillage des pages ville, métier et guides : une seule liste, deux rendus.
 
 POURQUOI CE GARDE EXISTE (27/10/2026)
 
@@ -24,9 +24,15 @@ Ce qui peut diverger, et que ce fichier refuse :
   * un libellé RECOPIÉ À LA MAIN (« Prix : plomberie » écrit deux fois) finit
     par désigner un guide qui n'existe pas : les noms sont comparés à
     l'identique, pas seulement les slugs ;
-  * les quatre rendus (accueil React, coquille de l'accueil, pied de page
-    React, pied de page des coquilles) doivent lire CETTE déclaration : un
-    cinquième domicile serait une seconde liste, et rien ne le dirait ;
+  * les deux rendus du pied de page (React et coquille) doivent lire CETTE
+    déclaration : un troisième domicile serait une seconde liste, et rien ne le
+    dirait ;
+  * et le bloc ne doit apparaître QU'UNE fois par document. Mesuré le
+    29/10/2026 : l'accueil et sa coquille peignaient EN PLUS leur propre
+    section de maillage, juste au-dessus du pied de page qui publie la même,
+    donc « / » portait les trois groupes DEUX fois dans le même écran (/jobs et
+    /login une seule fois). Chacun de ces rendus lisait pourtant la bonne
+    déclaration — c'est le DOMAINE qui était en double, pas la liste ;
   * les trois titres de groupe sont des clés i18n : si l'une manque à un
     dictionnaire, la coquille publie « undefined » à la place du titre.
 """
@@ -40,13 +46,16 @@ RACINE = Path(__file__).resolve().parents[2]
 FRONTEND = RACINE / "frontend"
 LISTE = FRONTEND / "src" / "config" / "pages-seo.json"
 
-# Les quatre rendus qui publient le bloc, et le fichier où chacun le fait.
+# Les DEUX rendus qui publient le bloc, et le fichier où chacun le fait.
+# Le pied de page est rendu sur toutes les routes : c'est pourquoi la section de
+# maillage que l'accueil peignait en plus a été retirée (29/10/2026).
 RENDUS = {
-    "accueil React": FRONTEND / "src" / "pages" / "Home.js",
     "pied de page React": FRONTEND / "src" / "App.js",
     "coquille du pied de page": FRONTEND / "vite-plugins" / "prerender" / "app-chrome.js",
-    "coquille de l'accueil": FRONTEND / "vite-plugins" / "prerender" / "shells-home.js",
 }
+
+# Les fichiers autorisés à porter le bloc : la déclaration et ses deux rendus.
+DOMAINES_DU_MAILLAGE = set(RENDUS.values()) | {FRONTEND / "src" / "config" / "liens-seo.js"}
 
 LANGUES = ("fr", "en", "wo", "bm", "mos")
 CLES_TITRES = ("footerCities", "footerTrades", "footerGuides")
@@ -120,25 +129,56 @@ def test_aucun_libelle_n_est_vide_ni_double():
         assert len(noms) == len(set(noms)), f"{groupe} : deux pages de même libellé"
 
 
-# ── Les quatre rendus lisent CETTE déclaration ─────────────────────────────
+# ── Les deux rendus lisent CETTE déclaration ───────────────────────────────
 
-def test_les_quatre_rendus_lisent_la_meme_declaration():
+def test_les_deux_rendus_lisent_la_meme_declaration():
     """Un rendu qui tiendrait sa propre liste serait le défaut d'origine.
 
     Le module partagé (`src/config/liens-seo.js`) est le seul propriétaire du
-    balisage ; la coquille de l'accueil réutilise même la fonction du pied de
-    page (`liensSeoHtml`) au lieu de réécrire la chaîne.
+    balisage ; la coquille réutilise même la fonction du pied de page React
+    (`liensSeoHtml`, écrite une fois pour les deux) au lieu de réécrire la
+    chaîne.
     """
     for nom, chemin in RENDUS.items():
         source = chemin.read_text(encoding="utf-8")
-        if nom == "coquille de l'accueil":
-            assert "liensSeoHtml" in source, (
-                f"{nom} ne réutilise pas le bloc du pied de page — deux balisages divergeraient"
-            )
-            continue
         assert "config/liens-seo" in source, (
             f"{nom} ne lit pas src/config/liens-seo.js : il tient sa propre liste"
         )
+
+
+def test_le_maillage_n_est_peint_qu_une_fois_par_document():
+    """Un second domicile publierait le bloc DEUX fois dans le même écran.
+
+    C'est le doublon mesuré le 29/10/2026 : l'accueil peignait sa propre section
+    de maillage, puis le pied de page — qui la suit immédiatement — publiait la
+    même. Les deux lisaient pourtant la bonne déclaration : c'est le nombre de
+    DOMAINES que ce cas juge, pas la liste.
+
+    Le balayage couvre tout le front (composants, pages, coquilles) : un
+    troisième rendu réapparaîtrait ici, et pas ailleurs.
+    """
+    trouvees = set()
+    for racine in (FRONTEND / "src", FRONTEND / "vite-plugins"):
+        for chemin in racine.rglob("*"):
+            if not chemin.is_file() or chemin.suffix not in {".js", ".jsx"}:
+                continue
+            if "__tests__" in chemin.parts or chemin.name.endswith(".test.js"):
+                continue
+            source = chemin.read_text(encoding="utf-8", errors="ignore")
+            if "GROUPES_LIENS_SEO" in source or "liensSeoHtml(" in source:
+                trouvees.add(chemin)
+    en_trop = sorted(
+        str(chemin.relative_to(FRONTEND)) for chemin in trouvees - DOMAINES_DU_MAILLAGE
+    )
+    assert not en_trop, (
+        f"le maillage est peint par {en_trop} : le pied de page le publie déjà sur "
+        "toutes les routes, donc ce rendu-là afficherait les mêmes « Villes / "
+        "Métiers / Guides » deux fois dans le même document"
+    )
+    assert trouvees == DOMAINES_DU_MAILLAGE, (
+        "un des deux rendus du pied de page ne publie plus le bloc : "
+        f"{sorted(str(c.relative_to(FRONTEND)) for c in DOMAINES_DU_MAILLAGE - trouvees)}"
+    )
 
 
 def test_les_liens_sont_de_vrais_liens_et_pas_des_routes_react():
@@ -150,8 +190,8 @@ def test_les_liens_sont_de_vrais_liens_et_pas_des_routes_react():
     """
     module = (FRONTEND / "src" / "config" / "liens-seo.js").read_text(encoding="utf-8")
     assert "/emplois/" in module and "/metiers/" in module and "/guides/" in module
-    accueil = (FRONTEND / "src" / "pages" / "Home.js").read_text(encoding="utf-8")
-    bloc = accueil.split("GROUPES_LIENS_SEO.map", 1)[1].split("</section>", 1)[0]
+    pied = (FRONTEND / "src" / "App.js").read_text(encoding="utf-8")
+    bloc = pied.split("GROUPES_LIENS_SEO.map", 1)[1].split("</div>", 1)[0]
     assert "href={lien.href}" in bloc
     assert "<Link" not in bloc
 
@@ -203,9 +243,8 @@ def test_les_trois_familles_sont_des_depliants_et_les_liens_restent_publies():
     # L'ORDRE du document : le déclencheur, PUIS les liens, PUIS la fermeture.
     assert bloc.index("</summary>") < bloc.index("groupe.liens") < bloc.index("</details>")
 
-    # Les deux rendus React publient le MÊME élément, sans état ni condition.
-    for nom in ("accueil React", "pied de page React"):
-        source = RENDUS[nom].read_text(encoding="utf-8")
-        assert "<details key=" in source, f"{nom} ne publie plus de dépliant"
-        assert "<summary className=" in source, f"{nom} n'a pas de déclencheur"
-        assert "groupe.liens.map" in source, f"{nom} ne publie plus les liens"
+    # Le rendu React publie le MÊME élément, sans état ni condition.
+    rendu = RENDUS["pied de page React"].read_text(encoding="utf-8")
+    assert "<details key=" in rendu, "pied de page React : plus de dépliant"
+    assert "<summary className=" in rendu, "pied de page React : pas de déclencheur"
+    assert "groupe.liens.map" in rendu, "pied de page React : plus de liens publiés"

@@ -1080,17 +1080,33 @@ export const PAGE_SECTIONS = {
     // haute) et **645,8 px** après, donc le pied de page remontait de 293,5 px
     // — et c'est ce déplacement, pas sa hauteur, que Chrome compte.
     //
-    // Le cadre porte donc `min-h-screen` en mobile : la page courte fait la
-    // hauteur de la fenêtre, le pied de page s'arrête SOUS la ligne de
-    // flottaison (y=984 au lieu de 710,8) et le relâchement ne le déplace plus
-    // d'un pixel visible. `md:min-h-0` rend au desktop EXACTEMENT ce qu'il avait
-    // (`min-h-full` sur un parent de hauteur automatique vaut 0) : sa mesure du
-    // 28/10/2026 — pied à y=772, CLS 0,0331 — n'est pas touchée.
+    // Le cadre porte donc `min-h-screen` : la page courte fait la hauteur de la
+    // fenêtre, le pied de page s'arrête SOUS la ligne de flottaison (y=984 au
+    // lieu de 710,8 en mobile) et le relâchement ne le déplace plus d'un pixel
+    // visible.
+    //
+    // ── CE CADRE-ÉCRAN S'APPLIQUE AUSSI EN DESKTOP (29/10/2026), ET C'EST UNE MESURE ──
+    // Le `md:min-h-0` qui rendait au desktop son ancien `min-h-full` laissait
+    // SURVIVRE le décalage à cette taille : 1350×940, fixture, compte
+    // travailleur, `layout-shift` lu par `PerformanceObserver` sur l'artefact
+    // servi — CLS **0,0274**, source `<footer>` (0×0 → sa boîte à y=804).
+    // Relevé au marqueur sur le nœud : la coquille peint le pied de page à
+    // y=815 (125 px), React le RE-CRÉE à 1 005 px quand le repli du chunk est
+    // plus haut que la page, puis le fait remonter à 815 px — et c'est cette
+    // ENTRÉE dans l'écran que Chrome compte. La cause n'est ni la hauteur du
+    // pied de page ni la réserve d'écran du repli : retirer celle-ci en desktop
+    // (`min-height:0` posé sur `.reserve-pied-hors-ecran`) rend le MÊME 0,0274,
+    // parce que `main.flex-1` colle de toute façon le pied de page au bas de la
+    // fenêtre, donc ses 125 px sont visibles en permanence.
+    // Avec `min-h-screen` aux deux tailles, le pied de page démarre à 1 005 px
+    // et y reste : CLS **0,0039** (la pastille de la barre du haut, seule
+    // source restante) sur les DEUX branches de l'URL, contre 0,0274.
     //
     // Ce que ça change à l'écran, et c'est assumé : la carte « mission requise »
     // laisse une bande de fond sous elle au lieu de laisser le pied de page
-    // dépasser dans l'écran. Le contenu de la page, lui, n'est pas retaillé.
-    frameClass: 'min-h-screen md:min-h-0 bg-gray-50 py-8',
+    // dépasser dans l'écran, et c'est vrai en desktop aussi (la page défile de
+    // ~125 px de plus). Le contenu de la page, lui, n'est pas retaillé.
+    frameClass: 'min-h-screen bg-gray-50 py-8',
     corpsClass: 'max-w-6xl mx-auto px-4 space-y-6',
     // ── LE VOCABULAIRE D'ÉCRAN (17/10/2026) ──────────────────────────────────
     // /payment était le dernier écran déclaré sans le vocabulaire des autres :

@@ -60,19 +60,22 @@ const ENTREE_APPLICATION = /\/assets\/index-[^/]*\.js$/;
 const PLANCHER_MS = 5;
 /** Le nombre de sections de l'accueil : le héros plus NEUF différées (07/10/2026 ;
  * le héros plus DIX du 27/09 au 07/10, le temps de la galerie, puis de la bande
- * des chiffres — cette dernière retirée du corps), plus l'INDEX DES PAGES VILLE,
- * MÉTIER ET GUIDE ajouté le 27/10/2026 (onze le 28/10). Compté sur le document
+ * des chiffres — cette dernière retirée du corps). Compté sur le document
  * livré, jamais déduit : ce fichier refuse d'amputer un accueil dont la structure
  * a changé, ce qui est exactement ce qui l'avait arrêté le 07/10.
  *
- * L'index est la ONZIÈME et la DERNIÈRE, APRÈS le conteneur des sections
- * différées : il ne décale donc aucun rang. C'est ce qui compte ici — le rang de
- * ce compteur n'est PAS cosmétique : les `contain-intrinsic-size` de
+ * L'INDEX DES PAGES VILLE, MÉTIER ET GUIDE n'y est PLUS (29/10/2026) : il avait
+ * porté le compte à onze du 27 au 28/10, puis il a été retiré — le pied de page
+ * publie le même bloc, juste en dessous, donc « / » affichait « Villes /
+ * Métiers / Guides » DEUX fois dans le même écran (mesuré : deux occurrences
+ * dans build/index.html, une dans /jobs et /login).
+ *
+ * Le rang de ce compteur n'est PAS cosmétique : les `contain-intrinsic-size` de
  * `src/App.css` sont indexés par `nth-of-type`, donc retirer une section au
  * milieu décale la réserve de tous les rangs suivants. La preuve d'échec est le
- * premier endroit où ce décalage s'est vu. Une section ajoutée AVANT l'index
- * exige de revoir ces réserves, pas seulement ce nombre. */
-const SECTIONS_ACCUEIL = 11;
+ * premier endroit où ce décalage s'est vu. Ici l'index était le DERNIER, ce qui
+ * est précisément pourquoi sa disparition ne décale aucune réserve. */
+const SECTIONS_ACCUEIL = 10;
 
 /**
  * Retire du corps publié toutes les sections SAUF le héros — exactement la

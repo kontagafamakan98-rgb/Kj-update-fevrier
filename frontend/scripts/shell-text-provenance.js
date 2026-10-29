@@ -615,6 +615,27 @@ export const MARQUEURS_EN_EXEMPTION = [
       'UN propriétaire demanderait une constante que les deux canaux importent, hors du ' +
       'périmètre de cette passe',
   },
+  // ── LE NUMÉRO DU STATUT HTTP DE LA 404 (29/10/2026) ────────────────────────
+  // La 404 statique peint désormais la marque du site (`<p class="marque">404</p>`,
+  // la carte éditoriale de `src/pages/NotFound.js`) au lieu d'un simple titre :
+  // le fragment « 404 » est donc publié par une coquille, et il n'a de clé dans
+  // aucun dictionnaire — ce n'est pas un libellé traduisible, c'est le CODE du
+  // statut que Vercel renvoie. Sa valeur est identique dans les cinq langues, et
+  // lui donner une clé ferait cinq copies d'un numéro que les autres tests
+  // refusent précisément comme « copie du français ».
+  //
+  // Ce qui garantit que les deux 404 ne disent pas deux choses différentes n'est
+  // pas une clé, c'est la comparaison directionnelle de
+  // `scripts/__tests__/check-coquilles-equilibrees.test.js` (mêmes quatre
+  // destinations) et `src/pages/__tests__/NotFound.test.jsx` (même palette).
+  {
+    valeur: '404',
+    sorte: 'publie',
+    motif:
+      'le code du statut HTTP de la page, pas un libellé : il ne se traduit pas, donc il n\'a pas de clé ; ' +
+      'les deux 404 l\'écrivent en littéral et leurs destinations comme leur palette sont comparées par ' +
+      'check-coquilles-equilibrees et NotFound.test.jsx',
+  },
 ];
 
 /**

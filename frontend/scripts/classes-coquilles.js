@@ -188,6 +188,54 @@ export const CLASSES_PROPRES_AUX_COQUILLES = [
     module: 'vite-plugins/prerender/shells-routes.js',
     motif: "case à cocher de l'aperçu (les utilitaires de formulaire de React ne sont pas écrits en clair)",
   },
+  // ── LA 404 STATIQUE (29/10/2026) : SIX NOMS, PARCE QU'ELLE N'A PAS TAILWIND ──
+  // Cette page est servie sans bundle (un lien mort doit s'afficher même quand
+  // le JavaScript échoue), donc elle porte SA feuille, écrite en clair dans
+  // `vite-plugins/prerender/not-found.js`. Ses composants y sont nommés comme
+  // le site les nomme (carte, marque, boutons encre et clair, liste de liens),
+  // mais ce sont des RÈGLES CSS, pas des utilitaires : la 404 React peint les
+  // mêmes matières avec `carte-editoriale` / `bouton-encre`, donc aucun de ces
+  // six noms n'existe chez elle, et il n'y a pas de jumeau à exiger.
+  //
+  // Ce qui tient la parité des DEUX peintures n'est donc pas ce garde-ci mais
+  // les deux suivants, et c'est écrit pour qu'on ne croie pas l'inverse :
+  // `scripts/__tests__/check-coquilles-equilibrees.test.js` compare chaque
+  // littéral de couleur aux JETONS de `src/index.css` (et refuse le gris froid
+  // comme `orange-600`), et `src/pages/__tests__/NotFound.test.jsx` compare les
+  // QUATRE destinations des deux rendus. Les déclarer ici est ce que la règle
+  // demande : une décision nommée, pas un oubli avec un droit de passage.
+  {
+    publiee: 'carte',
+    module: 'vite-plugins/prerender/not-found.js',
+    motif:
+      'la 404 statique n’a pas de feuille Tailwind : elle porte la carte éditoriale du site dans SA feuille, sous son propre nom',
+  },
+  {
+    publiee: 'marque',
+    module: 'vite-plugins/prerender/not-found.js',
+    motif: 'marque « 404 » de cette même page, stylée par sa feuille inlinée (uppercase + orange-700 du site)',
+  },
+  {
+    publiee: 'actions',
+    module: 'vite-plugins/prerender/not-found.js',
+    motif: 'rangée des deux boutons de la 404 statique (mise en page portée par sa feuille, sans utilitaires)',
+  },
+  {
+    publiee: 'bouton encre',
+    module: 'vite-plugins/prerender/not-found.js',
+    motif:
+      'bouton principal de la 404 statique : `.bouton` + `.encre` de sa feuille, l’équivalent de `bouton bouton-encre` chez React',
+  },
+  {
+    publiee: 'bouton clair',
+    module: 'vite-plugins/prerender/not-found.js',
+    motif: 'bouton secondaire de la même page : `.bouton` + `.clair`, l’équivalent de `bouton bouton-clair` chez React',
+  },
+  {
+    publiee: 'liens',
+    module: 'vite-plugins/prerender/not-found.js',
+    motif: 'rangée des deux liens texte de la 404 statique, peinte par sa feuille (React utilise `nav` + utilitaires)',
+  },
 ];
 
 /**

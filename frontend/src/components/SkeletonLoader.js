@@ -847,7 +847,7 @@ export const PaymentContentSkeleton = () => {
 
 // Skeleton complet de la page Paiement (fallback Suspense de /payment) :
 // réplique l'enveloppe réelle — son cadre vient du PLAN de la route
-// (`PAGE_SECTIONS['/payment']` : `min-h-screen md:min-h-0 bg-gray-50 py-8` et le
+// (`PAGE_SECTIONS['/payment']` : `min-h-screen bg-gray-50 py-8` et le
 // conteneur `max-w-6xl`), jamais d'une copie écrite ici — et la carte de titre,
 // puis le contenu ci-dessus — le swap chunk → page ne déplace ni le footer
 // ancré (flex-1, cf. App.js) ni les cartes.
@@ -895,9 +895,20 @@ export const PaymentContentSkeleton = () => {
 // l'écran, le reste n'est jamais peint. La cause était le RÉTRÉCISSEMENT de la
 // page (ce repli réserve la branche la plus haute) : `main` mesurait 939,3 px
 // pendant le chargement et 645,8 px après, donc le pied de page remontait de
-// 293,5 px. Le cadre de la route porte donc `min-h-screen` en mobile (lu dans le
-// plan, ci-dessus) et le relâchement mesure 0,0000 sur les deux branches ; le
-// desktop est inchangé, `md:min-h-0` lui rendant son ancien `min-h-full`.
+// 293,5 px. Le cadre de la route porte donc `min-h-screen` (lu dans le plan,
+// ci-dessus) et le relâchement mesure 0,0000 sur les deux branches.
+//
+// ── LE MÊME CADRE-ÉCRAN S'APPLIQUE EN DESKTOP (29/10/2026), ET LA RÉSERVE N'Y
+//    ÉTAIT POUR RIEN ──
+// `md:min-h-0` rendait au desktop son ancien `min-h-full`, et le décalage y
+// survivait : 1350×940, fixture, compte travailleur, CLS **0,0274** mesuré sur
+// l'artefact servi, source `<footer>` — le pied de page était re-créé par React
+// à 1 005 px (le repli est plus haut que la page) puis remontait à 815 px, où
+// `main.flex-1` le colle au bas de la fenêtre. Retirer la réserve d'écran en
+// desktop rend le MÊME 0,0274 : ce n'est pas elle qui déplace le pied de page,
+// c'est le cadre qui le laisse visible en permanence. Avec `min-h-screen` aux
+// deux tailles, le pied de page reste à 1 005 px et le CLS tombe à **0,0039**
+// (la pastille de la barre du haut) sur les deux branches de l'URL.
 export const PaymentSkeleton = () => {
   const plan = PAGE_SECTIONS['/payment'];
   const { hauteurClass } = REGLES_DE_CHARGEMENT['/payment'];

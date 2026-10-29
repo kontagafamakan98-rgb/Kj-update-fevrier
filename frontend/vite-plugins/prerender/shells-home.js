@@ -39,11 +39,6 @@ import { svgDeLIcone, svgDuDrapeau } from './icons-serveur.js'
 // `scripts/check-classes-coquilles.js` refuse qu'un champ du domicile soit
 // RETAPÉ ici.
 import { CONTENEUR_CLASS } from '../../src/config/classes-chrome.js'
-// Le bloc de maillage vers les pages ville, métier et guides : le MÊME balisage
-// que le pied de page (app-chrome.js), importé au lieu d'être réécrit. Les
-// libellés viennent de `pages-seo.json`, que le backend relit dans un garde —
-// la coquille ne tient aucune liste de villes ni de métiers.
-import { liensSeoHtml } from './app-chrome.js'
 
 export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
   // ── Shell statique de l'ACCUEIL (index.html) ────────────────────
@@ -551,17 +546,11 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `</section>`,
     `</div>`,
 
-    // ── LE MAILLAGE VERS LES PAGES VILLE, MÉTIER ET GUIDES ────────────────
-    // Un FRÈRE du conteneur `sections-differees`, pas un enfant : une section
-    // ajoutée dedans exige un `contain-intrinsic-size` mesuré de plus
-    // (src/App.css), sans quoi la hauteur du document s'effondre au défilement.
-    // Hors du conteneur elle n'est pas différée, donc rien n'est à réserver —
-    // et src/pages/Home.js la rend au même endroit, avec les mêmes classes.
-    `<section class="${sectionClass} ${paperClass}">`,
-    `<div class="${CONTENEUR_CLASS}">`,
-    liensSeoHtml({ esc, T }),
-    `</div>`,
-    `</section>`,
+    // ── PAS DE MAILLAGE ICI (29/10/2026) ──────────────────────────────────
+    // La coquille peignait ce bloc-là PUIS celui du pied de page, qui le suit
+    // immédiatement : le document de « / » portait donc le bloc DEUX fois.
+    // Il ne vit plus que dans le pied de page (`piedDePage` d'app-chrome.js),
+    // publié sur toutes les routes — src/pages/Home.js fait de même.
 
     // Le PIED DE PAGE n'est PAS ici : il appartient au CHROME de
     // l'application (`piedDePage` d'app-chrome.js), qui le publie après

@@ -332,7 +332,15 @@ describe('app-chrome — l’alignement est EXPLICITE, plus hérité (refonte du
     // concerner. app.html, lui, publie un `#root` VIDE (l'enveloppe y vient de
     // React au montage) : rien à aligner. Ces deux exceptions sont écrites dans
     // le commentaire d'App.css, et elles sont les seules.
-    expect(NOT_FOUND).toMatch(/main\{[^}]*text-align:center/);
+    //
+    // L'ADRESSE de cette règle a changé le 29/10/2026 : le centrage vivait sur
+    // `main`, il vit sur `.carte` — la 404 peignant désormais la carte
+    // éditoriale du site, c'est elle qui porte le `text-align`, et `main` n'est
+    // plus qu'un conteneur de largeur. Ce que le cas juge n'a pas bougé : un
+    // alignement EXPLICITE, jamais hérité. Et pas sur `body`, qui le
+    // transmettrait à tout ce que la page publiera un jour.
+    expect(NOT_FOUND).toMatch(/\.carte\{[^}]*text-align:center/);
+    expect(NOT_FOUND).not.toMatch(/body\{[^}]*text-align:center/);
     expect(NOT_FOUND).not.toContain('App.css');
   });
 });

@@ -508,12 +508,18 @@ def lien_alerte(genre: str, page: dict) -> str:
     page — la veille garde ce texte et le compare au nom de la mission, donc
     envoyer le slug (« segou ») ferait une alerte qui ne correspondrait à
     rien. Le `&` est écrit `&amp;` : c'est un attribut `href`.
+
+    `origine` DÉCLARE la page de départ (29/10/2026) : `/jobs` ne peut pas la
+    deviner, parce qu'y arriver avec `ville=Bamako` ne dit pas si le visiteur
+    vient de la page de Bamako ou d'un lien recopié. Le genre EST cette
+    provenance — il est donc écrit tel quel, et un test vérifie que la valeur
+    émise appartient au vocabulaire de `kojo_job_alerts.ORIGINES_ALERTE`.
     """
     if genre == "metier":
         parametres = f"alerte=1&amp;category={quote(page['categorie'])}"
     else:
         parametres = f"alerte=1&amp;ville={quote(page['nom'])}"
-    return f"/jobs?{parametres}"
+    return f"/jobs?{parametres}&amp;origine={quote(genre)}"
 
 
 def _bloc_alerte(genre: str, page: dict) -> str:
@@ -577,11 +583,73 @@ def _json_ld(page: dict, genre: str, url: str, missions: Iterable[dict]) -> str:
     return seed_json(donnees)
 
 
-STYLE = """
-:root{--sable:#fcf8f2;--encre:#1c1917;--brun:#7c2d12;--orange:#c2410c;--trait:#e7e2d8}
+# ── LES DEUX POLICES DU SITE, DÉCLARÉES POUR LES PAGES QUI N'ONT PAS REACT ──
+#
+# Ces 45 pages (villes, métiers, guides) sont écrites par le backend, mais leur
+# URL est celle du SITE (`frontend/vercel.json` les réécrit) : `/fonts/*` y
+# répond donc depuis le build Vercel, et `font-src 'self'` les autorise.
+#
+# Sans ces deux `@font-face`, ces pages peignaient `system-ui` — la police
+# d'AUCUNE autre page du site, qui sert Inter au corps et Cormorant Garamond
+# aux titres (`frontend/src/index.css`). Un visiteur qui passait de `/jobs` à
+# `/emplois/abidjan` changeait de site sans changer d'URL.
+#
+# Les `unicode-range` sont ceux d'`index.css`, aux mêmes valeurs : le
+# sous-ensemble `latin-ext` (œ, ɛ, ɔ, ŋ) n'est téléchargé que si un texte
+# l'emploie, donc une page française ne paie pas les deux fichiers.
+#
+# CE QUI N'EST PAS RECOPIÉ, ET POURQUOI : les faces de repli à `size-adjust`
+# (`Inter repli Arial`, `Cormorant Garamond repli Times`) restent propres au
+# build. Ce sont des constantes MESURÉES sur des éléments dont le déplacement
+# est suivi (le héros de l'accueil, les titres de section) ; ces pages-ci n'ont
+# ni budget de CLS ni élément LCP suivi, et recopier quatre constantes ici en
+# ferait une SECONDE propriétaire, qui divergerait à la première re-mesure.
+# `font-display: swap` et les deux préchargements ci-dessous couvrent le cas.
+POLICES = """
+@font-face{font-family:'Inter';font-style:normal;font-weight:100 900;
+font-display:swap;src:url('/fonts/inter-variable-latin.woff2') format('woff2');
+unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,
+U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,
+U+FEFF,U+FFFD}
+@font-face{font-family:'Inter';font-style:normal;font-weight:100 900;
+font-display:swap;src:url('/fonts/inter-variable-latin-ext.woff2') format('woff2');
+unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,
+U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,
+U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Cormorant Garamond';font-style:normal;font-weight:500 700;
+font-display:swap;
+src:url('/fonts/cormorant-garamond-variable-latin.woff2') format('woff2');
+unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,
+U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,
+U+FEFF,U+FFFD}
+@font-face{font-family:'Cormorant Garamond';font-style:normal;font-weight:500 700;
+font-display:swap;
+src:url('/fonts/cormorant-garamond-variable-latin-ext.woff2') format('woff2');
+unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,
+U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,
+U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+"""
+
+# Le préchargement, UN par famille — les mêmes fichiers que `frontend/index.html`,
+# avec le même `latin` seul. `crossorigin` est OBLIGATOIRE même en même-origine :
+# les polices se téléchargent toujours en mode CORS, et sans l'attribut le
+# préchargement est ignoré en silence (le fichier serait alors découvert à
+# l'analyse du CSS, donc après le premier paint).
+ENTETES_POLICES = (
+    '<link rel="preload" as="font" type="font/woff2" '
+    'href="/fonts/inter-variable-latin.woff2" crossorigin />\n'
+    '<link rel="preload" as="font" type="font/woff2" '
+    'href="/fonts/cormorant-garamond-variable-latin.woff2" crossorigin />\n'
+)
+
+STYLE = POLICES + """
+:root{--sable:#fcf8f2;--encre:#1c1917;--brun:#7c2d12;--orange:#c2410c;--trait:#e7e2d8;
+--police-texte:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,
+"Helvetica Neue",Arial,sans-serif;
+--police-titre:'Cormorant Garamond',Georgia,'Times New Roman',serif}
 *{box-sizing:border-box}
 body{margin:0;background:var(--sable);color:var(--encre);
-font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.6}
+font-family:var(--police-texte);line-height:1.6}
 header{border-bottom:1px solid var(--trait);padding:1rem 1.25rem;display:flex;
 align-items:center;justify-content:space-between;gap:.6rem 1rem;flex-wrap:wrap}
 header .marque{display:inline-flex;align-items:center;gap:.55rem;font-weight:700;
@@ -592,12 +660,14 @@ nav.langues a{color:var(--brun);text-decoration:none}
 nav.langues a:hover{text-decoration:underline}
 nav.langues a[aria-current]{color:var(--encre);font-weight:700;text-decoration:underline}
 main{max-width:52rem;margin:0 auto;padding:2rem 1.25rem 3rem}
-h1{font-size:clamp(1.6rem,4vw,2.3rem);line-height:1.2;margin:.2rem 0 1rem}
+h1,h2,h3{font-family:var(--police-titre);font-weight:700}
+h1{font-size:clamp(1.9rem,4.4vw,2.7rem);line-height:1.15;margin:.2rem 0 1rem;
+letter-spacing:-.01em}
 .intro{font-size:1.05rem;margin:0 0 1.75rem}
 .cta{display:inline-block;background:var(--orange);color:#fff;text-decoration:none;
 padding:.7rem 1.15rem;border-radius:.5rem;font-weight:600;margin-bottom:2rem}
 .cta:hover{background:var(--brun)}
-h2{font-size:1.2rem;margin:2rem 0 .75rem}
+h2{font-size:clamp(1.35rem,2.3vw,1.7rem);line-height:1.2;margin:2rem 0 .75rem}
 ul.offres{list-style:none;padding:0;margin:0}
 .offre{padding:.85rem 0;border-bottom:1px solid var(--trait)}
 .offre a{color:var(--brun);font-weight:600;text-decoration:none}
@@ -605,7 +675,7 @@ ul.offres{list-style:none;padding:0;margin:0}
 .meta{display:block;color:#57534e;font-size:.9rem;margin-top:.2rem}
 .etapes{display:grid;gap:1rem;grid-template-columns:1fr}
 @media(min-width:44rem){.etapes{grid-template-columns:repeat(3,1fr)}}
-.etape h3{margin:0 0 .35rem;font-size:1rem}
+.etape h3{margin:0 0 .35rem;font-size:1.2rem}
 .etape p{margin:0;font-size:.95rem;color:#44403c}
 .maillage{display:grid;gap:1rem;grid-template-columns:1fr;margin-top:2.5rem}
 @media(min-width:44rem){.maillage{grid-template-columns:1fr 1fr}}
@@ -679,7 +749,7 @@ def document(page: dict, genre: str, origine: str, missions: list) -> str:
         f'<meta name="twitter:card" content="summary_large_image" />\n'
         f'<meta name="twitter:title" content="{_esc(titre)}" />\n'
         f'<meta name="twitter:description" content="{_esc(description)}" />\n'
-        f"{balise_csp()}"
+        f"{balise_csp()}{ENTETES_POLICES}"
         f"<style>{STYLE}</style>\n"
         f'<script type="application/ld+json">{_json_ld(page, genre, url, missions)}</script>\n'
         "</head>\n<body>\n"
@@ -710,7 +780,7 @@ def document_introuvable(origine: str) -> str:
         "<title>Page introuvable — Kojo</title>\n"
         '<meta name="robots" content="noindex, follow" />\n'
         f'<link rel="canonical" href="{_esc(base)}/jobs" />\n'
-        f"{balise_csp()}<style>{STYLE}</style>\n"
+        f"{balise_csp()}{ENTETES_POLICES}<style>{STYLE}</style>\n"
         "</head>\n<body>\n"
         f"{_en_tete()}<main>\n"
         "<h1>Cette page n'existe pas</h1>\n"

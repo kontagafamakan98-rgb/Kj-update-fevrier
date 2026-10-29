@@ -16,6 +16,7 @@ import { jobsAPI } from '../services/apiEndpoints';
 import { getLocaleForLanguage } from '../utils/pack2PageI18n/core';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/jobs';
 import { PAGE_SECTIONS } from '../config/page-sections';
+import { origineDepuisURL } from '../config/provenance-alerte';
 import { getJobUiLabel } from '../utils/jobUiLocale';
 import { safeLog } from '../utils/env';
 import { PremiersArrivants, JobCard } from '../components/JobsResults';
@@ -124,6 +125,12 @@ export default function Jobs() {
   // transmet le NOM de la ville, pas son slug.
   const alerteDemandee = searchParams.get('alerte') === '1';
   const villeAlerte = searchParams.get('ville') || '';
+  // La PROVENANCE que le lien déclare (`&origine=ville|metier`, écrit par les
+  // pages servies par le backend). Elle est lue ici et transmise à la carte, qui
+  // l'envoie au serveur à la CRÉATION ; sans lien, c'est `/jobs` lui-même
+  // (`directe`). Une valeur inconnue retombe sur ce défaut plutôt que d'être
+  // relayée — le serveur refuserait la création pour un lien mal recopié.
+  const origineAlerte = origineDepuisURL(searchParams.get('origine'));
   const [filters, setFilters] = useState(() => ({
     category: searchParams.get('category') || '',
     // Le PAYS arrive par un LIEN (`/jobs?country=mali`), depuis le ruban de
@@ -409,6 +416,7 @@ export default function Jobs() {
           ouvrirAlerte={alerteDemandee}
           categorieInitiale={filters.category || ''}
           villeInitiale={villeAlerte}
+          origine={origineAlerte}
         />
       )}
 

@@ -65,6 +65,9 @@ describe('AlerteEmploi', () => {
       city: 'Dakar',
       country: 'senegal',
       active: true,
+      // La carte ne DEVINE pas sa provenance : sans page d'origine déclarée,
+      // elle dit « directe », et c'est `/jobs` qui envoie autre chose.
+      origin: 'directe',
     });
     expect(toast.success).toHaveBeenCalledWith('jobAlertSaved');
   });
@@ -81,7 +84,30 @@ describe('AlerteEmploi', () => {
       city: null,
       country: 'senegal',
       active: true,
+      origin: 'directe',
     });
+  });
+
+  it('envoie la provenance qu’on lui a donnée, sans la réinventer', async () => {
+    // Le lien d'une page ville porte sa provenance (`&origine=ville`) ; la
+    // carte la transmet telle quelle, et le serveur ne l'écrit qu'à la
+    // CRÉATION — une veille garde la page d'où elle est née.
+    render(
+      <AlerteEmploi
+        categories={CATEGORIES}
+        pays="mali"
+        ouvrirAlerte
+        villeInitiale="Bamako"
+        origine="ville"
+      />
+    );
+
+    await screen.findByLabelText('jobAlertCity');
+    await userEvent.click(screen.getByRole('button', { name: 'jobAlertSave' }));
+
+    await waitFor(() => expect(api.put).toHaveBeenCalledTimes(1));
+    expect(api.put.mock.calls[0][1].origin).toBe('ville');
+    expect(api.put.mock.calls[0][1].city).toBe('Bamako');
   });
 
   it('affiche l’état actif et permet de couper la veille', async () => {
