@@ -295,18 +295,38 @@ const CLS_BUDGETS = {
   // CLS **0,0000**, aucune source, et les groupes à leur géométrie finale dès
   // la première peinture (451,02 px à x=264,66 · 405,69 px à x=877,31).
   //
-  // Le plafond descend de 0,02 à 0,0035 : juste SOUS les 0,0039 retirés, donc
-  // leur retour ROUGIT — c'est le rôle de ce chiffre, pas une marge de confort.
-  // Il reste 28× sous le seuil « bon » de Lighthouse (0,1) et 7× sous le
-  // garde-fou du fichier de test (`max × 7 < 0,15`).
+  // LE PLANCHER DE LA CI EST 0,0093, ET IL N'EST PAS LA BARRE (29/10/2026).
+  // Le plafond avait été posé à 0,0035, juste sous les 0,0039 retirés. La CI a
+  // rendu /payment desktop à 0,0093 DEUX FOIS DE SUITE (run relancé, même
+  // valeur) et NOMMÉ la source : `<footer.border-t.verre-barre>` 0×0 →
+  // 1350×84,7 px à (0, 855,3), à t=159,6 ms. Ce n'est pas un mouvement : la
+  // coquille peint le pied de page DANS le point de montage React, donc
+  // createRoot le détruit et le recrée à l'identique — Chrome compte la
+  // création comme une entrée (aucun rect précédent, donc départ 0×0). Le coût
+  // suit la part du pied de page qui ENTRE dans l'écran (84,7 px pour 940 :
+  // cadre `min-h-screen`, `main.flex-1`), et il existe sur main aussi, où le
+  // plafond de 0,02 le couvrait. Deux runs locaux ne l'avaient pas vu : le
+  // planché n'est donc pas une propriété du poste, et un plafond SOUS lui
+  // rougit au hasard des machines.
+  //
+  // Le plafond passe donc à 0,012 : au-dessus du plancher mesuré (1,29×) et
+  // toujours SOUS le 0,0274 du cadre mobile d'avant (2,28×), donc la
+  // régression d'origine rougit encore. Le retrait des deux groupes n'est plus
+  // prouvé par ce chiffre (0,0039 y serait noyé) mais par `Navbar.test.jsx`,
+  // qui exige l'ÉGALITÉ de la signature des commandes réservées avec celle
+  // d'un compte connecté — une classe ne le prouverait pas.
   '/payment': {
-    max: 0.0035,
-    pireMediane: 0,
+    max: 0.012,
+    pireMediane: 0.0093,
     mesure:
-      'MESURE DU 29/10/2026, DÉCALAGE DES DEUX GROUPES DE LA BARRE RETIRÉ : 1350×940, compte travailleur, '
+      'PLANCHER DE LA CI, 29/10/2026 : /payment desktop rend **0,0093** deux fois de suite, source nommée '
+      + '`<footer>` 0×0 → 1350×84,7 px à (0, 855,3) à t=159,6 ms — le pied de page de la coquille, détruit et '
+      + 'recréé par createRoot (aucun rect précédent), compté pour la part qui entre dans l’écran. Plafond porté de '
+      + '0,0035 à **0,012** (1,29× au-dessus du plancher, 2,28× sous le 0,0274 d’avant). '
+      + 'MESURE LOCALE, MÊME JOUR, DÉCALAGE DES DEUX GROUPES DE LA BARRE RETIRÉ : 1350×940, compte travailleur, '
       + 'artefact servi, CLS **0,0039 → 0,0000** (2 runs, aucune source rapportée, groupes à 451,02 px à '
-      + 'x=264,66 et 405,69 px à x=877,31 dès la première peinture) ; plafond 0,02 → 0,0035, sous les 0,0039 '
-      + 'retirés. '
+      + 'x=264,66 et 405,69 px à x=877,31 dès la première peinture) — mesure CONTREDITE par la CI sur le pied de '
+      + 'page, d’où le plafond ci-dessus. '
       + 'MESURE PRÉCÉDENTE, CADRE PLEIN ÉCRAN AUX DEUX TAILLES : en 1350×940, CLS **0,0274 → 0,0039** sur les '
       + 'DEUX branches de l’URL (6 runs mesurés sur l’artefact servi, pied de page à y=1 005 pour une fenêtre de '
       + '940) ; le mobile est inchangé (0,0000, pied à y=1 004,33). '
