@@ -346,6 +346,13 @@ describe('initAnalytics — PostHog, conditionnel et une seule vue par navigatio
     expect(sdk.init).toHaveBeenCalledTimes(1);
     const [cle, options] = sdk.init.mock.calls[0];
     expect(cle).toBe(CLE);
+    // Le SDK ÉCRIT ses défauts dans l'objet qu'on lui passe : un objet gelé le
+    // fait échouer au premier `init` (« Cannot add property debug, object is
+    // not extensible », mesuré en production le 29/10/2026 — le script se
+    // chargeait, la console portait l'exception, aucune vue ne partait).
+    expect(Object.isFrozen(options), 'les options données au SDK doivent être une COPIE').toBe(
+      false
+    );
     expect(options).toMatchObject({
       api_host: POSTHOG_API_HOST,
       capture_pageview: false,
