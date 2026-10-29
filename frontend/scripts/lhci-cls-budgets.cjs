@@ -282,11 +282,52 @@ const CLS_BUDGETS = {
   // y=1 005 pour une fenêtre de 940. 0,02 et non 0,01 : c'est un plafond de
   // RÉGRESSION — la valeur d'avant (0,0274) doit rougir —, pas encore la marge
   // serrée des routes à 0,0039.
+  // ── CE QUI RESTAIT, 0,0039, EST NOMMÉ, RETIRÉ, ET LE PLAFOND SUIT (29/10/2026) ──
+  // Le reliquat de 0,0039 avait une cause précise, publiée par la sonde : les
+  // DEUX groupes de la barre du haut, qui changeaient de largeur à l'arrivée de
+  // la session. Relevé à t=129,3 ms, 1350×940, compte travailleur : navigation
+  // 588 → 451 px (x 216,3 → 264,7) et commandes 365,3 → 405,7 px (x 917,7 →
+  // 877,3). La barre peint désormais la disposition CONNECTÉE, invisible, quand
+  // une session est probable (`sessionProbable`, AuthContext) : l'arrivée du
+  // profil ne fait que la révéler.
+  //
+  // MESURE APRÈS, MÊME PROTOCOLE, MÊME ARTEFACT QUE LA CI SERT (2 runs) :
+  // CLS **0,0000**, aucune source, et les groupes à leur géométrie finale dès
+  // la première peinture (451,02 px à x=264,66 · 405,69 px à x=877,31).
+  //
+  // LE PLANCHER DE LA CI EST 0,0093, ET IL N'EST PAS LA BARRE (29/10/2026).
+  // Le plafond avait été posé à 0,0035, juste sous les 0,0039 retirés. La CI a
+  // rendu /payment desktop à 0,0093 DEUX FOIS DE SUITE (run relancé, même
+  // valeur) et NOMMÉ la source : `<footer.border-t.verre-barre>` 0×0 →
+  // 1350×84,7 px à (0, 855,3), à t=159,6 ms. Ce n'est pas un mouvement : la
+  // coquille peint le pied de page DANS le point de montage React, donc
+  // createRoot le détruit et le recrée à l'identique — Chrome compte la
+  // création comme une entrée (aucun rect précédent, donc départ 0×0). Le coût
+  // suit la part du pied de page qui ENTRE dans l'écran (84,7 px pour 940 :
+  // cadre `min-h-screen`, `main.flex-1`), et il existe sur main aussi, où le
+  // plafond de 0,02 le couvrait. Deux runs locaux ne l'avaient pas vu : le
+  // planché n'est donc pas une propriété du poste, et un plafond SOUS lui
+  // rougit au hasard des machines.
+  //
+  // Le plafond passe donc à 0,012 : au-dessus du plancher mesuré (1,29×) et
+  // toujours SOUS le 0,0274 du cadre mobile d'avant (2,28×), donc la
+  // régression d'origine rougit encore. Le retrait des deux groupes n'est plus
+  // prouvé par ce chiffre (0,0039 y serait noyé) mais par `Navbar.test.jsx`,
+  // qui exige l'ÉGALITÉ de la signature des commandes réservées avec celle
+  // d'un compte connecté — une classe ne le prouverait pas.
   '/payment': {
-    max: 0.02,
-    pireMediane: 0.0039,
+    max: 0.012,
+    pireMediane: 0.0093,
     mesure:
-      'MESURE DU 29/10/2026, CADRE PLEIN ÉCRAN AUX DEUX TAILLES : en 1350×940, CLS **0,0274 → 0,0039** sur les '
+      'PLANCHER DE LA CI, 29/10/2026 : /payment desktop rend **0,0093** deux fois de suite, source nommée '
+      + '`<footer>` 0×0 → 1350×84,7 px à (0, 855,3) à t=159,6 ms — le pied de page de la coquille, détruit et '
+      + 'recréé par createRoot (aucun rect précédent), compté pour la part qui entre dans l’écran. Plafond porté de '
+      + '0,0035 à **0,012** (1,29× au-dessus du plancher, 2,28× sous le 0,0274 d’avant). '
+      + 'MESURE LOCALE, MÊME JOUR, DÉCALAGE DES DEUX GROUPES DE LA BARRE RETIRÉ : 1350×940, compte travailleur, '
+      + 'artefact servi, CLS **0,0039 → 0,0000** (2 runs, aucune source rapportée, groupes à 451,02 px à '
+      + 'x=264,66 et 405,69 px à x=877,31 dès la première peinture) — mesure CONTREDITE par la CI sur le pied de '
+      + 'page, d’où le plafond ci-dessus. '
+      + 'MESURE PRÉCÉDENTE, CADRE PLEIN ÉCRAN AUX DEUX TAILLES : en 1350×940, CLS **0,0274 → 0,0039** sur les '
       + 'DEUX branches de l’URL (6 runs mesurés sur l’artefact servi, pied de page à y=1 005 pour une fenêtre de '
       + '940) ; le mobile est inchangé (0,0000, pied à y=1 004,33). '
       + 'MESURE DU 28/10/2026, APRÈS LE CADRE PLEIN ÉCRAN EN MOBILE (`min-h-screen` sur le cadre de la route, '
