@@ -26,11 +26,21 @@
 // trois autres n'ont pas d'équivalent standard et portent donc un nom propre,
 // en `snake_case` comme le reste du rapport.
 //
+// ── Deux fournisseurs, UN SEUL filtre (29/10/2026) ──────────────────────────
+// Les cinq étapes partent chez GA4 ET chez PostHog, et c'est le MÊME filtrage
+// qui les précède : les noms déclarés et les clés admises ci-dessous sont le
+// seul vocabulaire qui sort, quel que soit le fournisseur. Relayer sans repasser
+// par la liste blanche aurait suffi à ce que `email` ou `job_id` atteignent un
+// second hôte, donc à doubler la surface d'une fuite qu'on avait fermée. PostHog
+// reçoit une COPIE du dictionnaire transmis : le SDK est libre de ses propres
+// mutations, et l'un des deux fournisseurs ne décide pas de ce que voit l'autre.
+//
 // ── Aucun envoi sans mesure configurée ──────────────────────────────────────
 // `window.gtag` n'existe qu'APRÈS `initAnalytics()`, lui-même appelé seulement
-// sur consentement (`utils/consent.js`) : sans consentement, sans
-// `VITE_GA_MEASUREMENT_ID`, ou hors navigateur, ces appels sont des no-op
-// stricts (aucune requête, aucune exception).
+// sur consentement (`utils/consent.js`), et `window.posthog` n'existe qu'APRÈS
+// le chargement du SDK CDN (`POSTHOG_SCRIPT_URL`), qui suit la même décision :
+// sans consentement, sans fournisseur configuré, ou hors navigateur, ces appels
+// sont des no-op stricts (aucune requête, aucune exception).
 //
 // Le garde `scripts/check-funnel-events.js` refuse, dans la source, un écart à
 // ces deux listes : clé inconnue, événement non déclaré, `gtag('event', …)`
@@ -119,11 +129,18 @@ const valeurAdmise = (cle, valeur) => {
  * @param {string} nom Nom d'événement ; doit figurer dans `EVENEMENTS_FUNNEL`.
  * @param {Record<string, unknown>} [parametres] Dimensions ; seules les clés
  *   de `CLES_FUNNEL` dont la valeur est admise sont transmises.
- * @returns {boolean} vrai si l'événement a été remis à `gtag`.
+ * @returns {boolean} vrai si l'événement a été remis à AU MOINS un fournisseur
+ *   (GA4 et/ou PostHog) — les deux reçoivent le même nom et les mêmes clés.
  */
 export const trackFunnel = (nom, parametres = {}) => {
   if (typeof nom !== 'string' || !NOMS_DECLARES.has(nom)) return false;
-  if (typeof window === 'undefined' || typeof window.gtag !== 'function') return false;
+  if (typeof window === 'undefined') return false;
+
+  // Les deux fournisseurs du site, chacun absent tant que son consentement et
+  // sa configuration ne l'ont pas chargé (voir `analytics.js`).
+  const gtag = typeof window.gtag === 'function' ? window.gtag : null;
+  const posthog = typeof window.posthog?.capture === 'function' ? window.posthog : null;
+  if (!gtag && !posthog) return false;
 
   const transmis = {};
   for (const [cle, valeur] of Object.entries(parametres || {})) {
@@ -133,6 +150,10 @@ export const trackFunnel = (nom, parametres = {}) => {
     transmis[cle] = admise;
   }
 
-  window.gtag('event', nom, transmis);
+  if (gtag) gtag('event', nom, transmis);
+  // Même nom, mêmes clés filtrées : un rapport PostHog et un rapport GA4 de la
+  // même étape se lisent côte à côte. Copie pour que le SDK ne modifie pas
+  // l'objet qu'a reçu `gtag`.
+  if (posthog) posthog.capture(nom, { ...transmis });
   return true;
 };
