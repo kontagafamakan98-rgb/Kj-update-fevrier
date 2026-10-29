@@ -39,6 +39,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from kojo_auth_core import revocation_stats
+from kojo_job_alerts import ORIGINES_COMPTEES
 from kojo_live import (
     MAX_STREAMS_PER_USER,
     MAX_STREAMS_TOTAL,
@@ -338,6 +339,33 @@ def rendre(corpus: Optional[dict] = None) -> str:
             "kojo_missions_ouvertes",
             "Missions ouvertes en base (place de marche VIDE quand la valeur est 0).",
             corpus.get("missions_ouvertes"),
+        )
+
+    # ── Provenance des veilles emploi (lue en base par la route) ────────────
+    # Les pages ville et métier existent pour produire des veilles ; sans ce
+    # chiffre, rien ne pouvait dire si elles en produisent. Une série par valeur
+    # DÉCLARÉE (`ORIGINES_COMPTEES`, importée du module propriétaire), jamais
+    # une par document : l'étiquette est une constante, donc la cardinalité est
+    # de quatre. Le hors-vocabulaire est une jauge À PART et non une cinquième
+    # étiquette : replier une valeur fausse dans « inconnue » ferait passer une
+    # donnée écrite de travers pour une absence, et c'est justement la
+    # différence que ce champ existe pour mesurer.
+    if corpus is not None and corpus.get("alertes_emploi"):
+        alertes = corpus["alertes_emploi"]
+        par_origine = alertes.get("par_origine") or {}
+        lignes.append(
+            "# HELP kojo_alertes_emploi Veilles emploi actives, par provenance declaree."
+        )
+        lignes.append("# TYPE kojo_alertes_emploi gauge")
+        for origine in ORIGINES_COMPTEES:
+            lignes.append(
+                'kojo_alertes_emploi{origine="%s"} %s'
+                % (origine, _nombre(par_origine.get(origine)))
+            )
+        jauge(
+            "kojo_alertes_emploi_hors_vocabulaire",
+            "Veilles dont la provenance n'appartient pas au vocabulaire declare.",
+            alertes.get("hors_vocabulaire"),
         )
 
     # Le format texte se termine par un saut de ligne : un corps sans lui est
