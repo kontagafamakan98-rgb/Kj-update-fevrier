@@ -43,12 +43,26 @@ import sys
 # un identifiant mort, et l'autoriser élargirait la politique pour rien.
 GA_MOTIF = re.compile(r"G-[A-Z0-9]+", re.IGNORECASE)
 
+# PostHog (Cloud EU) : son SDK est un script tiers et il parle ensuite à son
+# hôte d'ingestion, donc il ouvre DEUX directives. Les deux origines sont celles
+# de `frontend/src/config/posthog.js` — le contrat les compare à l'octet, et
+# c'est la seule façon qu'une politique autorise exactement ce que le code
+# charge.
+POSTHOG_ASSETS_ORIGIN = "https://eu-assets.i.posthog.com"
+POSTHOG_API_ORIGIN = "https://eu.i.posthog.com"
+
+# La forme d'une clé de projet utilisable — la même expression que
+# `POSTHOG_KEY_MOTIF` dans `frontend/src/config/posthog.js`. Un jeton personnel
+# (`phx_…`) n'ouvre RIEN : aucune mesure n'en sortirait.
+POSTHOG_MOTIF = re.compile(r"phc_[A-Za-z0-9]+", re.ASCII)
+
 # Les réglages du backend, lus dans l'environnement. Les noms sont SANS préfixe
 # `VITE_` (ce ne sont pas des variables exposées au navigateur) ; les valeurs
 # doivent être les mêmes que celles du build Vercel.
 ENV_ORIGINE_API = "BACKEND_PUBLIC_URL"
 ENV_PLAUSIBLE = "PLAUSIBLE_DOMAIN"
 ENV_GA = "GA_MEASUREMENT_ID"
+ENV_POSTHOG = "POSTHOG_KEY"
 
 # Ce que la copie refuse de porter : `frame-ancestors` est ignoré dans une
 # balise <meta> (avertissement console à chaque chargement). Il reste l'en-tête
@@ -61,7 +75,9 @@ def normaliser_origine(valeur) -> str:
     return str(valeur or "").strip().rstrip("/")
 
 
-def construire_csp(api_origin="", plausible_domain="", ga_measurement_id="") -> str:
+def construire_csp(
+    api_origin="", plausible_domain="", ga_measurement_id="", posthog_key=""
+) -> str:
     """Compose la politique du site.
 
     L'ORDRE des directives et des sources est SIGNIFICATIF : cette chaîne est
@@ -74,6 +90,7 @@ def construire_csp(api_origin="", plausible_domain="", ga_measurement_id="") -> 
         api_origin: origine du backend, pour `connect-src`.
         plausible_domain: domaine Plausible déclaré, ou ''.
         ga_measurement_id: identifiant GA4 (`G-…`), ou ''.
+        posthog_key: clé de projet PostHog (`phc_…`), ou ''.
 
     Returns:
         La politique, prête pour l'attribut `content` d'une meta CSP.
@@ -82,6 +99,7 @@ def construire_csp(api_origin="", plausible_domain="", ga_measurement_id="") -> 
     plausible = str(plausible_domain or "").strip()
     ga = str(ga_measurement_id or "").strip()
     ga_actif = bool(GA_MOTIF.fullmatch(ga))
+    posthog_actif = bool(POSTHOG_MOTIF.fullmatch(str(posthog_key or "").strip()))
 
     # Le SDK Google Identity Services (bouton SSO) est chargé depuis
     # accounts.google.com/gsi/client : sans cette entrée, le bouton échoue avec
@@ -91,6 +109,9 @@ def construire_csp(api_origin="", plausible_domain="", ga_measurement_id="") -> 
         script_src.append("https://plausible.io")
     if ga_actif:
         script_src.append("https://www.googletagmanager.com")
+    # PostHog : le SDK lui-même vient de son CDN d'actifs (`/static/array.js`).
+    if posthog_actif:
+        script_src.append(POSTHOG_ASSETS_ORIGIN)
 
     connect_src = ["'self'"]
     if origine:
@@ -108,6 +129,8 @@ def construire_csp(api_origin="", plausible_domain="", ga_measurement_id="") -> 
             "https://region1.google-analytics.com",
             "https://www.google.com",
         ]
+    if posthog_actif:
+        connect_src.append(POSTHOG_API_ORIGIN)
 
     img_src = [
         "'self'",
@@ -151,6 +174,7 @@ def csp_du_site(environ=None) -> str:
         api_origin=source.get(ENV_ORIGINE_API, ""),
         plausible_domain=source.get(ENV_PLAUSIBLE, ""),
         ga_measurement_id=source.get(ENV_GA, ""),
+        posthog_key=source.get(ENV_POSTHOG, ""),
     )
 
 
@@ -203,7 +227,7 @@ def _main(argv) -> int:
         print(
             "usage : cat cas.json | python backend/kojo_csp.py --json\n"
             "  cas : [{\"api_origin\": …, \"plausible_domain\": …, "
-            "\"ga_measurement_id\": …}, …]",
+            "\"ga_measurement_id\": …, \"posthog_key\": …}, …]",
             file=sys.stderr,
         )
         return 2
@@ -220,6 +244,7 @@ def _main(argv) -> int:
             api_origin=item.get("api_origin", ""),
             plausible_domain=item.get("plausible_domain", ""),
             ga_measurement_id=item.get("ga_measurement_id", ""),
+            posthog_key=item.get("posthog_key", ""),
         )
         for item in cas
     ]

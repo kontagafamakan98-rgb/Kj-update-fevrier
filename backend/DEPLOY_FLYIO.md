@@ -70,6 +70,32 @@ fly secrets set \
   "VAPID_CLAIMS_EMAIL=mailto:kojoapp98@gmail.com"
 ```
 
+### Réglages d'analytique : les MÊMES valeurs que sur Vercel
+
+Les documents pré-rendus (`/jobs/:id`, `/workers/:id`) sont écrits par le
+backend, et ils publient la politique CSP du site — calculée ICI avec ces
+réglages (cf. `kojo_csp.py`). Une valeur posée d'un seul côté produit deux
+politiques différentes, et la sonde `frontend/scripts/check-csp-documents-production.js`
+refuse l'écart en nommant le réglage à poser.
+
+```bash
+fly secrets set \
+  "GA_MEASUREMENT_ID=<même valeur que VITE_GA_MEASUREMENT_ID>" \
+  "POSTHOG_KEY=<même valeur que VITE_POSTHOG_KEY>"
+```
+
+`POSTHOG_KEY` fait partie des réglages qui ouvrent une origine tierce : sans
+lui, `script-src` n'autorise pas le CDN PostHog et `connect-src` pas son hôte
+d'ingestion (cf. `frontend/src/config/posthog.js`).
+
+`PLAUSIBLE_DOMAIN` n'est PAS dans ce bloc, et c'est une mesure : ni le build
+Vercel ni Fly ne déclarent de domaine Plausible aujourd'hui. Ce bloc est lu par
+`.github/scripts/check-fly-env-drift.py` comme la liste des secrets REQUIS — y
+mettre une valeur qu'aucune surface n'emploie ferait rougir la présence pour
+n'ouvrir aucune origine. Le jour où Plausible est configuré, la variable se pose
+ici (`fly secrets set PLAUSIBLE_DOMAIN=… -a kojo-backend`) ET sur Vercel, et
+elle rejoint ce bloc à ce moment-là.
+
 **Règles d'or :**
 
 - 🔒 **`EMAIL_OTP_SECRET` ne doit JAMAIS être changé** (il signe les jetons de

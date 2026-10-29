@@ -22,6 +22,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GA_PUBLICATION_DELAY_MS } from '../analytics.js';
+import { POSTHOG_API_HOST, POSTHOG_SCRIPT_URL } from '../../config/posthog.js';
 
 const GA_ID = 'G-TEST123456';
 const GA_SRC = `https://www.googletagmanager.com/gtag/js?id=${GA_ID}`;
@@ -248,5 +249,148 @@ describe('page vue SPA — le bon titre, une seule fois', () => {
       vi.advanceTimersByTime(sansGa.TRACKED_TITLE_FALLBACK_MS);
       expect(window.dataLayer).toBeUndefined();
     });
+  });
+});
+
+/**
+ * PostHog — troisième fournisseur, MÊME règle que les deux autres : rien n'est
+ * chargé sans clé, et la vue part par le planificateur (donc avec le titre de
+ * la page d'ARRIVÉE, une seule fois par navigation).
+ *
+ * Deux défauts sont tenus ici, et aucun des deux ne se verrait à l'œil nu :
+ *   • un SDK chargé sans clé ouvrirait une origine tierce pour rien, alors que
+ *     la CSP de production ne l'autorise pas — le script échouerait en silence ;
+ *   • la vue d'arrivée planifiée AVANT l'arrivée du SDK serait perdue si
+ *     `capturerVuePosthog` ne la reprenait pas au `load` du script.
+ */
+describe('initAnalytics — PostHog, conditionnel et une seule vue par navigation', () => {
+  const CLE = 'phc_test123';
+  const scriptPosthog = () => document.querySelector('script[data-kojo-posthog]');
+  const pourStateOrigine = window.history.pushState;
+  const remplaceStateOrigine = window.history.replaceState;
+
+  const restaurerHistory = () => {
+    window.history.pushState = pourStateOrigine;
+    window.history.replaceState = remplaceStateOrigine;
+  };
+
+  const sdkFactice = () => {
+    window.posthog = { init: vi.fn(), capture: vi.fn() };
+    return window.posthog;
+  };
+
+  // `load` du script injecté : c'est le signal que `initPosthog` attend pour
+  // initialiser le SDK et reprendre la vue d'arrivée.
+  const chargerLeSdk = () => {
+    scriptPosthog()?.dispatchEvent(new Event('load'));
+  };
+
+  const vuesPosthog = (sdk) => sdk.capture.mock.calls.filter(([nom]) => nom === '$pageview');
+
+  beforeEach(() => {
+    vi.resetModules();
+    restaurerHistory();
+    vi.useFakeTimers();
+    vi.stubEnv('VITE_POSTHOG_KEY', CLE);
+    vi.stubEnv('VITE_GA_MEASUREMENT_ID', '');
+    vi.stubEnv('VITE_PLAUSIBLE_DOMAIN', '');
+    document.head.innerHTML = '';
+    delete window.posthog;
+    window.history.replaceState({}, '', '/');
+    document.title = 'Kojo';
+  });
+
+  afterEach(() => {
+    restaurerHistory();
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+    delete window.posthog;
+  });
+
+  it('sans clé : aucun script PostHog n’est injecté', async () => {
+    vi.stubEnv('VITE_POSTHOG_KEY', '');
+    const { initAnalytics } = await import('../analytics.js');
+    initAnalytics();
+    window.dispatchEvent(new Event('load'));
+    vi.advanceTimersByTime(GA_PUBLICATION_DELAY_MS);
+
+    expect(scriptPosthog()).toBeNull();
+  });
+
+  it('avec une clé de la MAUVAISE forme (jeton personnel) : rien non plus', async () => {
+    // `phx_` est le préfixe d'un jeton PERSONNEL, et rien d'autre : c'est la
+    // FORME que `estClePosthog` refuse. Le corps est laissé vide exprès — un
+    // faux jeton complet (16 caractères aléatoires) est exactement ce qu'un
+    // détecteur de secrets signale, et un cas négatif n'a pas besoin de la
+    // valeur qu'il refuse, seulement de son préfixe.
+    vi.stubEnv('VITE_POSTHOG_KEY', 'phx_');
+    const { initAnalytics } = await import('../analytics.js');
+    initAnalytics();
+
+    expect(scriptPosthog()).toBeNull();
+  });
+
+  it('injecte le SDK depuis le CDN EU, puis l’initialise avec les options qui bornent le consentement', async () => {
+    const { initAnalytics } = await import('../analytics.js');
+    initAnalytics();
+
+    const tag = scriptPosthog();
+    expect(tag, 'le script PostHog doit être injecté après un accord').not.toBeNull();
+    expect(tag.src).toBe(POSTHOG_SCRIPT_URL);
+    expect(tag.async).toBe(true);
+
+    const sdk = sdkFactice();
+    chargerLeSdk();
+
+    expect(sdk.init).toHaveBeenCalledTimes(1);
+    const [cle, options] = sdk.init.mock.calls[0];
+    expect(cle).toBe(CLE);
+    expect(options).toMatchObject({
+      api_host: POSTHOG_API_HOST,
+      capture_pageview: false,
+      autocapture: false,
+      disable_session_recording: true,
+      persistence: 'localStorage',
+    });
+  });
+
+  it('publie la vue d’ARRIVÉE une seule fois, même si le repli du titre a déjà tourné', async () => {
+    const { initAnalytics, TRACKED_TITLE_FALLBACK_MS } = await import('../analytics.js');
+    initAnalytics();
+
+    // Le planificateur publie avant que le SDK n'existe : la vue est PERDUE
+    // pour PostHog à cet instant (pas de `capture` disponible).
+    vi.advanceTimersByTime(TRACKED_TITLE_FALLBACK_MS);
+
+    const sdk = sdkFactice();
+    chargerLeSdk();
+    // Second `load` (le navigateur peut rejouer l'événement) : pas de doublon.
+    chargerLeSdk();
+
+    expect(vuesPosthog(sdk)).toHaveLength(1);
+    expect(vuesPosthog(sdk)[0][1]).toMatchObject({ $current_url: window.location.href });
+  });
+
+  it('publie une vue par navigation SPA, avec l’URL de la page d’arrivée', async () => {
+    const { initAnalytics, notifierTitreDePage } = await import('../analytics.js');
+    initAnalytics();
+    const sdk = sdkFactice();
+    chargerLeSdk();
+    expect(vuesPosthog(sdk)).toHaveLength(1);
+
+    window.history.pushState({}, '', '/jobs');
+    // La navigation seule ne publie rien : on attend le titre de la page.
+    document.title = 'Emplois disponibles · Kojo';
+    notifierTitreDePage();
+
+    expect(vuesPosthog(sdk)).toHaveLength(2);
+    expect(vuesPosthog(sdk)[1][1].$current_url).toContain('/jobs');
+  });
+
+  it('rend le bandeau nécessaire quand SEUL PostHog est configuré', async () => {
+    const { isAnalyticsConfigured } = await import('../analytics.js');
+
+    expect(isAnalyticsConfigured()).toBe(true);
   });
 });

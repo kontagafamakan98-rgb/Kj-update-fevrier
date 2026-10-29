@@ -70,6 +70,34 @@ from kojo_job_og import seed_json
 # marque n'est pas un réglage qui change d'un déploiement à l'autre.
 MARQUE = "Kojo"
 
+# La marque DESSINÉE, servie par le site : les icônes PWA descendent de
+# `src/config/marque-kojo.json` (le même dessin que la barre de l'application),
+# donc l'en-tête de ces pages porte la marque du site et pas un second logo.
+# 72 px pour 28 px affichés : deux fois et demie la densité, 6,6 Ko — la 192
+# pesait dix fois plus pour la même tache à l'écran.
+ICONE_MARQUE = "/icons/icon-72x72.png"
+
+# ── Les LANGUES du site, publiées par l'en-tête de chaque page ──────────────
+# Ces pages sont servies par le BACKEND : elles n'ont ni barre de navigation ni
+# sélecteur de langue, alors que l'application en propose cinq. Un visiteur
+# arrivé d'un moteur de recherche sans comprendre le français n'avait donc
+# aucune porte. Les libellés sont les noms NATIFS (celui que lit le visiteur),
+# et la liste est la MÊME que `frontend/src/config/languages.js` — un garde
+# compare les deux, donc une langue ajoutée à l'application rougit ici au lieu
+# de rester absente de la moitié des pages du site.
+#
+# Le lien mène à `/?lang=<code>` : l'application lit ce paramètre au démarrage
+# (LanguageContext) et parle cette langue. Il ne prétend PAS traduire CETTE
+# page, qui n'existe qu'en français — c'est pourquoi la navigation s'appelle
+# « Langues du site » et non « cette page en… ».
+LANGUES_SITE = [
+    {"code": "fr", "nom": "Français"},
+    {"code": "en", "nom": "English"},
+    {"code": "wo", "nom": "Wolof"},
+    {"code": "bm", "nom": "Bamanankan"},
+    {"code": "mos", "nom": "Mòoré"},
+]
+
 # Borne de la liste publiée. Au-delà, la page renvoie vers /jobs : une page de
 # ville qui énumérerait 3 000 missions pèserait plus lourd que le bénéfice, et
 # le sitemap de fiches les couvre déjà une par une.
@@ -218,6 +246,39 @@ def _esc(value: str) -> str:
         .replace(">", "&gt;")
         .replace('"', "&quot;")
         .replace("'", "&apos;")
+    )
+
+
+def _en_tete() -> str:
+    """L'en-tête commun à TOUTES les pages servies par le backend.
+
+    Deux choses seulement, et les deux manquaient : LA MARQUE (le texte « Kojo »
+    nu de l'ancien en-tête ne disait pas de quel site on parlait, et un visiteur
+    venu d'un moteur n'avait aucun chemin de retour lisible) et LES LANGUES du
+    site (l'application en propose cinq, ces pages n'en disaient rien).
+
+    Le dessin est décoratif (`alt` vide) : le nom accessible du lien est le mot
+    « Kojo » qui l'accompagne, comme dans la barre de l'application où le tracé
+    est `aria-hidden`. Un `aria-label` doublerait ce nom.
+
+    Les `width`/`height` sont écrits : une image sans dimensions connues fait
+    danser la mise en page pendant son chargement, et c'est exactement le défaut
+    que le reste de ce dépôt paie déjà cher.
+    """
+    def lien(langue):
+        code = langue["code"]
+        courant = ' aria-current="true"' if code == "fr" else ""
+        return f'<a href="/?lang={code}" lang="{code}"{courant}>{_esc(langue["nom"])}</a>'
+
+    langues = "".join(lien(langue) for langue in LANGUES_SITE)
+    return (
+        "<header>"
+        '<a href="/" class="marque">'
+        f'<img src="{ICONE_MARQUE}" alt="" width="28" height="28" />'
+        f"<span>{MARQUE}</span>"
+        "</a>"
+        f'<nav class="langues" aria-label="Langues du site">{langues}</nav>'
+        "</header>\n"
     )
 
 
@@ -521,8 +582,15 @@ STYLE = """
 *{box-sizing:border-box}
 body{margin:0;background:var(--sable);color:var(--encre);
 font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.6}
-header{border-bottom:1px solid var(--trait);padding:1rem 1.25rem}
-header a{font-weight:700;color:var(--brun);text-decoration:none;font-size:1.15rem}
+header{border-bottom:1px solid var(--trait);padding:1rem 1.25rem;display:flex;
+align-items:center;justify-content:space-between;gap:.6rem 1rem;flex-wrap:wrap}
+header .marque{display:inline-flex;align-items:center;gap:.55rem;font-weight:700;
+color:var(--brun);text-decoration:none;font-size:1.15rem}
+header .marque img{display:block}
+nav.langues{display:flex;flex-wrap:wrap;gap:.35rem 1rem;font-size:.85rem}
+nav.langues a{color:var(--brun);text-decoration:none}
+nav.langues a:hover{text-decoration:underline}
+nav.langues a[aria-current]{color:var(--encre);font-weight:700;text-decoration:underline}
 main{max-width:52rem;margin:0 auto;padding:2rem 1.25rem 3rem}
 h1{font-size:clamp(1.6rem,4vw,2.3rem);line-height:1.2;margin:.2rem 0 1rem}
 .intro{font-size:1.05rem;margin:0 0 1.75rem}
@@ -615,7 +683,7 @@ def document(page: dict, genre: str, origine: str, missions: list) -> str:
         f"<style>{STYLE}</style>\n"
         f'<script type="application/ld+json">{_json_ld(page, genre, url, missions)}</script>\n'
         "</head>\n<body>\n"
-        f'<header><a href="/">{MARQUE}</a></header>\n'
+        f"{_en_tete()}"
         "<main>\n"
         f"<h1>{_esc(h1)}</h1>\n"
         f'<p class="intro">{_esc(introduction_de(page, genre))}</p>\n'
@@ -644,7 +712,7 @@ def document_introuvable(origine: str) -> str:
         f'<link rel="canonical" href="{_esc(base)}/jobs" />\n'
         f"{balise_csp()}<style>{STYLE}</style>\n"
         "</head>\n<body>\n"
-        f'<header><a href="/">{MARQUE}</a></header>\n<main>\n'
+        f"{_en_tete()}<main>\n"
         "<h1>Cette page n'existe pas</h1>\n"
         '<p class="intro">Aucune ville ni métier ne porte ce nom sur Kojo. '
         'Les offres ouvertes sont <a href="/jobs">ici</a>.</p>\n'

@@ -27,6 +27,7 @@ from kojo_csp import (
     ENV_GA,
     ENV_ORIGINE_API,
     ENV_PLAUSIBLE,
+    ENV_POSTHOG,
     GA_MOTIF,
     balise_csp,
     construire_csp,
@@ -146,8 +147,33 @@ class TestEnvironnement:
         assert "https://plausible.io" in politique
         assert "https://www.googletagmanager.com" in politique
 
+    def test_le_reglage_posthog_ouvre_deux_directives_et_pas_trois(self, monkeypatch):
+        """Le SDK (script) ET l'ingestion (connect), rien d'autre.
+
+        Ce cas est le pendant Python de `analytics.test.js` côté navigateur : le
+        backend calcule la politique des documents pré-rendus, et une origine
+        oubliée ici ferait diverger ce que les documents autorisent de ce que le
+        site autorise — c'est exactement ce que la sonde de production refuse.
+        """
+        monkeypatch.setenv(ENV_POSTHOG, "phc_abc123")
+        politique = csp_du_site()
+        script = politique.split("script-src ", 1)[1].split(";", 1)[0]
+        connect = politique.split("connect-src ", 1)[1].split(";", 1)[0]
+
+        assert "https://eu-assets.i.posthog.com" in script
+        assert "https://eu.i.posthog.com" in connect
+        # Aucune autre directive n'est élargie : ni les images, ni les cadres.
+        assert politique.count("posthog.com") == 2
+
+    def test_un_jeton_personnel_posthog_n_ouvre_rien(self, monkeypatch):
+        # Un `phx_…` est un jeton personnel : aucune mesure n'en sortirait, donc
+        # ouvrir deux origines pour lui serait une surface gratuite.
+        for valeur in ("phx_personnel123", "", "   ", "phc_"):
+            monkeypatch.setenv(ENV_POSTHOG, valeur)
+            assert "posthog.com" not in csp_du_site(), valeur
+
     def test_sans_reglage_la_politique_se_reduit(self, monkeypatch):
-        for cle in (ENV_ORIGINE_API, ENV_PLAUSIBLE, ENV_GA):
+        for cle in (ENV_ORIGINE_API, ENV_PLAUSIBLE, ENV_GA, ENV_POSTHOG):
             monkeypatch.delenv(cle, raising=False)
         politique = csp_du_site()
         assert "plausible.io" not in politique

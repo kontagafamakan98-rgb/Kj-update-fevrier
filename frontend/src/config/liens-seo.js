@@ -62,31 +62,60 @@ export const GROUPES_LIENS_SEO = [
 // de page est INSÉRÉ quand le splash PWA rend la main : sur une page courte comme
 // /payment (706 px de `main` en desktop pour une fenêtre de 940), ce qui entre
 // dans l'écran À CE MOMENT-LÀ déplace le document, et le coût suit la HAUTEUR du
-// pied de page. Mesuré le 28/10/2026 par `e2e/cadres-app.spec.js` (branches
-// « mission requise » et « mission », 1350×940) : pied de 228 px à l'insertion →
-// **0,0611**, sous un plafond de 0,07 que la mesure du 28/10 avait déjà dû
-// relever ; un pied SANS ce bloc (141 px, 17/10) valait 0,0470. Après ce
-// raccourcissement, le même protocole rend **0,0376** (et 0,0331 pour le
-// relâchement du chunk retenu) : le plafond de /payment redescend à 0,06.
+// pied de page. Protocole et chiffres du 28/10/2026, quand le bloc était
+// TOUJOURS déplié : 45 liens sur quatre lignes, bloc de 64 px, pied de page de
+// 157 px arrêté (168 px à l'insertion), CLS mesuré **0,0376** sur les deux
+// branches de /payment pour un plafond de 0,06 — et 0,0611 avant le
+// raccourcissement du même jour, avec un pied de 228 px.
 //
-// DESKTOP SEULEMENT, et voici pourquoi : le bloc empilait trois groupes (titre au
-// corps du texte, puis ses liens à la ligne suivante) — **124 px** sur desktop,
-// dont 16 px de pas vertical entre groupes et trois lignes de titres qui ne
-// portent qu'un mot. Au-delà de `md`, les trois groupes partagent donc UN flux :
-// la classe `md:contents` retire la boîte du groupe, son titre et ses liens
-// deviennent des éléments du même rang, et le titre (gras, `stone-800`) reste ce
-// qui distingue les familles — d'autant mieux qu'il n'occupe plus une ligne à lui
-// seul. Le corps passe à `text-xs`, celui que le pied de page emploie DÉJÀ pour
-// son bloc d'adresse (`PIED_ADRESSE_CLASS`) : il n'y a pas de corps « de
-// maillage » à inventer, ces 45 liens sont des liens secondaires. Mesuré après
-// coup : **64 px** (quatre lignes), pied de page **217 → 157 px** arrêté et
-// 228 → 168 px à l'insertion. Ce que la mesure interdit n'est pas de réduire,
-// c'est de réduire SOUS la destination — ce bloc n'en réserve aucune, il EST son
-// propre contenu.
+// MESURÉ LE 29/10/2026 APRÈS LE DÉPLIANT (Chromium, artefact de `build/`,
+// 1350×940 et 412×823, la boîte de `footer` et celle du bloc) : bloc FERMÉ
+// 32 px, pied de page **125 px** en desktop (157 → 125) ; bloc 88 px, pied
+// **241 px** en mobile (565 → 241). Dépliant « Guides » ouvert en desktop :
+// bloc 128 px, pied 221 px, 23 liens peints. Le CLS de /payment n'a PAS été
+// re-mesuré (son harnais exige la connexion à la fixture, qui échoue dans
+// l'environnement de cette passe) : la hauteur baisse de 32 px, donc la part du
+// pied de page dans le décalage baisse — ce n'est pas une mesure, et c'est écrit
+// comme tel plutôt que présenté comme un gain constaté.
 //
-// Le MOBILE NE CHANGE PAS : il empile les groupes et garde le corps des liens de
-// navigation, ses liens ne partageant pas de ligne de toute façon (13 villes y
-// prennent cinq lignes).
+// L'OUVERTURE D'UN DÉPLIANT ne coûte aucun CLS : le décalage suit un APPUI, et
+// un déplacement consécutif à une interaction n'entre pas dans la métrique.
+// Aucune réserve de hauteur n'est posée sur le bloc : il EST son propre contenu,
+// ouvert comme fermé.
+//
+// ── LA DISPOSITION, ET POURQUOI ELLE NE PEINT PLUS 45 LIENS ─────────────────
+// Au-delà du point de rupture, les trois dépliants partagent UNE rangée centrée
+// (le conteneur devient un flux horizontal) : fermés, ils tiennent sur 32 px et
+// le pied de page ne montre que trois noms — « Villes », « Métiers », « Guides ».
+// En dessous, ils s'empilent sur 88 px. Ouvert, un panneau déroule SES liens
+// sous son titre ; le paragraphe qui les porte perd sa boîte au-delà du point de
+// rupture (mode d'affichage partagé), donc ses liens s'enchaînent en ligne dans
+// le panneau, à la taille du bloc d'adresse du pied de page. Ce sont des liens
+// secondaires : il n'y a pas de corps « de maillage » à inventer.
+//
+// ── LE DÉPLIANT, PARCE QU'UNE MURAILLE DE LIENS N'EST PAS UN MAILLAGE LISIBLE
+// (29/10/2026) : 45 liens dépliés sur QUATRE lignes en desktop et DIX-HUIT en
+// mobile. Un visiteur ne lit pas un index de 45 entrées en bas de page : il le
+// traverse en le prenant pour du bruit, et le pied de page en devenait une
+// muraille. Chaque famille est donc un DÉPLIANT natif — un élément du HTML, pas
+// un composant à état : fermé par défaut, ouvert au clic ou au clavier, sans une
+// ligne de JavaScript, donc identique à l'identique dans les deux canaux (la
+// coquille pré-rendue n'a rien à simuler, React n'a rien à hydrater).
+//
+// CE QUE ÇA NE CHANGE PAS, ET QUI EST LE POINT : les 45 liens restent DANS le
+// document servi. Un dépliant fermé MASQUE du contenu, il ne le retire pas — le
+// HTML publié porte les mêmes `<a href>` qu'avant, dans le même ordre, donc le
+// texte de lien entrant qui justifiait ce bloc existe toujours pour un moteur
+// qui lit le document sans exécuter de script. C'est la condition pour que le
+// raccourcissement ne défasse pas le maillage : un bloc qui n'aurait chargé ses
+// liens qu'à l'ouverture aurait rendu les 45 pages invisibles, en silence.
+//
+// Le prix assumé, écrit noir sur blanc plutôt que passé sous silence : un moteur
+// peut accorder moins de poids à un lien masqué qu'à un lien peint. Le bloc
+// reste donc sur les deux surfaces où il a été mesuré utile (l'accueil et le
+// pied de page, ce dernier rendu sur toutes les routes), et les trois titres de
+// famille restent VISIBLES, fermés compris — c'est eux qu'un lecteur pressé lit,
+// et le dépliant ne les cache jamais.
 //
 // ── CE QUE CE BLOC COÛTE EN CSS CRITIQUE, ET COMMENT ON L'A PAYÉ MOINS CHER ──
 // Toute classe utilisée ici devient une règle de CSS CRITIQUE INLINÉ, lue AVANT
@@ -107,7 +136,7 @@ export const GROUPES_LIENS_SEO = [
 //      28/10/2026 en comparant les deux builds : +11 règles ajoutées, dont SIX
 //      que le code n'utilisait plus. C'est pourquoi ce paragraphe décrit les
 //      utilitaires au lieu de les nommer.
-export const LIENS_SEO_CLASS = 'space-y-2 md:flex md:flex-wrap md:justify-center';
+export const LIENS_SEO_CLASS = 'space-y-2 gap-x-3 md:flex md:flex-wrap md:justify-center';
 // Le CORPS vit sur le GROUPE et pas sur le conteneur, et c'est une mesure, pas un
 // goût : un élément au mode d'affichage partagé ne peint pas de boîte mais
 // transmet TOUJOURS ses propriétés héritées. Mesuré le 28/10/2026 : le corps posé
@@ -115,10 +144,10 @@ export const LIENS_SEO_CLASS = 'space-y-2 md:flex md:flex-wrap md:justify-center
 // 14 px / 20 px — le bloc restait à cinq lignes de 20 px.
 export const LIENS_SEO_GROUPE_CLASS =
   'flex flex-wrap items-baseline justify-center gap-x-3 gap-y-1 text-sm md:contents md:text-xs';
-// L'espacement horizontal du flux desktop se paie sur l'ÉLÉMENT et non sur le
-// conteneur : une SEULE règle pour le titre et pour les liens, puisqu'ils portent
-// la même. C'est ce qui remplace une gouttière de colonne ET une gouttière de
-// ligne — deux règles — pour le même résultat visible.
-export const LIENS_SEO_TITRE_CLASS = 'font-semibold text-stone-800 md:mr-2';
+// LE TITRE DEVIENT LE DÉCLENCHEUR du dépliant : c'est le même dessin qu'avant
+// (gras, encre de titre) sur l'élément qui ouvre et ferme, donc le visiteur voit
+// les trois familles sans ouvrir une seule ligne. Il ne porte AUCUNE classe
+// nouvellement écrite : ce sont les deux seules règles que le bloc payait déjà.
+export const LIENS_SEO_SOMMAIRE_CLASS = 'font-semibold text-stone-800 md:mr-2';
 export const LIENS_SEO_LIEN_CLASS =
   'text-orange-900 underline underline-offset-2 hover:text-orange-950 md:mr-2';

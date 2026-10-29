@@ -195,8 +195,21 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 // coquilles hors accueil répètent le même bloc. Le sortir du HTML pré-rendu
 // rendrait le maillage invisible au crawler qui ne lit que le document servi
 // — c'est-à-dire précisément le cas que ce bloc existe pour couvrir.
+// ── 29/10/2026 : 134 → 135 Ko, POUR LE TROISIÈME FOURNISSEUR D'ANALYTICS ──
+// PostHog s'ajoute à GA4 et à Plausible (choix du propriétaire, mesuré plus
+// bas). Ce que le JS initial paie n'est PAS le SDK : `array.js` est chargé
+// depuis `eu-assets.i.posthog.com`, donc hors du bundle et hors de ce budget.
+// Il paie le module de constantes (deux origines, la forme `phc_…`), l'injecteur
+// consentement-gated et le relais de page vue qui sert désormais les DEUX
+// fournisseurs : mesuré sur le build du jour, 134,2 Ko gzip des sept chunks
+// référencés par `index.html`, soit +1,2 Ko par rapport aux 133,0 du 28/10 — et
+// c'est ce qui a fait REFUSER le premier jet (134,2 > 134,0). Le plafond passe
+// à 135 Ko avec 0,8 Ko de marge, pour la raison du 22/10 : laisser le prochain
+// hachage de build fixer le seuil, c'est laisser un hash décider à la place du
+// développeur. Les chunks paresseux ne bougent pas (rien n'importe PostHog) et
+// le total reste à 5,62 Mo.
 export const BUDGETS = {
-  initialGzip: 134 * 1024, // JS initial (chunks référencés par index.html), gzip
+  initialGzip: 135 * 1024, // JS initial (chunks référencés par index.html), gzip
   largestChunkGzip: 200 * 1024, // plus gros chunk JS, gzip
   totalRaw: 5.66 * 1024 * 1024, // build/ entier, brut (voir les mesures datées ci-dessus)
 };

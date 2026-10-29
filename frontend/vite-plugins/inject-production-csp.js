@@ -19,11 +19,14 @@ export function injectProductionCspPlugin({ env, mode, apiOrigin }) {
       // divergence entre les deux documents servis.
       //
       // Les domaines d'analytique suivent la configuration : une origine
-      // tierce ouverte sans besoin est une surface d'attaque gratuite.
+      // tierce ouverte sans besoin est une surface d'attaque gratuite. PostHog
+      // en ouvre DEUX (SDK + ingestion) et seulement si une clé de projet de la
+      // bonne forme est posée au build.
       const csp = construireCsp({
         apiOrigin,
         plausibleDomain: env.VITE_PLAUSIBLE_DOMAIN,
         gaMeasurementId: env.VITE_GA_MEASUREMENT_ID,
+        posthogKey: env.VITE_POSTHOG_KEY,
       })
       return {
         html,

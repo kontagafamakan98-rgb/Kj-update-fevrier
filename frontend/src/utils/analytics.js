@@ -37,10 +37,32 @@
 // où la page devient interactive sur le matériel le plus lent mesuré — et il ne
 // concerne que les rebonds de quelques secondes.
 //
+// 3. PostHog : son SDK (`POSTHOG_SCRIPT_URL`, Cloud EU) est ajouté au DOM
+//    seulement si `VITE_POSTHOG_KEY` porte la FORME d'une clé de projet
+//    (`phc_…`). Comme Plausible, c'est un script tiers — mais il parle ensuite
+//    à son hôte d'ingestion, donc la CSP ouvre DEUX directives (voir
+//    `src/config/csp.js`, qui lit les mêmes constantes que ce module).
+//
+// Pourquoi PostHog ne capture PAS de lui-même : `capture_pageview: false` —
+// la vue est publiée par le MÊME planificateur que GA, donc avec le titre de
+// la page d'ARRIVÉE et une seule fois par navigation (le défaut mesuré le
+// 25/10/2026 sur GA, où la vue partait sur `pushState` avec le titre de la
+// page précédente). `autocapture` et l'enregistrement de session sont éteints :
+// le consentement recueilli porte sur la MESURE D'AUDIENCE, pas sur
+// l'enregistrement du parcours ni sur la capture de chaque clic — les activer
+// ici étendrait la finalité sans que personne ne l'ait accepté. `persistence`
+// est `localStorage` pour la même raison : le produit ne pose aucun cookie
+// tiers (cf. utils/consent.js).
+//
 // Aucun identifiant n'est codé en dur : sans variable d'environnement, ces
 // fonctions sont des no-op stricts (aucune requête, aucune erreur console).
 
 import { hasAnalyticsConsent } from './consent';
+import {
+  POSTHOG_API_HOST,
+  POSTHOG_SCRIPT_URL,
+  estClePosthog,
+} from '../config/posthog';
 
 const normalize = (value) => String(value || '').trim();
 
@@ -51,6 +73,15 @@ export const getGaMeasurementId = () =>
 
 export const getPlausibleDomain = () =>
   normalize(import.meta.env?.VITE_PLAUSIBLE_DOMAIN);
+
+/**
+ * La clé de projet PostHog lue au build, ou `''`.
+ *
+ * Rendue BRUTE (normalisée) et non validée : c'est `estClePosthog` qui décide
+ * si elle est utilisable, au même endroit que la CSP — une clé mal formée ne
+ * doit ni ouvrir d'origine, ni charger de script.
+ */
+export const getPosthogKey = () => normalize(import.meta.env?.VITE_POSTHOG_KEY);
 
 const initPlausible = (domain) => {
   if (document.querySelector('script[data-kojo-plausible]')) return;
@@ -108,12 +139,47 @@ const trackGaPageView = () => {
   });
 };
 
+/**
+ * Une vue PostHog est-elle encore à publier pour la navigation courante ?
+ *
+ * Le SDK de PostHog arrive APRÈS la décision de consentement (un clic sur le
+ * bandeau, ou un module chargé au boot pour un visiteur qui a déjà accepté) et
+ * donc après le premier planificateur : la vue d'arrivée peut être planifiée
+ * AVANT que `window.posthog` n'existe. Sans ce drapeau, elle serait perdue en
+ * silence — c'est le même défaut que la vue de `/messages` partie avec le titre
+ * de la page précédente, mais côté fournisseur.
+ */
+let vuePosthogEnAttente = false;
+
+/**
+ * Publie la vue PostHog si le SDK est là, et une seule fois par navigation.
+ *
+ * @returns {boolean} vrai si une vue a été envoyée.
+ */
+const capturerVuePosthog = () => {
+  if (!vuePosthogEnAttente) return false;
+  const sdk = window.posthog;
+  if (!sdk || typeof sdk.capture !== 'function') return false;
+  sdk.capture('$pageview', { $current_url: window.location.href });
+  vuePosthogEnAttente = false;
+  return true;
+};
+
+/** Publie la vue courante pour TOUS les fournisseurs configurés. */
+const publierVueCourante = () => {
+  trackGaPageView();
+  capturerVuePosthog();
+};
+
 /** Planifie la vue de la route qui vient d'être atteinte (voir ci-dessus). */
 const planifierVueDePage = () => {
   window.clearTimeout(vueEnAttente);
+  // La navigation courante doit une vue à PostHog aussi : elle sera publiée par
+  // `publierVueCourante`, ou par l'arrivée du SDK (voir `initPosthog`).
+  vuePosthogEnAttente = true;
   vueEnAttente = window.setTimeout(() => {
     vueEnAttente = 0;
-    trackGaPageView();
+    publierVueCourante();
   }, TRACKED_TITLE_FALLBACK_MS);
 };
 
@@ -130,7 +196,7 @@ export const notifierTitreDePage = () => {
   if (!vueEnAttente) return false;
   window.clearTimeout(vueEnAttente);
   vueEnAttente = 0;
-  trackGaPageView();
+  publierVueCourante();
   return true;
 };
 
@@ -206,6 +272,22 @@ const initGoogleAnalytics = (measurementId) => {
   const src = gaScriptUrlFrom();
   if (src) loadGaScriptAfterLoad(src);
 
+  installerRelaisDeNavigation();
+};
+
+/**
+ * Le relais de navigation SPA, posé UNE fois quel que soit le fournisseur.
+ *
+ * Il vivait dans `initGoogleAnalytics` : avec PostHog seul configuré, aucune
+ * navigation n'aurait été vue après la première page. Le relais ne publie rien
+ * lui-même — il PLANIFIE la vue, et `publierVueCourante` la donne à qui est
+ * présent.
+ */
+let relaisDeNavigationInstalle = false;
+
+const installerRelaisDeNavigation = () => {
+  if (relaisDeNavigationInstalle) return;
+  relaisDeNavigationInstalle = true;
   const wrap = (type) => {
     const original = window.history[type];
     window.history[type] = function patched(...args) {
@@ -220,6 +302,62 @@ const initGoogleAnalytics = (measurementId) => {
 };
 
 /**
+ * Les réglages du SDK PostHog — le périmètre du consentement, écrit ici.
+ *
+ * Chacun retire quelque chose que le SDK ferait de lui-même : une vue, la
+ * capture de chaque clic, l'enregistrement de session, un profil pour un
+ * visiteur anonyme, un cookie. Le bandeau demande la MESURE D'AUDIENCE ; le
+ * reste demanderait un autre consentement, donc ne s'active pas ici.
+ */
+const POSTHOG_OPTIONS = Object.freeze({
+  api_host: POSTHOG_API_HOST,
+  capture_pageview: false,
+  capture_pageleave: false,
+  autocapture: false,
+  disable_session_recording: true,
+  person_profiles: 'identified_only',
+  persistence: 'localStorage',
+});
+
+/**
+ * Charge le SDK PostHog et l'initialise — APRÈS un accord explicite, seulement.
+ *
+ * Le script est ajouté au DOM (aucun code inline : la CSP du site est
+ * `script-src 'self' …`, un init inline serait refusé avec une erreur console).
+ * L'initialisation attend `load` du script : c'est à cet instant que
+ * `window.posthog` existe, et la vue d'arrivée est publiée là si le
+ * planificateur n'a pas pu le faire avant (voir `vuePosthogEnAttente`).
+ *
+ * @param {string} key Clé de projet (`phc_…`) déjà validée par l'appelant.
+ */
+const initPosthog = (key) => {
+  if (document.querySelector('script[data-kojo-posthog]')) return;
+  installerRelaisDeNavigation();
+  // La vue d'ARRIVÉE, planifiée comme les suivantes : la page monte après
+  // `initAnalytics`, donc son titre n'existe pas encore ici.
+  planifierVueDePage();
+
+  const script = document.createElement('script');
+  script.async = true;
+  script.defer = true;
+  script.setAttribute('data-kojo-posthog', '1');
+  script.src = POSTHOG_SCRIPT_URL;
+  script.addEventListener(
+    'load',
+    () => {
+      if (typeof window.posthog?.init !== 'function') return;
+      window.posthog.init(key, POSTHOG_OPTIONS);
+      // Le planificateur a pu publier la vue d'arrivée AVANT que le SDK
+      // n'existe (elle était alors perdue) : le drapeau garantit qu'elle n'est
+      // envoyée qu'une fois, et avec l'URL courante.
+      capturerVuePosthog();
+    },
+    { once: true }
+  );
+  document.head.appendChild(script);
+};
+
+/**
  * L'éditeur a-t-il configuré une mesure d'audience ?
  *
  * Sert au BANDEAU de consentement : sans fournisseur configuré, il n'y a rien
@@ -228,7 +366,9 @@ const initGoogleAnalytics = (measurementId) => {
  * `initAnalytics` n'est appelé qu'après un accord explicite.
  */
 export const isAnalyticsConfigured = () =>
-  isEnabled(getPlausibleDomain()) || isEnabled(getGaMeasurementId());
+  isEnabled(getPlausibleDomain()) ||
+  isEnabled(getGaMeasurementId()) ||
+  estClePosthog(getPosthogKey());
 
 /**
  * Initialise la mesure d'audience SI ET SEULEMENT SI l'utilisateur a accepté.
@@ -256,5 +396,12 @@ export const initAnalytics = () => {
   const measurementId = getGaMeasurementId();
   if (isEnabled(measurementId)) {
     initGoogleAnalytics(measurementId);
+  }
+
+  // Une clé de la mauvaise forme n'ouvre rien : la CSP ne l'autorise pas (même
+  // prédicat des deux côtés), donc charger le SDK ne servirait qu'à échouer.
+  const posthogKey = getPosthogKey();
+  if (estClePosthog(posthogKey)) {
+    initPosthog(posthogKey);
   }
 };

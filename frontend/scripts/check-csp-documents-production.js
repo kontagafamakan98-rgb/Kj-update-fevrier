@@ -11,9 +11,9 @@
  * environnements DIFFÉRENTS.
  *
  *   • le build Vercel lit `VITE_API_URL`, `VITE_PLAUSIBLE_DOMAIN`,
- *     `VITE_GA_MEASUREMENT_ID` ;
+ *     `VITE_GA_MEASUREMENT_ID`, `VITE_POSTHOG_KEY` ;
  *   • le backend Fly lit `BACKEND_PUBLIC_URL`, `PLAUSIBLE_DOMAIN`,
- *     `GA_MEASUREMENT_ID` (secrets).
+ *     `GA_MEASUREMENT_ID`, `POSTHOG_KEY` (secrets).
  *
  * Rien dans le dépôt ne dit que ces deux jeux de valeurs coïncident — ils
  * peuvent diverger au premier identifiant d'analytique ajouté d'un seul côté,
@@ -78,9 +78,9 @@ export const PAGE_REFERENCE = '/';
 /** Le rappel de ce qui doit être réglé quand les deux politiques divergent. */
 export const REMEDE_ENV =
   'les réglages des deux déploiements doivent porter les mêmes valeurs : sur Fly, ' +
-  'BACKEND_PUBLIC_URL / PLAUSIBLE_DOMAIN / GA_MEASUREMENT_ID ; sur Vercel, ' +
-  'VITE_API_URL / VITE_PLAUSIBLE_DOMAIN / VITE_GA_MEASUREMENT_ID. Poser le secret manquant ' +
-  'sur Fly, ou retirer la valeur du build — jamais laisser les deux se contredire.';
+  'BACKEND_PUBLIC_URL / PLAUSIBLE_DOMAIN / GA_MEASUREMENT_ID / POSTHOG_KEY ; sur Vercel, ' +
+  'VITE_API_URL / VITE_PLAUSIBLE_DOMAIN / VITE_GA_MEASUREMENT_ID / VITE_POSTHOG_KEY. Poser le ' +
+  'secret manquant sur Fly, ou retirer la valeur du build — jamais laisser les deux se contredire.';
 
 const TIMEOUT_MS = 20000;
 

@@ -172,3 +172,40 @@ def test_les_titres_de_groupe_existent_dans_les_cinq_dictionnaires():
         )
         for cle in CLES_TITRES:
             assert dictionnaire.get(cle), f"{langue}.json : « {cle} » manque ou est vide"
+
+
+# ── Les trois familles sont des DÉPLIANTS, et les liens restent publiés ─────
+
+def test_les_trois_familles_sont_des_depliants_et_les_liens_restent_publies():
+    """Un dépliant fermé MASQUE les liens, il ne les RETIRE pas (29/10/2026).
+
+    Le bloc dépliait 45 liens sur quatre lignes en desktop et dix-huit en
+    mobile : une muraille en bas de chaque page. Chaque famille est devenue un
+    dépliant NATIF (un élément du HTML, pas un composant à état) : fermé par
+    défaut, ouvert au clic ou au clavier, sans une ligne de JavaScript, donc
+    identique dans les deux canaux — la coquille n'a rien à simuler et React n'a
+    rien à hydrater.
+
+    Ce que ce cas refuse, et qui est LE risque de ce raccourcissement : un
+    dépliant dont les liens seraient montés à l'OUVERTURE. Le document servi
+    porterait alors trois titres et zéro lien, le maillage disparaîtrait pour un
+    moteur qui lit le HTML sans exécuter de script — et rien ne rougirait,
+    puisque la page AFFICHÉE serait juste.
+    """
+    coquille = (FRONTEND / "vite-plugins" / "prerender" / "app-chrome.js").read_text(
+        encoding="utf-8"
+    )
+    bloc = coquille.split("export function liensSeoHtml", 1)[1].split(
+        "export function piedDePage", 1
+    )[0]
+    assert "<details>" in bloc and "<summary class=" in bloc
+    assert "<details open" not in bloc, "un dépliant ouvert par défaut rend la muraille"
+    # L'ORDRE du document : le déclencheur, PUIS les liens, PUIS la fermeture.
+    assert bloc.index("</summary>") < bloc.index("groupe.liens") < bloc.index("</details>")
+
+    # Les deux rendus React publient le MÊME élément, sans état ni condition.
+    for nom in ("accueil React", "pied de page React"):
+        source = RENDUS[nom].read_text(encoding="utf-8")
+        assert "<details key=" in source, f"{nom} ne publie plus de dépliant"
+        assert "<summary className=" in source, f"{nom} n'a pas de déclencheur"
+        assert "groupe.liens.map" in source, f"{nom} ne publie plus les liens"
