@@ -309,6 +309,17 @@ const installerRelaisDeNavigation = () => {
  * visiteur anonyme, un cookie. Le bandeau demande la MESURE D'AUDIENCE ; le
  * reste demanderait un autre consentement, donc ne s'active pas ici.
  */
+//
+// ── CES OPTIONS SONT GELÉES, MAIS UNE COPIE EST DONNÉE AU SDK (29/10/2026) ──
+// Le gel protège la CONSTANTE de ce module : personne ne peut la modifier en
+// place. Il ne protège pas l'appel, et c'est mesuré : le SDK écrit ses valeurs
+// par défaut DANS l'objet qu'on lui passe, si bien qu'un objet gelé le fait
+// échouer au premier `init` — « Cannot add property debug, object is not
+// extensible » (array.js, `_init`), relevé en production le 29/10/2026 : le
+// script se chargeait, la console portait l'exception, et AUCUNE vue ne
+// partait. `initPosthog` passe donc une COPIE (`{ ...POSTHOG_OPTIONS }`), et le
+// test vérifie que l'objet reçu est extensible — une copie gelée referait le
+// même silence.
 const POSTHOG_OPTIONS = Object.freeze({
   api_host: POSTHOG_API_HOST,
   capture_pageview: false,
@@ -346,7 +357,9 @@ const initPosthog = (key) => {
     'load',
     () => {
       if (typeof window.posthog?.init !== 'function') return;
-      window.posthog.init(key, POSTHOG_OPTIONS);
+      // COPIE, jamais la constante gelée : le SDK écrit ses défauts dans
+      // l'objet reçu (voir le commentaire de POSTHOG_OPTIONS).
+      window.posthog.init(key, { ...POSTHOG_OPTIONS });
       // Le planificateur a pu publier la vue d'arrivée AVANT que le SDK
       // n'existe (elle était alors perdue) : le drapeau garantit qu'elle n'est
       // envoyée qu'une fois, et avec l'URL courante.
