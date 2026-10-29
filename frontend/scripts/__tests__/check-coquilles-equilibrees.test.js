@@ -35,7 +35,7 @@
  * les fichiers ÉCRITS dans `build/` (l'artefact livré), celui-là lit ce que les
  * fabriques PRODUISENT (la source du défaut). Les deux lisent la même règle.
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -255,4 +255,120 @@ describe('équilibre des balises — les DEUX artefacts hors routes', () => {
       expect(desequilibresDesBalises(document).map(decrireDesequilibre)).toEqual([]);
     });
   }
+});
+
+/**
+ * LA TYPOGRAPHIE DE LA 404 (29/10/2026).
+ *
+ * Elle était la SEULE page du site à peindre `system-ui` : les douze coquilles
+ * de route et l'application portent Inter au corps et Cormorant Garamond aux
+ * titres depuis `src/index.css`, et les quarante-cinq pages écrites par le
+ * backend reçoivent désormais les mêmes (`backend/kojo_pages_metier.py`).
+ *
+ * Ce qui est jugé, et pourquoi ce n'est pas décoratif :
+ *   • les deux familles sont déclarées, et ce sont CELLES du site ;
+ *   • chaque fichier cité existe dans `public/fonts` — un nom recopié de
+ *     travers répondrait 404, `font-display: swap` ne dirait rien, et la page
+ *     retomberait en silence sur la police de l'hôte ;
+ *   • les deux fichiers sont PRÉCHARGÉS, une fois chacun, `crossorigin`
+ *     compris (sans cet attribut le préchargement est ignoré en silence).
+ */
+describe('typographie — la 404 sert les polices du site', () => {
+  const document = buildNotFoundPage({ T, contact: CONTACT });
+  const tete = document.split('</head>', 1)[0];
+
+  it('déclare les deux familles du site, et plus la police de l’hôte', () => {
+    expect(document).toContain("font-family:'Inter'");
+    expect(document).toContain("font-family:'Cormorant Garamond'");
+    expect(tete).not.toMatch(/font-family:\s*system-ui/);
+    // Le corps et le titre ne prennent pas la même : c'est la hiérarchie du site.
+    expect(document).toContain("font-family:'Inter',-apple-system");
+    expect(document).toMatch(/h1\{[^}]*font-family:'Cormorant Garamond'/);
+  });
+
+  it('ne cite que des fichiers que le build sert vraiment', () => {
+    const fichiers = [...document.matchAll(/\/fonts\/([a-z0-9.-]+\.woff2)/g)];
+    expect(fichiers.length).toBeGreaterThanOrEqual(2);
+    for (const [, nom] of fichiers) {
+      expect(
+        existsSync(path.join(FRONTEND_DIR, 'public', 'fonts', nom)),
+        `la 404 cite /fonts/${nom}, absent de public/fonts`
+      ).toBe(true);
+    }
+  });
+
+  it('précharge les deux fichiers, une fois chacun, en mode CORS', () => {
+    const preloads = tete.match(/<link rel="preload"[^>]*>/g) || [];
+    expect(preloads).toHaveLength(2);
+    for (const famille of ['inter', 'cormorant-garamond']) {
+      const lien = preloads.filter((l) => l.includes(`/fonts/${famille}-variable-latin.woff2`));
+      expect(lien, famille).toHaveLength(1);
+      expect(lien[0]).toContain('as="font"');
+      expect(lien[0]).toContain('crossorigin');
+    }
+  });
+});
+
+/**
+ * LA PALETTE DE LA 404 (29/10/2026) — le sable et l'encre du site.
+ *
+ * La 404 statique peignait `#f9fafb` / `#111827` / `#4b5563`, le gris FROID
+ * d'un gabarit générique, et ses liens `#ea580c` — une teinte mesurée à 3,39:1
+ * sur surface claire (sous le seuil de 4,5:1, corrigée sur /login le 26/10).
+ * C'est la dernière page que voit un visiteur égaré, et c'était la seule du
+ * site à ne pas employer sa matière.
+ *
+ * Ce qui est jugé ici, et pourquoi ce n'est pas une histoire de goût : les
+ * littéraux de cette page sont comparés AUX JETONS de `src/index.css`, dans les
+ * deux sens. Une retouche du socle qui laisse la 404 en arrière rougit, et une
+ * valeur inventée dans la 404 rougit aussi — les deux documents peignent alors
+ * deux sites différents, sur la même origine.
+ */
+describe('palette — la 404 peint le sable et l’encre du site', () => {
+  const document = buildNotFoundPage({ T, contact: CONTACT });
+  const tete = document.split('</head>', 1)[0];
+  const socle = readFileSync(path.join(FRONTEND_DIR, 'src', 'index.css'), 'utf8');
+  const jeton = (nom) => {
+    const trouve = socle.match(new RegExp(`${nom}\\s*:\\s*(#[0-9a-fA-F]{3,8})`));
+    expect(trouve, `le jeton ${nom} a disparu de src/index.css`).not.toBeNull();
+    return trouve[1].toLowerCase();
+  };
+
+  it('prend SES fonds et SES encres dans les jetons du socle', () => {
+    expect(tete).toContain(`background:${jeton('--kojo-sable')}`);
+    expect(tete).toContain(`color:${jeton('--kojo-encre')}`);
+    expect(tete).toContain(`color:${jeton('--kojo-encre-douce')}`);
+    expect(tete).toContain(`color:${jeton('--kojo-orange-fonce')}`);
+    expect(tete).toContain(`background:${jeton('--kojo-papier')}`);
+    expect(tete).toContain(`border-color:${jeton('--kojo-filet')}`);
+  });
+
+  it('ne peint plus le gris froid de l’hôte, ni la teinte de lien qui échouait', () => {
+    // Les couleurs d'AVANT, nommées pour qu'un retour en arrière soit refusé :
+    // #f9fafb (gray-50), #111827 (gray-900), #4b5563 (gray-600) et #ea580c
+    // (orange-600, 3,39:1 sur une surface claire).
+    for (const ancienne of ['#f9fafb', '#111827', '#4b5563', '#ea580c']) {
+      expect(tete.toLowerCase(), `la 404 repeint ${ancienne}`).not.toContain(ancienne);
+    }
+  });
+
+  it('emploie les COMPOSANTS du site : la carte et les deux boutons', () => {
+    const carte = socle.match(/\.carte-editoriale \{([^}]*)\}/);
+    expect(carte, '.carte-editoriale a disparu de src/index.css').not.toBeNull();
+    // Le VERRE de la carte : mêmes opacités et mêmes teintes que le socle, ou
+    // c'est une seconde carte qui se dessine sur la même origine.
+    expect(carte[1]).toContain('rgba(252, 249, 242, 0.94)');
+    expect(carte[1]).toContain('rgba(240, 220, 195, 0.9)');
+    expect(tete).toContain('background:rgba(252,249,242,.94)');
+    expect(tete).toContain('border:1px solid rgba(240,220,195,.9)');
+
+    // Les deux boutons portent le dessin de `.bouton` (52 px de haut, angle
+    // 3 px) et les deux teintes de `.bouton-encre` / `.bouton-clair`.
+    expect(tete).toContain('min-height:3.25rem');
+    expect(tete).toContain('border-radius:3px');
+    expect(tete).toContain(`.encre{background:${jeton('--kojo-encre')};color:#fff}`);
+    expect(tete).toContain(`.clair{background:${jeton('--kojo-papier')}`);
+    expect(document).toContain('<a class="bouton encre" href="/">');
+    expect(document).toContain('<a class="bouton clair" href="/jobs">');
+  });
 });

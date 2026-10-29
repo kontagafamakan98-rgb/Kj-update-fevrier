@@ -201,6 +201,12 @@ export const CSS_INLINE_BUDGETS = {
   'terms.html': { budget: 86016, plancher: 61440, blocs: 1, feuille: 'index.html' },
   // Le document minimal n'a pas la feuille critique : il a la sienne, et courte.
   // Relevé 09/10/2026 : 392 o / 6 règles / sha 8108c4546aacc8b6.
+  // Relevé 29/10/2026 : 1,43 Ko / 14 règles / sha d34135cd600ebf12 — la 404 a
+  // reçu la TYPOGRAPHIE du site (deux `@font-face`, deux préchargements) puis sa
+  // PALETTE et ses COMPOSANTS (sable, carte éditoriale, deux boutons), là où
+  // elle peignait `system-ui` sur le gris froid d'un gabarit. Le budget n'est
+  // pas élargi pour autant : 2 048 o tenait avant, il tient encore, et la marge
+  // de 690 o est ce qui reste pour la prochaine retouche.
   '404.html': { budget: 2048, plancher: 256, blocs: 1, feuille: '404.html' },
 };
 

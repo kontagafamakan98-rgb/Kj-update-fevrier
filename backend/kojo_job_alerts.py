@@ -107,6 +107,23 @@ PAYS_MAX = 50
 # pas d'email.
 SITE_PAR_DEFAUT = "https://kojoforafrica.cc.cd"
 
+# ── LA PROVENANCE D'UNE VEILLE (29/10/2026) ──────────────────────────────
+# Une veille se crée TOUJOURS depuis `/jobs` : c'est la carte de cette page qui
+# la pose. Ce qui manquait n'est donc pas la page d'ARRIVÉE mais la page de
+# DÉPART — celle qu'un visiteur lisait quand il a cliqué (`/emplois/bamako`,
+# `/metiers/plomberie`, ou rien du tout). Sans ce fait, impossible de dire si
+# les pages ville et métier produisent des veilles, alors que c'est la seule
+# raison d'être de leur bloc d'alerte.
+#
+# Trois valeurs CLIENTES, et une quatrième que personne ne peut déclarer :
+# `inconnue` n'est écrite QUE lorsqu'un client ne dit rien du tout (une version
+# d'avant ce champ). La compter comme « directe » gonflerait précisément la
+# mesure que ce champ existe pour produire — mieux vaut une colonne « on ne
+# sait pas » qu'un chiffre inventé.
+ORIGINES_ALERTE = ("ville", "metier", "directe")
+ORIGINE_ABSENTE = "inconnue"
+ORIGINE_MAX = 20
+
 
 def _base_publique() -> str:
     """Origine des liens de l'email, sans slash final."""
@@ -121,6 +138,25 @@ def _texte(valeur, maximum: int = 100) -> str:
     if valeur is None or isinstance(valeur, bool):
         return ""
     return str(valeur).strip()[:maximum]
+
+
+def _origine(donnees: dict) -> str:
+    """La provenance DÉCLARÉE par le client, ou `inconnue` s'il se tait.
+
+    Une valeur hors vocabulaire LÈVE au lieu de retomber sur « directe » :
+    c'est une faute du client, et la replier en silence la compterait dans la
+    mauvaise colonne. Un client muet, lui, n'est pas une faute — c'est une
+    version antérieure au champ, et rien dans son message ne dit d'où il vient.
+    """
+    if "origin" not in donnees:
+        return ORIGINE_ABSENTE
+    origine = _texte(donnees.get("origin"), ORIGINE_MAX).lower()
+    if origine not in ORIGINES_ALERTE:
+        raise ValueError(
+            "provenance inconnue « %s » — valeurs admises : %s"
+            % (origine, ", ".join(ORIGINES_ALERTE))
+        )
+    return origine
 
 
 def _instant(valeur) -> Optional[datetime]:
@@ -247,6 +283,7 @@ def vue(alerte: Optional[dict]) -> dict:
             "category": None,
             "city": None,
             "country": None,
+            "origin": ORIGINE_ABSENTE,
             "sent_count": 0,
             "last_notified_at": None,
         }
@@ -256,6 +293,10 @@ def vue(alerte: Optional[dict]) -> dict:
         "category": alerte.get("category") or None,
         "city": alerte.get("city") or None,
         "country": alerte.get("country") or None,
+        # `inconnue` pour les veilles créées avant le champ : elles existent,
+        # mais aucune ne dit d'où elles viennent, et l'avouer vaut mieux que
+        # les ranger d'office dans une colonne.
+        "origin": _texte(alerte.get("origin"), ORIGINE_MAX) or ORIGINE_ABSENTE,
         "sent_count": int(alerte.get("sent_count") or 0),
         "last_notified_at": dernier.isoformat() if dernier else None,
     }
@@ -280,6 +321,11 @@ async def enregistrer(user_id: str, email: str, donnees: dict) -> dict:
     route deviendrait un moyen d'envoyer des emails à un tiers).
     """
     donnees = donnees if isinstance(donnees, dict) else {}
+
+    # AVANT toute écriture : une provenance hors vocabulaire refuse la requête
+    # entière (422), plutôt que d'être ignorée pendant que les critères, eux,
+    # seraient enregistrés.
+    origine = _origine(donnees)
 
     categorie = _texte(donnees.get("category"), CATEGORIE_MAX) or None
     if categorie and not _categorie_connue(categorie):
@@ -323,6 +369,13 @@ async def enregistrer(user_id: str, email: str, donnees: dict) -> dict:
                 "$set": {**changement, **pose_jeton},
                 "$setOnInsert": {
                     "created_at": maintenant,
+                    # La PROVENANCE est un fait de CRÉATION : une veille née
+                    # sur la page de Bamako garde cette origine même si son
+                    # propriétaire change ensuite de ville ou de métier. D'où
+                    # `$setOnInsert` — un `$set` l'aurait réécrite à chaque
+                    # réglage, et la mesure aurait décrit la dernière visite
+                    # au lieu de l'acquisition.
+                    "origin": origine,
                     "sent_count": 0,
                     "last_checked_at": None,
                 },

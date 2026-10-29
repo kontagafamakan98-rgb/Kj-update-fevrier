@@ -160,6 +160,120 @@ class TestReglages:
         assert coupee.json()["category"] == "plumbing"
 
 
+class TestLaProvenance:
+    """D'où vient une veille — le fait que ce champ existe pour produire.
+
+    Une alerte se crée toujours depuis `/jobs` : la page d'ARRIVÉE ne dit donc
+    rien de l'acquisition. C'est la page de DÉPART qu'on enregistre, déclarée
+    par le lien (`&origine=ville|metier`, cf. `kojo_pages_metier.lien_alerte`),
+    et une alerte n'a qu'une provenance : celle de sa CRÉATION.
+    """
+
+    async def test_la_provenance_est_ecrite_a_la_creation(self, client: AsyncClient):
+        entetes = await auth_headers(client, WORKER_USER)
+
+        reponse = await client.put(
+            "/api/job-alerts",
+            json={"city": "Bamako", "origin": "ville"},
+            headers=entetes,
+        )
+
+        assert reponse.status_code == 200, reponse.text
+        assert reponse.json()["origin"] == "ville"
+        # Relu par la route de lecture, donc aussi écrite en base.
+        assert (await client.get("/api/job-alerts", headers=entetes)).json()["origin"] == "ville"
+
+    async def test_un_reglage_ulterieur_ne_reecrit_pas_la_provenance(
+        self, client: AsyncClient
+    ):
+        """Sinon la mesure décrirait la dernière visite, pas l'acquisition."""
+        entetes = await auth_headers(client, WORKER_USER)
+        await client.put(
+            "/api/job-alerts",
+            json={"category": "plumbing", "origin": "metier"},
+            headers=entetes,
+        )
+
+        seconde = await client.put(
+            "/api/job-alerts",
+            json={"category": "electrical", "city": "Dakar", "origin": "directe"},
+            headers=entetes,
+        )
+
+        assert seconde.status_code == 200, seconde.text
+        assert seconde.json()["category"] == "electrical"
+        # Le réglage a changé, l'origine NON.
+        assert seconde.json()["origin"] == "metier"
+
+    async def test_une_provenance_inconnue_est_refusee(self, client: AsyncClient):
+        """Un client qui ment ne doit pas être replié en silence sur « directe »."""
+        entetes = await auth_headers(client, WORKER_USER)
+
+        reponse = await client.put(
+            "/api/job-alerts",
+            json={"city": "Dakar", "origin": "facebook"},
+            headers=entetes,
+        )
+
+        assert reponse.status_code == 422
+        assert "facebook" in reponse.text
+        # Le refus porte sur la REQUÊTE : aucun critère n'a été enregistré.
+        assert (await client.get("/api/job-alerts", headers=entetes)).json()["active"] is False
+
+    async def test_un_client_muet_n_est_pas_compte_comme_direct(self, client: AsyncClient):
+        """Une version d'avant le champ ne sait pas d'où elle vient : on le dit."""
+        entetes = await auth_headers(client, WORKER_USER)
+
+        reponse = await client.put(
+            "/api/job-alerts", json={"city": "Bamako"}, headers=entetes
+        )
+
+        assert reponse.status_code == 200, reponse.text
+        assert reponse.json()["origin"] == "inconnue"
+        # Et « inconnue » n'est pas une valeur qu'un client peut DÉCLARER.
+        refus = await client.put(
+            "/api/job-alerts",
+            json={"city": "Bamako", "origin": "inconnue"},
+            headers=entetes,
+        )
+        assert refus.status_code == 422
+
+    def test_le_vocabulaire_est_celui_que_le_client_declare(self):
+        """Deux applications déployées séparément : c'est ce cas qui les tient ensemble.
+
+        Le client (`frontend/src/config/provenance-alerte.js`) tombe sur
+        « directe » quand il ne reconnaît pas une valeur, et n'envoie donc
+        jamais autre chose. Si les deux listes divergent, une origine légitime
+        côté client serait refusée ici en 422 — la carte ne s'enregistrerait
+        plus, sans que rien ne le dise.
+        """
+        import re
+        from pathlib import Path
+
+        from kojo_job_alerts import ORIGINE_ABSENTE, ORIGINES_ALERTE
+
+        source = (
+            Path(__file__).resolve().parents[2]
+            / "frontend"
+            / "src"
+            / "config"
+            / "provenance-alerte.js"
+        ).read_text(encoding="utf-8")
+        declaration = re.search(r"ORIGINES_ALERTE\s*=\s*\[([^\]]*)\]", source)
+        assert declaration, (
+            "provenance-alerte.js n'exporte plus ORIGINES_ALERTE : le client ne dit donc plus "
+            "lequel des trois vocables il emploie, et ce garde ne mesure plus rien"
+        )
+        client = re.findall(r"'([a-z]+)'", declaration.group(1))
+
+        assert client == list(ORIGINES_ALERTE), (
+            f"le client déclare {client}, le serveur accepte {list(ORIGINES_ALERTE)}"
+        )
+        # « inconnue » est une valeur de DOCUMENT, jamais une valeur d'entrée :
+        # aucun client ne doit pouvoir s'en réclamer.
+        assert ORIGINE_ABSENTE not in ORIGINES_ALERTE
+
+
 class TestCorrespondance:
     def test_les_trois_criteres_filtrent_et_un_absent_ne_filtre_rien(self):
         from kojo_job_alerts import correspond
