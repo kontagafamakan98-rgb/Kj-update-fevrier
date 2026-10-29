@@ -319,7 +319,12 @@ describe('initAnalytics — PostHog, conditionnel et une seule vue par navigatio
   });
 
   it('avec une clé de la MAUVAISE forme (jeton personnel) : rien non plus', async () => {
-    vi.stubEnv('VITE_POSTHOG_KEY', 'phx_personnel123');
+    // `phx_` est le préfixe d'un jeton PERSONNEL, et rien d'autre : c'est la
+    // FORME que `estClePosthog` refuse. Le corps est laissé vide exprès — un
+    // faux jeton complet (16 caractères aléatoires) est exactement ce qu'un
+    // détecteur de secrets signale, et un cas négatif n'a pas besoin de la
+    // valeur qu'il refuse, seulement de son préfixe.
+    vi.stubEnv('VITE_POSTHOG_KEY', 'phx_');
     const { initAnalytics } = await import('../analytics.js');
     initAnalytics();
 

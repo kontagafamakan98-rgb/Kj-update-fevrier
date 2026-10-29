@@ -80,7 +80,6 @@ refuse l'écart en nommant le réglage à poser.
 
 ```bash
 fly secrets set \
-  "PLAUSIBLE_DOMAIN=<même valeur que VITE_PLAUSIBLE_DOMAIN>" \
   "GA_MEASUREMENT_ID=<même valeur que VITE_GA_MEASUREMENT_ID>" \
   "POSTHOG_KEY=<même valeur que VITE_POSTHOG_KEY>"
 ```
@@ -88,6 +87,14 @@ fly secrets set \
 `POSTHOG_KEY` fait partie des réglages qui ouvrent une origine tierce : sans
 lui, `script-src` n'autorise pas le CDN PostHog et `connect-src` pas son hôte
 d'ingestion (cf. `frontend/src/config/posthog.js`).
+
+`PLAUSIBLE_DOMAIN` n'est PAS dans ce bloc, et c'est une mesure : ni le build
+Vercel ni Fly ne déclarent de domaine Plausible aujourd'hui. Ce bloc est lu par
+`.github/scripts/check-fly-env-drift.py` comme la liste des secrets REQUIS — y
+mettre une valeur qu'aucune surface n'emploie ferait rougir la présence pour
+n'ouvrir aucune origine. Le jour où Plausible est configuré, la variable se pose
+ici (`fly secrets set PLAUSIBLE_DOMAIN=… -a kojo-backend`) ET sur Vercel, et
+elle rejoint ce bloc à ce moment-là.
 
 **Règles d'or :**
 
