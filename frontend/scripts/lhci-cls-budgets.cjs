@@ -282,11 +282,32 @@ const CLS_BUDGETS = {
   // y=1 005 pour une fenêtre de 940. 0,02 et non 0,01 : c'est un plafond de
   // RÉGRESSION — la valeur d'avant (0,0274) doit rougir —, pas encore la marge
   // serrée des routes à 0,0039.
+  // ── CE QUI RESTAIT, 0,0039, EST NOMMÉ, RETIRÉ, ET LE PLAFOND SUIT (29/10/2026) ──
+  // Le reliquat de 0,0039 avait une cause précise, publiée par la sonde : les
+  // DEUX groupes de la barre du haut, qui changeaient de largeur à l'arrivée de
+  // la session. Relevé à t=129,3 ms, 1350×940, compte travailleur : navigation
+  // 588 → 451 px (x 216,3 → 264,7) et commandes 365,3 → 405,7 px (x 917,7 →
+  // 877,3). La barre peint désormais la disposition CONNECTÉE, invisible, quand
+  // une session est probable (`sessionProbable`, AuthContext) : l'arrivée du
+  // profil ne fait que la révéler.
+  //
+  // MESURE APRÈS, MÊME PROTOCOLE, MÊME ARTEFACT QUE LA CI SERT (2 runs) :
+  // CLS **0,0000**, aucune source, et les groupes à leur géométrie finale dès
+  // la première peinture (451,02 px à x=264,66 · 405,69 px à x=877,31).
+  //
+  // Le plafond descend de 0,02 à 0,0035 : juste SOUS les 0,0039 retirés, donc
+  // leur retour ROUGIT — c'est le rôle de ce chiffre, pas une marge de confort.
+  // Il reste 28× sous le seuil « bon » de Lighthouse (0,1) et 7× sous le
+  // garde-fou du fichier de test (`max × 7 < 0,15`).
   '/payment': {
-    max: 0.02,
-    pireMediane: 0.0039,
+    max: 0.0035,
+    pireMediane: 0,
     mesure:
-      'MESURE DU 29/10/2026, CADRE PLEIN ÉCRAN AUX DEUX TAILLES : en 1350×940, CLS **0,0274 → 0,0039** sur les '
+      'MESURE DU 29/10/2026, DÉCALAGE DES DEUX GROUPES DE LA BARRE RETIRÉ : 1350×940, compte travailleur, '
+      + 'artefact servi, CLS **0,0039 → 0,0000** (2 runs, aucune source rapportée, groupes à 451,02 px à '
+      + 'x=264,66 et 405,69 px à x=877,31 dès la première peinture) ; plafond 0,02 → 0,0035, sous les 0,0039 '
+      + 'retirés. '
+      + 'MESURE PRÉCÉDENTE, CADRE PLEIN ÉCRAN AUX DEUX TAILLES : en 1350×940, CLS **0,0274 → 0,0039** sur les '
       + 'DEUX branches de l’URL (6 runs mesurés sur l’artefact servi, pied de page à y=1 005 pour une fenêtre de '
       + '940) ; le mobile est inchangé (0,0000, pied à y=1 004,33). '
       + 'MESURE DU 28/10/2026, APRÈS LE CADRE PLEIN ÉCRAN EN MOBILE (`min-h-screen` sur le cadre de la route, '

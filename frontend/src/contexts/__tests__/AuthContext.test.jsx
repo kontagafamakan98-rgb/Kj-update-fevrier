@@ -97,11 +97,12 @@ const FRESH_USER = {
 
 // Sonde : expose le pays de l'utilisateur React ET le bouton de rechargement.
 const Probe = () => {
-  const { user, loadUser, loading } = useAuth();
+  const { user, loadUser, loading, sessionProbable } = useAuth();
   return (
     <div>
       <span data-testid="country">{user?.country || 'none'}</span>
       <span data-testid="loading">{String(loading)}</span>
+      <span data-testid="probable">{String(sessionProbable)}</span>
       <button onClick={() => loadUser()}>reload</button>
     </div>
   );
@@ -431,5 +432,63 @@ describe('AuthContext — shell natif : le jeton a le droit d\'être écrit', ()
     await waitFor(() => expect(screen.getByTestId('country').textContent).toBe('mali'));
     expect(localStorage.getItem('token')).toBe(JWT_SONDE);
     expect(authAPI.getProfile).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * ── LA SESSION ATTENDUE EST PUBLIÉE, ET ELLE S'ÉTEINT (29/10/2026) ────────
+ *
+ * `sessionProbable` existe pour une seule raison : permettre au chrome de
+ * peindre la disposition d'un compte connecté AVANT que `/auth/me` n'ait
+ * répondu (la barre du haut passait sinon d'un visiteur à un utilisateur, ce qui
+ * déplaçait ses deux groupes — CLS 0,0039 sur /payment, 1357×940, mesuré).
+ *
+ * Ce que ces cas tiennent, et qui n'est pas décoratif : la valeur est vraie
+ * SEULEMENT pendant l'amorçage d'une session qui laisse une trace locale. Trop
+ * large (vraie après résolution, ou pour un visiteur quelconque), elle ferait
+ * peindre à la barre la disposition d'un utilisateur qui n'existe pas.
+ */
+describe('AuthContext — la session attendue (`sessionProbable`)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+
+  it('vraie pendant l’amorçage d’une session probable, fausse une fois le profil arrivé', async () => {
+    localStorage.setItem('kojo_session_trace', '1');
+    let resoudre;
+    authAPI.getProfile.mockReturnValue(new Promise((resolve) => {
+      resoudre = resolve;
+    }));
+
+    renderProvider();
+
+    // Le profil n'a pas répondu : la session est PROBABLE, et c'est tout ce que
+    // la barre a besoin de savoir pour réserver sa disposition.
+    expect(screen.getByTestId('loading').textContent).toBe('true');
+    expect(screen.getByTestId('probable').textContent).toBe('true');
+
+    await act(async () => {
+      resoudre({ ...FRESH_USER });
+    });
+
+    await waitFor(() => expect(screen.getByTestId('probable').textContent).toBe('false'));
+    expect(screen.getByTestId('country').textContent).toBe('mali');
+  });
+
+  it('fausse dès le premier rendu d’un visiteur SANS trace — aucune requête, aucune réserve', () => {
+    authAPI.getProfile.mockResolvedValue({ ...FRESH_USER });
+
+    renderProvider();
+
+    expect(screen.getByTestId('probable').textContent).toBe('false');
+    expect(authAPI.getProfile).not.toHaveBeenCalled();
   });
 });

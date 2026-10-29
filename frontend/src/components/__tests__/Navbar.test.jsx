@@ -64,11 +64,20 @@ vi.mock('../../contexts/LanguageContext', async (importOriginal) => {
 // `user` est mutable : le même fichier mesure les deux barres (visiteur et
 // connecté), et une doublure figée n'en peindrait qu'une.
 let utilisateur = null;
+// `loading`/`sessionProbable` sont muables pour la même raison : la barre peint
+// TROIS états (visiteur, session attendue, connecté), pas deux.
+let etatSession = { loading: false, sessionProbable: false };
 vi.mock('../../contexts/AuthContext', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
-    useAuth: () => ({ user: utilisateur, logout: vi.fn(), login: vi.fn(), loginWithGoogle: vi.fn() }),
+    useAuth: () => ({
+      user: utilisateur,
+      ...etatSession,
+      logout: vi.fn(),
+      login: vi.fn(),
+      loginWithGoogle: vi.fn(),
+    }),
   };
 });
 
@@ -231,6 +240,7 @@ const monter = (user) => {
 afterEach(() => {
   cleanup();
   utilisateur = null;
+  etatSession = { loading: false, sessionProbable: false };
 });
 
 /** Les entrées de BUREAU : la variante qui porte le filet de 2 px. */
@@ -390,5 +400,98 @@ describe('navbar — lisibilité sur le verre', () => {
         ).toBeTruthy();
       }
     }
+  });
+});
+
+/**
+ * ── LA BARRE NE SE DÉPLACE PAS QUAND LA SESSION ARRIVE (29/10/2026) ────────
+ *
+ * Le défaut mesuré à la sonde des cadres (1350×940, artefact servi, compte
+ * travailleur) : la barre peignait d'abord les deux groupes d'un VISITEUR, puis
+ * les remplaçait par ceux d'un utilisateur connecté quand `/auth/me` répondait.
+ * Relevé à t=129,3 ms — les deux groupes se déplaçaient d'un coup :
+ *
+ *   • navigation : 588 → 451 px, de x=216,3 à x=264,7 ;
+ *   • commandes : 365,3 → 405,7 px, de x=917,7 à x=877,3.
+ *
+ * CLS 0,0039, et c'était la TOTALITÉ de ce qui restait sur /payment une fois son
+ * cadre réglé. Le remède : pendant l'amorçage d'une session PROBABLE (trace
+ * locale, `sessionProbable` d'AuthContext), la barre peint la disposition
+ * connectée `invisible` — elle occupe sa place sans se peindre, donc l'arrivée du
+ * profil ne fait que la révéler.
+ *
+ * Ce que ces cas tiennent, et pourquoi ils comparent une SIGNATURE plutôt qu'une
+ * classe : la propriété qui empêche le déplacement est que les deux peintures
+ * portent les MÊMES commandes, dans le même ordre. Un libellé ajouté d'un côté
+ * seulement ferait rougir le cas même si la classe `invisible` était là.
+ */
+describe('navbar — la disposition de la session est réservée', () => {
+  /** Les quatre groupes de la rangée, dans l’ordre du DOM. */
+  const groupes = (nav) => Array.from(nav.querySelector(':scope > div > div').children);
+
+  /** Ce que chaque groupe COMMANDE (tag + nom accessible ou texte), groupe par groupe. */
+  const signature = (nav) =>
+    groupes(nav).map((groupe) =>
+      Array.from(groupe.querySelectorAll('a, button'))
+        .map((el) => `${el.tagName}:${(el.textContent || el.getAttribute('aria-label') || '').trim()}`)
+        .join('|')
+    );
+
+  /** Les groupes masqués pendant la réserve — la classe que la barre pose. */
+  const groupesMasques = (nav) => Array.from(nav.querySelectorAll('.invisible'));
+
+  it('pendant l’amorçage, la barre porte les commandes d’un compte — sans les peindre', () => {
+    etatSession = { loading: true, sessionProbable: true };
+    const nav = monter(null);
+
+    // L’état VISITEUR ne doit pas être peint : c’est son remplacement qui
+    // déplaçait les deux groupes.
+    expect(
+      nav.querySelector('a[href="/login"]'),
+      'la barre peint encore « Connexion » alors qu’une session est attendue : c’est le remplacement qui déplace les groupes'
+    ).toBeNull();
+
+    const reserves = groupesMasques(nav);
+    expect(
+      reserves.length,
+      `la barre réserve ${reserves.length} groupe(s) au lieu de deux : les deux groupes qui changent avec la session doivent occuper leur place sans se peindre`
+    ).toBe(2);
+    for (const groupe of reserves) {
+      expect(
+        groupe.getAttribute('aria-hidden'),
+        'un groupe réservé n’est pas retiré de l’arbre d’accessibilité : il annoncerait une session qui n’est pas encore prouvée'
+      ).toBe('true');
+    }
+  });
+
+  it('la disposition réservée est EXACTEMENT celle d’un compte connecté', () => {
+    etatSession = { loading: true, sessionProbable: true };
+    const reservee = signature(monter(null));
+    cleanup();
+
+    etatSession = { loading: false, sessionProbable: false };
+    const connectee = signature(monter({ id: 'u1', email: 'a@b.c', email_verified: true }));
+
+    expect(
+      reservee,
+      'la barre réservée et la barre connectée ne portent pas les mêmes commandes : la révélation déplacerait les groupes'
+    ).toEqual(connectee);
+    // Et une fois le profil arrivé, plus rien n’est masqué.
+    const nav = monter({ id: 'u1', email: 'a@b.c', email_verified: true });
+    expect(groupesMasques(nav).length, 'la barre garde un groupe masqué une fois le profil arrivé').toBe(0);
+  });
+
+  it('un visiteur SANS trace ne réserve rien : la barre publique est peinte tout de suite', () => {
+    // `sessionProbable` est faux dès le premier rendu pour un visiteur sans
+    // trace (AuthContext le dérive de `loading && hasSessionTrace()`), donc le
+    // cas où la réservation ne doit PAS avoir lieu.
+    etatSession = { loading: true, sessionProbable: false };
+    const nav = monter(null);
+
+    expect(
+      nav.querySelector('a[href="/login"]'),
+      'la barre a perdu « Connexion » pour un visiteur sans trace : le remède a été appliqué à tout le monde'
+    ).not.toBeNull();
+    expect(groupesMasques(nav).length, 'la barre masque un groupe pour un visiteur sans trace').toBe(0);
   });
 });
