@@ -362,6 +362,49 @@ export default function Jobs() {
         {pageT(pagePlan.introKey)}
       </p>
 
+      {/* ── LA PROMESSE D'ALERTE, POUR UN VISITEUR SANS COMPTE ─────────────
+          Elle n'est PAS conditionnée par `?alerte=1` : mesuré le 30/10/2026,
+          le document pré-rendu de /jobs (109 568 o) ne portait aucune
+          occurrence de la promesse, qui n'existait qu'APRÈS la réponse de
+          l'API (le titre de l'état vide) ou pour un travailleur connecté. Un
+          crawler, et la première image, ne voyaient donc pas que cette page
+          OFFRE une veille — alors que c'est le seul chemin de retour du
+          produit.
+
+          Elle est peinte ICI, juste après l'intro, parce que c'est là que la
+          COQUILLE la publie (elle ne connaît ni la session ni la barre
+          d'onglets) : peintre la page plus bas la décalait d'une barre, et le
+          garde de géométrie coquille ↔ React l'a refusé (4 rouges du 30/10).
+
+          Ce bloc est STATIQUE et ses classes comme ses clés sont lues dans le
+          plan de la route, que la coquille pré-rérendue lit aussi : les deux
+          canaux peignent la même chose, et le build refuse une coquille qui
+          l'aurait perdue. Il dit la seule chose vraie — l'alerte s'active
+          depuis un compte — et ne promet aucune offre.
+
+          Un CLIENT connecté ne voit rien : une veille lui enverrait le
+          catalogue qu'il publie lui-même. Un TRAVAILLEUR connecté voit la
+          carte interactive (`AlerteEmploi`) à la place, jamais les deux. */}
+      {!user && (
+        <section
+          className={pagePlan.alerteCarteClass}
+          aria-labelledby="alerte-emploi-promesse"
+        >
+          <h2 id="alerte-emploi-promesse" className={pagePlan.alerteTitreClass}>
+            {pageT(pagePlan.alerteTitreKey)}
+          </h2>
+          <p className={pagePlan.alerteTexteClass}>{pageT(pagePlan.alerteTexteKey)}</p>
+          <div className={pagePlan.alerteActionsClass}>
+            <LienVue to="/register?type=worker" className={pagePlan.alerteBoutonClass}>
+              {pageT(pagePlan.alerteInscriptionKey)}
+            </LienVue>
+            <LienVue to="/login" className={pagePlan.alerteBoutonClairClass}>
+              {pageT(pagePlan.alerteConnexionKey)}
+            </LienVue>
+          </div>
+        </section>
+      )}
+
       {/* Onglets : découverte / candidatures / missions. Présentés comme un
           sélecteur unique quand il y en a plusieurs : c'est le même contrôle
           (un jeu d'options dont une seule est active), pas trois boutons
@@ -418,44 +461,6 @@ export default function Jobs() {
           villeInitiale={villeAlerte}
           origine={origineAlerte}
         />
-      )}
-
-      {/* ── LA PROMESSE D'ALERTE, POUR UN VISITEUR SANS COMPTE ─────────────
-          Elle n'est PAS conditionnée par `?alerte=1` : mesuré le 30/10/2026,
-          le document pré-rendu de /jobs (109 568 o) ne portait aucune
-          occurrence de la promesse, qui n'existait qu'APRÈS la réponse de
-          l'API (le titre de l'état vide) ou pour un travailleur connecté. Un
-          crawler, et la première image, ne voyaient donc pas que cette page
-          OFFRE une veille — alors que c'est le seul chemin de retour du
-          produit.
-
-          Ce bloc est STATIQUE et ses classes comme ses clés sont lues dans le
-          plan de la route, que la coquille pré-rendue lit aussi : les deux
-          canaux peignent la même chose, et le build refuse une coquille qui
-          l'aurait perdue. Il dit la seule chose vraie — l'alerte s'active
-          depuis un compte — et ne promet aucune offre.
-
-          Un CLIENT connecté ne voit rien : une veille lui enverrait le
-          catalogue qu'il publie lui-même. Un TRAVAILLEUR connecté voit la
-          carte interactive (`AlerteEmploi`) à la place, jamais les deux. */}
-      {!user && (
-        <section
-          className={pagePlan.alerteCarteClass}
-          aria-labelledby="alerte-emploi-promesse"
-        >
-          <h2 id="alerte-emploi-promesse" className={pagePlan.alerteTitreClass}>
-            {pageT(pagePlan.alerteTitreKey)}
-          </h2>
-          <p className={pagePlan.alerteTexteClass}>{pageT(pagePlan.alerteTexteKey)}</p>
-          <div className={pagePlan.alerteActionsClass}>
-            <LienVue to="/register?type=worker" className={pagePlan.alerteBoutonClass}>
-              {pageT(pagePlan.alerteInscriptionKey)}
-            </LienVue>
-            <LienVue to="/login" className={pagePlan.alerteBoutonClairClass}>
-              {pageT(pagePlan.alerteConnexionKey)}
-            </LienVue>
-          </div>
-        </section>
       )}
 
       {/* ── Recherche et filtres : UNE carte, lisible d'un coup d'œil ───────
