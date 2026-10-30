@@ -59,7 +59,14 @@
    refusait. Cesser de la générer est le remède écrit par le garde lui-même ;
    le jour où un composant posera à nouveau `z-10`, le garde le refusera, et
    c'est voulu. */
-@source not inline("{container,visible,static,table,resize,blur,filter,transition,ease-out,z-10}");
+/* Les GRIS FROIDS RETIRÉS DU SITE (29/10/2026). Les pages, les composants et le
+   chrome peignent la gamme CHAUDE (`stone-*`) et le sable ; ces cinq noms ne
+   sont plus posés par aucun nœud livré, mais les tables de mesure des tests de
+   contraste et la prose qui racontent le remplacement les citent encore — et
+   Tailwind lit les unes comme l'autre. Cesser de les générer est le remède que
+   le garde écrit lui-même : le jour où quelqu'un les reposera, il refusera, et
+   c'est voulu (le retour d'un gris froid doit être une décision, pas un oubli). */
+@source not inline("{container,visible,static,table,resize,blur,filter,transition,ease-out,z-10,bg-gray-50,text-gray-500,text-gray-600,text-gray-700,border-gray-300}");
 
 /* ── Tailwind v4 : défauts de v3 préservés (guide de migration, 10/10/2026) ──
    `rounded-sm` valait 4 px en v3 (la config étend `borderRadius.sm`) ; en v4
@@ -1332,7 +1339,7 @@ body {
 }
 
 /* Les deux FONDS du rythme de page. Ils remplacent l'alternance
-   `bg-white` / `bg-gray-50` des sections : le gris froid jurait avec l'encre
+   `bg-white` / `gray-50` des sections : le gris froid jurait avec l'encre
    chaude du texte, et c'est l'alternance qui donne à une longue page son pas.
    Aucune propriété de mise en page ici : changer un fond ne déplace rien. */
 .fond-papier {
@@ -2184,7 +2191,7 @@ body {
 
    L'accueil avait reçu un langage (bande orange, listes à filets, panneau à
    deux moitiés, clôture) et les AUTRES pages étaient restées sur l'ancien :
-   dégradés orange → rouge, cartes `rounded-2xl` à ombre, fonds `bg-gray-50`,
+   dégradés orange → rouge, cartes `rounded-2xl` à ombre, fonds `gray-50`,
    et — mesuré sur /how-it-works — un panneau de séquestre VERT ÉMERAUDE au
    milieu d'un site orange, plus un sous-titre en `text-stone-600` posé sur le
    fond orange du héros (contraste 2,6:1 : illisible, et la page le publiait
@@ -2741,7 +2748,7 @@ body {
    rien à recopier côté coquille.
 
    La spécificité bat les utilitaires (`form :is(input…)` = 0,3,2 contre 0,1,0
-   pour `border-gray-300`), ce qui est VOULU : le dessin d'un champ appartient à
+   pour une bordure froide), ce qui est VOULU : le dessin d'un champ appartient à
    la page, pas au champ qui l'écrit. C'est la seule exception du site à la
    règle « un utilitaire gagne », et elle est bornée aux propriétés ci-dessous. */
 form :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]) {

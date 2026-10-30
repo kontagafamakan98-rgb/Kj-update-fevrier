@@ -135,7 +135,7 @@ export function listesDeClasseReact(source) {
 export const CLASSES_PROPRES_AUX_COQUILLES = [
   {
     publiee:
-      'w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-gray-300 rounded-md bg-white text-gray-700 text-sm font-medium',
+      'w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-stone-300 rounded-md bg-white text-stone-700 text-sm font-medium',
     module: 'vite-plugins/prerender/shells-routes.js',
     motif:
       "bouton d'un aperçu de formulaire (état sans JavaScript) : React peint le bouton ACTIF, jamais ce repli inerte",
@@ -156,7 +156,7 @@ export const CLASSES_PROPRES_AUX_COQUILLES = [
   },
   {
     publiee:
-      'relative flex items-center justify-center p-4 border-2 border-gray-300 rounded-lg cursor-pointer transition-all',
+      'relative flex items-center justify-center p-4 border-2 border-stone-300 rounded-lg cursor-pointer transition-all',
     module: 'vite-plugins/prerender/shells-routes.js',
     motif:
       "carte de choix NON sélectionnée du même aperçu (l'autre moitié de la paire ci-dessus)",
@@ -168,7 +168,7 @@ export const CLASSES_PROPRES_AUX_COQUILLES = [
       "valeur vide d'un sélecteur d'aperçu : elle n'existe que sans JavaScript (React publie la valeur choisie)",
   },
   {
-    publiee: 'text-xs text-gray-500 transition-transform',
+    publiee: 'text-xs text-stone-500 transition-transform',
     module: 'vite-plugins/prerender/shells-routes.js',
     motif: "chevron du sélecteur d'aperçu (rotation à l'ouverture, état React)",
   },
@@ -184,7 +184,7 @@ export const CLASSES_PROPRES_AUX_COQUILLES = [
     motif: "boîte du même emplacement différé (le cadre en pointillés de l'uploader)",
   },
   {
-    publiee: 'mt-1 h-4 w-4 rounded-sm border-gray-300 text-orange-600',
+    publiee: 'mt-1 h-4 w-4 rounded-sm border-stone-300 text-orange-600',
     module: 'vite-plugins/prerender/shells-routes.js',
     motif: "case à cocher de l'aperçu (les utilitaires de formulaire de React ne sont pas écrits en clair)",
   },

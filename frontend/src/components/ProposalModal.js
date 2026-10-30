@@ -174,13 +174,13 @@ export default function ProposalModal({ job, onClose, onProposalSubmitted }) {
 
   return (
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="proposal-modal-title" tabIndex={-1} className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/50 px-4">
-      <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-gray-100">
-        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+      <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-stone-100">
+        <div className="flex items-center justify-between border-b border-stone-100 px-6 py-4">
           <div>
-            <h2 id="proposal-modal-title" className="text-xl font-bold text-gray-900">{t('jobUiApplyTitle')}</h2>
-            <p className="text-sm text-gray-500">{t('jobUiApplySubtitlePrefix')} {title}</p>
+            <h2 id="proposal-modal-title" className="text-xl font-bold text-stone-900">{t('jobUiApplyTitle')}</h2>
+            <p className="text-sm text-stone-500">{t('jobUiApplySubtitlePrefix')} {title}</p>
           </div>
-          <button type="button" onClick={onClose} aria-label={t('close')} className="rounded-lg px-3 py-2 text-gray-500 hover:bg-gray-100"><X className="h-4 w-4" aria-hidden="true" /></button>
+          <button type="button" onClick={onClose} aria-label={t('close')} className="rounded-lg px-3 py-2 text-stone-500 hover:bg-stone-100"><X className="h-4 w-4" aria-hidden="true" /></button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5 px-6 py-6">
@@ -190,7 +190,7 @@ export default function ProposalModal({ job, onClose, onProposalSubmitted }) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">{t('jobUiProposedAmount')}</label>
+              <label className="mb-2 block text-sm font-medium text-stone-700">{t('jobUiProposedAmount')}</label>
               <input
                 type="number"
                 min="0"
@@ -198,37 +198,37 @@ export default function ProposalModal({ job, onClose, onProposalSubmitted }) {
                 name="proposed_amount"
                 value={formData.proposed_amount}
                 onChange={handleChange}
-                className="w-full rounded-xl border border-gray-200 px-4 py-3 outline-hidden focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+                className="w-full rounded-xl border border-stone-200 px-4 py-3 outline-hidden focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
                 placeholder="5000"
               />
             </div>
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">{t('jobUiEstimatedCompletionTime')}</label>
+              <label className="mb-2 block text-sm font-medium text-stone-700">{t('jobUiEstimatedCompletionTime')}</label>
               <input
                 type="text"
                 name="estimated_completion_time"
                 value={formData.estimated_completion_time}
                 onChange={handleChange}
-                className="w-full rounded-xl border border-gray-200 px-4 py-3 outline-hidden focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+                className="w-full rounded-xl border border-stone-200 px-4 py-3 outline-hidden focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
                 placeholder={t('jobUiEstimatedCompletionPlaceholder')}
               />
             </div>
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">{t('jobUiMessage')}</label>
+            <label className="mb-2 block text-sm font-medium text-stone-700">{t('jobUiMessage')}</label>
             <textarea
               name="message"
               rows="6"
               value={formData.message}
               onChange={handleChange}
-              className="w-full rounded-xl border border-gray-200 px-4 py-3 outline-hidden focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+              className="w-full rounded-xl border border-stone-200 px-4 py-3 outline-hidden focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
               placeholder={t('jobUiMessagePlaceholder')}
             />
           </div>
 
           <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
-            <button type="button" onClick={onClose} className="rounded-xl border border-gray-200 px-5 py-3 font-semibold text-gray-700 hover:bg-gray-50">
+            <button type="button" onClick={onClose} className="rounded-xl border border-stone-200 px-5 py-3 font-semibold text-stone-700 hover:bg-stone-50">
               {t('jobUiCancel')}
             </button>
             <button type="submit" disabled={loading} className="rounded-xl bg-orange-700 px-5 py-3 font-semibold text-white hover:bg-orange-800 disabled:opacity-60">

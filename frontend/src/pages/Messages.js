@@ -428,7 +428,7 @@ export default function Messages() {
                       type="button"
                       onClick={loadOlderMessages}
                       disabled={loadingOlder}
-                      className="inline-flex items-center rounded-lg border border-gray-200 bg-white px-4 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                      className="inline-flex items-center rounded-lg border border-stone-200 bg-white px-4 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50 disabled:opacity-50"
                     >
                       {loadingOlder ? (pageT('loadingOlder') || 'Chargement…') : (pageT('loadOlderExists') || 'Afficher les messages plus anciens')}
                     </button>
@@ -438,7 +438,7 @@ export default function Messages() {
                   <p className="text-center text-xs text-red-600">{moreError}</p>
                 )}
                 {messages.length === 0 ? (
-                  <div className="flex h-full items-center justify-center text-sm text-gray-400">
+                  <div className="flex h-full items-center justify-center text-sm text-stone-400">
                     {t('noMessagesYet')}
                   </div>
                 ) : (

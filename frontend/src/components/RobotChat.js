@@ -193,19 +193,19 @@ export default function RobotChat({ onBack }) {
 
   if (submitted) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-xs p-8 text-center">
+      <div className="bg-white rounded-2xl border border-stone-100 shadow-xs p-8 text-center">
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
           <CheckCircle size={28} />
         </div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">{t('supportConfirmTitle')}</h2>
-        <p className="text-gray-600">{t('supportConfirmMessage')}</p>
+        <h2 className="text-xl font-semibold text-stone-900 mb-2">{t('supportConfirmTitle')}</h2>
+        <p className="text-stone-600">{t('supportConfirmMessage')}</p>
         {lastTicketId && (
-          <div className="mt-4 rounded-xl bg-gray-50 border border-gray-100 px-4 py-3 text-sm">
-            <span className="text-gray-500">{t('supportYourTicketId')} : </span>
-            <span className="font-mono font-semibold text-gray-900">{lastTicketId}</span>
+          <div className="mt-4 rounded-xl bg-stone-50 border border-stone-100 px-4 py-3 text-sm">
+            <span className="text-stone-500">{t('supportYourTicketId')} : </span>
+            <span className="font-mono font-semibold text-stone-900">{lastTicketId}</span>
           </div>
         )}
-        <button onClick={onBack} className="mt-6 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+        <button onClick={onBack} className="mt-6 rounded-xl border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50">
           {t('supportBack')}
         </button>
       </div>
@@ -214,23 +214,23 @@ export default function RobotChat({ onBack }) {
 
   const enTete = (sousTitre) => (
     <div className="flex items-center gap-2 mb-5">
-      <button onClick={onBack} className="text-gray-400 hover:text-gray-600" aria-label={t('supportBack')}>
+      <button onClick={onBack} className="text-stone-400 hover:text-stone-600" aria-label={t('supportBack')}>
         <ArrowLeft size={18} />
       </button>
       <span className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-100 text-orange-600"><Bot size={18} /></span>
-      <span className="text-sm font-semibold text-gray-900">{t('supportAssistantName')}</span>
-      <span className="ml-auto text-xs text-gray-400">{sousTitre}</span>
+      <span className="text-sm font-semibold text-stone-900">{t('supportAssistantName')}</span>
+      <span className="ml-auto text-xs text-stone-400">{sousTitre}</span>
     </div>
   );
 
   if (mode === 'chat') {
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-xs p-6">
+      <div className="bg-white rounded-2xl border border-stone-100 shadow-xs p-6">
         {enTete('')}
 
         <div className="space-y-3 mb-4 max-h-[40vh] overflow-y-auto pr-1">
           <div className="flex justify-start">
-            <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-gray-100 px-4 py-2 text-sm text-gray-700">{t('robotChatIntro')}</div>
+            <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-stone-100 px-4 py-2 text-sm text-stone-700">{t('robotChatIntro')}</div>
           </div>
           {conversation.map((tour, index) => (
             <div key={`${tour.role}-${index}`} className={tour.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
@@ -238,7 +238,7 @@ export default function RobotChat({ onBack }) {
                 className={
                   tour.role === 'user'
                     ? 'max-w-[85%] rounded-2xl rounded-tr-sm bg-orange-700 px-4 py-2 text-sm text-white whitespace-pre-line'
-                    : 'max-w-[85%] rounded-2xl rounded-tl-sm bg-gray-100 px-4 py-2 text-sm text-gray-700 whitespace-pre-line'
+                    : 'max-w-[85%] rounded-2xl rounded-tl-sm bg-stone-100 px-4 py-2 text-sm text-stone-700 whitespace-pre-line'
                 }
               >
                 {tour.content}
@@ -247,7 +247,7 @@ export default function RobotChat({ onBack }) {
           ))}
           {asking && (
             <div className="flex justify-start">
-              <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-gray-100 px-4 py-2 text-sm text-gray-500">{t('supportSending')}</div>
+              <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-stone-100 px-4 py-2 text-sm text-stone-500">{t('supportSending')}</div>
             </div>
           )}
           <div ref={bottomRef} />
@@ -279,7 +279,7 @@ export default function RobotChat({ onBack }) {
             placeholder={t('robotChatPlaceholder')}
             rows={2}
             disabled={budgetEpuise}
-            className="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm focus:outline-hidden focus:ring-2 focus:ring-orange-500 disabled:bg-gray-50"
+            className="flex-1 rounded-xl border border-stone-300 px-4 py-3 text-sm focus:outline-hidden focus:ring-2 focus:ring-orange-500 disabled:bg-stone-50"
           />
           <button
             onClick={envoyerQuestion}
@@ -310,14 +310,14 @@ export default function RobotChat({ onBack }) {
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-xs p-6">
+    <div className="bg-white rounded-2xl border border-stone-100 shadow-xs p-6">
       {enTete(`${t('supportStep')} ${stepIndex + 1}/${STEPS.length}`)}
 
       <div className="space-y-3 mb-4 max-h-[40vh] overflow-y-auto pr-1">
         {STEPS.slice(0, stepIndex).map((step) => (
           <React.Fragment key={step.key}>
             <div className="flex justify-start">
-              <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-gray-100 px-4 py-2 text-sm text-gray-700">{step.question}</div>
+              <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-stone-100 px-4 py-2 text-sm text-stone-700">{step.question}</div>
             </div>
             <div className="flex justify-end">
               <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-orange-700 px-4 py-2 text-sm text-white">{answers[step.key]}</div>
@@ -325,7 +325,7 @@ export default function RobotChat({ onBack }) {
           </React.Fragment>
         ))}
         <div className="flex justify-start">
-          <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-gray-100 px-4 py-2 text-sm text-gray-700">{currentStep.question}</div>
+          <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-stone-100 px-4 py-2 text-sm text-stone-700">{currentStep.question}</div>
         </div>
         <div ref={bottomRef} />
       </div>
@@ -337,7 +337,7 @@ export default function RobotChat({ onBack }) {
               key={motif}
               type="button"
               onClick={() => setInputValue(motif)}
-              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${inputValue === motif ? 'border-orange-600 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${inputValue === motif ? 'border-orange-600 bg-orange-50 text-orange-700' : 'border-stone-200 text-stone-600 hover:bg-stone-50'}`}
             >
               {motif}
             </button>
@@ -352,7 +352,7 @@ export default function RobotChat({ onBack }) {
             onChange={(e) => setInputValue(e.target.value)}
             placeholder={currentStep.placeholder}
             rows={3}
-            className="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm focus:outline-hidden focus:ring-2 focus:ring-orange-500"
+            className="flex-1 rounded-xl border border-stone-300 px-4 py-3 text-sm focus:outline-hidden focus:ring-2 focus:ring-orange-500"
           />
         ) : (
           <input
@@ -361,7 +361,7 @@ export default function RobotChat({ onBack }) {
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') handleNext(); }}
             placeholder={currentStep.placeholder}
-            className="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm focus:outline-hidden focus:ring-2 focus:ring-orange-500"
+            className="flex-1 rounded-xl border border-stone-300 px-4 py-3 text-sm focus:outline-hidden focus:ring-2 focus:ring-orange-500"
           />
         )}
         <button
@@ -374,7 +374,7 @@ export default function RobotChat({ onBack }) {
         </button>
       </div>
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-      {submitting && <p className="mt-2 text-sm text-gray-500">{t('supportSending')}</p>}
+      {submitting && <p className="mt-2 text-sm text-stone-500">{t('supportSending')}</p>}
       {submitError && <p className="mt-2 text-sm text-red-600">{submitError}</p>}
 
       <button

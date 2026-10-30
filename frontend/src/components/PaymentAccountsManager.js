@@ -278,9 +278,9 @@ const PaymentAccountsManager = ({ onSuccess }) => {
     return (
       <div className="rounded-[3px] border border-stone-200 bg-white p-6">
         <div className="animate-pulse">
-          <div className="h-4 bg-gray-200 rounded-sm w-1/4 mb-4"></div>
-          <div className="h-4 bg-gray-200 rounded-sm w-full mb-2"></div>
-          <div className="h-4 bg-gray-200 rounded-sm w-3/4"></div>
+          <div className="h-4 bg-stone-200 rounded-sm w-1/4 mb-4"></div>
+          <div className="h-4 bg-stone-200 rounded-sm w-full mb-2"></div>
+          <div className="h-4 bg-stone-200 rounded-sm w-3/4"></div>
         </div>
       </div>
     );
@@ -346,7 +346,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
             <div className="w-8 h-8 bg-orange-700 rounded-full flex items-center justify-center mr-3">
               <span className="text-white text-sm font-bold">OM</span>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900">{t('orangeMoney')}</h3>
+            <h3 className="text-lg font-semibold text-stone-900">{t('orangeMoney')}</h3>
           </div>
           
           {isEditing ? (
@@ -365,16 +365,16 @@ const PaymentAccountsManager = ({ onSuccess }) => {
               {validationErrors.orange_money && (
                 <p className="mt-1 text-sm text-red-600">{validationErrors.orange_money}</p>
               )}
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-stone-500">
                 {supportedOrangeMoneyCountries}
               </p>
             </div>
           ) : (
             <div>
               {accounts.orange_money ? (
-                <p className="text-gray-700 font-mono">{accounts.orange_money}</p>
+                <p className="text-stone-700 font-mono">{accounts.orange_money}</p>
               ) : (
-                <p className="text-gray-500 italic">{t('notConfigured')}</p>
+                <p className="text-stone-500 italic">{t('notConfigured')}</p>
               )}
             </div>
           )}
@@ -386,7 +386,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
             <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-3">
               <span className="text-white text-sm font-bold">W</span>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900">{t('wave')}</h3>
+            <h3 className="text-lg font-semibold text-stone-900">{t('wave')}</h3>
           </div>
           
           {isEditing && isWaveUnavailable ? (
@@ -409,16 +409,16 @@ const PaymentAccountsManager = ({ onSuccess }) => {
               {validationErrors.wave && (
                 <p className="mt-1 text-sm text-red-600">{validationErrors.wave}</p>
               )}
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-stone-500">
                 {t('availableAcrossWestAfrica')}
               </p>
             </div>
           ) : (
             <div>
               {accounts.wave ? (
-                <p className="text-gray-700 font-mono">{accounts.wave}</p>
+                <p className="text-stone-700 font-mono">{accounts.wave}</p>
               ) : (
-                <p className="text-gray-500 italic">{t('notConfigured')}</p>
+                <p className="text-stone-500 italic">{t('notConfigured')}</p>
               )}
             </div>
           )}
@@ -427,7 +427,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
         {/* Titulaire du wallet : la pièce qui rend le versement vérifiable */}
         <div className="rounded-[3px] border border-stone-200 p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-lg font-semibold text-gray-900">{t('walletHolderTitle')}</h3>
+            <h3 className="text-lg font-semibold text-stone-900">{t('walletHolderTitle')}</h3>
             {!isEditing && walletVerification && (
               <span
                 className={`whitespace-nowrap rounded-[3px] border px-2.5 py-1 text-xs font-semibold ${
@@ -460,15 +460,15 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                 placeholder={t('walletHolderPlaceholder')}
                 className={`mt-1 ${CHAMP}`}
               />
-              <p className="mt-1 text-sm text-gray-500">{t('walletHolderHelp')}</p>
+              <p className="mt-1 text-sm text-stone-500">{t('walletHolderHelp')}</p>
             </div>
           ) : (
             <div className="space-y-1">
-              <p className="text-gray-700">
-                {accounts.holder_name || <span className="italic text-gray-500">{t('notConfigured')}</span>}
+              <p className="text-stone-700">
+                {accounts.holder_name || <span className="italic text-stone-500">{t('notConfigured')}</span>}
               </p>
               {walletVerification && (
-                <p className="text-sm text-gray-500">{walletStateLabel(walletVerification.etat)}</p>
+                <p className="text-sm text-stone-500">{walletStateLabel(walletVerification.etat)}</p>
               )}
             </div>
           )}
@@ -477,10 +477,10 @@ const PaymentAccountsManager = ({ onSuccess }) => {
         {/* Bank Account */}
         <div className="rounded-[3px] border border-stone-200 p-4">
           <div className="flex items-center mb-3">
-            <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center mr-3">
+            <div className="w-8 h-8 bg-stone-600 rounded-full flex items-center justify-center mr-3">
               <Landmark className="h-4 w-4 text-white" aria-hidden="true" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900">{t('bankAccount')}</h3>
+            <h3 className="text-lg font-semibold text-stone-900">{t('bankAccount')}</h3>
           </div>
           
           {isEditing ? (
@@ -594,23 +594,23 @@ const PaymentAccountsManager = ({ onSuccess }) => {
             <div>
               {accounts.bank_account?.account_number ? (
                 <div className="space-y-2">
-                  <p className="text-gray-700">
-                    <span className="text-sm text-gray-500">{t('accountLabel')}:</span> {maskAccountNumber(accounts.bank_account.account_number)}
+                  <p className="text-stone-700">
+                    <span className="text-sm text-stone-500">{t('accountLabel')}:</span> {maskAccountNumber(accounts.bank_account.account_number)}
                   </p>
-                  <p className="text-gray-700">
-                    <span className="text-sm text-gray-500">{t('bankLabel')}:</span> {accounts.bank_account.bank_name}
+                  <p className="text-stone-700">
+                    <span className="text-sm text-stone-500">{t('bankLabel')}:</span> {accounts.bank_account.bank_name}
                   </p>
-                  <p className="text-gray-700">
-                    <span className="text-sm text-gray-500">{t('holderLabel')}:</span> {accounts.bank_account.account_holder}
+                  <p className="text-stone-700">
+                    <span className="text-sm text-stone-500">{t('holderLabel')}:</span> {accounts.bank_account.account_holder}
                   </p>
                   {accounts.bank_account.branch && (
-                    <p className="text-gray-700">
-                      <span className="text-sm text-gray-500">{t('branchLabel')}:</span> {accounts.bank_account.branch}
+                    <p className="text-stone-700">
+                      <span className="text-sm text-stone-500">{t('branchLabel')}:</span> {accounts.bank_account.branch}
                     </p>
                   )}
                 </div>
               ) : (
-                <p className="text-gray-500 italic">{t('notConfigured')}</p>
+                <p className="text-stone-500 italic">{t('notConfigured')}</p>
               )}
             </div>
           )}

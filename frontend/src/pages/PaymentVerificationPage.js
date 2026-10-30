@@ -251,7 +251,7 @@ const PaymentVerificationPage = () => {
 
   if (!effectiveUser) {
     return (
-      <div className="min-h-full bg-gray-50 flex items-center justify-center">
+      <div className="min-h-full fond-sable flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500 mx-auto"></div>
           <div className="mt-4 text-orange-600 font-medium">{pageT('redirecting')}</div>
@@ -261,7 +261,7 @@ const PaymentVerificationPage = () => {
   }
 
   return (
-    <div className="min-h-full bg-gray-50 cadre-page max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-full fond-sable cadre-page max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="space-y-6">
         {/* LE BANDEAU D'ÉCRAN (17/10/2026) : la carte bleue ombrée disait un état
             d'alerte là où la page accueille. Elle appartenait à une gamme froide

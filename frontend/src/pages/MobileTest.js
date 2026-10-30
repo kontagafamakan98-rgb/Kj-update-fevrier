@@ -11,7 +11,7 @@ export default function MobileTest() {
   const pageT = makeScopedTranslator(currentLanguage, t);
 
   return (
-    <div className="min-h-full bg-gray-50">
+    <div className="min-h-full fond-sable">
       <header className="bg-orange-700 text-white p-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center space-x-4">
@@ -78,7 +78,7 @@ export default function MobileTest() {
               <div className="text-orange-700 space-y-2">
                 <p><strong>{pageT('step1')}</strong></p>
                 <p><strong>{pageT('step2')}:</strong></p>
-                <code className="bg-gray-100 px-2 py-1 rounded-sm text-sm block w-fit">
+                <code className="bg-stone-100 px-2 py-1 rounded-sm text-sm block w-fit">
                   cd /app/KojoMobile_FINAL && npx expo start
                 </code>
                 <p><strong>{pageT('step3')}</strong></p>
@@ -91,7 +91,7 @@ export default function MobileTest() {
                 <Wrench className="h-5 w-5" aria-hidden="true" />
                 {pageT('troubleshooting')}
               </h3>
-              <ul className="text-gray-700 space-y-1">
+              <ul className="text-stone-700 space-y-1">
                 <li>{pageT('help1')}</li>
                 <li>{pageT('help2')}</li>
                 <li>{pageT('help3')}</li>

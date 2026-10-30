@@ -159,7 +159,7 @@ export const TableSkeleton = ({ rows = 5, cols = 4 }) => {
       </div>
       
       {/* Rows */}
-      <div className="divide-y divide-gray-200">
+      <div className="divide-y divide-stone-200">
         {Array.from({ length: rows }).map((_, rowIndex) => (
           <div key={rowIndex} className="px-6 py-4">
             <div className="flex gap-4">
@@ -588,13 +588,13 @@ export const DashboardSkeleton = () => {
 
       {/* Section quick-actions : conteneur stable, contenu skeleton */}
       <div className="carte-editoriale bloc-app">
-        <div className="carte-cotes py-4 border-b border-gray-200">
+        <div className="carte-cotes py-4 border-b border-stone-200">
           <Skeleton className="h-5 w-40" />
         </div>
         <div className="carte-publique">
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {Array.from({ length: 3 }).map((_, index) => (
-              <div key={index} className="flex items-center gap-4 p-4 border border-gray-200 rounded-lg">
+              <div key={index} className="flex items-center gap-4 p-4 border border-stone-200 rounded-lg">
                 <Skeleton className="h-11 w-11 rounded-xl" />
                 <Skeleton className="h-4 w-28" />
               </div>
@@ -605,10 +605,10 @@ export const DashboardSkeleton = () => {
 
       {/* Liste récente : header + lignes skeleton (même structure que la page) */}
       <div className="carte-editoriale">
-        <div className="carte-cotes py-4 border-b border-gray-200">
+        <div className="carte-cotes py-4 border-b border-stone-200">
           <Skeleton className="h-5 w-40" />
         </div>
-        <div className="divide-y divide-gray-200">
+        <div className="divide-y divide-stone-200">
           {Array.from({ length: 3 }).map((_, index) => (
             <div key={index} className="carte-publique">
               <div className="flex items-center justify-between">
@@ -764,8 +764,8 @@ export const MessagesSkeleton = () => {
 
       <div className="carte-editoriale overflow-hidden h-[75vh] flex">
         {/* Colonne des conversations (pleine largeur sur mobile) */}
-        <div className="w-full sm:w-[320px] sm:shrink-0 border-r border-gray-100 flex flex-col">
-          <div className="px-4 py-3 border-b border-gray-100">
+        <div className="w-full sm:w-[320px] sm:shrink-0 border-r border-stone-100 flex flex-col">
+          <div className="px-4 py-3 border-b border-stone-100">
             <Skeleton className="h-4 w-28" />
           </div>
           <div className="flex-1 overflow-hidden py-2">
@@ -847,7 +847,7 @@ export const PaymentContentSkeleton = () => {
 
 // Skeleton complet de la page Paiement (fallback Suspense de /payment) :
 // réplique l'enveloppe réelle — son cadre vient du PLAN de la route
-// (`PAGE_SECTIONS['/payment']` : `min-h-screen bg-gray-50 py-8` et le
+// (`PAGE_SECTIONS['/payment']` : `min-h-screen … py-8` sur `gray-50`, et le
 // conteneur `max-w-6xl`), jamais d'une copie écrite ici — et la carte de titre,
 // puis le contenu ci-dessus — le swap chunk → page ne déplace ni le footer
 // ancré (flex-1, cf. App.js) ni les cartes.

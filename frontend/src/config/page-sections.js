@@ -390,7 +390,7 @@ const ACCUEIL = {
   // libellé français au milieu de quatre autres langues.
   heroKickerClass: 'sur-titre sur-titre-clair',
   // Les deux fonds du rythme : `papier` pour les sections claires, `sable`
-  // pour celles qui alternent. Ils remplacent `bg-white` / `bg-gray-50`, dont
+  // pour celles qui alternent. Ils remplacent `bg-white` / `gray-50`, dont
   // le gris froid jurait avec l'encre chaude du texte.
   paperClass: 'fond-papier',
   sandClass: 'fond-sable',
@@ -770,7 +770,7 @@ export const PAGE_SECTIONS = {
     // que soit le corps de police. Mesuré le 23/10/2026 : 24 px réservés pour
     // une ligne de 25,088 px décalaient de 1,1 px tout ce qui suit la date
     // (« Liste », « Carte », l'intro), refusé par `geometrie-coquille-react`.
-    dateClass: 'mt-2 text-gray-600 min-h-[1.6em]',
+    dateClass: 'mt-2 text-stone-600 min-h-[1.6em]',
     // L'élément élu : le PARAGRAPHE d'introduction, pas le titre animé —
     // mesuré le 20/10/2026 après l'animation de `.titre-page`.
     lcpChamp: 'introClass',
@@ -816,7 +816,7 @@ export const PAGE_SECTIONS = {
     //
     // ── LE DESSIN DE L'ÉCRAN (17/10/2026) ───────────────────────────────────
     // /login était la dernière page publique restée au vocabulaire d'AVANT la
-    // refonte : libellés `text-gray-700`, champs `rounded-md border-gray-300`,
+    // refonte : libellés en `gray-700`, champs `rounded-md` à bordure froide,
     // bouton `bg-orange-700`, encadré légal `bg-orange-50` — quatre familles de
     // chaînes qu'aucune autre page ne portait plus. Le formulaire devient une
     // CARTE du site (`.carte-editoriale` + `.carte-publique`), son bouton lit
@@ -1040,13 +1040,13 @@ export const PAGE_SECTIONS = {
     badgeTexteClass: 'text-white text-2xl font-bold',
     titleClass: 'mt-6 text-3xl font-bold text-stone-900',
     carteClass: 'carte-editoriale carte-publique space-y-6',
-    etapesClass: 'flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-gray-500',
+    etapesClass: 'flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-stone-500',
     etapeActiveClass: 'text-orange-600',
     etapeAttenteClass: 'text-stone-500',
     formClass: 'space-y-5',
-    labelClass: 'block text-sm font-medium text-gray-700',
+    labelClass: 'block text-sm font-medium text-stone-700',
     champClass: 'mt-1 block w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-hidden focus:ring-orange-500',
-    aideClass: 'text-xs text-gray-500',
+    aideClass: 'text-xs text-stone-500',
     boutonClass: 'relative w-full rounded-lg bg-orange-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-800',
     retourClass: 'text-center',
     lienRetourClass: 'text-sm font-medium text-orange-600 hover:text-orange-500',
@@ -1064,7 +1064,7 @@ export const PAGE_SECTIONS = {
     // une COQUILLE, donc les deux canaux peignent ce cadre — une chaîne recopiée
     // de chaque côté divergerait en silence, et c'est exactement le défaut que ce
     // bloc ferme (`src/pages/Payment.js` et `vite-plugins/prerender/shells-routes.js`
-    // écrivaient tous deux `min-h-full bg-gray-50 py-8` et
+    // écrivaient tous deux `min-h-full … py-8` sur `gray-50`, et
     // `max-w-6xl mx-auto px-4 space-y-6` à la main).
     // /payment ne passe PAS par `CadrePage` : ce composant sert les routes SANS
     // coquille (`src/config/app-cadres.js`), et le fond gris de celle-ci est une
@@ -1106,7 +1106,7 @@ export const PAGE_SECTIONS = {
     // laisse une bande de fond sous elle au lieu de laisser le pied de page
     // dépasser dans l'écran, et c'est vrai en desktop aussi (la page défile de
     // ~125 px de plus). Le contenu de la page, lui, n'est pas retaillé.
-    frameClass: 'min-h-screen bg-gray-50 py-8',
+    frameClass: 'min-h-screen fond-sable py-8',
     corpsClass: 'max-w-6xl mx-auto px-4 space-y-6',
     // ── LE VOCABULAIRE D'ÉCRAN (17/10/2026) ──────────────────────────────────
     // /payment était le dernier écran déclaré sans le vocabulaire des autres :

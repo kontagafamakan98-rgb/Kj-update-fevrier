@@ -60,8 +60,8 @@ const LanguageSelector = ({
         <button
           onClick={() => setIsOpen(!isOpen)}
           className={`
-            flex items-center space-x-2 px-3 py-2 rounded-lg border border-gray-300 
-            bg-white hover:bg-gray-50 transition-colors ${buttonClassName}
+            flex items-center space-x-2 px-3 py-2 rounded-lg border border-stone-300 
+            bg-white hover:bg-stone-50 transition-colors ${buttonClassName}
           `}
         >
           {showFlags && <FlagIcon country={currentLang.code} className="w-5 h-4" />}
@@ -78,7 +78,7 @@ const LanguageSelector = ({
 
         {isOpen && (
           <div className={`
-            absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20
+            absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-stone-200 z-20
             ${dropdownClassName}
           `}>
             <div className="py-1">
@@ -87,14 +87,14 @@ const LanguageSelector = ({
                   key={lang.code}
                   onClick={() => handleLanguageChange(lang.code)}
                   className={`
-                    w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center space-x-3
-                    ${currentLanguage === lang.code ? 'bg-orange-50 text-orange-600' : 'text-gray-700'}
+                    w-full text-left px-4 py-2 text-sm hover:bg-stone-100 flex items-center space-x-3
+                    ${currentLanguage === lang.code ? 'bg-orange-50 text-orange-600' : 'text-stone-700'}
                   `}
                 >
                   {showFlags && <FlagIcon country={lang.code} className="w-5 h-4" />}
                   <div>
                     <div className="font-medium">{lang.nativeName}</div>
-                    <div className="text-xs text-gray-500">{lang.name}</div>
+                    <div className="text-xs text-stone-500">{lang.name}</div>
                   </div>
                   {currentLanguage === lang.code && (
                     <Check className="ml-auto h-4 w-4 text-orange-600" aria-hidden="true" />
@@ -119,7 +119,7 @@ const LanguageSelector = ({
             px-3 py-1 rounded-md text-sm font-medium transition-colors
             ${currentLanguage === lang.code
               ? 'bg-orange-700 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
             }
           `}
         >

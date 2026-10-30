@@ -4,7 +4,7 @@
  *
  * ── Pourquoi ce fichier existe (17/10/2026) ────────────────────────────────
  * Les sous-formulaires de /register et de /profile écrivaient encore le champ
- * d'AVANT la refonte : `border-gray-300` (un gris FROID, que la refonte a
+ * d'AVANT la refonte : `border-stone-300` (un gris FROID, que la refonte a
  * remplacé partout par le filet chaud `stone-300`), `rounded-md` (un rayon
  * qu'aucune carte du site ne porte : 8 px partout depuis `.carte-editoriale`),
  * `shadow-xs` et un anneau de focus PLEIN (`ring-orange-500`) qui se lisait

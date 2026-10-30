@@ -260,10 +260,10 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
   return (
     <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-md">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">
+        <h2 className="text-2xl font-bold text-stone-900 mb-2">
           <Landmark className="inline h-7 w-7 mr-2 text-orange-600" aria-hidden="true" /> {t('paymentVerification')}
         </h2>
-        <p className="text-gray-600">
+        <p className="text-stone-600">
           {userType === 'worker' ? t('workerPaymentRequirement') : t('clientPaymentRequirement')}
         </p>
         
@@ -305,7 +305,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
         <div className="border border-orange-200 rounded-lg p-4">
           <div className="flex items-center mb-3">
             <Wallet className="h-6 w-6 mr-3 text-orange-500" aria-hidden="true" />
-            <h3 className="text-lg font-semibold text-gray-900">{t('orangeMoney')}</h3>
+            <h3 className="text-lg font-semibold text-stone-900">{t('orangeMoney')}</h3>
             <span className="ml-2 text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-sm">
               {supportedOrangeMoneyCountries}
             </span>
@@ -321,7 +321,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
             onChange={(e) => handleInputChange('orange_money', e.target.value)}
             placeholder={phoneExample}
             className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 ${
-              validationErrors.orange_money ? 'border-red-500' : 'border-gray-300'
+              validationErrors.orange_money ? 'border-red-500' : 'border-stone-300'
             }`}
           />
           {validationErrors.orange_money && (
@@ -330,17 +330,17 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
         </div>
 
         {/* Wave */}
-        <div className={`border rounded-lg p-4 ${isWaveUnavailable ? 'border-gray-200 bg-gray-50' : 'border-blue-200'}`}>
+        <div className={`border rounded-lg p-4 ${isWaveUnavailable ? 'border-stone-200 bg-stone-50' : 'border-blue-200'}`}>
           <div className="flex items-center mb-3">
             <Waves className="h-6 w-6 mr-3 text-blue-500" aria-hidden="true" />
-            <h3 className="text-lg font-semibold text-gray-900">{t('wave')}</h3>
-            <span className={`ml-2 text-xs px-2 py-1 rounded-sm ${isWaveUnavailable ? 'bg-gray-200 text-gray-600' : 'bg-blue-100 text-blue-800'}`}>
+            <h3 className="text-lg font-semibold text-stone-900">{t('wave')}</h3>
+            <span className={`ml-2 text-xs px-2 py-1 rounded-sm ${isWaveUnavailable ? 'bg-stone-200 text-stone-600' : 'bg-blue-100 text-blue-800'}`}>
               {t('availableAcrossWestAfrica')}
             </span>
           </div>
           
           {isWaveUnavailable ? (
-            <p className="text-sm text-gray-500 bg-white border border-gray-200 rounded-lg px-4 py-3">
+            <p className="text-sm text-stone-500 bg-white border border-stone-200 rounded-lg px-4 py-3">
               {t('waveUnavailableInYourCountry')}
             </p>
           ) : (
@@ -355,7 +355,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
                 onChange={(e) => handleInputChange('wave', e.target.value)}
                 placeholder={phoneExample}
                 className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-                  validationErrors.wave ? 'border-red-500' : 'border-gray-300'
+                  validationErrors.wave ? 'border-red-500' : 'border-stone-300'
                 }`}
               />
               {validationErrors.wave && (
@@ -369,7 +369,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
         <div className="border border-green-200 rounded-lg p-4">
           <div className="flex items-center mb-3">
             <Landmark className="h-6 w-6 mr-3 text-green-600" aria-hidden="true" />
-            <h3 className="text-lg font-semibold text-gray-900">{t('bankAccount')}</h3>
+            <h3 className="text-lg font-semibold text-stone-900">{t('bankAccount')}</h3>
             <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded-sm">
               {t('forBankTransfers')}
             </span>
@@ -386,7 +386,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
               onChange={(e) => handleInputChange('bank_account.account_number', e.target.value)}
               placeholder={t('bankAccountNumber')}
               className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 ${
-                validationErrors.bank_account ? 'border-red-500' : 'border-gray-300'
+                validationErrors.bank_account ? 'border-red-500' : 'border-stone-300'
               }`}
             />
             
@@ -402,7 +402,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
                 onChange={(e) => handleInputChange('bank_account.account_holder', e.target.value)}
                 placeholder={t('accountHolderName')}
                 className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 ${
-                  validationErrors.bank_account ? 'border-red-500' : 'border-gray-300'
+                  validationErrors.bank_account ? 'border-red-500' : 'border-stone-300'
                 }`}
               />
               </div>
@@ -416,7 +416,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
                 value={accounts.bank_account.bank_name}
                 onChange={(e) => handleInputChange('bank_account.bank_name', e.target.value)}
                 className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 ${
-                  validationErrors.bank_account ? 'border-red-500' : 'border-gray-300'
+                  validationErrors.bank_account ? 'border-red-500' : 'border-stone-300'
                 }`}
               >
                 <option value="">{t('selectBank')}</option>
@@ -438,7 +438,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
                 type="text"
                 onChange={(e) => handleInputChange('bank_account.bank_name', e.target.value)}
                 placeholder={t('yourBankName')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                className="w-full px-4 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-green-500"
               />
               </>
             )}
@@ -454,7 +454,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
                 value={accounts.bank_account.bank_code}
                 onChange={(e) => handleInputChange('bank_account.bank_code', e.target.value)}
                 placeholder={t('bankCodeOptional')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                className="w-full px-4 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-green-500"
               />
               </div>
               
@@ -468,7 +468,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
                 value={accounts.bank_account.branch}
                 onChange={(e) => handleInputChange('bank_account.branch', e.target.value)}
                 placeholder={t('branchOptional')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                className="w-full px-4 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-green-500"
               />
               </div>
             </div>
@@ -493,7 +493,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
         )}
 
         <div className="flex justify-between items-center pt-6">
-          <div className="text-sm text-gray-600">
+          <div className="text-sm text-stone-600">
             <p className="flex items-center gap-1"><Lock className="h-4 w-4 shrink-0" aria-hidden="true" />{t('paymentInfoSecure')}</p>
             <p className="flex items-center gap-1"><Smartphone className="h-4 w-4 shrink-0" aria-hidden="true" />{userType === 'worker' ? t('requiredToReceivePayments') : t('requiredToMakePayments')}</p>
           </div>
@@ -503,7 +503,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
             disabled={loading || linkedAccountsCount < requiredMinimum}
             className={`px-6 py-3 rounded-lg font-medium transition-colors ${
               loading || linkedAccountsCount < requiredMinimum
-                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                ? 'bg-stone-300 text-stone-500 cursor-not-allowed'
                 : 'bg-orange-700 text-white hover:bg-orange-800'
             }`}
           >

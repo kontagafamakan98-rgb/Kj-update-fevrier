@@ -185,7 +185,7 @@ export default function Login() {
 
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-200" />
+                  <div className="w-full border-t border-stone-200" />
                 </div>
                 <div className="relative flex justify-center text-sm">
                   {/* stone-500 et non stone-400 : le séparateur « ou » est du

@@ -179,7 +179,7 @@ const OwnerMissionEvents = () => {
           value={identifiant}
           onChange={(event) => setIdentifiant(event.target.value)}
           placeholder="Identifiant de la mission"
-          className="border border-gray-300 rounded-lg px-3 py-2 flex-1 min-w-[16rem]"
+          className="border border-stone-300 rounded-lg px-3 py-2 flex-1 min-w-[16rem]"
         />
         <button
           type="submit"
@@ -195,7 +195,7 @@ const OwnerMissionEvents = () => {
       )}
 
       {evenements && evenements.length === 0 && (
-        <p className="text-gray-600">Aucun événement enregistré pour cette mission.</p>
+        <p className="text-stone-600">Aucun événement enregistré pour cette mission.</p>
       )}
 
       {evenements && evenements.length > 0 && (
@@ -209,14 +209,14 @@ const OwnerMissionEvents = () => {
             return (
               <li
                 key={evenement.id || `${evenement.type}-${evenement.created_at}`}
-                className="border-b border-gray-200 pb-2"
+                className="border-b border-stone-200 pb-2"
               >
                 <div className="flex justify-between gap-4">
-                  <span className="font-medium text-gray-900">
+                  <span className="font-medium text-stone-900">
                     {LIBELLES_JALONS[evenement.type] || evenement.type}
                     {detail ? ` — ${detail}` : ''}
                   </span>
-                  <time dateTime={evenement.created_at} className="text-gray-600">
+                  <time dateTime={evenement.created_at} className="text-stone-600">
                     {formaterDate(evenement.created_at)}
                   </time>
                 </div>
@@ -224,7 +224,7 @@ const OwnerMissionEvents = () => {
                 {/* La réponse COMPLÈTE, sous son jalon : lue chez le
                     propriétaire seul, jamais réécrite dans le journal. */}
                 {reponseDuJalon?.note && (
-                  <p className="mt-1 whitespace-pre-line rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                  <p className="mt-1 whitespace-pre-line rounded-lg bg-stone-50 px-3 py-2 text-sm text-stone-700">
                     {reponseDuJalon.note}
                   </p>
                 )}
@@ -233,8 +233,8 @@ const OwnerMissionEvents = () => {
                     Nommée : sans étiquette, elle se lirait comme la réponse de
                     l'autre partie, déjà posée sous le jalon précédent. */}
                 {noteDecision && (
-                  <p className="mt-1 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
-                    <span className="block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  <p className="mt-1 rounded-lg bg-stone-50 px-3 py-2 text-sm text-stone-700">
+                    <span className="block text-xs font-semibold uppercase tracking-wide text-stone-500">
                       Motivation de la décision (propriétaire)
                     </span>
                     <span className="mt-1 block whitespace-pre-line">{noteDecision}</span>

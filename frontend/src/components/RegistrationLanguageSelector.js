@@ -126,7 +126,7 @@ const RegistrationLanguageSelector = ({
 
       {/* Sélection des langues */}
       <div>
-        <p className="text-sm text-gray-700 mb-3">
+        <p className="text-sm text-stone-700 mb-3">
           <strong>{t('languageNote') || 'Note :'}</strong> {t('interfaceWillChange') || 'L’interface changera selon votre choix et cette langue s’affichera sur votre profil.'}
         </p>
         
@@ -145,7 +145,7 @@ const RegistrationLanguageSelector = ({
                     ? 'border-orange-500 bg-orange-100 shadow-md'
                     : isCountryLanguage
                     ? 'border-blue-300 bg-blue-50 hover:border-blue-400'
-                    : 'border-gray-300 bg-white hover:border-gray-400'
+                    : 'border-stone-300 bg-white hover:border-stone-400'
                 }`}
               >
                 {/* Badge pour les langues du pays */}
@@ -164,10 +164,10 @@ const RegistrationLanguageSelector = ({
 
                 <div className="text-center">
                   <div className="flex justify-center mb-2"><FlagIcon country={language.code} className="w-8 h-6" /></div>
-                  <div className="font-medium text-gray-900 text-sm">
+                  <div className="font-medium text-stone-900 text-sm">
                     {language.name}
                   </div>
-                  <div className="text-xs text-gray-600 mt-1">
+                  <div className="text-xs text-stone-600 mt-1">
                     {language.nativeName}
                   </div>
                   

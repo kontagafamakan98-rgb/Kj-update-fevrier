@@ -162,7 +162,7 @@ function ProtectedRoute({ children }) {
       // (modèle validé sur 4 mesures : 0,0012 / 0,0042 / 0,0167 / 0,0000).
       // Les pages, elles, suivent la règle inverse (min-h-full) — cf. le garde
       // antiClsSkeletons : la règle dépend de ce que l'état doit recouvrir.
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center fond-sable">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500 mx-auto"></div>
           <div className="mt-4 text-orange-600 font-medium">{t('loading')}</div>
@@ -451,7 +451,7 @@ function AppRoutes() {
 
   return (
     // Le fond de l'application prend le SABLE du site (`fond-sable`,
-    // src/index.css) : c'était le dernier `bg-gray-50` de la coquille — le
+    // src/index.css) : c'était le dernier fond gris clair (`gray-50`) de la coquille — le
     // gris froid de la gamme Tailwind, celui qui donnait aux pages
     // d'application une autre couleur de papier que le site public. Les pages
     // pré-rendues posent leur propre fond, donc ce changement ne touche que

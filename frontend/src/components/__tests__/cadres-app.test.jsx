@@ -341,8 +341,11 @@ describe('/payment — le cadre à DEUX canaux reste chez son propriétaire', ()
           'que là où les deux canaux la lisent.'
       ).toContain(`${cle}: '${cadre[cle]}'`);
     }
-    // Le fond gris reste la décision de CETTE page, et non un pas de site.
-    expect(cadre.frameClass, '/payment : le fond de la page a quitté la déclaration').toContain('bg-gray-50');
+    // Le fond reste la décision de CETTE page : c'est le SABLE du site depuis
+    // le 29/10/2026 (`fond-sable`, la même matière que la 404), et non plus un
+    // gris clair qui jurait avec l'encre chaude — le fait jugé est la présence
+    // d'un fond ici, pas la teinte du jour.
+    expect(cadre.frameClass, '/payment : le fond de la page a quitté la déclaration').toContain('fond-sable');
     expect(Object.keys(CADRES_APP)).not.toContain('/payment');
   });
 

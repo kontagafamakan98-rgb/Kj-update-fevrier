@@ -74,18 +74,18 @@ export default function ConfirmModal({
         if (e.target === e.currentTarget && !loading) onCancel?.();
       }}
     >
-      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-gray-100 overflow-hidden">
+      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-stone-100 overflow-hidden">
         <div className="px-6 pt-6">
           <h2
             id={`${idRef.current}-title`}
-            className="text-lg font-bold text-gray-900"
+            className="text-lg font-bold text-stone-900"
           >
             {title}
           </h2>
         </div>
 
         <div className="px-6 py-4">
-          <p className="text-sm text-gray-600 leading-relaxed">{message}</p>
+          <p className="text-sm text-stone-600 leading-relaxed">{message}</p>
         </div>
 
         <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 px-6 pb-6">
@@ -93,7 +93,7 @@ export default function ConfirmModal({
             type="button"
             onClick={onCancel}
             disabled={loading}
-            className="rounded-xl border border-gray-200 px-5 py-3 font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="rounded-xl border border-stone-200 px-5 py-3 font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50"
           >
             {cancelLabel || t('cancel')}
           </button>
