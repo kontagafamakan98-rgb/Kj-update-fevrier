@@ -63,8 +63,12 @@ const ICI = path.dirname(fileURLToPath(import.meta.url));
 export const SRC = path.resolve(ICI, '..', 'src');
 
 /** Le seul appel direct à `gtag('event', …)` toléré, et pourquoi. */
+// `page_view` a un domicile UNIQUE, et il a changé le 30/10/2026 : le
+// planificateur de vue vit désormais dans `utils/vue-de-page.js`, sans quoi
+// `utils/seo.js` (appelé à chaque navigation) entraînait le module d'injection
+// des fournisseurs dans le JS initial. C'est le même émetteur, plus mince.
 export const EVENEMENTS_HORS_FUNNEL = Object.freeze({
-  page_view: 'utils/analytics.js',
+  page_view: 'utils/vue-de-page.js',
 });
 
 /**

@@ -3,9 +3,11 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import {
-  Bell as BellGlyph, Briefcase, CheckCircle2, ClipboardList, Flag, MessageSquare, PartyPopper, Wallet, Wrench,
-} from 'lucide-react';
+// Les neuf glyphes de type venaient de `lucide-react` : ce composant est monté
+// avec le shell (`App.js`), donc l'import statique faisait entrer TOUTE la
+// bibliothèque d'icônes (`vendor-lucide`, 7,4 Ko gzip) dans le chemin critique,
+// panneau fermé ou non. Ils sont désormais dans `chrome-icons.js`, avec leurs
+// tracés copiés à l'identique de lucide v0.507.0.
 import { Icone } from './chrome-icons';
 import { VERS_LE_HAUT } from './notificationPanelPlacement';
 
@@ -20,23 +22,24 @@ const MESSAGE_ECHEC = {
 
 // Icône DESSINÉE selon le type de notification (lucide-react) : plus d'emoji
 // publié comme icône (règle « pas d'emoji en guise d'icônes »).
+// Le type donne un NOM d'icône du registre du chrome, pas un composant importé :
+// c'est ce qui garde le panneau dans le shell sans entraîner de bibliothèque.
 const ICONES_PAR_TYPE = {
-  proposal_received: ClipboardList,
-  proposal_accepted: PartyPopper,
-  job_in_progress: Wrench,
-  payment_received: Wallet,
-  payment_confirmed: CheckCircle2,
-  job_completed: Flag,
-  new_message: MessageSquare,
+  proposal_received: 'liste',
+  proposal_accepted: 'fete',
+  job_in_progress: 'cle',
+  payment_received: 'portefeuille',
+  payment_confirmed: 'cocheCercle',
+  job_completed: 'drapeau',
+  new_message: 'messages',
   // Une veille emploi servie : la mallette dit « mission », et la distinction
   // avec `job_in_progress` (clé) tient à la forme, pas à la couleur.
-  job_alert: Briefcase,
-  general: BellGlyph,
+  job_alert: 'valise',
+  general: 'cloche',
 };
-const TypeIcon = ({ type, className = 'h-5 w-5 text-orange-600' }) => {
-  const Icone = ICONES_PAR_TYPE[type] || BellGlyph;
-  return <Icone className={className} aria-hidden="true" />;
-};
+const TypeIcon = ({ type, className = 'h-5 w-5 text-orange-600' }) => (
+  <Icone nom={ICONES_PAR_TYPE[type] || 'cloche'} classe={className} />
+);
 
 // Formater la date relative (ex: "il y a 3 min") — traduit selon la langue
 const relativeTime = (isoDate, t) => {

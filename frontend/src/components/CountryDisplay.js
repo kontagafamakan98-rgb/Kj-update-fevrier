@@ -1,6 +1,8 @@
 import { IconePage } from '../config/page-icons';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check } from 'lucide-react';
+// La coche du pays sélectionné vient du registre du chrome (voir
+// LanguageSelector.js) : même famille de tracé que les autres coches du site.
+import { Icone } from './chrome-icons';
 import { useLanguage } from '../contexts/LanguageContext';
 import { normalizeCountryCode } from '../utils/countryAliases';
 import FlagIcon from './FlagIcon';
@@ -264,7 +266,7 @@ export function CountrySelect({
                     <FlagIcon country={country.code} className="w-6 h-4" />
                     <span className="truncate">{getTranslatedCountryName(country, t)}</span>
                   </span>
-                  {isSelected && <Check className="h-4 w-4 font-semibold" aria-hidden="true" />}
+                  {isSelected && <Icone nom="coche" classe="h-4 w-4 font-semibold" />}
                 </button>
               );
             }) : (

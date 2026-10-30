@@ -1,5 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Check } from 'lucide-react';
+// La coche du menu vient du registre du chrome : `lucide-react` importé ici
+// entraînait toute la bibliothèque (vendor-lucide) dans le chemin critique, via
+// la barre du haut. Le tracé est celui du SITE (`coche`, `M5 13l4 4L19 7`) et
+// non la coche de lucide : deux coches voisines dans la même barre ne doivent
+// pas venir de deux mains, et celle-ci sert déjà à quatre autres endroits.
+import { Icone } from './chrome-icons';
 import { useLanguage } from '../contexts/LanguageContext';
 import { LANGUAGES } from '../config/languages';
 import FlagIcon from './FlagIcon';
@@ -97,7 +102,7 @@ const LanguageSelector = ({
                     <div className="text-xs text-stone-500">{lang.name}</div>
                   </div>
                   {currentLanguage === lang.code && (
-                    <Check className="ml-auto h-4 w-4 text-orange-600" aria-hidden="true" />
+                    <Icone nom="coche" classe="ml-auto h-4 w-4 text-orange-600" />
                   )}
                 </button>
               ))}

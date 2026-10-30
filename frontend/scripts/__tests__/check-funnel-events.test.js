@@ -25,11 +25,22 @@ import { describe, expect, it } from 'vitest';
 
 import { EVENEMENTS_FUNNEL } from '../../src/utils/funnel.js';
 import {
+  EVENEMENTS_HORS_FUNNEL,
   PLANCHERS,
   auditerSources,
   fichiersSources,
   verifierFunnel,
 } from '../check-funnel-events.js';
+
+/**
+ * Le domicile DÉCLARÉ de `page_view` — lu, jamais recopié.
+ *
+ * Ce cas figeait `utils/analytics.js` en dur : le planificateur de vue a
+ * déménagé dans `utils/vue-de-page.js` le 30/10/2026 (pour sortir l'injection
+ * des fournisseurs du JS initial), et le test est devenu rouge alors que la
+ * RÈGLE n'avait pas bougé. Un garde juge la règle, pas l'adresse du jour.
+ */
+const PROPRIETAIRE_PAGE_VIEW = EVENEMENTS_HORS_FUNNEL.page_view;
 
 const ICI = path.dirname(fileURLToPath(import.meta.url));
 const SCRIPTS = path.resolve(ICI, '..');
@@ -135,18 +146,18 @@ export const pousse = () =>
         'pages/Vue.js': `
 export const pousse = () => gtag('event', 'page_view', {});
 `,
-        'utils/analytics.js': `
+        [PROPRIETAIRE_PAGE_VIEW]: `
 window.gtag('event', 'page_view', { page_path: '/' });
 `,
       })
     );
 
-    // `utils/analytics.js` est le propriétaire déclaré : lui seul est toléré,
-    // et le refus dit à l'autre fichier À QUI l'événement appartient.
+    // Le fichier DÉCLARÉ est le propriétaire : lui seul est toléré, et le refus
+    // dit à l'autre fichier À QUI l'événement appartient.
     const lignes = refus.split('\n');
     expect(lignes).toHaveLength(1);
     expect(lignes[0]).toContain('pages/Vue.js');
-    expect(lignes[0]).toContain('utils/analytics.js');
+    expect(lignes[0]).toContain(PROPRIETAIRE_PAGE_VIEW);
   });
 
   it('refuse un événement direct dont le nom n’est pas lisible', () => {

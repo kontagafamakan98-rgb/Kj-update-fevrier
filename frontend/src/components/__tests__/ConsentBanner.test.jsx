@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 import ConsentBanner from '../ConsentBanner';
@@ -13,10 +13,18 @@ import {
 // Le bandeau ne dépend que de deux choses : la configuration du fournisseur et
 // la décision enregistrée. Les deux sont pilotées ici, pour ne pas dépendre des
 // variables d'environnement du build de test.
+//
+// DEUX modules sont mockés, et c'est le point du 30/10/2026 : la CONFIGURATION
+// se lit dans `utils/mesure-audience.js` (monté avec le shell) et l'INJECTION
+// n'arrive que par `import()` au clic dans `utils/analytics.js`. Un seul mock
+// sur l'ancien module unique ne verrait plus rien.
 const etat = { configure: true, initAppele: 0 };
 
-vi.mock('../../utils/analytics', () => ({
+vi.mock('../../utils/mesure-audience', () => ({
   isAnalyticsConfigured: () => etat.configure,
+}));
+
+vi.mock('../../utils/analytics', () => ({
   initAnalytics: () => {
     etat.initAppele += 1;
   },
@@ -51,13 +59,17 @@ describe('ConsentBanner', () => {
     expect(screen.getByRole('region', { name: 'cookiesConsentTitle' })).toBeTruthy();
   });
 
-  it('« Accepter » enregistre l’accord et charge la mesure d’audience', () => {
+  it('« Accepter » enregistre l’accord et charge la mesure d’audience', async () => {
     monter();
     fireEvent.click(screen.getByRole('button', { name: 'cookiesConsentAccept' }));
 
+    // La décision est enregistrée SYNCHRONEMENT (c'est elle qui fait foi) ;
+    // l'injection, elle, arrive par `import()` — donc au tour suivant de la
+    // boucle d'événements. Attendre son effet est le prix de l'avoir sortie du
+    // JS initial, et ce cas le vérifie au lieu de le supposer.
     expect(readAnalyticsConsent()).toBe(CONSENT_GRANTED);
     expect(window.localStorage.getItem(CONSENT_STORAGE_KEY)).toBe(CONSENT_GRANTED);
-    expect(etat.initAppele).toBe(1);
+    await waitFor(() => expect(etat.initAppele).toBe(1));
     expect(screen.queryByRole('region')).toBeNull();
   });
 

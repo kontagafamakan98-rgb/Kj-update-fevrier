@@ -1,5 +1,10 @@
 import { useEffect } from 'react';
-import { notifierTitreDePage } from './analytics';
+// Le planificateur de vue vit dans `vue-de-page.js` et non dans
+// `analytics.js` : ce module est appelé À CHAQUE navigation, y compris par un
+// visiteur qui n'a jamais accepté la mesure, et il ne doit donc pas entraîner
+// le code d'injection des fournisseurs dans le JS initial (mesuré : 1,5 Ko gzip,
+// 30/10/2026).
+import { notifierTitreDePage } from './vue-de-page';
 import { ogCardFor } from '../config/og-cards';
 import { pageMetaKeys } from '../config/page-meta';
 import { useLanguage } from '../contexts/LanguageContext';

@@ -1,5 +1,8 @@
 import React from 'react';
-import { Flag } from 'lucide-react';
+// Le drapeau de repli vient du registre du chrome : `lucide-react` importé ici
+// faisait payer la bibliothèque d'icônes à tout visiteur, pour un dessin qui ne
+// sert que quand le pays n'a pas d'image.
+import { Icone } from './chrome-icons';
 import { IconeDrapeau, classeDuDrapeau, nomDuDrapeau } from '../config/flags';
 
 /**
@@ -28,7 +31,7 @@ export default function FlagIcon({ country, className = 'w-12 h-8' }) {
   if (!nom) {
     return (
       <div className={`${className} bg-stone-200 rounded-sm flex items-center justify-center`}>
-        <Flag className="h-4 w-4 text-stone-400" aria-hidden="true" />
+        <Icone nom="drapeau" classe="h-4 w-4 text-stone-400" />
       </div>
     );
   }
