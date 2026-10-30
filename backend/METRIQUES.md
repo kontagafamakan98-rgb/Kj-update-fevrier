@@ -99,6 +99,47 @@ Rotation : `fly secrets set METRICS_TOKEN=<nouveau>` redémarre les machines ;
 mettre à jour le fichier de credentials dans la même fenêtre. L'ancien jeton
 cesse immédiatement de valider (la valeur est lue à chaque requête).
 
+## Qui lit ces chiffres (le lecteur quotidien)
+
+Une configuration de scrape n'est une collecte que si QUELQU'UN lit la route.
+Mesuré le 30/10/2026 : `/metrics` répondait **401** sur l'hôte du backend (donc
+un jeton était posé sur la machine Fly), l'origine du site **404**, et le dépôt
+n'avait **aucun** secret `METRICS_TOKEN` ni aucun collecteur versionné — le
+bloc `scrape_configs` ci-dessus est une configuration que personne ne monte.
+Les quatre provenances des veilles et la jauge de fraîcheur de leur acquisition
+étaient donc publiées dans le vide : personne ne les lisait, et rien ne le
+disait.
+
+[`.github/workflows/metriques-collecte.yml`](../.github/workflows/metriques-collecte.yml)
+est ce **LECTEUR**, et il est la preuve qu'une collecte a lieu :
+[`scripts/check_metrics_collecte.py`](scripts/check_metrics_collecte.py)
+s'authentifie avec le jeton, lit l'exposition et juge la chaîne entière.
+
+| Situation | Verdict |
+|---|---|
+| 200, six familles présentes, acquisition de moins de 30 jours | **0** conforme |
+| aucun secret `METRICS_TOKEN` côté CI | **1** — « AUCUN COLLECTEUR », avec le remède |
+| 401 / 503 / 404 | **1**, nommé : jeton refusé / route fermée / mauvais hôte |
+| une provenance, le hors-vocabulaire ou la fraîcheur absents | **1**, la famille est NOMMÉE |
+| exposition illisible (ligne ou valeur) | **1** |
+| `plus_recente = 0`, date future, ou âge au-delà du seuil | **1**, nommé avec l'âge |
+| transport injoignable ou URL inutilisable | **2** prémisse — jamais un vert |
+
+Deux secrets, et les DEUX sont nécessaires :
+
+```bash
+fly secrets set METRICS_TOKEN=<jeton> -a kojo-backend   # ouvre la route
+gh secret set METRICS_TOKEN                             # donne un lecteur
+```
+
+Cadence : `48 7 * * *`, après les sondes de document de la matinée (07:04 →
+07:40). Un échec est relevé par
+[`sondes-sante.yml`](../.github/workflows/sondes-sante.yml), qui ouvre — et
+referme quand tout repasse au vert — l'issue des sondes : c'est la boucle
+fermée, la même que pour les treize crons que ce workflow surveille. Le coût de
+la passe (une requête, ses octets, sa durée) est publié dans le résumé du job,
+verdict **vert compris**.
+
 ## Familles exposées
 
 Aucune famille ne porte d'**étiquette** : une date ou un identifiant en label

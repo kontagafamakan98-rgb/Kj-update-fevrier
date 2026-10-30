@@ -1,0 +1,47 @@
+name: Collecte des métriques (daily)
+
+# ─── Le LECTEUR quotidien de GET /metrics, en PRODUCTION ────────────────────
+# Mesuré le 30/10/2026 : la route répond 401 sur l'hôte du backend (donc un
+# METRICS_TOKEN est posé sur la machine Fly), mais le dépôt n'a AUCUN secret
+# METRICS_TOKEN et aucun collecteur n'est versionné — `backend/metrics/
+# prometheus.yml` est une configuration que personne ne monte. Les quatre
+# provenances des veilles emploi et la jauge de FRAICHEUR de leur acquisition
+# étaient donc publiées dans le vide.
+#
+# Ce workflow EST ce lecteur : il s'authentifie, lit l'exposition et refuse en
+# nommant la cause (aucun jeton, route fermée en 503, jeton refusé en 401, route
+# perdue en 404, famille absente, exposition illisible, acquisition jamais
+# démarrée ou tarie au-delà des 30 jours que METRIQUES.md déclare). Son échec
+# est relevé par l'alerte des sondes (`.github/workflows/sondes-sante.yml`),
+# comme n'importe quel cron : c'est la boucle fermée.
+#
+# Le coût de la passe (une requête, ses octets, sa durée) est publié dans le
+# résumé du job, verdict vert compris.
+on:
+  schedule:
+    # 07:48 UTC : après les sondes de document de la matinée (07:04 → 07:40)
+    - cron: '48 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  metriques-collecte:
+    name: Collecte des métriques Prometheus
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Lire /metrics et juger la collecte
+        env:
+          # Le MÊME jeton que celui posé sur la machine Fly. Absent, la sonde
+          # refuse en le nommant : ce n'est pas une prémisse, c'est le défaut.
+          METRICS_TOKEN: ${{ secrets.METRICS_TOKEN }}
+        run: python backend/scripts/check_metrics_collecte.py

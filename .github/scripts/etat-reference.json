@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-30",
-    "motif": "L'internationalisation publie deux documents par page (24 au lieu de 12) : check-bundle-size.js releve le plafond du build total a 7,00 Mo, et check-prerender-shells.js juge chaque document de langue sur lang, canonical, og:locale et la liste EXACTE des alternatives hreflang, la reciproque confrontee aux fichiers ecrits. Les deux sont mutes par leur harnais : leurs etats se reenregistrent avec ce motif. S'y ajoute la sonde de production hreflang (frontend/scripts/check-hreflang-production.js), dont le premier etat de reference est celui de son ajout.",
+    "motif": "L'internationalisation publie deux documents par page (24 au lieu de 12) : check-bundle-size.js releve le plafond du build total a 7,00 Mo, et check-prerender-shells.js juge chaque document de langue sur lang, canonical, og:locale et la liste EXACTE des alternatives hreflang, la reciproque confrontee aux fichiers ecrits. Les deux sont mutes par leur harnais : leurs etats se reenregistrent avec ce motif. S'y ajoute la sonde de production hreflang (frontend/scripts/check-hreflang-production.js), dont le premier etat de reference est celui de son ajout. S'y ajoute, le meme jour, la sonde de collecte de /metrics (backend/scripts/check_metrics_collecte.py) : son etat fige ce que le garde REFUSE (fraicheur tarie au-dela des 30 jours, 0 = jamais, famille absente, exposition illisible, date dans le futur) et ses trois codes de sortie, pour qu'une derive de ces refus se lise comme une declaration explicite et non comme un detail de forme ; la mutation declaree neutralise justement le refus de fraicheur.",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -146,7 +146,8 @@
       "frontend/scripts/check-funnel-events.js": "0548b3419ae59feac15b78317316cdf9d3650db989ff3e08dd6542d41edc8485",
       "frontend/scripts/check-bundle-size.js": "4688385113b41369fd4bba8e244de2fc7aff8f91542a90b224e45a008d0371e0",
       "frontend/scripts/check-prerender-shells.js": "efbb287fe83a4708f0262796ac7b3d21b5a3f77ca568785fac9c80da27d458e5",
-      "frontend/scripts/check-hreflang-production.js": "f2bf5d3e57a884ad4f3ed28f976b825e671bc8b43132d1751d6f03599907b5f7"
+      "frontend/scripts/check-hreflang-production.js": "f2bf5d3e57a884ad4f3ed28f976b825e671bc8b43132d1751d6f03599907b5f7",
+      "backend/scripts/check_metrics_collecte.py": "88efd93fe9a9377e959730f215d9c5ff23378cb17c9e01f5aca9ab8b025fd2dd"
     }
   },
   "hors_perimetre": [
