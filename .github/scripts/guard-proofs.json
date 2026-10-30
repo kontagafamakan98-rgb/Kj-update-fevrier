@@ -489,6 +489,14 @@
       "motif": "les deux gardes HORS LIGNE de la typographie disent ce que le CODE déclare et ce que le build a écrit ; aucun des deux ne peut dire ce que le DÉPLOIEMENT sert, et c'est exactement là que la panne est muette : un backend Fly en retard sert encore `system-ui`, un rewrite Vercel perdu sert la coquille React à la place de la page, et dans les deux cas le document reste conforme à ce qu'on a relu. La sonde lit donc la PRODUCTION — 46 pages (13 villes, 9 métiers, 23 guides, dérivées de `src/config/liens-seo.js`, jamais recopiées) plus la 404 — et juge par page le statut attendu, les deux `@font-face`, les deux familles EMPLOYÉES (la PREMIÈRE d'une pile est celle qui est peinte, donc un corps qui commence par `system-ui` rougit même si `'Inter'` suit), un préchargement par famille avec `crossorigin` (sans lui le navigateur l'ignore en silence) et chaque fichier cité sous `/fonts/` ; puis demande une seule fois chaque fichier de police au total (200, `content-type` de police, taille minimale — un serveur peut répondre 200 avec du HTML sur le chemin d'une police). Un refus qui n'est pas de forme : un rewrite perdu servirait le SPA, qui déclare les deux familles dans son bundle, donc la marque lue est le point de montage React — sans quoi la sonde serait verte sur le mauvais objet. Trois sorties, jamais deux : 1 pour un refus nommé, et 2 = PRÉMISSE (corpus vide, aucune page lisible) qui rougit le run sans jamais valoir un vert ; le coût de la passe est publié sur le vert comme sur le rouge. Ce qu'elle ne dit pas, écrit : les faces de REPLI à `size-adjust` restent propres au build, et la police réellement PEINTE n'est pas lue — seuls le fichier servi et la déclaration qui l'emploie sont mesurés"
     },
     {
+      "chemin": "frontend/scripts/check-hreflang-production.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-hreflang-production.test.js",
+      "runner": "vitest",
+      "motif": "le triangle que les gardes hors ligne ne peuvent pas voir : quels DOCUMENTS le déploiement sert, avec quel lang et quel canonical, et ce que le SITEMAP en annonce. Trois gardes tiennent déjà la déclaration — check-prerender-shells.js sur l'artefact du build, backend/tests/test_hreflang_sitemap.py sur le sitemap du backend, et le test du module de déclaration — et aucun ne peut dire qu'un rewrite Vercel perdu (`/en/jobs` → `/en/jobs.html`, frontend/vercel.json) rend la 404 ou, pire, la coquille de l'application : un document VALIDE, à la mauvaise langue et sans la page dedans. La sonde lit donc la PRODUCTION : les 12 routes pré-rendues (src/config/page-meta.js) dans les 2 langues indexées (src/config/langues-indexees.js), et par document le statut 200, la marque de la page pré-rendue (point de montage React NON vide — sans elle la sonde serait verte sur le mauvais objet), le lang de <html>, le canonical ABSOLU qui doit désigner SA langue (un canonical croisé fait indexer la version française à la place de l'anglaise), et la liste hreflang EXACTE (réciproque, x-default compris) ; puis le fait de RÉCIPROCITÉ lu entre les documents de la famille, parce que deux documents également faux passeraient pour cohérents. Le sitemap est jugé sur sa propre symétrie — si une page est publiée dans une langue elle l'est dans toutes, et chaque entrée porte les alternatives de sa famille — avec un PLANCHER (la racine et /jobs) sans lequel un sitemap sans aucune page bilingue passerait la règle à vide, et avec le refus inverse : une alternative déclarée sur une page MONOLINGUE (villes, métiers, guides) envoie le moteur vers une version qui n'existe pas. Trois sorties, jamais deux : 1 pour un refus nommé, et 2 = PRÉMISSE (corpus vide, aucune page lisible, SITEMAP ILLISIBLE — sans lui l'énumération n'a pas été jugée) qui rougit le run sans jamais valoir un vert ; le coût de la passe est publié sur le vert comme sur le rouge. Ce qu'elle ne dit pas, écrit : un hreflang correct n'est pas une indexation (le moteur peut ignorer une alternative pour des raisons qu'aucune requête HTTP ne voit), et le TEXTE des traductions n'est pas comparé — i18nParity.test.js le tient hors ligne. Mesuré en production le 30/10/2026 : 24 documents conformes, 63 entrées de sitemap, 25 requêtes en 7,1 s, code 0"
+    },
+    {
       "chemin": "backend/kojo_balises.py",
       "role": "garde",
       "invoque_par": "test",
@@ -6960,6 +6968,26 @@
       "cwd": "frontend",
       "attend": [
         "refuse un corps peint dans la police de l’hôte"
+      ]
+    },
+    {
+      "id": "hreflang: le lang du document n'est plus comparé",
+      "garde": "frontend/scripts/check-hreflang-production.js",
+      "cible": "frontend/scripts/check-hreflang-production.js",
+      "trouve": "  if (lang !== langue.htmlLang) {",
+      "remplace": "  if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-hreflang-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-hreflang-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse un document dont le lang n’est pas celui de sa langue"
       ]
     }
   ]
