@@ -1712,6 +1712,18 @@ test.describe('Parcours E2E — l’état de chargement de /payment réserve ce 
             'peint, donc le sujet de l’autre describe (le chunk), pas l’état de chargement de la page.'
         ).not.toBe('');
 
+        // ── Anti-faux-vert : la PAGE MESURÉE est bien /payment ────────────
+        // /payment est derrière `ProtectedRoute` : mesuré sans session, ce
+        // relevé décrivait /login sous le plafond de la page de paiement (la
+        // sonde de la coquille le faisait, cf. e2e/cls-coquille-react.spec.js ;
+        // celle-ci ouvre la session, et ce refus rend l’oubli impossible).
+        expect(
+          releve.apres.urlComplete,
+          `${branche} (${taille}) : après relâchement, la page est ${releve.apres.urlComplete} et non ${chemin} — le ` +
+            'CLS mesuré est celui d’une AUTRE page (une route protégée sans session aboutit sur /login) sous le ' +
+            'plafond de /payment.'
+        ).toBe(chemin);
+
         // ── LE SUJET N° 1 : LA BRANCHE décide de ce qui est réservé ──────────
         // 0 pulse sur la branche « mission requise » (aucune carte de paiement
         // n’y est réservée), 12 sur la branche « mission ». Le même état de
@@ -1871,9 +1883,10 @@ test.describe('Parcours E2E — le repli dédié de /payment tient la règle pen
             'donc le CLS mesuré ne décrit pas le remplacement.'
         ).not.toBe('');
         expect(
-          releve.fcp,
-          `${route} (${taille}) : premier paint absent — le CLS relevé ne décrit rien.`
-        ).not.toBeNull();
+          releve.apres.urlComplete,
+          `${route} (${taille}) : après le relâchement du chunk, la page est ${releve.apres.urlComplete} et non ` +
+            `${chemin} — le CLS mesuré ne décrit pas la route qu’il nomme.`
+        ).toBe(chemin);
         expect(
           releve.cls,
           `${route} (${taille}) : le remplacement du repli par la page déplace celle-ci de ` +

@@ -22,7 +22,15 @@
  * scripts/lhci-cls-budgets.cjs, et de la course réelle du job.
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// Chemin du script LUI-MÊME : `import.meta.url` n'est pas une URL `file:` sous
+// vitest, donc on passe par `fileURLToPath` (convention des autres tests de
+// scripts) plutôt que par `new URL(…, import.meta.url)`.
+const SOURCE_BUDGETS = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'lhci-cls-budgets.cjs');
 
 const require = createRequire(import.meta.url);
 const {
@@ -258,6 +266,69 @@ describe('lighthouserc — budgets CLS par route (assertMatrix)', () => {
   it('chaque budget est AU-DESSUS de la pire médiane mesurée (il n’a jamais rougi)', () => {
     for (const [route, budget] of Object.entries(CLS_BUDGETS)) {
       expect(budget.max, `${route} : ${budget.mesure}`).toBeGreaterThan(budget.pireMediane);
+    }
+  });
+
+  it('le tableau d’en-tête porte les plafonds EN VIGUEUR, route par route', () => {
+    // Le tableau de l'en-tête est la seule vue d'ensemble des plafonds : il se
+    // relisait donc de mémoire, et dérive. Constaté le 30/10/2026 : /message,
+    // /create-job, /jobs/:id et /terms n'y figuraient pas, et /payment y
+    // annonçait encore 0,07 quand la CI appliquait 0,012 — un tableau qui décrit
+    // un plafond abrogé est pire qu'aucun tableau, parce qu'il se relit comme
+    // vérifié. Ce cas le compare à `CLS_BUDGETS`, dans les deux sens.
+    const source = readFileSync(SOURCE_BUDGETS, 'utf8');
+    const debut = source.indexOf('── Les valeurs sont MESURÉES');
+    const fin = source.indexOf('── Ce que le collect BLOQUE');
+    expect(debut, 'le bloc de mesures a-t-il été renommé ?').toBeGreaterThan(0);
+    expect(fin).toBeGreaterThan(debut);
+
+    const tableau = {};
+    for (const ligne of source.slice(debut, fin).split('\n')) {
+      const trouve = ligne.match(
+        /^\s*\*\s+(\/\S*)\s{2,}(Lighthouse CI|sonde CLS|sonde cadres|repli local|aucune)\s{2,}.*?(\d+,\d+)\s*$/
+      );
+      if (trouve) {
+        tableau[trouve[1]] = { instrument: trouve[2], max: Number(trouve[3].replace(',', '.')) };
+      }
+    }
+
+    // Couverture EXACTE, dans les deux sens : une route du code absente du
+    // tableau ne serait documentée nulle part, une route du tableau absente du
+    // code documenterait un plafond que personne n'applique.
+    expect(Object.keys(tableau).sort()).toEqual(Object.keys(CLS_BUDGETS).sort());
+    for (const [route, ligne] of Object.entries(tableau)) {
+      expect(
+        ligne.max,
+        `${route} : le tableau annonce ${ligne.max}, la CI applique ${CLS_BUDGETS[route].max}`
+      ).toBe(CLS_BUDGETS[route].max);
+    }
+
+    // L'INSTRUMENT, route par route : la colonne existe pour qu'un chiffre ne
+    // se relise pas comme s'il venait de la CI quand il vient d'une sonde. Un
+    // instrument ré-attribué serait une mesure déplacée d'un outil à l'autre
+    // sans que rien ne bouge dans les nombres — donc il est verrouillé ici.
+    const ATTENDU = {
+      '/payment': 'sonde CLS',
+      '/messages': 'sonde cadres',
+      '/create-job': 'sonde cadres',
+      '/jobs/:id': 'sonde cadres',
+      '/about': 'repli local',
+      '/contact': 'repli local',
+      '/privacy': 'repli local',
+      '/terms': 'aucune',
+    };
+    for (const route of Object.keys(CLS_BUDGETS)) {
+      expect(tableau[route].instrument, `${route} : instrument`).toBe(
+        ATTENDU[route] ?? 'Lighthouse CI'
+      );
+    }
+
+    // Les instruments employés par le tableau sont DÉCLARÉS dans le fichier :
+    // un cinquième instrument apparaîtrait ici sans que son protocole soit
+    // écrit nulle part, et la colonne ne dirait plus d'où vient le chiffre.
+    for (const nom of new Set(Object.values(tableau).map((l) => l.instrument))) {
+      if (nom === 'aucune') continue;
+      expect(source, `instrument « ${nom} » non déclaré`).toContain(nom);
     }
   });
 
