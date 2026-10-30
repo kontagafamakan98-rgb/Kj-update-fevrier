@@ -29,7 +29,7 @@ export default function MobileBottomNav() {
           icon: (active) => (
             <Icone
               nom="accueil"
-              classe={`w-6 h-6 ${active ? 'text-orange-700' : 'text-gray-600'}`}
+              classe={`w-6 h-6 ${active ? 'text-orange-700' : 'text-stone-700'}`}
             />
           ),
           label: t('home'),
@@ -39,7 +39,7 @@ export default function MobileBottomNav() {
           icon: (active) => (
             <Icone
               nom="valise"
-              classe={`w-6 h-6 ${active ? 'text-orange-700' : 'text-gray-600'}`}
+              classe={`w-6 h-6 ${active ? 'text-orange-700' : 'text-stone-700'}`}
             />
           ),
           label: t('jobs'),
@@ -49,7 +49,7 @@ export default function MobileBottomNav() {
           icon: (active) => (
             <Icone
               nom="casque"
-              classe={`w-6 h-6 ${active ? 'text-orange-700' : 'text-gray-600'}`}
+              classe={`w-6 h-6 ${active ? 'text-orange-700' : 'text-stone-700'}`}
             />
           ),
           label: t('support'),
@@ -59,7 +59,7 @@ export default function MobileBottomNav() {
           icon: (active) => (
             <Icone
               nom="entree"
-              classe={`w-6 h-6 ${active ? 'text-orange-700' : 'text-gray-600'}`}
+              classe={`w-6 h-6 ${active ? 'text-orange-700' : 'text-stone-700'}`}
             />
           ),
           label: t('login'),
@@ -71,7 +71,7 @@ export default function MobileBottomNav() {
       icon: (active) => (
         <Icone
               nom="tableau"
-              classe={`w-6 h-6 ${active ? 'text-orange-700' : 'text-gray-600'}`}
+              classe={`w-6 h-6 ${active ? 'text-orange-700' : 'text-stone-700'}`}
             />
       ),
       label: t('dashboard')
@@ -81,7 +81,7 @@ export default function MobileBottomNav() {
       icon: (active) => (
         <Icone
               nom="valise"
-              classe={`w-6 h-6 ${active ? 'text-orange-700' : 'text-gray-600'}`}
+              classe={`w-6 h-6 ${active ? 'text-orange-700' : 'text-stone-700'}`}
             />
       ),
       label: t('jobs')
@@ -91,7 +91,7 @@ export default function MobileBottomNav() {
       icon: (active) => (
         <Icone
               nom="messages"
-              classe={`w-6 h-6 ${active ? 'text-orange-700' : 'text-gray-600'}`}
+              classe={`w-6 h-6 ${active ? 'text-orange-700' : 'text-stone-700'}`}
             />
       ),
       label: t('messages')
@@ -101,7 +101,7 @@ export default function MobileBottomNav() {
       icon: (active) => (
         <Icone
               nom="profil"
-              classe={`w-6 h-6 ${active ? 'text-orange-700' : 'text-gray-600'}`}
+              classe={`w-6 h-6 ${active ? 'text-orange-700' : 'text-stone-700'}`}
             />
       ),
       label: t('profile')
@@ -124,7 +124,7 @@ export default function MobileBottomNav() {
         icon: (active) => (
           <Icone
             nom="casque"
-            classe={`w-6 h-6 ${active ? 'text-orange-700' : 'text-gray-600'}`}
+            classe={`w-6 h-6 ${active ? 'text-orange-700' : 'text-stone-700'}`}
           />
         ),
         label: t('support'),
@@ -220,24 +220,27 @@ export default function MobileBottomNav() {
   // au-dessus. Une icône qu'on ne sait pas mesurer finit par rester sous le
   // seuil : elles sont donc mesurées par le garde, à leur propre seuil.
   //
-  // Inactives : `gray-600` (`#4b5563`) — 7,14:1 sur le sable et 4,57:1 sur
-  // l'encre, la teinte la plus sombre des deux composites de référence.
+  // Inactives : `stone-700` (`#44403c`) — la teinte CHAUDE du site, plus sombre
+  // que le `gray-600` (`#4b5563`, 7,14:1 sur le sable et 4,57:1 sur le pire
+  // composite) qu'elle remplace le 29/10/2026 : le gris froid de la barre jurait
+  // avec l'encre chaude du reste de la page. Le garde re-mesure et refuse sous
+  // 4,5:1 pour un libellé, 3:1 pour un tracé.
   // Actives : `orange-700` (`#c2410c`), la MÊME teinte que le libellé de
   // l'onglet, sur le fond opaque `bg-orange-50` : 4,88:1. Deux oranges
   // voisins pour une seule case (icône `orange-600`, libellé `orange-700`) se
   // lisaient comme deux états différents.
-  // La CLOCHE suit les inactives (`text-gray-600`) : son tracé est aussi un
+  // La CLOCHE suit les inactives (`text-stone-700`) : son tracé est aussi un
   // objet graphique sur la vitre, et il n'y a aucune raison de lui laisser un
   // seuil plus faible que ses voisines.
   // Garde : `src/components/__tests__/pied-de-page-contraste.test.js`.
   const caseDeNav =
     'flex min-h-[72px] flex-col items-center justify-center rounded-2xl px-1 py-2 text-[11px] font-medium transition-colors';
-  // L'encre de la cloche est celle d'un LIBELLÉ (`text-gray-700`, 9,74:1 sur le
+  // L'encre de la cloche est celle d'un LIBELLÉ (`text-stone-700`, 9,74:1 sur le
   // sable et 6,24:1 sur l'encre) : la cloche rend « Notifications » sous son
-  // tracé, et ce texte hérite de la couleur du BOUTON. En `text-gray-500` il
+  // tracé, et ce texte hérite de la couleur du BOUTON. En `gray-500` il
   // tombait à 4,57:1 puis **2,93:1** — sous le seuil du texte, alors que le
-  // tracé, lui, relève de 1.4.11 et tient 3:1 avec `text-gray-600`.
-  const caseDeCloche = `${caseDeNav} w-full text-gray-700 focus:outline-hidden focus:ring-2 focus:ring-orange-500`;
+  // tracé, lui, relève de 1.4.11 et tient 3:1 avec `text-stone-700`.
+  const caseDeCloche = `${caseDeNav} w-full text-stone-700 focus:outline-hidden focus:ring-2 focus:ring-orange-500`;
 
   return (
     <div
@@ -251,11 +254,11 @@ export default function MobileBottomNav() {
             <Link
               key={cle(item.path)}
               to={item.path}
-              className={`${caseDeNav} ${isActive ? 'bg-orange-50 text-orange-700' : 'text-gray-700'}`}
+              className={`${caseDeNav} ${isActive ? 'bg-orange-50 text-orange-700' : 'text-stone-700'}`}
               aria-current={isActive ? 'page' : undefined}
             >
               {item.icon(isActive)}
-              <span className={`mt-1 text-center leading-tight ${isActive ? 'text-orange-700' : 'text-gray-700'}`}>
+              <span className={`mt-1 text-center leading-tight ${isActive ? 'text-orange-700' : 'text-stone-700'}`}>
                 {item.label}
               </span>
             </Link>
@@ -266,7 +269,7 @@ export default function MobileBottomNav() {
             sens={VERS_LE_HAUT}
             className="flex"
             buttonClassName={caseDeCloche}
-            iconClassName="w-6 h-6 text-gray-600"
+            iconClassName="w-6 h-6 text-stone-700"
             label={t('notificationsTitle')}
           />
         )}

@@ -161,7 +161,7 @@ const OwnerDisputes = () => {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 id="titre-litiges-arbitrage" className="titre-entree">Litiges à trancher</h2>
-          <p className="mt-1 text-sm text-gray-600">
+          <p className="mt-1 text-sm text-stone-600">
             Le paiement est gelé tant qu’un litige est ouvert — et tant qu’une décision
             qui n’a rien payé n’est pas relancée.
             {fenetreJours ? ` Fenêtre d’arbitrage : ${fenetreJours} jours, puis la règle ordinaire reprend.` : ''}
@@ -171,7 +171,7 @@ const OwnerDisputes = () => {
           type="button"
           onClick={charger}
           disabled={chargement}
-          className="px-4 py-2 bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 disabled:opacity-50"
+          className="px-4 py-2 bg-stone-100 text-stone-800 rounded-lg hover:bg-stone-200 disabled:opacity-50"
         >
           {chargement ? 'Chargement…' : 'Actualiser'}
         </button>
@@ -183,19 +183,19 @@ const OwnerDisputes = () => {
       {mesures && (
         <section
           aria-labelledby="titre-mesures-arbitrage"
-          className="mb-6 rounded-lg bg-gray-50 p-4"
+          className="mb-6 rounded-lg bg-stone-50 p-4"
         >
           <h3
             id="titre-mesures-arbitrage"
-            className="text-sm font-semibold uppercase tracking-wide text-gray-600"
+            className="text-sm font-semibold uppercase tracking-wide text-stone-600"
           >
             Mesures de l’arbitrage
           </h3>
           {mesures.litiges?.total === 0 ? (
-            <p className="mt-1 text-sm text-gray-600">Aucun litige à mesurer pour l’instant.</p>
+            <p className="mt-1 text-sm text-stone-600">Aucun litige à mesurer pour l’instant.</p>
           ) : (
             <>
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-stone-500">
                 {mesures.litiges?.total} litige(s)
                 {mesures.depuis ? ` depuis le ${formaterDate(mesures.depuis)}` : ''}
                 {mesures.litiges?.tronque ? ' — lecture bornée, chiffres partiels' : ''}
@@ -203,11 +203,11 @@ const OwnerDisputes = () => {
               </p>
               <dl className="mt-3 grid gap-4 sm:grid-cols-3">
                 <div>
-                  <dt className="text-xs text-gray-500">Réponse reçue avant l’échéance</dt>
-                  <dd className="text-lg font-semibold text-gray-900">
+                  <dt className="text-xs text-stone-500">Réponse reçue avant l’échéance</dt>
+                  <dd className="text-lg font-semibold text-stone-900">
                     {mesures.reponse?.avant_echeance} / {mesures.reponse?.avec_reponse}
                   </dd>
-                  <dd className="text-xs text-gray-500">
+                  <dd className="text-xs text-stone-500">
                     {libelleTaux(
                       mesures.reponse?.taux_avant_echeance,
                       mesures.plancher,
@@ -219,11 +219,11 @@ const OwnerDisputes = () => {
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-gray-500">Tranchés sans réponse</dt>
-                  <dd className="text-lg font-semibold text-gray-900">
+                  <dt className="text-xs text-stone-500">Tranchés sans réponse</dt>
+                  <dd className="text-lg font-semibold text-stone-900">
                     {mesures.tranches?.sans_reponse} / {mesures.tranches?.total}
                   </dd>
-                  <dd className="text-xs text-gray-500">
+                  <dd className="text-xs text-stone-500">
                     {libelleTaux(
                       mesures.tranches?.taux_sans_reponse,
                       mesures.plancher,
@@ -233,11 +233,11 @@ const OwnerDisputes = () => {
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-gray-500">Réponse → décision</dt>
-                  <dd className="text-lg font-semibold text-gray-900">
+                  <dt className="text-xs text-stone-500">Réponse → décision</dt>
+                  <dd className="text-lg font-semibold text-stone-900">
                     {formaterDelai(mesures.delai_reponse_decision?.mediane_heures)}
                   </dd>
-                  <dd className="text-xs text-gray-500">
+                  <dd className="text-xs text-stone-500">
                     {mesures.delai_reponse_decision?.n
                       ? `médiane · moyenne ${formaterDelai(mesures.delai_reponse_decision.moyenne_heures)} · pire ${formaterDelai(mesures.delai_reponse_decision.max_heures)} (n = ${mesures.delai_reponse_decision.n})`
                       : 'aucune décision précédée d’une réponse'}
@@ -250,16 +250,16 @@ const OwnerDisputes = () => {
                   trois questions sur 30 et 90 jours, calculées par le serveur
                   sur les mêmes lignes lues. */}
               {Array.isArray(mesures.fenetres) && mesures.fenetres.length > 0 && (
-                <div className="mt-4 border-t border-gray-200 pt-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                <div className="mt-4 border-t border-stone-200 pt-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
                     Sur une période — la santé actuelle, pas l’historique
                   </p>
-                  <ul className="mt-2 space-y-1 text-xs text-gray-600">
+                  <ul className="mt-2 space-y-1 text-xs text-stone-600">
                     {mesures.fenetres.map((fenetre) => {
                       const ignorees = datesIgnorees(fenetre);
                       return (
                         <li key={fenetre.fenetre_jours}>
-                          <span className="font-medium text-gray-800">
+                          <span className="font-medium text-stone-800">
                             {fenetre.fenetre_jours} derniers jours
                           </span>
                           {' — '}
@@ -288,7 +288,7 @@ const OwnerDisputes = () => {
         </section>
       )}
       {mesuresIndisponibles && !mesures && (
-        <p className="mb-4 text-xs text-gray-500">
+        <p className="mb-4 text-xs text-stone-500">
           Mesures de l’arbitrage indisponibles : la file reste utilisable.
         </p>
       )}
@@ -302,7 +302,7 @@ const OwnerDisputes = () => {
       {message && <p className="mb-4 text-green-800">{message}</p>}
 
       {!chargement && litiges.length === 0 && !erreur && (
-        <p className="text-gray-600">Aucun litige en attente d’arbitrage.</p>
+        <p className="text-stone-600">Aucun litige en attente d’arbitrage.</p>
       )}
 
       <ul className="space-y-4">
@@ -311,11 +311,11 @@ const OwnerDisputes = () => {
           const jobId = item.job_id;
           const occupe = enCours === jobId;
           return (
-            <li key={jobId} className="rounded-lg border border-gray-200 p-4">
+            <li key={jobId} className="rounded-lg border border-stone-200 p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="font-semibold text-gray-900">{item.title || jobId}</p>
-                  <p className="text-xs text-gray-500">
+                  <p className="font-semibold text-stone-900">{item.title || jobId}</p>
+                  <p className="text-xs text-stone-500">
                     {LIBELLES_ETAT[litige.state] || litige.state}
                     {litige.decision_deadline_at ? ` — échéance ${formaterDate(litige.decision_deadline_at)}` : ''}
                   </p>
@@ -329,7 +329,7 @@ const OwnerDisputes = () => {
                     </p>
                   )}
                 </div>
-                <span className="text-xs text-gray-600">
+                <span className="text-xs text-stone-600">
                   Ouvert par le {LIBELLES_ROLE[litige.opened_by_role] || litige.opened_by_role}
                   {litige.opened_at ? ` le ${formaterDate(litige.opened_at)}` : ''}
                 </span>
@@ -341,33 +341,33 @@ const OwnerDisputes = () => {
                   de cloche. */}
               {litige.reason && (
                 <div className="mt-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
                     Ce que conteste le {LIBELLES_ROLE[litige.opened_by_role] || litige.opened_by_role}
                   </p>
-                  <p className="mt-1 whitespace-pre-line text-sm text-gray-700">{litige.reason}</p>
+                  <p className="mt-1 whitespace-pre-line text-sm text-stone-700">{litige.reason}</p>
                 </div>
               )}
 
               {litige.response ? (
-                <div className="mt-3 rounded-lg bg-gray-50 px-3 py-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                <div className="mt-3 rounded-lg bg-stone-50 px-3 py-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
                     Réponse de l’autre partie — demande :
                     {' '}
                     {LIBELLES_POSITION[litige.response.position] || litige.response.position}
                   </p>
-                  <p className="mt-1 whitespace-pre-line text-sm text-gray-700">
+                  <p className="mt-1 whitespace-pre-line text-sm text-stone-700">
                     {litige.response.note}
                   </p>
                 </div>
               ) : (
-                <p className="mt-3 text-sm text-gray-500">
+                <p className="mt-3 text-sm text-stone-500">
                   Pas encore de réponse : la décision porterait sur une seule version.
                 </p>
               )}
 
               <label
                 htmlFor={`note-litige-${jobId}`}
-                className="mt-4 block text-sm font-medium text-gray-800"
+                className="mt-4 block text-sm font-medium text-stone-800"
               >
                 Motivation de la décision (lue par les deux parties)
               </label>
@@ -376,7 +376,7 @@ const OwnerDisputes = () => {
                 rows={2}
                 value={notes[jobId] || ''}
                 onChange={(event) => setNotes((previous) => ({ ...previous, [jobId]: event.target.value }))}
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2 text-sm"
               />
 
               <div className="mt-3 flex flex-wrap gap-3">

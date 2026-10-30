@@ -78,7 +78,7 @@ const JobsMap = lazy(() => import('../components/JobsMap'));
 // repli au suspens de la carte lazy : le chunk arrive derrière une boîte
 // déjà à la bonne taille, donc le budget CLS de /jobs (0,01) tient.
 const CarteEnChargement = () => (
-  <div className="h-full w-full animate-pulse bg-gray-200" aria-hidden="true" />
+  <div className="h-full w-full animate-pulse bg-stone-200" aria-hidden="true" />
 );
 
 // ── Préchargement PARALLÈLE de la liste publique (decouverte) ───────────────
@@ -306,12 +306,12 @@ export default function Jobs() {
           {/* Bascule liste / carte. Les deux vues sont des boutons d'un même
               groupe : `aria-pressed` dit laquelle est active (les emoji ☰/🗺️
               ne le disaient qu'à l'œil, et différemment selon la plateforme). */}
-          <div className="flex rounded-xl border border-gray-200 bg-white p-1" role="group" aria-label={`${t('listView')} / ${t('mapView')}`}>
+          <div className="flex rounded-xl border border-stone-200 bg-white p-1" role="group" aria-label={`${t('listView')} / ${t('mapView')}`}>
             <button
               type="button"
               onClick={() => setViewMode('list')}
               aria-pressed={viewMode === 'list'}
-              className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${viewMode === 'list' ? 'bg-orange-700 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+              className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${viewMode === 'list' ? 'bg-orange-700 text-white' : 'text-stone-600 hover:bg-stone-100'}`}
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
@@ -322,7 +322,7 @@ export default function Jobs() {
               type="button"
               onClick={() => setViewMode('map')}
               aria-pressed={viewMode === 'map'}
-              className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${viewMode === 'map' ? 'bg-orange-700 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+              className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${viewMode === 'map' ? 'bg-orange-700 text-white' : 'text-stone-600 hover:bg-stone-100'}`}
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 4 3.5 6.5v13L9 17l6 2.5 5.5-2.5v-13L15 6.5 9 4z" />

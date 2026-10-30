@@ -217,19 +217,19 @@ export function CountrySelect({
       >
         <span className="flex items-center gap-3 min-w-0">
           {activeCountry ? <FlagIcon country={activeCountry.code} className="w-6 h-4" /> : <span className="text-lg leading-none"><IconePage nom={iconeGlobe} role="paysGlobe" /></span>}
-          <span className={`truncate ${activeCountry ? 'text-gray-900' : 'text-gray-500'}`}>
+          <span className={`truncate ${activeCountry ? 'text-stone-900' : 'text-stone-500'}`}>
             {activeCountry ? getTranslatedCountryName(activeCountry, t) : resolvedPlaceholder}
           </span>
         </span>
-        <span className={`text-xs text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}><IconePage nom={iconeChevron} role="paysChevron" /></span>
+        <span className={`text-xs text-stone-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}><IconePage nom={iconeChevron} role="paysChevron" /></span>
       </button>
 
       <input type="hidden" name={name} value={value || ''} required={required} />
 
       {isOpen && (
-        <div className="absolute z-30 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden">
+        <div className="absolute z-30 mt-2 w-full bg-white border border-stone-200 rounded-lg shadow-xl overflow-hidden">
           {searchable && (
-            <div className="p-3 border-b border-gray-100 bg-gray-50">
+            <div className="p-3 border-b border-stone-100 bg-stone-50">
               <input
                 id={`${id}-search`}
                 name={`${name || 'country'}_search`}
@@ -257,7 +257,7 @@ export function CountrySelect({
                   onClick={() => emitChange(country.code)}
                   onMouseEnter={() => setHighlightedIndex(index)}
                   className={`w-full flex items-center justify-between gap-3 px-4 py-3 text-left transition-colors ${
-                    isSelected ? 'bg-orange-50 text-orange-700' : isHighlighted ? 'bg-gray-100 text-gray-900' : 'hover:bg-gray-50 text-gray-800'
+                    isSelected ? 'bg-orange-50 text-orange-700' : isHighlighted ? 'bg-stone-100 text-stone-900' : 'hover:bg-stone-50 text-stone-800'
                   }`}
                 >
                   <span className="flex items-center gap-3 min-w-0">
@@ -268,7 +268,7 @@ export function CountrySelect({
                 </button>
               );
             }) : (
-              <div className="px-4 py-3 text-sm text-gray-500">{t('noCountryFound')}</div>
+              <div className="px-4 py-3 text-sm text-stone-500">{t('noCountryFound')}</div>
             )}
           </div>
         </div>

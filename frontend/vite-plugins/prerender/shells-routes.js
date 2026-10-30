@@ -80,11 +80,11 @@ function basculeListeCarte({ esc, T }) {
     `<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">${paths}</svg>`
   const bouton = (actif, paths, cle) =>
     `<button type="button" class="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
-      actif ? 'bg-orange-700 text-white' : 'text-gray-600 hover:bg-gray-100'
+      actif ? 'bg-orange-700 text-white' : 'text-stone-600 hover:bg-stone-100'
     }">${icone(paths)}${esc(T(cle))}</button>`
   return (
     `<div class="flex flex-wrap items-center gap-3">` +
-    `<div class="flex rounded-xl border border-gray-200 bg-white p-1" role="group" aria-label="${esc(T('listView'))} / ${esc(T('mapView'))}">` +
+    `<div class="flex rounded-xl border border-stone-200 bg-white p-1" role="group" aria-label="${esc(T('listView'))} / ${esc(T('mapView'))}">` +
     bouton(true, '<path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>', 'listView') +
     bouton(false, '<path stroke-linecap="round" stroke-linejoin="round" d="M9 4 3.5 6.5v13L9 17l6 2.5 5.5-2.5v-13L15 6.5 9 4z"/><path stroke-linecap="round" d="M9 4v13M15 6.5v13"/>', 'mapView') +
     `</div>` +
@@ -94,7 +94,7 @@ function basculeListeCarte({ esc, T }) {
 
 function boutonGoogle({ esc, label }) {
   return (
-    `<button type="button" class="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-gray-300 rounded-md bg-white text-gray-700 text-sm font-medium">` +
+    `<button type="button" class="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-stone-300 rounded-md bg-white text-stone-700 text-sm font-medium">` +
     SVG_GOOGLE +
     `<span>${esc(label)}</span>` +
     `</button>`
@@ -198,7 +198,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, pageSectio
       + (googleAuth ? boutonGoogle({ esc, label: registerT(loginPlan.googleLoginKey) }) : '')
       + (googleAuth
         ? `<div class="relative">`
-          + `<div class="absolute inset-0 flex items-center"><div class="w-full border-t border-gray-200"></div></div>`
+          + `<div class="absolute inset-0 flex items-center"><div class="w-full border-t border-stone-200"></div></div>`
           // La teinte du séparateur est celle de la CARTE qui le traverse
           // (17/10/2026) : ce bloc vit sous condition Google, donc sa chaîne
           // ne peut pas être déclarée dans le plan (elle devrait y être
@@ -298,11 +298,11 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, pageSectio
       + `</div>`
       + `<div class="flex items-center">`
       + `<div class="w-6 h-6 bg-stone-300 text-stone-600 rounded-full flex items-center justify-center text-xs font-medium">${esc(registerT(registerPlan.step2NumberKey))}</div>`
-      + `<span class="ml-2 text-gray-500 font-medium whitespace-nowrap">${esc(registerT('stepEmail'))}</span>`
+      + `<span class="ml-2 text-stone-500 font-medium whitespace-nowrap">${esc(registerT('stepEmail'))}</span>`
       + `</div>`
       + `<div class="flex items-center">`
       + `<div class="w-6 h-6 bg-stone-300 text-stone-600 rounded-full flex items-center justify-center text-xs font-medium">${esc(registerT(registerPlan.step3NumberKey))}</div>`
-      + `<span class="ml-2 text-gray-500 font-medium whitespace-nowrap">${esc(registerT('stepPayments'))}</span>`
+      + `<span class="ml-2 text-stone-500 font-medium whitespace-nowrap">${esc(registerT('stepPayments'))}</span>`
       + `</div>`
       + `</div>`
       // La jauge du formulaire, peinte VIDE : c'est l'état du document
@@ -319,7 +319,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, pageSectio
       + (googleAuth ? boutonGoogle({ esc, label: registerT('googleSignup') }) : '')
       + (googleAuth
         ? `<div class="relative">`
-          + `<div class="absolute inset-0 flex items-center"><div class="w-full border-t border-gray-200"></div></div>`
+          + `<div class="absolute inset-0 flex items-center"><div class="w-full border-t border-stone-200"></div></div>`
           // `text-stone-500` et non `gray-400` (26/10/2026) : mesuré 2,54:1 sur
           // blanc pour `gray-400`, sous le 4,5:1 du texte courant — et la
           // coquille doit peindre la teinte de React, pas celle d'avant.
@@ -340,11 +340,11 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, pageSectio
       // de géométrie, pas un détail de sémantique.
       + `<label for="user_type_client" class="relative flex items-center justify-center p-4 border-2 border-orange-500 bg-orange-50 rounded-lg cursor-pointer transition-all">`
       + `<input id="user_type_client" type="radio" name="user_type" value="client" checked class="sr-only" />`
-      + `<div class="text-center"><div class="text-2xl mb-2">${svgDeLIcone(registerPlan.clientIcon, 'carteUserType')}</div><span class="text-sm font-medium text-gray-700">${esc(registerT('client'))}</span><p class="text-xs text-gray-500 mt-1">${esc(registerT('iAmClient'))}</p></div>`
+      + `<div class="text-center"><div class="text-2xl mb-2">${svgDeLIcone(registerPlan.clientIcon, 'carteUserType')}</div><span class="text-sm font-medium text-stone-700">${esc(registerT('client'))}</span><p class="text-xs text-stone-500 mt-1">${esc(registerT('iAmClient'))}</p></div>`
       + `</label>`
-      + `<label for="user_type_worker" class="relative flex items-center justify-center p-4 border-2 border-gray-300 rounded-lg cursor-pointer transition-all">`
+      + `<label for="user_type_worker" class="relative flex items-center justify-center p-4 border-2 border-stone-300 rounded-lg cursor-pointer transition-all">`
       + `<input id="user_type_worker" type="radio" name="user_type" value="worker" class="sr-only" />`
-      + `<div class="text-center"><div class="text-2xl mb-2">${svgDeLIcone(registerPlan.workerIcon, 'carteUserType')}</div><span class="text-sm font-medium text-gray-700">${esc(registerT('worker'))}</span><p class="text-xs text-gray-500 mt-1">${esc(registerT('iAmWorker'))}</p></div>`
+      + `<div class="text-center"><div class="text-2xl mb-2">${svgDeLIcone(registerPlan.workerIcon, 'carteUserType')}</div><span class="text-sm font-medium text-stone-700">${esc(registerT('worker'))}</span><p class="text-xs text-stone-500 mt-1">${esc(registerT('iAmWorker'))}</p></div>`
       + `</label>`
       + `</div>`
       + `</fieldset>`
@@ -366,7 +366,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, pageSectio
       + `<span class="text-lg leading-none">${svgDeLIcone(registerPlan.countryGlobeIcon, 'paysGlobe')}</span>`
       + `<span class="truncate text-gray-400">${esc(COUNTRY_PLACEHOLDER(registerT('country')))}</span>`
       + `</span>`
-      + `<span class="text-xs text-gray-500 transition-transform">${svgDeLIcone(registerPlan.countryChevronIcon, 'paysChevron')}</span>`
+      + `<span class="text-xs text-stone-500 transition-transform">${svgDeLIcone(registerPlan.countryChevronIcon, 'paysChevron')}</span>`
       + `</button>`
       + `<input type="hidden" name="country" value="" />`
       + `</div>`
@@ -388,9 +388,9 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, pageSectio
       + `<span class="${registerPlan.champPrefixeClass}">${esc(PHONE_PREFIX_FALLBACK)}</span>`
       + `<input readonly placeholder="${esc(phoneNumberExample())}" class="${registerPlan.champTelephoneClass}" />`
       + `</div>`
-      + `<p class="mt-1 text-sm text-gray-500">${esc(registerT('phoneFormatHint'))}: ${esc(phoneNumberExample())}</p>`
+      + `<p class="mt-1 text-sm text-stone-500">${esc(registerT('phoneFormatHint'))}: ${esc(phoneNumberExample())}</p>`
       + `</div>`
-      + `<div><label class="block text-sm font-semibold text-stone-800 mb-2">${esc(registerT('password'))}</label><input readonly type="password" class="${registerPlan.champClass}" /><p class="mt-1 text-xs text-gray-500">${esc(registerT('passwordTooShort'))}</p></div>`
+      + `<div><label class="block text-sm font-semibold text-stone-800 mb-2">${esc(registerT('password'))}</label><input readonly type="password" class="${registerPlan.champClass}" /><p class="mt-1 text-xs text-stone-500">${esc(registerT('passwordTooShort'))}</p></div>`
       + `<div class="bloc-differe-photo carte-editoriale carte-publique mb-6">`
       + `<div class="mb-4 flex items-center gap-3">${svgDeLIcone(registerPlan.photoIcon, 'photoTitre')}<h3 class="titre-entree">${esc(registerT('profilePhotoOptional'))}</h3></div>`
       + `<p class="mb-4 text-sm text-stone-600">${esc(registerT('profilePhotoHelps'))}</p>`
@@ -420,7 +420,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, pageSectio
       + `<h2 class="text-lg font-semibold text-orange-900">${esc(T('choosePreferredLanguage'))}</h2>`
       + `</div>`
       + `<div>`
-      + `<p class="text-sm text-gray-700 mb-3"><strong>${esc(T('languageNote'))}</strong> ${esc(T('interfaceWillChange'))}</p>`
+      + `<p class="text-sm text-stone-700 mb-3"><strong>${esc(T('languageNote'))}</strong> ${esc(T('interfaceWillChange'))}</p>`
       + `<div class="grid grid-cols-2 md:grid-cols-4 gap-3">`
       // La PREMIÈRE langue est celle de l'interface, donc la langue SÉLECTIONNÉE :
       // React la peint `border-orange-500 bg-orange-100 shadow-md` et la coquille
@@ -429,12 +429,12 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, pageSectio
       + LANGUES_PAR_DEFAUT.map(
         (langue, rang) =>
           `<button type="button" class="relative p-4 border-2 rounded-lg transition-all hover:scale-105 ${
-            rang === 0 ? 'border-orange-500 bg-orange-100 shadow-md' : 'border-gray-300 bg-white hover:border-gray-400'
+            rang === 0 ? 'border-orange-500 bg-orange-100 shadow-md' : 'border-stone-300 bg-white hover:border-stone-400'
           }">`
           + `<div class="text-center">`
           + `<div class="flex justify-center mb-2">${svgDuDrapeau(nomDuDrapeau(langue.code), classeDuDrapeau('w-8 h-6'))}</div>`
-          + `<div class="font-medium text-gray-900 text-sm">${esc(langue.name)}</div>`
-          + `<div class="text-xs text-gray-600 mt-1">${esc(langue.nativeName)}</div>`
+          + `<div class="font-medium text-stone-900 text-sm">${esc(langue.name)}</div>`
+          + `<div class="text-xs text-stone-600 mt-1">${esc(langue.nativeName)}</div>`
           + `</div>`
           + `</button>`
       ).join('')
@@ -467,7 +467,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, pageSectio
       + `<div class="bloc-differe-legal rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-3">`
       + `<div><h3 class="text-sm font-semibold text-orange-900">${svgDeLIcone(registerPlan.legalNoticeIcon, 'notice')} ${esc(registerT('legalNoticeTitle'))}</h3><p class="text-xs text-orange-800 mt-1">${esc(registerT('legalConsentHelp'))}</p></div>`
       + `<span class="inline-flex items-center text-sm font-medium text-orange-700 underline">${esc(registerT('legalConsentLink'))}</span>`
-      + `<label class="flex items-start gap-3 cursor-pointer"><input type="checkbox" readonly class="mt-1 h-4 w-4 rounded-sm border-gray-300 text-orange-600" /><span class="text-sm text-gray-700">${esc(registerT('legalConsentLabel'))}</span></label>`
+      + `<label class="flex items-start gap-3 cursor-pointer"><input type="checkbox" readonly class="mt-1 h-4 w-4 rounded-sm border-stone-300 text-orange-600" /><span class="text-sm text-stone-700">${esc(registerT('legalConsentLabel'))}</span></label>`
       + `<p class="text-xs text-stone-600">${esc(registerT('legalContactLine'))}</p>`
       + `</div>`
       + `<div class="bloc-differe-envoi"><button type="submit" class="${registerPlan.boutonClass}">${esc(registerT('continueButton'))}</button></div>`

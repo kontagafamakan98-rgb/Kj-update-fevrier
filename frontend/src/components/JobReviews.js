@@ -84,15 +84,15 @@ export default function JobReviews({ jobId }) {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-xs p-6">
-        <p className="text-sm text-gray-500">{pageT('loading')}</p>
+      <div className="bg-white rounded-2xl border border-stone-100 shadow-xs p-6">
+        <p className="text-sm text-stone-500">{pageT('loading')}</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-xs p-6">
-      <h2 className="text-xl font-semibold text-gray-900 mb-4">{pageT('title')}</h2>
+    <div className="bg-white rounded-2xl border border-stone-100 shadow-xs p-6">
+      <h2 className="text-xl font-semibold text-stone-900 mb-4">{pageT('title')}</h2>
 
       {error && (
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -106,14 +106,14 @@ export default function JobReviews({ jobId }) {
       )}
 
       {reviews.length === 0 ? (
-        <p className="text-sm text-gray-500">{pageT('noReviews')}</p>
+        <p className="text-sm text-stone-500">{pageT('noReviews')}</p>
       ) : (
         <div className="space-y-3">
           {reviews.map((review) => (
-            <div key={review.id} className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+            <div key={review.id} className="rounded-xl border border-stone-100 bg-stone-50 px-4 py-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-sm font-semibold text-gray-900 truncate">
+                  <span className="text-sm font-semibold text-stone-900 truncate">
                     {review.reviewer_name || pageT('anonymous')}
                   </span>
                   {renderStars(review.rating)}
@@ -129,7 +129,7 @@ export default function JobReviews({ jobId }) {
                 )}
               </div>
               {review.comment && (
-                <p className="mt-1 text-sm text-gray-600 whitespace-pre-line">{review.comment}</p>
+                <p className="mt-1 text-sm text-stone-600 whitespace-pre-line">{review.comment}</p>
               )}
             </div>
           ))}
@@ -137,8 +137,8 @@ export default function JobReviews({ jobId }) {
       )}
 
       {!myReview && (
-        <div className="mt-5 border-t border-gray-100 pt-5">
-          <p className="text-sm font-medium text-gray-700 mb-2">{pageT('yourRating')}</p>
+        <div className="mt-5 border-t border-stone-100 pt-5">
+          <p className="text-sm font-medium text-stone-700 mb-2">{pageT('yourRating')}</p>
           <div className="flex items-center gap-1">
             {[1, 2, 3, 4, 5].map((value) => (
               <button
@@ -149,12 +149,12 @@ export default function JobReviews({ jobId }) {
                   setRating(value);
                   setError('');
                 }}
-                className={`text-2xl leading-none transition-colors ${value <= rating ? 'text-yellow-400' : 'text-gray-300 hover:text-yellow-300'}`}
+                className={`text-2xl leading-none transition-colors ${value <= rating ? 'text-yellow-400' : 'text-stone-300 hover:text-yellow-300'}`}
               >
                 ★
               </button>
             ))}
-            {rating > 0 && <span className="ml-2 text-sm text-gray-500">{rating}/5</span>}
+            {rating > 0 && <span className="ml-2 text-sm text-stone-500">{rating}/5</span>}
           </div>
           <textarea
             value={comment}
@@ -162,7 +162,7 @@ export default function JobReviews({ jobId }) {
             maxLength={1000}
             placeholder={pageT('commentPlaceholder')}
             rows={3}
-            className="mt-3 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:outline-hidden focus:ring-2 focus:ring-orange-500"
+            className="mt-3 w-full rounded-xl border border-stone-300 px-4 py-3 text-sm focus:outline-hidden focus:ring-2 focus:ring-orange-500"
           />
           <button
             type="button"

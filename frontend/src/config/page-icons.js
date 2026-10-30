@@ -174,7 +174,7 @@ export const CLASSES_ICONE = {
   carte: 'h-6 w-6 text-orange-600',
   // La pastille du contrôle de carte de /contact (l'ancien `text-2xl`) : elle
   // est grise, comme le contrôle qu'elle accompagne.
-  carteContact: 'h-6 w-6 text-gray-500',
+  carteContact: 'h-6 w-6 text-stone-500',
   // La pastille d'un mode de /support (`pastille-rond-large`, 3 rem depuis le
   // 28/09/2026) — la couleur vient de la pastille, donc le trait suit
   // `currentColor`.
@@ -253,12 +253,12 @@ export const CLASSES_ICONE = {
   // hauteur de ligne ne le dimensionne plus et l'alignement par `em` n'a plus
   // d'objet. La teinte suit celle de la section, c'est-à-dire l'orange du site.
   photoTitre: 'h-6 w-6 text-orange-700',
-  photoZone: 'h-10 w-10 text-gray-400',
+  photoZone: 'h-10 w-10 text-stone-400',
   // Le globe et le chevron du sélecteur de pays, dans un `text-lg`/`text-xs`.
-  paysGlobe: 'h-5 w-5 text-gray-500',
+  paysGlobe: 'h-5 w-5 text-stone-500',
   paysChevron: 'h-3 w-3',
   // La carte « mission requise » de /payment (l'ancien `text-4xl text-center`).
-  carteVide: 'h-12 w-12 text-gray-400',
+  carteVide: 'h-12 w-12 text-stone-400',
   // Le repère de la LANGUE SÉLECTIONNÉE de /register (25/10/2026) : le bloc
   // vert publiait le CARACTÈRE « ✓ », un glyphe du produit sans domicile — ni
   // clé de dictionnaire, ni config de page — donc refusé par

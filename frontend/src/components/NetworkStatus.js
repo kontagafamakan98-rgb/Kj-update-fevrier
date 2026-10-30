@@ -88,7 +88,7 @@ const NetworkStatus = ({ showDetails = false, className = '' }) => {
       case 'excellent':
         return 'bg-blue-50 border-blue-200';
       default:
-        return 'bg-gray-50 border-gray-200';
+        return 'bg-stone-50 border-stone-200';
     }
   };
 
@@ -105,7 +105,7 @@ const NetworkStatus = ({ showDetails = false, className = '' }) => {
       case 'excellent':
         return 'text-blue-700';
       default:
-        return 'text-gray-700';
+        return 'text-stone-700';
     }
   };
 

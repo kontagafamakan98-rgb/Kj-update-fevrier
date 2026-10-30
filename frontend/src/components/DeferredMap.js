@@ -125,7 +125,7 @@ export default function DeferredMap({ src, title, href, label }) {
 
   // La BOÎTE est la même dans les deux états (mêmes classes, même hauteur) :
   // c'est ce qui garantit qu'apparition de la carte = zéro décalage.
-  const boite = 'relative h-80 w-full overflow-hidden rounded-xl border border-gray-200 bg-gray-50';
+  const boite = 'relative h-80 w-full overflow-hidden rounded-xl border border-stone-200 bg-stone-50';
 
   return (
     <div ref={bloc} className={boite} data-carte-differee="">

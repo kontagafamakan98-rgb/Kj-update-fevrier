@@ -582,14 +582,14 @@ export default function Register() {
                 <div className="w-6 h-6 bg-stone-300 text-stone-600 rounded-full flex items-center justify-center text-xs font-medium">
                   {t(pagePlan.step2NumberKey)}
                 </div>
-                <span className="ml-2 text-gray-500 font-medium whitespace-nowrap">{pageT(pagePlan.step2TitleKey)}</span>
+                <span className="ml-2 text-stone-500 font-medium whitespace-nowrap">{pageT(pagePlan.step2TitleKey)}</span>
               </div>
 
               <div className="flex items-center">
                 <div className="w-6 h-6 bg-stone-300 text-stone-600 rounded-full flex items-center justify-center text-xs font-medium">
                   {t(pagePlan.step3NumberKey)}
                 </div>
-                <span className="ml-2 text-gray-500 font-medium whitespace-nowrap">{pageT(pagePlan.step3TitleKey)}</span>
+                <span className="ml-2 text-stone-500 font-medium whitespace-nowrap">{pageT(pagePlan.step3TitleKey)}</span>
               </div>
             </div>
             
@@ -648,7 +648,7 @@ export default function Register() {
             {isGoogleAuthEnabled() && (
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-200" />
+                  <div className="w-full border-t border-stone-200" />
                 </div>
                 <div className="relative flex justify-center text-sm">
                   <span className="bg-white px-3 text-stone-500">{pageT('orSeparator') || 'ou'}</span>
@@ -667,7 +667,7 @@ export default function Register() {
                   className={`relative flex items-center justify-center p-4 border-2 rounded-lg cursor-pointer transition-all ${
                     formData.user_type === 'client' 
                       ? 'border-orange-500 bg-orange-50' 
-                      : 'border-gray-300 hover:border-gray-400'
+                      : 'border-stone-300 hover:border-stone-400'
                   }`}
                 >
                   <input
@@ -682,8 +682,8 @@ export default function Register() {
                   />
                   <div className="text-center">
                     <div className="text-2xl mb-2"><IconePage nom={pagePlan.clientIcon} role="carteUserType" /></div>
-                    <span className="text-sm font-medium text-gray-700">{t('client')}</span>
-                    <p className="text-xs text-gray-500 mt-1">{t('iAmClient')}</p>
+                    <span className="text-sm font-medium text-stone-700">{t('client')}</span>
+                    <p className="text-xs text-stone-500 mt-1">{t('iAmClient')}</p>
                   </div>
                 </label>
                 
@@ -692,7 +692,7 @@ export default function Register() {
                   className={`relative flex items-center justify-center p-4 border-2 rounded-lg cursor-pointer transition-all ${
                     formData.user_type === 'worker' 
                       ? 'border-orange-500 bg-orange-50' 
-                      : 'border-gray-300 hover:border-gray-400'
+                      : 'border-stone-300 hover:border-stone-400'
                   }`}
                 >
                   <input
@@ -707,8 +707,8 @@ export default function Register() {
                   />
                   <div className="text-center">
                     <div className="text-2xl mb-2"><IconePage nom={pagePlan.workerIcon} role="carteUserType" /></div>
-                    <span className="text-sm font-medium text-gray-700">{t('worker')}</span>
-                    <p className="text-xs text-gray-500 mt-1">{t('iAmWorker')}</p>
+                    <span className="text-sm font-medium text-stone-700">{t('worker')}</span>
+                    <p className="text-xs text-stone-500 mt-1">{t('iAmWorker')}</p>
                   </div>
                 </label>
               </div>
@@ -727,7 +727,7 @@ export default function Register() {
                 </label>
                 {activeCountry && (
                   <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-sm border text-xs font-medium whitespace-nowrap ${
-                    detectedCountry ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-700'
+                    detectedCountry ? 'bg-green-50 border-green-200 text-green-700' : 'bg-stone-50 border-stone-200 text-stone-700'
                   }`}>
                     <CountryDisplay countryCode={activeCountry.code} className="inline-flex align-middle" />
                   </span>
@@ -872,7 +872,7 @@ export default function Register() {
                   }}
                 />
               </div>
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-stone-500">
                 {pageT('phoneFormatHint')}: {phoneNumberExample(activePhonePrefix || '---')}
               </p>
             </div>
@@ -892,7 +892,7 @@ export default function Register() {
                 value={formData.password}
                 onChange={handleChange}
               />
-              <p className="mt-1 text-xs text-gray-500">{t('passwordTooShort')}</p>
+              <p className="mt-1 text-xs text-stone-500">{t('passwordTooShort')}</p>
             </div>
 
             {/* Code de parrainage (optionnel) — réservé aux TRAVAILLEURS :
@@ -915,7 +915,7 @@ export default function Register() {
                   value={formData.referral_code || ''}
                   onChange={handleChange}
                 />
-                <p className="mt-1 text-xs text-gray-500">{pageT('referralCodeHelp')}</p>
+                <p className="mt-1 text-xs text-stone-500">{pageT('referralCodeHelp')}</p>
               </div>
             )}
           </div>
@@ -968,7 +968,7 @@ export default function Register() {
                 onChange={handleChange}
                 className="mt-1 h-4 w-4 rounded-sm border-stone-300 text-orange-600 focus:ring-orange-500"
               />
-              <span className="text-sm text-gray-700">{pageT('legalConsentLabel')}</span>
+              <span className="text-sm text-stone-700">{pageT('legalConsentLabel')}</span>
             </label>
             <p className="text-xs text-stone-600">{pageT('legalContactLine')}</p>
           </div>

@@ -48,21 +48,21 @@ import BoutonPartageMission from './BoutonPartageMission';
 // SkeletonLoader.js, qui réplique ces trois rangées pour que le passage
 // squelette → résultats ne déplace pas le pied de page ancré).
 const IconeEpingle = () => (
-  <svg className="h-4 w-4 shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+  <svg className="h-4 w-4 shrink-0 text-stone-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 21s-6.5-5.6-6.5-10.5a6.5 6.5 0 1 1 13 0C18.5 15.4 12 21 12 21z" />
     <circle cx="12" cy="10.5" r="2.2" />
   </svg>
 );
 
 const IconeCalendrier = () => (
-  <svg className="h-4 w-4 shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+  <svg className="h-4 w-4 shrink-0 text-stone-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
     <rect x="3.5" y="5" width="17" height="15" rx="2.5" />
     <path strokeLinecap="round" d="M8 3.5v3M16 3.5v3M3.5 10h17" />
   </svg>
 );
 
 const IconeEtiquette = () => (
-  <svg className="h-4 w-4 shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+  <svg className="h-4 w-4 shrink-0 text-stone-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
     <path strokeLinecap="round" strokeLinejoin="round" d="M20.5 12.6 12.6 20.5a2 2 0 0 1-2.8 0L3.5 14.2V3.5H14l6.5 6.5a2 2 0 0 1 0 2.6z" />
     <circle cx="8" cy="8" r="1.4" />
   </svg>
@@ -162,7 +162,7 @@ export function JobCard({ job, user, userType, appliedJobIds, t }) {
           {/* Titre + état, sur une ligne qui se replie : mêmes hauteurs de
               ligne que le squelette (titre text-lg, pastille 24 px). */}
           <div className="mb-2 flex flex-wrap items-center gap-3">
-            <h3 className="text-lg font-semibold text-gray-900">{job.title}</h3>
+            <h3 className="text-lg font-semibold text-stone-900">{job.title}</h3>
             {/* L'ÉTAT, PAR LA COULEUR : la pastille était orange POUR TOUS les
                 états — « Terminée », « Annulée » et « Ouverte » avaient la même
                 teinte, donc la couleur ne disait rien et il fallait lire le mot.

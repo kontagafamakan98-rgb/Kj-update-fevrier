@@ -116,7 +116,7 @@ export const LIEN_EVITEMENT_CLASS = 'lien-evitement';
 export const PIED_CLASS = 'border-t verre-barre';
 export const PIED_INTERIEUR_CLASS = `${CONTENEUR_CLASS} py-4 space-y-3`;
 export const PIED_ADRESSE_CLASS =
-  'not-italic flex flex-wrap items-center justify-center md:justify-end gap-x-4 gap-y-2 text-xs text-gray-600';
+  'not-italic flex flex-wrap items-center justify-center md:justify-end gap-x-4 gap-y-2 text-xs text-stone-700';
 // ── LES ENCRES DU PIED DE PAGE, MESURÉES SUR LA VITRE (27/10/2026) ────────
 // Le pied de page est du VERRE lui aussi (`PIED_CLASS` : `border-t verre-barre`),
 // donc ses liens ne sont pas posés sur du papier : la surface qu'ils peignent

@@ -296,7 +296,7 @@ export default function Navbar() {
                     chacun avec son écouteur de clic extérieur — c'est ce
                     nombre qui faisait disparaître l'appui avant le `click`. */}
                 <NotificationBell />
-                <Link to="/profile" className="text-gray-700 hover:text-orange-900 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                <Link to="/profile" className="text-stone-700 hover:text-orange-900 px-3 py-2 rounded-md text-sm font-medium transition-colors">
                   {t('profile')}
                 </Link>
                 <button onClick={handleLogout} className="bg-orange-700 hover:bg-orange-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
@@ -305,7 +305,7 @@ export default function Navbar() {
               </div>
             ) : (
               <div className="flex items-center space-x-4">
-                <Link to="/login" className="text-gray-700 hover:text-orange-900 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                <Link to="/login" className="text-stone-700 hover:text-orange-900 px-3 py-2 rounded-md text-sm font-medium transition-colors">
                   {t('login')}
                 </Link>
                 <Link to="/register" className="bg-orange-700 hover:bg-orange-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
@@ -334,7 +334,7 @@ export default function Navbar() {
                  fond, et le seul moyen de refermer le menu était de toucher une
                  zone grise sans commande. Le bouton reste sous le tiroir
                  (`z-50` tous les deux) : il ne passe pas devant son contenu. */
-              className="relative z-50 min-h-[44px] min-w-[44px] text-gray-700 hover:text-orange-900 p-2 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-orange-500"
+              className="relative z-50 min-h-[44px] min-w-[44px] text-stone-700 hover:text-orange-900 p-2 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-orange-500"
             >
               {/* Le dessin vient du registre du chrome : c'est lui qui porte les
                   jointures, les bouts et `aria-hidden`. Deux tracés écrits ici
@@ -354,14 +354,14 @@ export default function Navbar() {
                 (`overflow: hidden`), mais la chaîne de défilement remonte quand
                 même au document sur iOS sans cette borne. */}
             <div className="max-h-[calc(100vh-4rem)] overflow-y-auto overscroll-contain px-3 pt-3 pb-6 space-y-2">
-              <div className="rounded-xl border border-gray-200 px-3 py-3">
+              <div className="rounded-xl border border-stone-200 px-3 py-3">
                 {/* Le tiroir mobile ne porte PLUS son propre contrôle : il monte le
                     MÊME composant que la barre du haut (`LanguageSelector`), donc
                     le même menu, la même liste et le même comportement d'appui
                     extérieur. Un `<select>` natif d'un côté et un menu déroulant
                     de l'autre donnaient deux contrôles de formes différentes pour
                     un seul choix — et deux comportements à tenir d'accord. */}
-                <span className="block text-xs font-medium text-gray-500 mb-2">{t('languageLabel')}</span>
+                <span className="block text-xs font-medium text-stone-700 mb-2">{t('languageLabel')}</span>
                 <LanguageSelector
                   showDropdown={true}
                   showFlags={true}
@@ -372,19 +372,19 @@ export default function Navbar() {
 
               {user ? (
                 <>
-                  <Link to="/dashboard" className="block rounded-xl text-gray-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/dashboard" className="block rounded-xl text-stone-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('dashboard')}
                   </Link>
-                  <Link to="/jobs" className="block rounded-xl text-gray-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/jobs" className="block rounded-xl text-stone-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('jobs')}
                   </Link>
-                  <Link to="/messages" className="block rounded-xl text-gray-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/messages" className="block rounded-xl text-stone-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('messages')}
                   </Link>
-                  <Link to="/profile" className="block rounded-xl text-gray-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/profile" className="block rounded-xl text-stone-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('profile')}
                   </Link>
-                  <Link to={versSupport} className="block rounded-xl text-gray-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to={versSupport} className="block rounded-xl text-stone-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('support')}
                   </Link>
                   <div className="pt-2">
@@ -398,22 +398,22 @@ export default function Navbar() {
                   {/* Les mêmes entrées publiques que sur grand écran : le menu
                       mobile d'un visiteur non connecté ne doit pas être plus
                       pauvre que la barre du haut. */}
-                  <Link to="/jobs" className="block rounded-xl text-gray-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/jobs" className="block rounded-xl text-stone-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('jobs')}
                   </Link>
-                  <Link to="/how-it-works" className="block rounded-xl text-gray-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/how-it-works" className="block rounded-xl text-stone-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('howItWorksTitle')}
                   </Link>
-                  <Link to="/about" className="block rounded-xl text-gray-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/about" className="block rounded-xl text-stone-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('aboutTitle')}
                   </Link>
-                  <Link to="/contact" className="block rounded-xl text-gray-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/contact" className="block rounded-xl text-stone-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('contactTitle')}
                   </Link>
-                  <Link to="/privacy" className="block rounded-xl text-gray-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/privacy" className="block rounded-xl text-stone-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('privacyTitle')}
                   </Link>
-                  <Link to="/login" className="block rounded-xl text-gray-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/login" className="block rounded-xl text-stone-700 hover:text-orange-900 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('login')}
                   </Link>
                   <Link to="/register" className="block rounded-xl bg-orange-700 hover:bg-orange-800 text-white px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>

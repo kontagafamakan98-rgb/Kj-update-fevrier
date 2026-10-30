@@ -91,6 +91,11 @@ const SURFACES_VERRE = [SABLE, ENCRE];
  * régression rende son rapport (1,54:1) au lieu d'un refus muet.
  */
 const ENCRES = {
+  // Les teintes CHAUDES désormais peintes (29/10/2026) : la barre du bas, son
+  // bouton de cloche et le pied de page quittent les gris froids pour
+  // `stone-700`, la même encre que les liens de la barre du haut. Elles sont
+  // MESURÉES comme les autres — déclarer une teinte ne la fait pas passer.
+  'stone-700': '#44403c',
   'gray-400': '#9ca3af',
   'gray-500': '#6b7280',
   'gray-600': '#4b5563',

@@ -103,21 +103,21 @@ const OwnerCommissionTiers = () => {
 
   return (
     <section className="carte-editoriale carte-publique mb-6" data-section="paliers-commission">
-      <h2 className="text-lg font-semibold text-gray-900">Paliers de commission</h2>
-      <p className="mt-1 text-sm text-gray-600">
+      <h2 className="text-lg font-semibold text-stone-900">Paliers de commission</h2>
+      <p className="mt-1 text-sm text-stone-600">
         Le barème suit le travailleur, pas la mission : un travailleur sans mission
         terminée paie le tarif de lancement, un habitué paie le tarif de fidélité,
         les autres paient le taux standard
         {tauxStandard !== null ? ` (${formaterTaux(tauxStandard)})` : ''}.
       </p>
 
-      {chargement && <p className="mt-4 text-sm text-gray-500">Chargement des paliers…</p>}
+      {chargement && <p className="mt-4 text-sm text-stone-500">Chargement des paliers…</p>}
       {erreur && <p role="alert" className="mt-4 text-sm text-red-700">{erreur}</p>}
       {message && <p className="mt-4 text-sm text-green-800">{message}</p>}
 
       {paliers && !chargement && (
         <form onSubmit={enregistrer} className="mt-4 space-y-4">
-          <label className="flex items-center gap-3 text-sm text-gray-800">
+          <label className="flex items-center gap-3 text-sm text-stone-800">
             <input
               type="checkbox"
               checked={paliers.actif}
@@ -127,7 +127,7 @@ const OwnerCommissionTiers = () => {
           </label>
 
           <div className="flex flex-wrap items-end gap-3">
-            <label className="grow text-sm text-gray-700">
+            <label className="grow text-sm text-stone-700">
               <span>Missions offertes au lancement</span>
               <input
                 type="number"
@@ -139,7 +139,7 @@ const OwnerCommissionTiers = () => {
                 onChange={(e) => modifier('lancement_missions', e.target.value)}
               />
             </label>
-            <label className="grow text-sm text-gray-700">
+            <label className="grow text-sm text-stone-700">
               <span>Commission de lancement (%)</span>
               <input
                 type="number"
@@ -154,7 +154,7 @@ const OwnerCommissionTiers = () => {
           </div>
 
           <div className="flex flex-wrap items-end gap-3">
-            <label className="grow text-sm text-gray-700">
+            <label className="grow text-sm text-stone-700">
               <span>Seuil de fidélité (missions terminées)</span>
               <input
                 type="number"
@@ -166,7 +166,7 @@ const OwnerCommissionTiers = () => {
                 onChange={(e) => modifier('recurrent_missions', e.target.value)}
               />
             </label>
-            <label className="grow text-sm text-gray-700">
+            <label className="grow text-sm text-stone-700">
               <span>Commission de fidélité (%)</span>
               <input
                 type="number"
@@ -180,7 +180,7 @@ const OwnerCommissionTiers = () => {
             </label>
           </div>
 
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-stone-500">
             Barème appliqué : de 0 à {Math.max(nombre(paliers.lancement_missions) - 1, 0)} mission(s)
             terminée(s) → {formaterTaux(paliers.lancement_taux_percent)} · jusqu’à{' '}
             {Math.max(nombre(paliers.recurrent_missions) - 1, nombre(paliers.lancement_missions))} →

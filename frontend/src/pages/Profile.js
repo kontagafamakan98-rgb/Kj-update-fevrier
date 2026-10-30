@@ -393,7 +393,7 @@ export default function Profile() {
         {cartePays && (
           <div className="carte-cotes border-t border-stone-200 py-6">
             <h2 className="titre-carte-app text-stone-900 mb-1">{t('location')}</h2>
-            <p className="mb-4 text-sm text-gray-500">
+            <p className="mb-4 text-sm text-stone-500">
               <CountryDisplay countryCode={user.country} className="inline-flex align-middle" />
             </p>
             <DeferredMap
@@ -659,7 +659,7 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
               className={CHAMP_TELEPHONE}
             />
           </div>
-          <p className="mt-1 text-sm text-gray-500">{t('phoneFormat')}: {getPhonePrefixByCountry(formData.country.toLowerCase())} {PHONE_NUMBER_MASK}</p>
+          <p className="mt-1 text-sm text-stone-500">{t('phoneFormat')}: {getPhonePrefixByCountry(formData.country.toLowerCase())} {PHONE_NUMBER_MASK}</p>
         </div>
 
         <div>
@@ -687,11 +687,11 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
 
       {profile?.user_type === 'worker' && (
         <div className="space-y-4">
-          <h3 className="text-lg font-medium text-gray-900">{pageT('professionalInfo')}</h3>
+          <h3 className="text-lg font-medium text-stone-900">{pageT('professionalInfo')}</h3>
           <div>
             <label htmlFor="bio" className="block text-sm font-semibold text-stone-800">{pageT('bio')}</label>
             <textarea id="bio" name="bio" autoComplete="off" rows={4} value={formData.bio} onChange={handleChange} placeholder={pageT('bioPlaceholder')} className={CHAMP} />
-            <p className="mt-1 text-sm text-gray-500">{pageT('bioHelp')}</p>
+            <p className="mt-1 text-sm text-stone-500">{pageT('bioHelp')}</p>
           </div>
 
           <div>
@@ -706,7 +706,7 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
               removeAriaPrefix={pageT('remove')}
               max={20}
             />
-            <p className="mt-1 text-sm text-gray-500">{pageT('skillsHelp')}</p>
+            <p className="mt-1 text-sm text-stone-500">{pageT('skillsHelp')}</p>
           </div>
         </div>
       )}
@@ -734,7 +734,7 @@ function WorkerProfileView({ profile, pageT, t }) {
 
         <div>
           <label className="block text-sm font-semibold text-stone-800">{pageT('yearsExperience')}</label>
-          <p className="mt-1 text-gray-900">{pageT('years', { count: profile.experience_years })}</p>
+          <p className="mt-1 text-stone-900">{pageT('years', { count: profile.experience_years })}</p>
         </div>
 
         <div>
@@ -750,7 +750,7 @@ function WorkerProfileView({ profile, pageT, t }) {
       {profile.description && (
         <div>
           <label className="block text-sm font-semibold text-stone-800">{pageT('description')}</label>
-          <p className="mt-1 text-gray-900">{profile.description}</p>
+          <p className="mt-1 text-stone-900">{profile.description}</p>
         </div>
       )}
     </div>
@@ -777,11 +777,11 @@ function WorkerProfileCreate({ onCreate, pageT }) {
 
   return (
     <div className="fond-sable p-6 rounded-lg">
-      <p className="text-gray-600 mb-4">{pageT('createWorkerProfileHelp')}</p>
+      <p className="text-stone-600 mb-4">{pageT('createWorkerProfileHelp')}</p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="profile_specialty_input" className="block text-sm font-medium text-gray-700 mb-2">{pageT('specialties')}</label>
+          <label htmlFor="profile_specialty_input" className="block text-sm font-medium text-stone-700 mb-2">{pageT('specialties')}</label>
           <TagInput
             inputId="profile_specialty_input"
             value={formData.specialties}
@@ -805,7 +805,7 @@ function WorkerProfileCreate({ onCreate, pageT }) {
 
         <div className="flex items-center">
           <input type="checkbox" id="availability" name="availability" autoComplete="off" checked={formData.availability} onChange={handleChange} className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-stone-300 rounded-sm" />
-          <label htmlFor="availability" className="ml-2 text-sm text-gray-700">{pageT('availableForProjects')}</label>
+          <label htmlFor="availability" className="ml-2 text-sm text-stone-700">{pageT('availableForProjects')}</label>
         </div>
 
         <button type="submit" className="bouton bouton-encre w-full">{pageT('createWorkerProfile')}</button>
@@ -835,7 +835,7 @@ function PortfolioManager({ images, uploading, onUpload, onRemove, t }) {
           ))}
         </div>
       ) : (
-        <p className="text-sm text-gray-500 mb-4">{t('portfolioEmpty')}</p>
+        <p className="text-sm text-stone-500 mb-4">{t('portfolioEmpty')}</p>
       )}
       <input
         ref={inputRef}
@@ -918,7 +918,7 @@ function ReferralCard({ referral, t, referredBy }) {
   return (
     <div>
       <h2 className="titre-carte-app text-stone-900 mb-2">{t('referralTitle')}</h2>
-      <p className="text-sm text-gray-500 mb-4">{t('referralText')}</p>
+      <p className="text-sm text-stone-500 mb-4">{t('referralText')}</p>
       {referredBy ? (
         <p className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
           {t('referralReferredNote')}
@@ -1030,7 +1030,7 @@ function FilleulsCard({ filleuls, t }) {
 
   return (
     <div className="mt-6">
-      <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+      <h3 className="text-sm font-semibold text-stone-900 mb-3 flex items-center">
         <Users className="h-4 w-4 mr-2" aria-hidden="true" />
         {t('filleulsTitle')}
         <span className="ml-2 rounded-sm bg-orange-100 text-orange-700 px-2 py-0.5 text-xs font-semibold">
@@ -1056,11 +1056,11 @@ function FilleulsCard({ filleuls, t }) {
                 </div>
               )}
               <div className="min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">
+                <p className="text-sm font-medium text-stone-900 truncate">
                   {`${filleul.first_name || ''} ${filleul.last_name || ''}`.trim() || t('filleulAnonymous')}
                 </p>
                 {formatDate(filleul.created_at) && (
-                  <p className="text-xs text-gray-500">{formatDate(filleul.created_at)}</p>
+                  <p className="text-xs text-stone-500">{formatDate(filleul.created_at)}</p>
                 )}
               </div>
             </div>
@@ -1070,7 +1070,7 @@ function FilleulsCard({ filleuls, t }) {
                   <CheckCircle2 className="inline h-4 w-4 mr-1" aria-hidden="true" /> {t('filleulFirstJobDone')}
                 </span>
               ) : (
-                <span className="inline-flex items-center text-xs text-gray-400">
+                <span className="inline-flex items-center text-xs text-stone-400">
                   {t('filleulFirstJobPending')}
                 </span>
               )}

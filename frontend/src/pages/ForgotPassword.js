@@ -279,10 +279,10 @@ const ForgotPassword = () => {
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 />
-                <p className="mt-2 text-xs text-gray-500">{t('forgotPasswordCodeHelp')}</p>
+                <p className="mt-2 text-xs text-stone-500">{t('forgotPasswordCodeHelp')}</p>
               </div>
 
-              <div className="flex items-center justify-between text-xs text-gray-500">
+              <div className="flex items-center justify-between text-xs text-stone-500">
                 <span>{cooldownSeconds > 0 ? interpolate(t('forgotPasswordResendIn'), { time: formatTime(cooldownSeconds) }) : t('forgotPasswordResendCode')}</span>
                 <span>{expiresInSeconds > 0 ? interpolate(t('forgotPasswordExpiresIn'), { time: formatTime(expiresInSeconds) }) : ''}</span>
               </div>

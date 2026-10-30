@@ -24,7 +24,7 @@ export const WORKER_LEVELS = {
   expert: { key: 'levelExpert', rank: 4, badgeClass: 'bg-orange-100 text-orange-700 border-orange-200' },
   confirmed: { key: 'levelConfirmed', rank: 3, badgeClass: 'bg-amber-100 text-amber-800 border-amber-200' },
   reliable: { key: 'levelReliable', rank: 2, badgeClass: 'bg-stone-100 text-stone-700 border-stone-200' },
-  beginner: { key: 'levelBeginner', rank: 1, badgeClass: 'bg-gray-100 text-gray-600 border-gray-200' },
+  beginner: { key: 'levelBeginner', rank: 1, badgeClass: 'bg-stone-100 text-stone-600 border-stone-200' },
 };
 
 const toNumber = (value, fallback = 0) => {
