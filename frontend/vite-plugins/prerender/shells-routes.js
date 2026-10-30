@@ -165,6 +165,28 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, pageSectio
       // Suspense (`JobsSkeleton`) — le paragraphe qui disparaît pendant le
       // chargement ne déplace pas la liste.
       + `<p class="${jobsPlan.introClass}">${esc(jobsT(jobsPlan.introKey))}</p>`
+      // ── LA PROMESSE D'ALERTE EMPLOI, DANS LE DOCUMENT SERVI (30/10/2026) ──
+      // Elle n'était peinte que par la PAGE, et seulement après deux
+      // conditions qu'un crawler ne remplit jamais : la réponse de /api/jobs
+      // (le titre de l'état vide) ou une session de travailleur (la carte
+      // interactive). Mesuré le 30/10/2026 sur le HTML pré-rendu de /jobs :
+      // 109 568 o, aucune occurrence de la promesse — donc ni le moteur ni la
+      // première image ne savaient que cette page OFFRE une veille.
+      //
+      // Le bloc est STATIQUE (aucun chiffre, aucune mission inventée : il dit
+      // ce que l'alerte fait, pas ce qu'elle contiendrait) et ses classes comme
+      // ses clés sont lues dans le plan, que src/pages/Jobs.js lit aussi : les
+      // deux canaux ne peuvent pas peindre deux blocs différents. Le
+      // garde-fou du corps déclaré (`exigerCorpsDeclare`) refuse un build où
+      // cette promesse manquerait.
+      + `<section class="${jobsPlan.alerteCarteClass}" aria-labelledby="alerte-emploi-promesse">`
+      + `<h2 id="alerte-emploi-promesse" class="${jobsPlan.alerteTitreClass}">${esc(jobsT(jobsPlan.alerteTitreKey))}</h2>`
+      + `<p class="${jobsPlan.alerteTexteClass}">${esc(jobsT(jobsPlan.alerteTexteKey))}</p>`
+      + `<div class="${jobsPlan.alerteActionsClass}">`
+      + `<a href="/register?type=worker" class="${jobsPlan.alerteBoutonClass}">${esc(jobsT(jobsPlan.alerteInscriptionKey))}</a>`
+      + `<a href="/login" class="${jobsPlan.alerteBoutonClairClass}">${esc(jobsT(jobsPlan.alerteConnexionKey))}</a>`
+      + `</div>`
+      + `</section>`
       + `</div>`,
     // Login : réplique la PAGE COMPLÈTE (h2 + formulaire : email,
     // mot de passe, bouton Connexion, Google, mention légale, lien
