@@ -42,27 +42,53 @@
  * de « la page a régressé » ; le meilleur des 3 le peut.
  *
  * ── Les valeurs sont MESURÉES, pas choisies ────────────────────────────────
- * Relevé des rapports Lighthouse réellement archivés par les jobs de `main` et
- * de PR (artifacts `lighthouse-reports` : 3 runs par page et par job, agrégation
- * par MÉDIANE comme en CI). Valeurs CLS par run, 9 jobs de main + 8 jobs de PR :
+ * Une valeur par ROUTE, et pour chacune l'INSTRUMENT qui l'a produite : un
+ * chiffre sans son instrument se relit comme s'il venait d'ailleurs, et la
+ * plupart de ces lignes ne viennent justement PAS du job de CI — la passe
+ * Lighthouse n'audite que les pages publiques, sans session. Quatre
+ * instruments, nommés :
  *
- *   route             base        runs  valeurs mesurées            budget
- *   /                 prod          27  0,0000 ×27                  0,01
- *   /                 repli local   24  0,0000 ×24                  0,01
- *   /register         prod          27  0,0088 ×27                  0,015
- *   /forgot-password  prod          27  0,0000 ×27                  0,01
- *   /login            prod          18  0,0000 ×17, 0,1762 ×1       0,02
- *   /how-it-works     prod          18  0,0000 ×18                  0,01
- *   /support          prod          18  0,0000 ×18                  0,01
- *   /jobs             prod          27  0,0000 ×27                  0,01
- *   /dashboard        prod          27  0,0450 ×27                  0,06
- *   /payment          prod          18  0,0450 ×18                  0,07  (mesure navigateur 0,0611)
- *   /profile          prod          27  0,0450 ×27                  0,06
- *   /about            repli local    3  0,0000 ×3                   0,01
- *   /contact          repli local    3  0,0000 ×3                   0,01
- *   /privacy          repli local    3  0,0000 ×3                   0,01
+ *   Lighthouse CI   le job `lighthouse-ci` (`frontend/lighthouserc.cjs`) : 3 runs
+ *                   par page, artefacts `lighthouse-reports`, médiane des 3 ;
+ *   sonde CLS       `e2e/cls-coquille-react.spec.js` — le CLS de l'artefact
+ *                   SERVI, aux deux tailles (412×823 et 1350×940) ;
+ *   sonde cadres    `e2e/cadres-app.spec.js` — même protocole, sur la fixture
+ *                   connectée qu'aucune passe Lighthouse n'audite ;
+ *   repli local     Lighthouse, 3 runs, contre `scripts/vercel-rewrite-server.js`
+ *                   (le serveur qui rejoue les rewrites de `vercel.json`).
  *
- * Trois marges sont explicites, parce qu'elles ne se déduisent pas du chiffre :
+ *   route              instrument      mesure                                    plafond
+ *   /                  Lighthouse CI   51 runs (27 prod + 24 repli), 0,0000       0,01
+ *   /register          Lighthouse CI   27 runs, 0,0088 (0,0165 avant #19)         0,015
+ *   /forgot-password   Lighthouse CI   27 runs, 0,0000                            0,01
+ *   /login             Lighthouse CI   18 runs : 17 × 0,0000, 1 × 0,1762          0,02
+ *   /how-it-works      Lighthouse CI   18 runs, 0,0000                            0,01
+ *   /support           Lighthouse CI   18 runs, 0,0000                            0,01
+ *   /jobs              Lighthouse CI   27 runs, 0,0000 (0,1353 le 16/09)          0,01
+ *   /dashboard         Lighthouse CI   27 runs, 0,0450                            0,06
+ *   /profile           Lighthouse CI   27 runs, 0,0450                            0,06
+ *   /payment           sonde CLS       25 cas × 2 tailles, 0,0000 (30/10)         0,012
+ *   /messages          sonde cadres    2 tailles, 0,0043 au pire (07/10)          0,02
+ *   /create-job        sonde cadres    2 tailles, 0,0039 au pire (08/10)          0,02
+ *   /jobs/:id          sonde cadres    2 cas × 2 tailles, 0,0164 au pire (09/10)  0,04
+ *   /about             repli local     3 runs, 0,0000 (19/09)                     0,01
+ *   /contact           repli local     3 runs, 0,0000 (19/09)                     0,01
+ *   /privacy           repli local     3 runs, 0,0000 (19/09)                     0,01
+ *   /terms             aucune          rien de propre : 0,01 comme /privacy       0,01
+ *
+ * La colonne « plafond » EST `CLS_BUDGETS[route].max` : ce tableau décrit ce que
+ * la CI applique, il ne s'en souvient pas. Un test le relit
+ * (`lhci-cls-budgets.test.js`, « le tableau d'en-tête porte les plafonds en
+ * vigueur ») et refuse une route manquante comme un chiffre qui n'aurait bougé
+ * que d'un côté.
+ *
+ * Une ligne demande une note, parce que son instrument n'est pas celui de ses
+ * voisines : **Lighthouse CI n'a AUCUNE mesure propre de /payment**. Le job
+ * l'audite SANS session, la route est derrière une garde, donc sous ce nom il
+ * mesure /login (0,0093 le 29/10) — le plafond de 0,012 est celui de ce
+ * rendez-vous-là, et la route elle-même rend 0,0000 à la sonde (30/10).
+ *
+ * Quatre marges sont explicites, parce qu'elles ne se déduisent pas du chiffre :
  *   • /register 0,015 — la régression corrigée par #19 valait 0,0165 : elle DOIT
  *     rougir. La mesure est stable (0,0088 sur 27 runs), la marge est de 1,7×.
  *   • /login 0,02 — un run isolé sur 18 a mesuré 0,1762 (non reproduit ; la
@@ -70,11 +96,9 @@
  *     strictement, pour ne pas dépendre d'un run.
  *   • /dashboard, /profile 0,06 — mesurés à 0,0450 sur 27/27 runs
  *     (valeur EXACTE, décalage fixe) : la marge est de 1,33×.
- *   • /payment 0,07 — la sonde navigateur (le seul instrument qui mesure les
- *     DEUX tailles) rend 0,0611 en 1350×940 et 0,0000-0,0496 en 412×823 depuis
- *     le 28/10/2026 : le plancher de cette route n'est plus la page mais
- *     l'insertion du pied de page au démarrage (voir le bloc ci-dessous), donc
- *     0,06 est SOUS la mesure. 0,07 garde 1,15× sur le pire relevé.
+ *   • /payment 0,012 — 1,29× la valeur de /login que la passe mesure sous ce nom
+ *     (0,0093), et 12× la valeur de la route à sa propre sonde (0,0000). Il
+ *     descendra sur la mesure de /payment le jour où le job s'authentifiera.
  *
  * Le défaut /jobs du 16/09/2026 (0,1353, déplacement qu'aucun nœud n'expliquait)
  * n'apparaît plus : 0,0000 sur 27 runs depuis. Le plafond global de 0,15 le
@@ -295,115 +319,53 @@ const CLS_BUDGETS = {
   // CLS **0,0000**, aucune source, et les groupes à leur géométrie finale dès
   // la première peinture (451,02 px à x=264,66 · 405,69 px à x=877,31).
   //
-  // LE PLANCHER DE LA CI EST 0,0093, ET IL N'EST PAS LA BARRE (29/10/2026).
-  // Le plafond avait été posé à 0,0035, juste sous les 0,0039 retirés. La CI a
-  // rendu /payment desktop à 0,0093 DEUX FOIS DE SUITE (run relancé, même
-  // valeur) et NOMMÉ la source : `<footer.border-t.verre-barre>` 0×0 →
-  // 1350×84,7 px à (0, 855,3), à t=159,6 ms. Ce n'est pas un mouvement : la
-  // coquille peint le pied de page DANS le point de montage React, donc
-  // createRoot le détruit et le recrée à l'identique — Chrome compte la
-  // création comme une entrée (aucun rect précédent, donc départ 0×0). Le coût
-  // suit la part du pied de page qui ENTRE dans l'écran (84,7 px pour 940 :
-  // cadre `min-h-screen`, `main.flex-1`), et il existe sur main aussi, où le
-  // plafond de 0,02 le couvrait. Deux runs locaux ne l'avaient pas vu : le
-  // planché n'est donc pas une propriété du poste, et un plafond SOUS lui
-  // rougit au hasard des machines.
-  //
-  // Le plafond passe donc à 0,012 : au-dessus du plancher mesuré (1,29×) et
-  // toujours SOUS le 0,0274 du cadre mobile d'avant (2,28×), donc la
-  // régression d'origine rougit encore. Le retrait des deux groupes n'est plus
-  // prouvé par ce chiffre (0,0039 y serait noyé) mais par `Navbar.test.jsx`,
-  // qui exige l'ÉGALITÉ de la signature des commandes réservées avec celle
-  // d'un compte connecté — une classe ne le prouverait pas.
+  // ── LE « PLANCHER » DE 0,0093 N'EXISTE PAS (mesuré le 30/10/2026) ────────
+  // Le relevé de la CI du 29/10 — 0,0093, source `<footer>` 0×0 →
+  // 1350×84,7 px — avait été lu comme un PLANCHER : createRoot détruirait le
+  // pied de page de la coquille et le recréerait, et Chrome compterait
+  // l'insertion. DEUX MESURES le démentent :
+  //   • ce chiffre décrivait /login : la sonde mesurait /payment SANS session,
+  //     et /payment est derrière `ProtectedRoute` — il n'a jamais été une
+  //     mesure de cette route ;
+  //   • la destruction/recréation NE COÛTE RIEN : 3 runs × 2 tailles sur
+  //     l'artefact servi, /login ET /payment rendent **0,0000** avec ZÉRO
+  //     décalage, alors que la trace du DOM montre bien deux nœuds successifs
+  //     (le `<footer>` publié par la coquille, puis celui de React) et un nœud
+  //     de hauteur CONSTANTE (125 px). Chrome ne compte pas un nœud neuf posé à
+  //     la place d'un autre, à la même place, dans la même trame.
+  // Et l'architecture qui devait retirer ce mécanisme a été MESURÉE PUIS
+  // REFUSÉE : sortir le pied de page de `#root` (coquille : `.App` > colonne >
+  // `#root` > [lien d'évitement, navbar, `main`], puis `<footer>` DANS la
+  // colonne) et le faire RÉUTILISER par React au lieu de le recréer rend
+  // **0,0102** /login desktop, 0,0022 /login mobile, 0,0052 /payment mobile et
+  // 0,0011 /payment desktop — PIRE que les 0,0000 du dépôt, parce que le pied
+  // de page devient alors un élément flex de la colonne, recompté à chaque
+  // trame pendant que le parseur le remplit. Rien à garder : le plancher
+  // n'existait pas, et c'est la mesure qui le dit.
   '/payment': {
+    // Plafond INCHANGÉ à 0,012 — et ce n'est plus pour couvrir un plancher : la
+    // passe Lighthouse de la CI audite encore /payment SANS session, donc sous
+    // ce nom elle mesure /login, dont la valeur de CI (0,0093) doit rester sous
+    // le plafond. Le jour où cette passe s'authentifie (ou cesse de nommer
+    // /payment ce qu'elle ne mesure pas), le plafond pourra descendre sur ce que
+    // la route rend réellement.
     max: 0.012,
-    pireMediane: 0.0093,
+    // Le plus haut relevé de la ROUTE, sur l'artefact servi : 0,0000
+    // (`e2e/cls-coquille-react.spec.js`, 25 cas, 412×823 et 1350×940,
+    // 30/10/2026). Ce n'est pas un plancher : c'est ce que la page fait.
+    pireMediane: 0,
     mesure:
-      'PLANCHER DE LA CI, 29/10/2026 : /payment desktop rend **0,0093** deux fois de suite, source nommée '
-      + '`<footer>` 0×0 → 1350×84,7 px à (0, 855,3) à t=159,6 ms — le pied de page de la coquille, détruit et '
-      + 'recréé par createRoot (aucun rect précédent), compté pour la part qui entre dans l’écran. Plafond porté de '
-      + '0,0035 à **0,012** (1,29× au-dessus du plancher, 2,28× sous le 0,0274 d’avant). '
-      + 'MESURE LOCALE, MÊME JOUR, DÉCALAGE DES DEUX GROUPES DE LA BARRE RETIRÉ : 1350×940, compte travailleur, '
-      + 'artefact servi, CLS **0,0039 → 0,0000** (2 runs, aucune source rapportée, groupes à 451,02 px à '
-      + 'x=264,66 et 405,69 px à x=877,31 dès la première peinture) — mesure CONTREDITE par la CI sur le pied de '
-      + 'page, d’où le plafond ci-dessus. '
-      + 'MESURE PRÉCÉDENTE, CADRE PLEIN ÉCRAN AUX DEUX TAILLES : en 1350×940, CLS **0,0274 → 0,0039** sur les '
-      + 'DEUX branches de l’URL (6 runs mesurés sur l’artefact servi, pied de page à y=1 005 pour une fenêtre de '
-      + '940) ; le mobile est inchangé (0,0000, pied à y=1 004,33). '
-      + 'MESURE DU 28/10/2026, APRÈS LE CADRE PLEIN ÉCRAN EN MOBILE (`min-h-screen` sur le cadre de la route, '
-      + '`md:min-h-0` rendant au desktop son ancien `min-h-full`) : chunk retenu **0,0532 → 0,0000** en 412×823 '
-      + '(aucun décalage enregistré ; `main` 919 px PENDANT et APRÈS, pied à y=984, sous la ligne de flottaison), '
-      + 'branche « mission requise » **0,0496 → 0,0000**, branche « mission » 0,0000 ; desktop INCHANGÉ — chunk '
-      + 'retenu 0,0331, branches 0,0376, pied 157 px à y=772. La cause était le RÉTRÉCISSEMENT de la page '
-      + '(`main` 939,3 → 645,8 px, soit 293,5 px de remontée du pied), PAS sa hauteur : ramener son bloc de '
-      + 'maillage de 565 à 457 px n’avait pas déplacé le chiffre d’un millième. '
-      + 'MESURE PRÉCÉDENTE, APRÈS LE PIED DE PAGE RACCOURCI (bloc de maillage à UN flux en desktop : '
-      + 'le groupe cesse de peindre sa boîte, le titre passe au rang de ses liens, corps du bloc d’adresse) : '
-      + '`main` 718 px, pied 168 px à l’insertion, CLS **0,0376** sur les DEUX branches en 1350×940 '
-      + '(0,0611 avant), et 0,0331 pour le chunk retenu (dont 0,0293 de pied de page, 0,0505 avant) ; '
-      + 'mobile INCHANGÉ — 0,0496 (mission requise), 0,0000 (mission), 0,0532 (chunk retenu), bloc à 412 px. '
-      + 'Le mobile ne bouge pas parce que ses liens ne partagent pas de ligne (13 villes y prennent 5 lignes, '
-      + '23 guides 18). Ce qui reste nommé par la sonde : `<footer>` 0×0 → 1350×168 à (0, 772) — le pied de '
-      + 'page est INSÉRÉ quand le splash PWA rend la main, sur une page de 718 px de `main` pour une fenêtre '
-      + 'de 940 —, plus les deux groupes de la barre (0,0039, mesuré sur toutes les routes connectées). Le '
-      + 'plafond redescend de 0,07 à 0,06 : 1,60× de marge sur le pire relevé desktop. '
-      + 'MESURE PRÉCÉDENTE, SQUELETTE RÉDUIT À SA DESTINATION (28/10/2026, pied de 228 px) : la sonde des cadres rendait 0,0000 (mission, '
-      + '412×823), 0,0496 (mission requise, 412×823) et 0,0611 (les deux branches, 1350×940). Ce qui reste n’est '
-      + 'PLUS la page : les deux branches mesurent la MÊME valeur, et la branche qui ne peint aucun pulse la paie '
-      + 'aussi. Source nommée par la sonde : `<footer>` 0×0 → 1350×228 à (0, 712) au démarrage, plus les deux '
-      + 'groupes de la barre (0,0039, déjà mesuré sur toutes les routes connectées) — le pied de page est INSÉRÉ '
-      + 'quand le splash PWA rend la main, et sur une page courte (658 px de `main` ici) il tombe dans l’écran. '
-      + 'Le coût suit sa hauteur au carré ((228/940)² ≈ 0,058) : 141 px de pied donnaient 0,0470 le 17/10, 228 px '
-      + 'donnent 0,0611 — le levier était la HAUTEUR DU PIED DE PAGE, et il a été tiré le même jour. DEUX AUTRES ARCHITECTURES ONT ÉTÉ MESURÉES LE MÊME JOUR ET SONT PIRE : peindre la '
-      + 'coquille pendant le splash rend 0,1118 desktop / 0,6174 mobile (le pied de page devient VISIBLE à y=247 '
-      + 'puis il est chassé hors écran par le squelette) ; la variante « repli réduit » du 09/10 rendait 0,0801. '
-      + 'Le plafond ne peut donc pas redescendre à 0,06 : c’est SOUS la mesure, et le levier pour y arriver est la '
-      + 'HAUTEUR DU PIED DE PAGE (son bloc de maillage), pas cette page. 0,07 laissait 1,15× sur le pire relevé. '
-      + 'HISTORIQUE : 0,0450 sur 18 runs de main ; source NOMMÉE le 09/10/2026 par la sonde des cadres : le pied de page, '
-      + 'qui entre dans l’écran au swap repli → page. Cause corrigée (l’état de chargement de la page réservait '
-      + 'les cartes d’une branche qui ne les montre pas : 1 376,4 px de `main` pour une destination de 700,4 en '
-      + 'mobile). Après correctif, l’état de chargement fait la hauteur de sa destination (700,38 / 765,38 mobile, '
-      + '794 / 859 desktop) ; le pire relevé de la sonde vaut 0,0801, obtenu par la variante de repli RÉDUITE, '
-      +      'mesurée puis retirée (elle insérait le pied de page dans l’écran dès le chargement, hauteur transitoire '
-      + 'de 141 px avant la pose de la police) — le repli entier, lui, mesure 0,0579. '
-      + 'LA SONDE PERMANENTE, DEPUIS LE 09/10/2026 (`e2e/cadres-app.spec.js`, cas « chunk retenu » de /payment : '
-      + 'le chunk de la route est retenu puis relâché, donc c’est le repli de <Suspense> qui est mesuré), rejoue '
-      + 'cette route au même protocole que les routes de CADRES_APP : pied de page HORS écran pendant le '
-      + 'chargement aux DEUX tailles (y=1019 pour une fenêtre de 823, y=1004 pour 940), réserve peinte 758 / '
-      + '875 px, puis 765,4 / 859 à l’arrivée de la page — CLS 0,0218 mobile / 0,0132 desktop. Le TÉMOIN SANS LA '
-      + 'RÉSERVE, mesuré le même jour, laissait le pied de page VISIBLE en desktop pendant tout le chargement '
-      + '(y=859, déjà à sa place finale) pour 0,0148 : c’est lui qui a décidé la déclaration '
-      + '(`REGLES_DE_CHARGEMENT[’/payment’]`, src/config/app-cadres.js). Le pire relevé de la journée reste le '
-      + '0,0801 de la variante réduite, et le plafond de 0,06 n’a pas été touché. '
-      + 'LA SONDE PERMANENTE MESURE AUSSI LES DEUX BRANCHES DE LA PAGE (`/api/**` RETENU, donc l’état de '
-      + 'chargement DE LA PAGE, celui que le correctif du 09/10/2026 a rendu dépendant de la branche) : sur '
-      + '« mission requise » (aucun paramètre, la branche que publie la coquille) l’état de chargement fait '
-      + 'EXACTEMENT la hauteur de sa destination — 0,00 px d’écart sur `main` (700,38 mobile / 794 desktop), '
-      + 'AUCUN pulse, CLS 0,0188 / 0,0148 — quand le défaut d’origine réservait 1 376,4 px pour 700,4 ; sur la '
-      + 'branche « mission » (`?job_id=…`) le MÊME état de chargement réserve ses 12 pulses (1 876,8 px de '
-      + '`main` en mobile pour une destination de 1 048,9, CLS 0,0000 ; 1 159,25 pour 794 en desktop, CLS '
-      + '0,0288 à 0,0458 selon le run — la valeur varie, ses sources sont nommées par la sonde). '
-      + 'CE QUI RESTE UNE LIMITE MESURÉE : sur la branche « mission », le squelette est PLUS HAUT que sa '
-      + 'destination (les barres réservées dépassent le formulaire réel), donc la page se RÉTRÉCIT à l’arrivée '
-      + 'des données — c’est là que naît ce 0,0288-0,0458, à comparer au plafond de 0,06 (marge ~25 %). '
-      + 'La contrainte que la sonde interdit est l’inverse (réserver MOINS que sa destination : variante '
-      + 'réduite, 0,0801) ; réduire ce squelette-là sans passer sous le formulaire réel reste à mesurer. '
-      + 'RE-MESURE DU 17/10/2026, APRÈS LE PORT DU VOCABULAIRE D’ÉCRAN (bande d’identité, tuiles de '
-      + 'montant, cartes à filet) : le chunk retenu vaut 0,0484 mobile / 0,0131 desktop (pied hors '
-      + 'écran à y=1004,33 / 1004, réserve peinte 779,33 / 875 px, destination 645,83 / 794), la '
-      + 'branche « mission requise » 0,0451 / 0,0147 et la branche « mission » 0,0046 / 0,0470. Le '
-      + 'relâchement mobile passe de 0,0218 à 0,0484 parce que la destination a perdu 54,6 px — une '
-      + 'bande remplace une carte ombrée, et la carte « mission requise » lit le rembourrage de '
-      + '`.carte-publique`. Le plafond de 0,06 n’a PAS bougé : la marge tombe de 1,75× à 1,24×, et '
-      + 'c’est ce chiffre-là que la prochaine retouche de cette page doit regarder avant d’en retirer '
-      + 'de la hauteur. '
-      + 'PREMIÈRE MESURE DU 28/10/2026, APRÈS LE BLOC DE MAILLAGE DU PIED DE PAGE : la branche « mission » valait '
-      + '0,0909 desktop (pied de 193 px au lieu de 141, destination 682 px, 492 px de déplacement) et le plafond '
-      + 'avait été relevé à 0,10 ; la redirection sans compte, qui valait 0,3770, est CORRIGÉE (0 décalage) et non '
-      + 'budgétée. LE SQUELETTE N’ÉTAIT PAS LE COUPABLE DE CES 492 px : la page peignait le formulaire réel ET le '
-      + 'squelette qui le représente, donc l’état de chargement DOUBLAIT son contenu. Il le REMPLACE désormais '
-      + '(cf. src/pages/Payment.js et PaymentContentSkeleton, qui tient la grille `lg:grid-cols-3` de la page) — '
-      + 'mesuré : `main` 658 → 658 px (Δ 0,00) en desktop et 1 015,33 → 966,61 en mobile',
+      'MESURE DU 30/10/2026, ARTEFACT SERVI, 412×823 ET 1350×940 : coquille **0,0000** · React **0,0000**, '
+      + 'AUCUN décalage des deux côtés (route conservée). Le 0,0093 du 29/10 est RETIRÉ de cette entrée : il '
+      + 'décrivait /login (sonde sans session) et le mécanisme qu’il nommait — createRoot détruisant puis '
+      + 'recréant le pied de page — mesure 0 décalage sur 3 runs × 2 tailles, avec un `<footer>` de hauteur '
+      + 'constante pendant que son enfant passe de la coquille à React ; l’architecture qui devait supprimer ce '
+      + 'mécanisme a été mesurée PIRE (0,0102 /login desktop, 0,0052 /payment mobile) puis REFUSÉE. '
+      + 'HISTORIQUE CONSERVÉ : cadre plein écran en desktop 0,0274 → 0,0039 (pied à y=1 005 pour une fenêtre de '
+      + '940) ; chunk retenu et branches de /payment 0,0532 → 0,0000 en mobile (le squelette DOUBLAIT la page : '
+      + '`main` 939,3 → 645,8 px) ; bloc de maillage du pied de page ramené à un flux en desktop (0,0611 → '
+      + '0,0376, plafond de 0,07 à 0,06) ; décalage des deux groupes de la barre retiré (0,0039 → 0,0000, '
+      + '`sessionProbable` et disposition connectée réservée en `invisible`).',
   },
   '/profile': { max: 0.06, pireMediane: 0.045, mesure: '0,0450 sur 27 runs' },
   // Route CONNECTÉE qu'AUCUNE passe Lighthouse n'audite (`/messages` n'est pas

@@ -201,14 +201,35 @@ redémarrage.
 | `kojo_missions_ouvertes` | gauge | Missions `open` en base, non supprimées. **0 = place de marché vide**, donc aucun effet de réseau, aucune fiche à indexer et un revenu nul |
 | `kojo_alertes_emploi{origine="ville\|metier\|directe\|inconnue"}` | gauge | Veilles emploi actives par provenance. Les quatre séries sont **toujours** publiées, zéro compris : une série qui disparaîtrait à zéro se lirait comme une provenance qui n'existe pas |
 | `kojo_alertes_emploi_hors_vocabulaire` | gauge | Veilles dont `origin` n'appartient pas au vocabulaire déclaré (`ORIGINES_ALERTE` + `inconnue`). Comptées **à part**, jamais repliées dans `inconnue` : ce serait faire passer une donnée écrite de travers pour une absence |
+| `kojo_alertes_emploi_plus_recente_timestamp_seconds` | gauge | Date de création de la veille la plus récente, en secondes epoch. **0 = aucune veille datée** (jamais « maintenant »). L'âge se lit `time() - valeur` : c'est lui qui distingue une acquisition qui **tarit** d'un total stable |
 
-Les deux familles de veilles viennent aussi de la BASE, lues par la route dans la
-même passe que le corpus : `kojo_job_alerts.compter_par_origine()` lit `origin`
-de chaque veille (une par compte, donc borné par le nombre de comptes en veille),
-une valeur inconnue ne crée **pas** d'étiquette — l'étiquette est une constante,
-donc la cardinalité est de quatre — et une lecture en panne **omet** la famille
-plutôt que de publier quatre zéros, qui se liraient comme un échec d'acquisition
-alors que c'en est un de lecture.
+Les trois familles de veilles viennent aussi de la BASE, lues par la route dans la
+même passe que le corpus : `kojo_job_alerts.compter_par_origine()` lit `origin` et
+`created_at` de chaque veille (une par compte, donc borné par le nombre de comptes
+en veille), une valeur inconnue ne crée **pas** d'étiquette — l'étiquette est une
+constante, donc la cardinalité est de quatre — et une lecture en panne **omet** la
+famille plutôt que de publier quatre zéros, qui se liraient comme un échec
+d'acquisition alors que c'en est un de lecture.
+
+La date de la plus récente est publiée **parce que les totaux ne suffisent pas** :
+quatre séries stables disent la même chose qu'il entre une veille par jour ou que
+la dernière date de six semaines. Trois règles, et aucune n'est cosmétique :
+
+- c'est la date d'**ACQUISITION** (`created_at`, posé par `$setOnInsert`), pas
+  celle du dernier réglage : régler sa ville ne rajeunit pas une acquisition ;
+- elle porte sur la **même population** que les compteurs — aucun filtre sur
+  `active`, une veille coupée reste une acquisition —, sinon les deux chiffres
+  décriraient deux corpus et l'écart serait inexplicable ;
+- `0` veut dire **JAMAIS**, et c'est pour ça que la série porte une date et non
+  un âge calculé au scrape : un âge vaudrait 0 aussi bien pour « créée à
+  l'instant » que pour « aucune veille », et l'age d'un corpus vide est l'infini,
+  pas zéro. `time() - 0` vaut l'infini, donc une acquisition tarie **ou jamais
+  démarrée** se voit. Une date illisible sur un document importé est ignorée
+  plutôt que datée d'office, et une date sans fuseau est ramenée à UTC.
+
+Alerte type : `time() - kojo_alertes_emploi_plus_recente_timestamp_seconds >
+30 * 86400` (aucune veille créée depuis un mois, corpus vide compris, puisque la
+valeur vaut alors 0).
 
 C'est la seule famille qui vient de la BASE : la route fait un `count_documents`
 indexé au moment du scrape (une lecture toutes les 30 s), et `kojo_metrics`

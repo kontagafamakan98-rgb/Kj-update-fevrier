@@ -130,30 +130,43 @@ ORIGINE_MAX = 20
 
 
 # Où se lit ce que les pages ville et métier ont produit : quatre séries fixes,
-# plus le nombre de valeurs HORS vocabulaire. `origin` est écrit par
-# `$setOnInsert` (régler une veille ne réécrit pas son acquisition), donc une
-# provenance ne peut pas être réécrite par une visite ultérieure ; elle ne peut
-# donc que venir d'une écriture hors de ce module (migration, correction à la
-# main), et c'est pour ça qu'elle est comptée À PART au lieu d'être repliée
-# dans « inconnue » — replier ferait passer une donnée fausse pour une absence.
+# plus le nombre de valeurs HORS vocabulaire, plus la DATE de la veille la plus
+# récente. `origin` est écrit par `$setOnInsert` (régler une veille ne réécrit
+# pas son acquisition), donc une provenance ne peut pas être réécrite par une
+# visite ultérieure ; elle ne peut donc que venir d'une écriture hors de ce
+# module (migration, correction à la main), et c'est pour ça qu'elle est
+# comptée À PART au lieu d'être repliée dans « inconnue » — replier ferait
+# passer une donnée fausse pour une absence.
 async def compter_par_origine() -> dict:
-    """Nombre de veilles par provenance, et nombre de provenances inconnues.
+    """Nombre de veilles par provenance, hors vocabulaire, et la plus récente.
 
-    Lit chaque document de `job_alerts` une fois (`origin` seul) : une veille
-    par compte, donc le corpus est borné par le nombre de comptes en veille. Le
-    champ absent — une version du client d'avant le champ — va dans
-    ``inconnue`` ; une valeur qui n'appartient PAS au vocabulaire ne va nulle
-    part dans les quatre séries et se publie à part.
+    Lit chaque document de `job_alerts` une fois (`origin` et `created_at`
+    seuls) : une veille par compte, donc le corpus est borné par le nombre de
+    comptes en veille. Le champ absent — une version du client d'avant le
+    champ — va dans ``inconnue`` ; une valeur qui n'appartient PAS au
+    vocabulaire ne va nulle part dans les quatre séries et se publie à part.
+
+    La DATE de la plus récente est le fait qui manque aux totaux : quatre
+    séries stables ne disent pas si l'acquisition tourne encore ou si elle
+    s'est tarie il y a six semaines. Elle est prise sur la MÊME population que
+    les compteurs (aucun filtre sur `active` — une veille coupée reste une
+    acquisition), et sur `created_at`, posé par `$setOnInsert` : c'est la date
+    d'ACQUISITION, pas celle du dernier réglage, comme `origin`.
 
     Returns:
-        dict: ``{"par_origine": {origine: n, …}, "hors_vocabulaire": n}``, avec
-            les QUATRE origines TOUJOURS présentes, à 0 comprises — une série
-            qui disparaîtrait à zéro se lirait comme une provenance qui
-            n'existe pas, alors que c'est justement la question posée.
+        dict: ``{"par_origine": {origine: n, …}, "hors_vocabulaire": n,
+            "plus_recente": datetime|None}``, avec les QUATRE origines
+            TOUJOURS présentes, à 0 comprises — une série qui disparaîtrait à
+            zéro se lirait comme une provenance qui n'existe pas, alors que
+            c'est justement la question posée. ``plus_recente`` vaut ``None``
+            quand aucune veille ne porte de date lisible (corpus vide, ou
+            documents importés sans le champ) : l'appelant publie alors 0, qui
+            veut dire « jamais », jamais « maintenant ».
     """
     comptes = {origine: 0 for origine in ORIGINES_COMPTEES}
     hors = 0
-    async for document in db[COLLECTION].find({}, {"origin": 1}):
+    plus_recente: Optional[datetime] = None
+    async for document in db[COLLECTION].find({}, {"origin": 1, "created_at": 1}):
         origine = _texte(document.get("origin"), ORIGINE_MAX).lower()
         if not origine:
             comptes[ORIGINE_ABSENTE] += 1
@@ -161,7 +174,21 @@ async def compter_par_origine() -> dict:
             comptes[origine] += 1
         else:
             hors += 1
-    return {"par_origine": comptes, "hors_vocabulaire": hors}
+        # `_instant` rend aussi une date SANS fuseau (chaîne ISO importée) :
+        # comparer un naïf à un averti lèverait, donc tout est ramené à UTC
+        # avant le `max`. Une date illisible ne vaut PAS « maintenant » — elle
+        # ne compte pas, sinon une donnée de travers daterait l'acquisition.
+        creee = _instant(document.get("created_at"))
+        if creee is not None:
+            if creee.tzinfo is None:
+                creee = creee.replace(tzinfo=timezone.utc)
+            if plus_recente is None or creee > plus_recente:
+                plus_recente = creee
+    return {
+        "par_origine": comptes,
+        "hors_vocabulaire": hors,
+        "plus_recente": plus_recente,
+    }
 
 
 def _base_publique() -> str:

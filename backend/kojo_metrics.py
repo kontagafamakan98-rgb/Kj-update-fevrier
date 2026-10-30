@@ -367,6 +367,21 @@ def rendre(corpus: Optional[dict] = None) -> str:
             "Veilles dont la provenance n'appartient pas au vocabulaire declare.",
             alertes.get("hors_vocabulaire"),
         )
+        # LA FRAICHEUR DE L'ACQUISITION. Quatre totaux stables ne disent pas si
+        # les pages ville et metier produisent encore : un corpus de 40 veilles
+        # dit la meme chose qu'il en rentre une par jour ou que la derniere date
+        # de six semaines. La valeur est la DATE (secondes epoch) et non un age
+        # calcule ici : une date ne bouge que si une veille est creee, alors
+        # qu'un age change a chaque scrape sans que rien ne se passe, et il ne
+        # peut pas distinguer « creee a l'instant » de « aucune veille » — les
+        # deux vaudraient 0. 0 veut donc dire JAMAIS (aucune veille datee), et
+        # l'age se lit `time() - valeur`, qui vaut alors l'infini : une
+        # acquisition tarie se voit, y compris quand elle n'a jamais demarre.
+        jauge(
+            "kojo_alertes_emploi_plus_recente_timestamp_seconds",
+            "Creation de la veille emploi la plus recente (0 = aucune). Age = time() - valeur.",
+            _epoch(alertes.get("plus_recente")),
+        )
 
     # Le format texte se termine par un saut de ligne : un corps sans lui est
     # encore lisible, mais un client strict peut refuser la derniere ligne.

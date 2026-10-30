@@ -16,8 +16,26 @@ import {
 // budgets divergeraient en silence.
 import budgets from '../scripts/lhci-cls-budgets.cjs';
 import { shellFileFor } from '../scripts/site-meta.js';
+import { connexionALaFixture } from './helpers/parcours-carte.js';
 
 const CLS_BUDGETS = budgets.CLS_BUDGETS;
+
+/**
+ * LES ROUTES DE `ROUTES` QUI SONT DERRIÈRE `ProtectedRoute` (`src/App.js`).
+ *
+ * Une seule aujourd'hui : `/payment`, enveloppée par `<ProtectedRoute>` au
+ * montage de l'application. Sans session, la navigation aboutit sur `/login` —
+ * et la sonde mesurait alors l'écran de connexion en l'appelant `/payment`, sous
+ * le plafond de la page de paiement (constaté le 30/10/2026 : le relevé le
+ * journalisait — « redirigé vers /login » — sans jamais le refuser).
+ *
+ * Cette liste ne fait pas la garantie à elle seule : le cas refuse désormais
+ * TOUTE peinture qui n'a pas abouti sur sa route, route par route, donc une
+ * page qui se mettrait à exiger une session sans être déclarée ici rougira au
+ * lieu de mesurer /login en silence. Elle dit seulement pour lesquelles la
+ * sonde doit d'abord ouvrir une session.
+ */
+const ROUTES_DERRIERE_UNE_SESSION = ['/payment'];
 
 /**
  * LA sonde de STABILITÉ VERTICALE : combien le montage de React déplace-t-il la
@@ -106,6 +124,14 @@ async function relever(browser, route, { peinture, viewport }) {
     // AVANT la navigation : les décalages du premier paint seraient enregistrés
     // avant que l'observateur ne les écoute (il observe avec `buffered: true`).
     await page.addInitScript(ESPION_CLS);
+    // La session s'ouvre AVANT la navigation mesurée, et seulement pour la
+    // peinture RÉELLE : la coquille est du HTML statique servi par le rewrite,
+    // elle ne passe par aucun garde. Le document de la page mesurée est un
+    // document NEUF, donc son `window.__kojoCls` ne garde rien du login — c'est
+    // la navigation de `page.goto(route)` qui remet le compteur à zéro.
+    if (peinture === 'reelle' && ROUTES_DERRIERE_UNE_SESSION.includes(route)) {
+      await connexionALaFixture(page);
+    }
     await page.goto(route);
     // La mise en page doit se stabiliser, PUIS la fenêtre de session se fermer
     // (1 s sans décalage) pour que le relevé couvre tout le chargement : c'est
@@ -150,6 +176,23 @@ test.describe('Parcours E2E — le CLS de chaque route pré-rendue, coquille pui
           reelle.fcp,
           `${route} (${taille}) : premier paint absent dans la navigation réelle — le CLS relevé ne décrit rien`
         ).not.toBeNull();
+
+        // ── Anti-faux-vert n° 2 : la page MESURÉE est bien la route ───────
+        // Sans ce refus, une route derrière `ProtectedRoute` mesurée sans
+        // session rendait le CLS de /login sous le plafond de sa propre page :
+        // le chiffre était vert, et il ne décrivait pas la page nommée.
+        for (const [peinture, releve] of [
+          ['coquille', coquille],
+          ['React', reelle],
+        ]) {
+          expect(
+            releve.url,
+            `${route} (${taille}) : la peinture « ${peinture} » a abouti sur ${releve.url} au lieu de ${route} — ` +
+              'le CLS mesuré est celui d’une AUTRE page (une route protégée sans session aboutit sur /login) ' +
+              'sous le plafond de celle que la sonde nomme. Ouvrir la session avant la navigation ' +
+              '(ROUTES_DERRIERE_UNE_SESSION), pas élargir le budget.'
+          ).toBe(route);
+        }
 
         // ── Le relevé AVANT le verdict : un rouge doit être réparable ────
         console.log(
