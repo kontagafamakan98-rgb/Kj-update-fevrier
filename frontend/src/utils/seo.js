@@ -1,13 +1,23 @@
 import { useEffect } from 'react';
 // Le planificateur de vue vit dans `vue-de-page.js` et non dans
-// `analytics.js` : ce module est appelé À CHAQUE navigation, y compris par un
+// `analytics.js` : ce module est appelé à CHAQUE navigation, y compris par un
 // visiteur qui n'a jamais accepté la mesure, et il ne doit donc pas entraîner
 // le code d'injection des fournisseurs dans le JS initial (mesuré : 1,5 Ko gzip,
 // 30/10/2026).
 import { notifierTitreDePage } from './vue-de-page';
 import { ogCardFor } from '../config/og-cards';
 import { pageMetaKeys } from '../config/page-meta';
+import { cheminSansPrefixe } from '../config/langues-indexees';
 import { useLanguage } from '../contexts/LanguageContext';
+
+// Le chemin de la route SANS son préfixe de langue : les tables de textes et de
+// cartes sont indexées par la route (`/jobs`), pas par la langue. Depuis le
+// 30/10/2026 un document anglais vit à `/en/jobs` (`basename` du routeur) : sans
+// ce retrait, la page anglaise n'aurait trouvé ni ses textes ni sa carte et se
+// serait annoncée avec le titre et le visuel génériques — un document pré-rendu
+// juste, écrasé au montage par du générique.
+const cheminSansLangue = () =>
+  typeof window === 'undefined' ? undefined : cheminSansPrefixe(window.location.pathname);
 
 // SEO par route (SPA) : met à jour document.title, la meta description ET le
 // <link rel="canonical"> au rendu — et le suit quand la route change de DONNÉE
@@ -98,7 +108,7 @@ export const usePageTitle = (title, { description, canonicalPath } = {}) => {
 // même que celle des coquilles pré-rendues. Sans argument, elle suit la route
 // COURANTE : une page ne peut donc pas annoncer la carte d'une autre route, et
 // changer une carte se fait à un seul endroit (le shell et le runtime suivent).
-const ogCardUrl = (route) => absoluteUrl(ogCardFor(route).image);
+const ogCardUrl = (route) => absoluteUrl(ogCardFor(route ?? cheminSansLangue()).image);
 
 const DEFAULT_OG_IMAGE = absoluteUrl('/icons/icon-512x512.png');
 
@@ -180,7 +190,7 @@ export const usePageOpenGraph = ({
  */
 export const usePageMeta = ({ title: titleOverride, description: descriptionOverride, image } = {}) => {
   const { t } = useLanguage();
-  const keys = pageMetaKeys();
+  const keys = pageMetaKeys(cheminSansLangue());
   // Résolu AVANT les hooks : les effets comparent des CHAÎNES (stables d'un
   // rendu à l'autre), pas la fonction t — recréée à chaque rendu du fournisseur.
   const title = titleOverride || (keys ? t(keys.title) : '');

@@ -208,10 +208,50 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 // hachage de build fixer le seuil, c'est laisser un hash décider à la place du
 // développeur. Les chunks paresseux ne bougent pas (rien n'importe PostHog) et
 // le total reste à 5,62 Mo.
+// ── 30/10/2026 : 134,2 → **126,7 Ko**, LA MARGE RECONQUISE PLUTÔT QUE REPOUSSÉE ──
+// L'audit du matin rendait le JS initial à **135,5 Ko gzip pour un budget de
+// 135** — marge nulle, et dépassement. Deux postes payés par des visiteurs qui
+// n'en avaient pas l'usage ont été retirés, sans relever le plafond :
+//   • `lucide-react` (7,4 Ko) était PRÉCHARGÉ par `index.html` parce que six
+//     modules du SHELL l'importaient — `NotificationPanel` (neuf glyphes),
+//     `NetworkStatus` (six), `ErrorBoundary`, `LanguageSelector`,
+//     `CountrySelector`, `CountryDisplay`, `FlagIcon`. Leurs tracés sont
+//     désormais dans `src/components/chrome-icons.js`, copiés à l'identique de
+//     lucide v0.507.0 (mêmes `d`), donc sans un pixel de différence. Le panneau
+//     de notifications d'un visiteur qui ne l'ouvre jamais, et l'indicateur de
+//     réseau d'un réseau correct, ne justifiaient pas cette dépense.
+//   • `utils/analytics.js` (l'injection Plausible / GA4 / PostHog) n'est plus
+//     importé statiquement : `utils/seo.js` lit le planificateur de vue dans
+//     `utils/vue-de-page.js`, `ConsentBanner` lit la configuration dans
+//     `utils/mesure-audience.js`, et le module d'injection arrive par `import()`
+//     sur consentement (`index.js`, `ConsentBanner.js`).
+// MESURÉ après : 126,7 Ko gzip des six chunks référencés par `index.html`
+// (index 63,7 · vendor-react-dom 40,7 · vendor-router 13,4 · Home 4,4 ·
+// vendor-react 2,8 · vendor 1,6), `vendor-lucide` n'étant plus dans le chemin
+// critique. Le plafond RESTE à 135 Ko : il a maintenant 8,3 Ko de marge, et il
+// ne doit pas servir de cible.
+// ── 30/10/2026 : 5,66 → 7,00 Mo, POUR LES DOCUMENTS DE LA SECONDE LANGUE ────
+// Une langue INDEXÉE a son propre document (`src/config/langues-indexees.js`) :
+// le build écrit douze coquilles de plus dans `build/en/` — les mêmes pages dans
+// l'autre langue, avec le CSS critique inliné et les 45 liens du pied de page.
+// Mesuré : 1 373 245 o pour les douze (114 Ko de moyenne), build entier à
+// **7 257 540 o / 160 fichiers** contre 5 888 238 o / 146 la veille, soit
+// +1 369 302 o dont 99,7 % sont ces documents.
+// CE QUE LE VISITEUR TÉLÉCHARGE NE BOUGE PAS, et c'est la distinction que ce
+// paragraphe existe pour tenir : le JS initial reste à 126,7 Ko gzip (un
+// document n'est pas du code, et les quatre autres budgets sont inchangés),
+// et un HTML part compressé par Vercel. Ce budget mesure la TAILLE DU BUILD ; il
+// paie donc ici une décision de fond — une URL et un `hreflang` réciproque par
+// langue, ce que l'audit du 30/10 reprochait au site de ne pas avoir — et non
+// une dérive de dépendance. La baisse possible est de NE PAS publier l'anglais
+// comme document : c'est exactement le défaut mesuré le matin (mille clés en
+// cinq langues, une seule surface indexable, aucun `hreflang`), donc elle est
+// REFUSÉE — et écrite, pour qu'un prochain relèvement ne se lise pas comme un
+// abandon.
 export const BUDGETS = {
   initialGzip: 135 * 1024, // JS initial (chunks référencés par index.html), gzip
   largestChunkGzip: 200 * 1024, // plus gros chunk JS, gzip
-  totalRaw: 5.66 * 1024 * 1024, // build/ entier, brut (voir les mesures datées ci-dessus)
+  totalRaw: 7.00 * 1024 * 1024, // build/ entier, brut (voir les mesures datées ci-dessus)
 };
 
 const ko = (bytes) => `${(bytes / 1024).toFixed(1)} Ko`;

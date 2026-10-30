@@ -1,6 +1,12 @@
 import { useEffect, useState, lazy, Suspense } from "react";
 import "./App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+// Le PRÉFIXE de langue d'une URL (`/en/jobs`) est porté par le `basename` du
+// routeur : les routes restent déclarées sans langue (une seule liste), et le
+// chemin de la barre d'adresse comme celui des liens suivent la langue du
+// DOCUMENT servi. Lu une fois au montage : changer de langue recharge, cf. la
+// limite déclarée dans src/contexts/LanguageContext.js.
+import { langueDuChemin, prefixeDeLaLangue } from "./config/langues-indexees";
 import Link from "./components/LienVue";
 
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
@@ -52,6 +58,20 @@ import {
 } from './config/liens-seo';
 import { isPWASupported, requestNotificationPermission } from "./utils/pwa";
 import { useNotifications } from './contexts/NotificationContext';
+
+// ── LE PRÉFIXE DE LANGUE DE L'ADRESSE, LU UNE FOIS ─────────────────────────
+// `/en/jobs` est servi par un document ÉCRIT EN ANGLAIS (vite-plugins/
+// prerender-route-meta.js) ; le routeur reçoit donc `/en` en `basename` et
+// résout la route `/jobs` comme d'habitude. Sans ce préfixe, le boot aurait
+// peint la 404 par-dessus un document correct — le défaut que le CTA des pages
+// ville évite déjà en menant à `/jobs` au lieu d'une route React inexistante.
+// Aucune langue préfixée : pas de `basename` (l'URL d'avant reste l'URL du
+// français, et un `basename` vide se lirait comme un chemin de base « / »).
+const BASE_DU_ROUTAGE = (() => {
+  if (typeof window === 'undefined') return undefined;
+  const prefixe = prefixeDeLaLangue(langueDuChemin(window.location.pathname) || '');
+  return prefixe ? `/${prefixe}` : undefined;
+})();
 
 
 // Toutes les pages sont lazy-loadées (bundle initial minimal) : seul le
@@ -703,7 +723,7 @@ function App() {
 
   return (
     <div className={APP_CLASS}>
-      <BrowserRouter>
+      <BrowserRouter basename={BASE_DU_ROUTAGE}>
         <LanguageProvider>
           <AuthProvider>
             <CountryProvider>

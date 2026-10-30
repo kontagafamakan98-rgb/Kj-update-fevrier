@@ -4,6 +4,36 @@
   "outputDirectory": "build",
   "rewrites": [
     {
+      "source": "/en",
+      "destination": "/en/index.html"
+    },
+    {
+      "source": "/en/",
+      "destination": "/en/index.html"
+    },
+    { "source": "/en/jobs", "destination": "/en/jobs.html" },
+    { "source": "/en/jobs/", "destination": "/en/jobs.html" },
+    { "source": "/en/login", "destination": "/en/login.html" },
+    { "source": "/en/login/", "destination": "/en/login.html" },
+    { "source": "/en/register", "destination": "/en/register.html" },
+    { "source": "/en/register/", "destination": "/en/register.html" },
+    { "source": "/en/forgot-password", "destination": "/en/forgot-password.html" },
+    { "source": "/en/forgot-password/", "destination": "/en/forgot-password.html" },
+    { "source": "/en/payment", "destination": "/en/payment.html" },
+    { "source": "/en/payment/", "destination": "/en/payment.html" },
+    { "source": "/en/how-it-works", "destination": "/en/how-it-works.html" },
+    { "source": "/en/how-it-works/", "destination": "/en/how-it-works.html" },
+    { "source": "/en/about", "destination": "/en/about.html" },
+    { "source": "/en/about/", "destination": "/en/about.html" },
+    { "source": "/en/contact", "destination": "/en/contact.html" },
+    { "source": "/en/contact/", "destination": "/en/contact.html" },
+    { "source": "/en/privacy", "destination": "/en/privacy.html" },
+    { "source": "/en/privacy/", "destination": "/en/privacy.html" },
+    { "source": "/en/terms", "destination": "/en/terms.html" },
+    { "source": "/en/terms/", "destination": "/en/terms.html" },
+    { "source": "/en/support", "destination": "/en/support.html" },
+    { "source": "/en/support/", "destination": "/en/support.html" },
+    {
       "source": "/jobs",
       "destination": "/jobs.html"
     },

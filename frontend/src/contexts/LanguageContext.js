@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { devLog, safeLog } from '../utils/env';
 import fr from '../i18n/fr.json';
+import { langueDuChemin } from '../config/langues-indexees';
 
 // Les traductions vivent dans des fichiers JSON par langue (src/i18n/*.json) :
 // faciles à maintenir/éditer sans toucher au code, et extractibles par les
@@ -30,8 +31,26 @@ const LanguageContext = createContext(null);
 // Une valeur inconnue est IGNORÉE, jamais traduite en « la première langue » :
 // l'adresse est une demande, pas une garantie, et `?lang=de` ne doit pas faire
 // parler le site dans une langue qu'il n'a pas.
+//
+// ── ET DEPUIS LE 30/10/2026, LE PRÉFIXE DE CHEMIN AUSSI (`/en/jobs`) ────────
+// Une langue indexée a une URL propre (src/config/langues-indexees.js) et le
+// document servi à cette URL est écrit dans cette langue : la page DOIT donc
+// parler la langue de son adresse, sinon `/en/jobs` publierait un `<html
+// lang="en">` et une page en français — le mensonge que le `hreflang` existe
+// pour éviter. Le chemin passe AVANT le paramètre : c'est lui qui décide de la
+// langue du document pré-rendu, et deux demandes contradictoires ne doivent pas
+// dépendre de l'ordre des lignes.
+//
+// Limite déclarée : changer la langue dans la barre ne réécrit PAS l'URL. Le
+// préfixe est une porte d'entrée (moteur, partage, `hreflang`) ; un visiteur qui
+// repasse en français sur `/en/jobs` lit du français jusqu'au rechargement, où
+// l'adresse reprend la main. Réécrire l'URL demanderait de changer le `basename`
+// du routeur, c'est-à-dire de recharger — et une bascule de langue qui recharge
+// la page est un autre choix, pas un effet de bord.
 const langueDemandeeParLUrl = () => {
   if (typeof window === 'undefined') return null;
+  const parLeChemin = langueDuChemin(window.location.pathname);
+  if (parLeChemin) return parLeChemin;
   try {
     const demandee = new URLSearchParams(window.location.search).get('lang');
     return demandee && LANGUAGES.includes(demandee) ? demandee : null;
