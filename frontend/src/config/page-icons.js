@@ -182,6 +182,14 @@ export const CLASSES_ICONE = {
   // La pastille d'une ligne de contact (`pastille-rond`, 2,5 rem — /contact
   // comme /support) : même héritage de couleur par `currentColor`.
   ligne: 'h-5 w-5',
+  // LA COCHE DE L'OPTION CHOISIE d'une liste de pays (30/10/2026). Sa taille
+  // vivait dans une chaîne de classes passée par son appelant
+  // (`CountryDisplay.js`) — c'est-à-dire une classe d'icône SANS domicile, la
+  // forme exacte que `scripts/__tests__/check-declared-body-icones.test.js`
+  // refuse : l'emplacement dit un RÔLE, le domicile dit la taille. Rien ne
+  // change à l'écran : `font-semibold` est inerte sur un `svg`, et la coche
+  // garde ses 16 px.
+  paysCoche: 'h-4 w-4',
   // ── Les emplacements des quatre écrans de compte (26/09/2026). Le SVG remplace
   // le CARACTÈRE, il ne suit donc pas `font-size` : la taille est écrite ici, une
   // fois pour les deux canaux.
