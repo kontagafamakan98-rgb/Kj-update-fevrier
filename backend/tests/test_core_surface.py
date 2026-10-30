@@ -151,17 +151,95 @@ _ADRESSE_MEMOIRE = re.compile(r" object at 0x[0-9a-fA-F]+")
 # même nom court, sans quoi la référence serait instable.
 _DEPENDS = re.compile(r"Depends\((?:dependency=)?<?([\w.]+)[^)]*\)")
 
+# ── Les unions de types : UN rendu, quel que soit l'interpréteur ──────────────
+#
+# MESURÉ LE 30/10/2026 : `pytest tests` sur Python **3.14.7** rendait ROUGE ce
+# contrat sur un arbre sain, avec onze écarts tous de la même forme —
+# `() -> Optional[Any]` figé, `() -> Any | None` observé. Depuis Python 3.14,
+# `inspect.signature` rend les annotations via `annotationlib`, qui applique PEP
+# 604 : `Optional[X]` devient `X | None`. Le dépôt vise 3.11
+# (`backend/Dockerfile`, `ci.yml`), donc la CI ne voyait rien — et un
+# développeur en 3.14 voyait un check REQUIS rouge sans pouvoir l'expliquer.
+#
+# La correction ne touche PAS les valeurs figées (elles restent lisibles en
+# `Optional[…]`, la forme sous laquelle le code les écrit) : les DEUX côtés
+# passent par `_forme_barre`, qui ramène `Optional[X]` / `Union[X, Y]` à
+# `X | None` / `X | Y`. Un contrat de surface décrit ce que les importeurs
+# lisent, pas la façon dont l'interpréteur du jour réécrit une annotation.
+_UNION = re.compile(r"(?<!\w)(?:typing\.)?(Optional|Union)\[")
+_FERMETURES = {"[": "]", "(": ")"}
+
+
+def _fermeture(texte: str, ouverture: int):
+    """L'indice qui équilibre l'ouverture située en `ouverture`, ou None."""
+    pile = []
+    for indice in range(ouverture, len(texte)):
+        caractere = texte[indice]
+        if caractere in _FERMETURES:
+            pile.append(_FERMETURES[caractere])
+        elif pile and caractere == pile[-1]:
+            pile.pop()
+            if not pile:
+                return indice
+    return None
+
+
+def _morceaux(texte: str) -> list[str]:
+    """Les arguments de PREMIER niveau d'une union (les virgules internes restent)."""
+    morceaux, profondeur, debut = [], 0, 0
+    for indice, caractere in enumerate(texte):
+        if caractere in "[(":
+            profondeur += 1
+        elif caractere in "])":
+            profondeur -= 1
+        elif caractere == "," and profondeur == 0:
+            morceaux.append(texte[debut:indice])
+            debut = indice + 1
+    morceaux.append(texte[debut:])
+    return [morceau.strip() for morceau in morceaux if morceau.strip()]
+
+
+def _forme_barre(texte: str) -> str:
+    """`Optional[X]` → `X | None`, `Union[X, Y]` → `X | Y` (PEP 604), partout.
+
+    Récursif : une union imbriquée (`Optional[Union[str, int]]`) est ramenée
+    aussi, et un texte déjà rendu en `|` (Python ≥ 3.14) est laissé tel quel —
+    c'est ce qui rend les deux côtés comparables sans figer d'interpréteur.
+    """
+    sortie, indice = [], 0
+    while indice < len(texte):
+        trouve = _UNION.search(texte, indice)
+        if not trouve:
+            sortie.append(texte[indice:])
+            break
+        ouverture = trouve.end() - 1
+        fermeture = _fermeture(texte, ouverture)
+        if fermeture is None:
+            # Union non fermée (signature illisible) : on ne bricole pas.
+            sortie.append(texte[indice:])
+            break
+        sortie.append(texte[indice:trouve.start()])
+        membres = [_forme_barre(membre) for membre in _morceaux(texte[ouverture + 1:fermeture])]
+        if trouve.group(1) == "Optional":
+            membres.append("None")
+        sortie.append(" | ".join(membres))
+        indice = fermeture + 1
+    return "".join(sortie)
+
 
 def _signature(valeur) -> str:
-    """La signature telle qu'un importeur la lit, SANS l'adresse mémoire ni
-    le rendu variable de `Depends`.
+    """La signature telle qu'un importeur la lit, SANS ce qui varie d'un
+    processus ou d'une version de Python à l'autre.
 
-    L'adresse change à chaque processus ; la forme de `Depends` change d'une
-    version ou d'un appel à l'autre. Noms, annotations et défauts restent
+    Trois instabilités connues sont ramenées à une seule forme : l'adresse
+    mémoire (change à chaque processus), le rendu détaillé de `Depends` (change
+    d'une version de FastAPI à l'autre), et l'écriture des unions (change avec
+    PEP 604, donc avec l'interpréteur). Noms, annotations et défauts restent
     comparés tels quels.
     """
     brut = _ADRESSE_MEMOIRE.sub("", str(inspect.signature(valeur)))
-    return _DEPENDS.sub(lambda m: "Depends(%s)" % m.group(1).split(".")[-1], brut)
+    brut = _DEPENDS.sub(lambda m: "Depends(%s)" % m.group(1).split(".")[-1], brut)
+    return _forme_barre(brut)
 
 
 def nature(valeur) -> dict:
@@ -266,9 +344,111 @@ class TestSurfacePubliqueDeKojoCore:
                 ecarts.append(
                     "%s : nature %s -> %s" % (nom, attendu["nature"], obtenu["nature"])
                 )
-            elif obtenu["signature"] != attendu["signature"]:
+            # La référence est écrite en `Optional[…]` (la forme du code) et
+            # l'observation peut venir d'un interpréteur qui rend `X | None` :
+            # les deux passent par la MÊME forme avant d'être comparées (cf.
+            # `_forme_barre`, et le cas qui le prouve dans `TestLeRenduDesUnions`).
+            elif obtenu["signature"] != _forme_barre(attendu["signature"]):
                 ecarts.append(
                     "%s : signature %s -> %s"
                     % (nom, attendu["signature"], obtenu["signature"])
                 )
         assert ecarts == [], "la surface publique de kojo_core a changé :\n  - " + "\n  - ".join(ecarts)
+
+
+class TestLeRenduDesUnions:
+    """Le contrat ne dépend PAS de l'interpréteur qui le lit (30/10/2026).
+
+    Le 30/10/2026, `pytest tests` sur Python 3.14.7 rendait ce fichier ROUGE sur
+    un arbre sain : `inspect.signature` y rend les annotations via
+    `annotationlib`, qui applique PEP 604 — `() -> Optional[Any]` figé,
+    `() -> Any | None` observé, onze fois. La CI (3.11) ne voyait rien, et un
+    développement en 3.14 voyait un check requis rouge sans explication.
+
+    Ces cas prouvent que les deux écritures sont ramenées à une seule, y compris
+    imbriquées, et que la comparaison du contrat RÉEL passe par ce rendu.
+    """
+
+    def test_les_deux_ecritures_d_une_union_donnent_le_meme_texte(self):
+        paires = [
+            # Le cas exact du 30/10, onze fois dans la référence.
+            ("() -> Optional[Any]", "() -> Any | None"),
+            # Une union à deux membres, et un défaut qui suit l'annotation.
+            ("(jti: Optional[str]) -> bool", "(jti: str | None) -> bool"),
+            ("(hashed: Optional[str] = None)", "(hashed: str | None = None)"),
+            # La virgule INTERNE ne doit pas être prise pour un séparateur
+            # d'union : `Dict[str, str]` est UN argument, pas deux.
+            (
+                "(env: Optional[Dict[str, str]] = None)",
+                "(env: Dict[str, str] | None = None)",
+            ),
+            # `Union` explicite, et une union imbriquée dans une autre.
+            ("(v: Union[str, int])", "(v: str | int)"),
+            ("(v: Optional[Union[str, int]])", "(v: str | int | None)"),
+            # Une qualification complète, telle que FastAPI la rend.
+            (
+                "(credentials: Optional[fastapi.security.http.HTTPAuthorizationCredentials])",
+                "(credentials: fastapi.security.http.HTTPAuthorizationCredentials | None)",
+            ),
+        ]
+
+        for reference, observee in paires:
+            assert _forme_barre(reference) == _forme_barre(observee), (
+                "« %s » et « %s » devraient décrire la MÊME signature"
+                % (reference, observee)
+            )
+
+    def test_une_signature_sans_union_traverse_le_rendu_intacte(self):
+        # Non-vacuité : le rendu ne réécrit pas ce qui n'est pas une union (et
+        # notamment pas une barre qui appartiendrait à un défaut).
+        for texte in (
+            "(password: str, hashed: str) -> bool",
+            "(request: starlette.requests.Request) -> kojo_models.User",
+            "(a: int = 1, b: str = 'x, y') -> None",
+        ):
+            assert _forme_barre(texte) == texte
+
+    def test_l_observation_est_rendue_en_forme_barre(self):
+        """`_signature` rend TOUJOURS `X | None`, quel que soit l'interpréteur.
+
+        MESURÉ le 30/10/2026 sur trois interpréteurs, même code :
+        `3.11.17` et `3.13.14` rendent `(jti: Optional[str]) -> bool`,
+        `3.14.7` rend `(jti: str | None) -> bool`. La citation est donc écrite
+        en forme BARRE — sur ≤ 3.13, retirer `_forme_barre` de `_signature`
+        rougit ICI ; sur 3.14, le cas serait vert de toute façon, et c'est
+        écrit plutôt que caché : la normalisation sert aux interpréteurs qui
+        rendent encore `Optional[…]`, donc à ceux que la CI exécute (3.11).
+        """
+        import kojo_core
+
+        observee = nature(kojo_core.is_token_revoked)["signature"]
+        assert observee == "(jti: str | None) -> bool", (
+            "l'observation n'est pas ramenée en forme barre : %r — sur un "
+            "interpréteur qui rend `Optional[jti]`, la référence figée (elle "
+            "aussi ramenée en forme barre) ne lui serait plus comparable" % observee
+        )
+
+    def test_le_contrat_reel_se_compare_dans_les_deux_ecritures(self, figee):
+        """Le nom porteur d'un `Optional` figé passe, quel que soit le Python.
+
+        C'est le cas qui ROUGIT si `_signature` cesse de ramener les unions :
+        la référence serait rendue en `X | None`, l'observation resterait en
+        `Optional[X]` (ou l'inverse), et le nom serait déclaré « changé ».
+        """
+        import kojo_core
+
+        nom = "is_token_revoked"
+        assert nom in figee, (
+            "« %s » a quitté la référence figée : ce cas ne prouverait plus rien"
+            % nom
+        )
+        attendu = figee[nom]["signature"]
+        assert "Optional[" in attendu, (
+            "la référence de « %s » ne porte plus d'union (%r) : relire la "
+            "référence avant de conclure" % (nom, attendu)
+        )
+        observee = nature(getattr(kojo_core, nom))["signature"]
+        assert observee == _forme_barre(attendu), (
+            "« %s » : observé %r, référence %r — le rendu des unions ne les "
+            "ramène plus à la même forme" % (nom, observee, attendu)
+        )
