@@ -29,14 +29,32 @@
 
      Ce qui reste ci-dessous est ce qu'App.css apporte VRAIMENT à `body` :
      `overscroll-behavior`, `position` et `min-height` n'ont aucun autre porteur,
-     et `background-color: #f9fafb` passe devant le `hsl(var(--background))` du
-     thème (règle #52, antérieure) — le fond des pages est ce gris-là, pas le
-     blanc du thème. */
+     et le FOND est le sable du site — le jeton `--kojo-sable`, celui que peint
+     `.fond-sable` —, plus le gris froid `#f9fafb` du gabarit, RETIRÉ le
+     30/10/2026.
+
+     CE QUE CE GRIS PEIGNAIT, MESURÉ CE JOUR SUR L'ARTEFACT SERVI, ET NON SUPPOSÉ.
+     `html` n'a aucun fond (`rgba(0, 0, 0, 0)`), donc c'est bien le fond de `body`
+     que le navigateur propage à la surface de la page. Mais `.fond-sable`
+     couvre la BOÎTE ENTIÈRE du document sur les treize routes balayées
+     (± 0,5 px en haut et à gauche, bas confondu à 1,5 px près avec
+     `scrollHeight` : 0 → 990 px sur `/login`, 0 → 5 916 px sur `/`) et AUCUN
+     autre élément ne peint ce gris. Le fond de `body` n'était donc pas visible
+     DANS le document : il ne l'était qu'au-delà, là où rien ne le couvre — le
+     rebond d'overscroll, où c'est la surface de la page qui se montre. C'est
+     cette surface-là, et elle seule, qui passe du gris au sable ; et c'est ce
+     que la sonde a mesuré en comparant, route par route, deux captures
+     identiques puis la même une fois le corps passé au sable : zéro pixel
+     d'écart — sur `/`, neuf bandes de 940 px, témoin stable à chaque cran.
+
+     La valeur est LUE du jeton et jamais recopiée : une teinte écrite en clair
+     ici redeviendrait une seconde déclaration du sable, libre de dériver de
+     `--kojo-sable`. */
   body {
     overscroll-behavior: none;
     position: relative;
     min-height: 100vh;
-    background-color: #f9fafb;
+    background-color: var(--kojo-sable);
   }
 
   /* iOS Standalone app styles */

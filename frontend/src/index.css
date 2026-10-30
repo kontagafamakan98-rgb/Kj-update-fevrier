@@ -608,8 +608,13 @@ body {
          est remplacée par l'encre du SITE (`--kojo-encre`, #1c1917), déclarée
          dans le socle en fin de fichier — un jeton étranger ne peint plus rien ;
        • `--background` était lu une fois aussi, mais sa règle est BATTUE :
-         `App.css` pose `body { background-color: #f9fafb }` plus loin dans la
-         feuille. Le fond calculé est `rgb(249, 250, 251)`, pas le blanc du jeton ;
+         `App.css` pose le fond de `body` plus loin dans la feuille. Mesuré le
+         08/10/2026, le fond calculé était `rgb(249, 250, 251)`, le gris du
+         gabarit, pas le blanc du jeton — et depuis le 30/10/2026 c'est le SABLE
+         du site (`var(--kojo-sable)`, lu du même jeton que `.fond-sable`) qui
+         est peint là, sans changer un pixel du document (le sable de
+         l'application couvre la boîte entière : seul le rebond d'overscroll
+         montrait cette surface) ;
        • `--border` était lu une fois, et BATTU lui aussi : le préflight de
          Tailwind (émis avec le `@tailwind base` d'`App.css`, donc plus loin)
          pose `border-color: #e7e5e4` sur `*, :before, :after` — la teinte du
@@ -653,8 +658,8 @@ body {
      • la couleur de bordure posée sur `*` est battue par le préflight de
        Tailwind, émis plus loin : zéro élément à la teinte du jeton, dix-sept à
        celle du préflight sur `/`. Elle ne peignait rien ;
-     • `background-color` est battu par `body { background-color: #f9fafb }`
-       d'`App.css` : rien non plus ;
+     • `background-color` est battu par le `body` d'`App.css` (le gris `#f9fafb`
+       jusqu'au 30/10/2026, le sable `--kojo-sable` depuis) : rien non plus ;
      • seule la couleur de TEXTE peignait — elle est désormais déclarée par le
        site, dans le socle : `body { color: var(--kojo-encre) }` (couche
        `base`, plus bas), avec la palette `--kojo-*` et aucun jeton étranger.

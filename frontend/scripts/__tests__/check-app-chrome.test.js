@@ -574,20 +574,50 @@ describe('les autres reliquats du gabarit dans src/App.css, TRANCHÉS eux aussi'
   it('et ce qu’App.css apporte VRAIMENT à `body` y est resté', () => {
     // Le pendant du test précédent : retirer la duplication ne doit pas
     // emporter ce qu'aucune autre feuille ne fournit. `overscroll-behavior`,
-    // `position` et `min-height` n'ont pas d'autre porteur, et le fond
-    // `#f9fafb` passe devant le `hsl(var(--background))` du thème (règle #52,
-    // antérieure) : c'est lui le fond des pages.
+    // `position` et `min-height` n'ont pas d'autre porteur, et le fond de
+    // `body` n'est peint par personne d'autre — c'est lui la surface de la
+    // page au-delà du document.
     const bloc = APP_CSS_SANS_COMMENTAIRES.match(/\bbody\s*\{([^}]*)\}/)[1];
     for (const declaration of [
       'overscroll-behavior',
       'position',
       'min-height',
-      'background-color: #f9fafb',
+      'background-color: var(--kojo-sable)',
     ]) {
       expect(bloc, `le bloc body d'App.css ne porte plus « ${declaration} »`).toContain(
         declaration
       );
     }
+  });
+
+  it('le fond de `body` est le SABLE du site, lu du jeton et non recopié (30/10/2026)', () => {
+    // Ce que ce cas tient : le fond de `body` est la SEULE surface de la page
+    // qu'AUCUN descendant ne couvre — c'est elle qu'on voit au rebond
+    // d'overscroll. Le gabarit y laissait `#f9fafb`, le gris froid de Tailwind,
+    // la dernière teinte du site qui n'appartenait pas à sa palette.
+    // Mesuré sur l'artefact servi le 30/10/2026 : `html` n'a aucun fond
+    // (`rgba(0, 0, 0, 0)`), donc c'est bien `body` que le navigateur propage à
+    // la surface de la page ; `.fond-sable` couvre la boîte entière du document
+    // sur les treize routes balayées (bas confondu à 1,5 px près avec
+    // `scrollHeight`), et aucun autre élément ne peint ce gris. Le document ne
+    // changeait donc pas d'un pixel — vérifié route par route en comparant deux
+    // captures identiques puis la même une fois le corps passé au sable — et
+    // seul le rebond d'overscroll change de teinte.
+    const css = INDEX_CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+    const jeton = (nom) => ((css.match(new RegExp(`${nom}:\\s*([^;]+);`)) || [])[1] || '').trim();
+    const bloc = APP_CSS_SANS_COMMENTAIRES.match(/\bbody\s*\{([^}]*)\}/)[1];
+    // La valeur du jeton, et pas une copie : réécrire le sable en clair ici
+    // fabriquerait la seconde déclaration que ce cas existe pour empêcher.
+    expect(jeton('--kojo-sable'), 'le jeton du sable a disparu de src/index.css').toBe(
+      '#f7f3ec'
+    );
+    expect(bloc, 'App.css ne peint plus le sable du site sur `body`').toContain(
+      'background-color: var(--kojo-sable)'
+    );
+    expect(bloc, 'le gris froid du gabarit est revenu sur `body`').not.toContain('#f9fafb');
+    expect(bloc, 'le fond de `body` est réécrit en clair au lieu de lire le jeton').not.toMatch(
+      /background-color:\s*#/
+    );
   });
 
   it('aucune autre règle du gabarit Vite n’est déclarée dans le dépôt', () => {
