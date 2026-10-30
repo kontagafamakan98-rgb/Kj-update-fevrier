@@ -1,6 +1,11 @@
 import { useState } from 'react';
 
-import { initAnalytics, isAnalyticsConfigured } from '../utils/analytics';
+// `isAnalyticsConfigured` vient de `utils/mesure-audience.js` : ce bandeau est
+// monté par `App.js`, donc dans le JS initial, et il n'a besoin que de LIRE la
+// configuration. Importer `utils/analytics.js` ici entraînerait tout le code
+// d'injection des fournisseurs dans le chargement de chaque visiteur — y compris
+// celui qui refusera. L'injection, elle, arrive au clic (voir `accepter`).
+import { isAnalyticsConfigured } from '../utils/mesure-audience';
 import {
   CONSENT_DENIED,
   CONSENT_GRANTED,
@@ -36,7 +41,13 @@ export default function ConsentBanner() {
   const accepter = () => {
     const retenu = writeAnalyticsConsent(CONSENT_GRANTED);
     setDecision(retenu);
-    initAnalytics();
+    // `import()` : le module d'injection n'a de sens qu'ici, une fois le
+    // consentement donné. Un échec de chargement ne doit pas casser la page —
+    // la décision est enregistrée, la mesure démarrera à la prochaine visite.
+    import('../utils/analytics').then(
+      (module) => module.initAnalytics(),
+      () => {}
+    );
   };
 
   const refuser = () => {

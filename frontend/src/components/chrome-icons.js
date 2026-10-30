@@ -123,6 +123,50 @@ export const ICONES = {
   photo:
     '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/>' +
     '<circle cx="12" cy="13" r="3"/>',
+  // ── Les glyphes de NOTIFICATION et de RÉSEAU (30/10/2026) ────────────────
+  // Ces douze dessins venaient de `lucide-react`, importé par TROIS composants
+  // du shell — `NotificationPanel` (neuf), `NetworkStatus` (six) et
+  // `ErrorBoundary` (un) — donc `vendor-lucide` (7,4 Ko gzip) était PRÉCHARGÉ
+  // par `index.html` pour tout visiteur, y compris celui qui ne verra jamais un
+  // panneau de notifications ni un indicateur de réseau dégradé. Mesuré le
+  // 30/10/2026 : le JS initial valait 135,5 Ko gzip pour un budget de 135 —
+  // marge nulle —, et ces 7,4 Ko sont le plus gros poste qu'un panneau fermé
+  // faisait payer.
+  //
+  // Les tracés sont COPIÉS À L'IDENTIQUE de lucide v0.507.0 (même grille 24,
+  // mêmes `d`, même épaisseur) : ce déménagement ne change pas un pixel, il
+  // change qui paie. `lucide-react` reste la source des icônes du CORPS des
+  // pages, où elles arrivent avec le chunk de leur page.
+  drapeau: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/>',
+  liste:
+    '<rect width="8" height="4" x="8" y="2" rx="1" ry="1"/>' +
+    '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>' +
+    '<path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>',
+  fete:
+    '<path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01"/><path d="M22 8h.01"/>' +
+    '<path d="M15 2h.01"/><path d="M22 20h.01"/>' +
+    '<path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10"/>' +
+    '<path d="m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11c-.11.7-.72 1.22-1.43 1.22H17"/>' +
+    '<path d="m11 2 .33.82c.34.86-.2 1.82-1.11 1.98C9.52 4.9 9 5.52 9 6.23V7"/>' +
+    '<path d="M11 13c1.93 1.93 2.83 4.17 2 5-.83.83-3.07-.07-5-2-1.93-1.93-2.83-4.17-2-5 .83-.83 3.07.07 5 2Z"/>',
+  portefeuille:
+    '<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/>' +
+    '<path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>',
+  cle: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+  cocheCercle: '<path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/>',
+  signalExcellent:
+    '<path d="M2 20h.01"/><path d="M7 20v-4"/><path d="M12 20v-8"/><path d="M17 20V8"/>',
+  signalBon: '<path d="M2 20h.01"/><path d="M7 20v-4"/><path d="M12 20v-8"/>',
+  signalMoyen: '<path d="M2 20h.01"/><path d="M7 20v-4"/>',
+  signalFaible: '<path d="M2 20h.01"/>',
+  wifi:
+    '<path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/>' +
+    '<path d="M5 12.859a10 10 0 0 1 14 0"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/>',
+  wifiCoupe:
+    '<path d="M12 20h.01"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/>' +
+    '<path d="M5 12.859a10 10 0 0 1 5.17-2.69"/><path d="M19 12.859a10 10 0 0 0-2.007-1.523"/>' +
+    '<path d="M2 8.82a15 15 0 0 1 4.177-2.643"/><path d="M22 8.82a15 15 0 0 0-11.288-3.764"/>' +
+    '<path d="m2 2 20 20"/>',
 };
 
 /**

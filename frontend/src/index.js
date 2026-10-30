@@ -4,7 +4,7 @@ import "./index.css";
 import App from "./App";
 import * as serviceWorkerRegistration from "./serviceWorkerRegistration";
 import { initSentryOnInteraction } from "./utils/sentry";
-import { initAnalyticsIfConsented } from "./utils/analytics";
+import { hasAnalyticsConsent } from "./utils/consent";
 
 // Sentry : armé tout de suite (tampon des erreurs précoces + écouteurs
 // passifs) mais le SDK n'est TÉLÉCHARGÉ qu'à la première interaction, pour ne
@@ -17,7 +17,29 @@ initSentryOnInteraction();
 // si l'éditeur a configuré un fournisseur. Le tag GA4 déclaré dans le HTML
 // statique reste INERTE (il n'a pas de `src`) : la sonde SEO continue de le
 // voir, l'utilisateur ne le charge pas.
-initAnalyticsIfConsented();
+//
+// ── ET LE CODE D'INJECTION N'EST PLUS DANS LE JS INITIAL (30/10/2026) ──────
+// Il était importé STATIQUEMENT ici, donc analysé par TOUS les visiteurs —
+// y compris ceux qui n'ont jamais accepté, pour qui il ne s'exécute jamais.
+// `utils/seo.js` faisait de même pour `notifierTitreDePage`, ce qui rendait le
+// report impossible sans ça. Désormais : la décision se lit dans le petit
+// `utils/consent.js` (déjà dans le shell, le bandeau l'utilise), et le module
+// d'injection n'arrive que si la réponse est oui. Mesuré : −1,5 Ko gzip sur le
+// JS initial (`scripts/check-bundle-size.js`), soit la marge que l'audit du
+// 30/10 réclamait (135,5 Ko contre un budget de 135).
+//
+// `initAnalyticsIfConsented` refait la vérification de son côté : ce n'est pas
+// une ceinture décorative, c'est ce qui rend la règle vraie pour tout autre
+// appelant, et le cas de test l'éprouve (`analyticsConsent.test.js`).
+if (hasAnalyticsConsent()) {
+  import("./utils/analytics").then(
+    (module) => module.initAnalyticsIfConsented(),
+    // Un chunk qui ne se charge pas ne casse pas la page : aucun fournisseur
+    // n'est un prérequis du produit, et le silence vaut mieux qu'une erreur
+    // console dans une page qui n'a rien demandé.
+    () => {}
+  );
+}
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 

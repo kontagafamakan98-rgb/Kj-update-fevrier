@@ -1,5 +1,8 @@
 import React from 'react';
-import { AlertTriangle } from 'lucide-react';
+// Le triangle d'alerte vient du registre du chrome : `lucide-react` importé ici
+// faisait entrer la bibliothèque entière (7,4 Ko gzip) dans le chemin critique,
+// pour une icône qui ne s'affiche que si l'application a déjà échoué.
+import { Icone } from './chrome-icons';
 import { useLanguage } from '../contexts/LanguageContext';
 import { safeLog } from '../utils/env';
 
@@ -60,7 +63,7 @@ class ErrorBoundaryInner extends React.Component {
       return (
         <div className="min-h-screen flex items-center justify-center fond-sable">
           <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6 text-center">
-            <AlertTriangle className="mx-auto mb-4 h-14 w-14 text-red-500" aria-hidden="true" />
+            <Icone nom="avertissement" classe="mx-auto mb-4 h-14 w-14 text-red-500" />
             <h2 className="text-xl font-bold text-stone-800 mb-2">{t('unexpectedErrorTitle')}</h2>
             <p className="text-stone-600 mb-4">{t('unexpectedErrorText')}</p>
             <button onClick={() => window.location.reload()} className="bg-orange-700 text-white px-4 py-2 rounded-lg hover:bg-orange-800 transition-colors">{t('refreshPage')}</button>
