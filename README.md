@@ -18,6 +18,14 @@ Kojo connecte clients et artisans en Afrique de l'Ouest (Sénégal, Mali, Côte 
 ## Setup local
 
 ### Backend
+
+Interpréteur : **Python 3.11**, déclaré une fois à la racine (`.python-version`),
+la même version que l'image déployée (`backend/Dockerfile`) et que la CI. Ce
+n'est pas une préférence : le contrat de surface (`backend/tests/test_core_surface.py`)
+compare des signatures figées, et un Python plus récent réécrit les annotations
+(`Optional[X]` devient `X | None` avec PEP 604) — le contrat ramène les deux
+écritures à une seule, et la version déclarée dit sur laquelle le dépôt est jugé.
+
 ```bash
 cd backend
 cp .env.example .env        # Remplir les valeurs
