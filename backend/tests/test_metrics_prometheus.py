@@ -485,7 +485,10 @@ class TestProvenanceDesAlertesEmploi:
       • une lecture en panne qui publierait quatre zéros (un échec de lecture se
         lirait comme un échec d'acquisition) ;
       • une liste d'étiquettes RECOPIÉE ici, qui divergerait du module
-        propriétaire dès qu'une provenance serait ajoutée.
+        propriétaire dès qu'une provenance serait ajoutée ;
+      • des totaux stables qu'on lirait comme une acquisition vivante : la date
+        de la plus récente est publiée pour ça, et 0 y veut dire JAMAIS (aucune
+        veille datée), jamais « maintenant ».
     """
 
     @staticmethod
@@ -569,6 +572,90 @@ class TestProvenanceDesAlertesEmploi:
         assert series["inconnue"] == "0"
         assert _valeur(texte, "kojo_alertes_emploi_hors_vocabulaire") == "1"
 
+    async def test_la_date_publiee_est_celle_de_l_acquisition_la_plus_recente(
+        self, client: AsyncClient, monkeypatch
+    ):
+        monkeypatch.setattr(kojo_metrics, "METRICS_TOKEN", JETON)
+        from tests.conftest import db_insert
+
+        # Deux acquisitions, et une veille RÉGLÉE plus tard qu'elle n'a été
+        # créée : la date publiée doit être celle de la CRÉATION (l'acquisition
+        # dont les totaux ne disent rien), pas celle du dernier réglage.
+        await db_insert("job_alerts", {
+            "id": "v1", "user_id": "u1", "origin": "ville",
+            "created_at": "2026-09-01T07:00:00+00:00",
+            "updated_at": "2026-10-29T12:00:00+00:00",
+        })
+        await db_insert("job_alerts", {
+            "id": "v2", "user_id": "u2", "origin": "metier",
+            "created_at": "2026-10-20T09:30:00+00:00",
+            "updated_at": "2026-10-21T08:00:00+00:00",
+        })
+        # Une veille COUPÉE reste une acquisition : la date porte sur le même
+        # corpus que les quatre séries, sinon les deux chiffres décriraient
+        # deux populations et l'écart serait inexplicable.
+        await db_insert("job_alerts", {
+            "id": "v3", "user_id": "u3", "origin": "directe", "active": False,
+            "created_at": "2026-10-25T06:15:00+00:00",
+        })
+
+        texte = await _lire(client, ENTETE)
+
+        attendu = int(datetime(2026, 10, 25, 6, 15, tzinfo=timezone.utc).timestamp())
+        assert (
+            _valeur(texte, "kojo_alertes_emploi_plus_recente_timestamp_seconds")
+            == str(attendu)
+        )
+        # La date ne déplace aucun compteur : elle dit QUAND, pas COMBIEN.
+        assert self._series(texte)["ville"] == "1"
+        assert self._series(texte)["metier"] == "1"
+        assert self._series(texte)["directe"] == "1"
+
+    async def test_sans_veille_datee_la_valeur_est_jamais_et_pas_maintenant(
+        self, client: AsyncClient, monkeypatch
+    ):
+        monkeypatch.setattr(kojo_metrics, "METRICS_TOKEN", JETON)
+        from tests.conftest import db_insert
+
+        # Corpus vide : la série est PUBLIÉE à 0 (et non omise), parce qu'un
+        # corpus vide est un fait mesuré, pas une panne de lecture.
+        texte = await _lire(client, ENTETE)
+        assert _valeur(texte, "kojo_alertes_emploi_plus_recente_timestamp_seconds") == "0"
+
+        # Un document importé sans date, ou avec une date illisible, ne date
+        # pas l'acquisition d'office : « maintenant » ferait croire à une veille
+        # fraîche alors que la donnée dit seulement qu'on ne sait pas.
+        await db_insert("job_alerts", {"id": "sans-date", "user_id": "u4"})
+        await db_insert("job_alerts", {
+            "id": "date-cassee", "user_id": "u5", "created_at": "pas-une-date",
+        })
+
+        texte = await _lire(client, ENTETE)
+        assert _valeur(texte, "kojo_alertes_emploi_plus_recente_timestamp_seconds") == "0"
+
+    async def test_une_date_sans_fuseau_est_lue_en_utc(
+        self, client: AsyncClient, monkeypatch
+    ):
+        monkeypatch.setattr(kojo_metrics, "METRICS_TOKEN", JETON)
+        from tests.conftest import db_insert
+
+        # Les documents importés portent parfois une chaîne SANS fuseau. La
+        # comparer à une date avertie lèverait, et la seule façon de ne pas
+        # lever serait de sauter la valeur — donc de perdre l'acquisition la
+        # plus récente sans le dire.
+        await db_insert("job_alerts", {
+            "id": "naif", "user_id": "u6", "origin": "ville",
+            "created_at": "2026-10-20T09:30:00",
+        })
+
+        texte = await _lire(client, ENTETE)
+
+        attendu = int(datetime(2026, 10, 20, 9, 30, tzinfo=timezone.utc).timestamp())
+        assert (
+            _valeur(texte, "kojo_alertes_emploi_plus_recente_timestamp_seconds")
+            == str(attendu)
+        )
+
     async def test_une_lecture_en_panne_omet_la_famille_sans_inventer_zero(
         self, client: AsyncClient, monkeypatch
     ):
@@ -584,6 +671,10 @@ class TestProvenanceDesAlertesEmploi:
 
         assert "kojo_alertes_emploi{" not in texte
         assert "kojo_alertes_emploi_hors_vocabulaire" not in texte
+        # La date de la plus récente voyage dans la MÊME lecture : elle est
+        # omise avec le reste, parce qu'un 0 publié sur une panne se lirait
+        # « aucune veille depuis toujours » — l'inverse d'une panne de lecture.
+        assert "kojo_alertes_emploi_plus_recente_timestamp_seconds" not in texte
         # Le reste de l'exposition reste publié : une panne de base ne rend pas
         # la route muette.
         assert "kojo_live_bus_publies_total" in texte
