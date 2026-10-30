@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-30",
-    "motif": "Le chrome ne peint plus de gris froids (30/10/2026) : la 404, la barre, le pied de page et les squelettes passent du gris froid au sable et a l'encre du site, donc les classes declarees ici changent.",
+    "motif": "la vue de page est emise par utils/vue-de-page.js, plus par utils/analytics.js (bonus JS initial, 30/10/2026)",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -143,9 +143,9 @@
       "frontend/scripts/check-csp-documents-production.js": "d0310634de2010955d71d445bae8a6428a2334bf78acb24c470094d3032081bc",
       "frontend/scripts/check-css-inline-budget.js": "9a20c6bdb6815dd23bd2ae02f1222290dacc954e74d1b1b99de1ccf1c3ac4127",
       "frontend/scripts/check-typo-pages-production.js": "d361b6e0bbff8db6b6855f0fdfe9d1661c1ffbda02bee7bf36ecba38d25a0e8c",
-      "frontend/scripts/check-funnel-events.js": "55591cf344697b0cd16d495baf47c54d7c95eecbfb1fb31b570c6374bf3ac05f",
       "backend/server.py": "8e6faf9fb0ce120afa1baaf89aec78e9fb9929a894b3e495086d7bf6dc9aeee8",
-      "frontend/scripts/classes-coquilles.js": "f7e12a4058f073735a48e7db6f47664cc806f5b70b1ad5148f4bed1431f80da0"
+      "frontend/scripts/classes-coquilles.js": "f7e12a4058f073735a48e7db6f47664cc806f5b70b1ad5148f4bed1431f80da0",
+      "frontend/scripts/check-funnel-events.js": "0548b3419ae59feac15b78317316cdf9d3650db989ff3e08dd6542d41edc8485"
     }
   },
   "hors_perimetre": [
