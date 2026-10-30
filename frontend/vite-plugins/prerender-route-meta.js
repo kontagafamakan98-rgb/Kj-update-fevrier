@@ -24,6 +24,17 @@ import { makeEquilibreGuard } from './prerender/balises.js'
 import { makeWriteRouteText, applyOgCard, setMeta } from './prerender/route-meta.js'
 import { buildAppTemplate, NOM_DU_GABARIT_APP } from './prerender/app-template.js'
 import { buildNotFoundPage, NOM_DE_LA_PAGE_404 } from './prerender/not-found.js'
+import { appliquerLaLangue } from './prerender/hreflang.js'
+// Une langue INDEXÉE est un document : sa liste, ses préfixes d'URL et la forme
+// des alternatives `hreflang` vivent dans src/config/langues-indexees.js, lue
+// aussi par le routeur et le sitemap (cf. le fichier). Aucun de ces faits n'est
+// recopié ici — ajouter une langue là-bas écrit ses documents, ou échoue.
+import {
+  LANGUES_INDEXEES,
+  LANGUE_PAR_DEFAUT,
+  cheminDansLaLangue,
+  fichierDansLaLangue,
+} from '../src/config/langues-indexees.js'
 // Les dictionnaires de PAGE (scopes pack2) : ce sont EUX que lisent
 // src/pages/Register.js et src/pages/Jobs.js (pageT), pas le dictionnaire
 // global. Les coquilles pré-rendues publiaient les mêmes mots en littéral,
@@ -85,16 +96,15 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
         JSON.parse(fs.readFileSync(path.join(process.cwd(), relative), 'utf8'))
       const contact = readJson('src/config/contact.json')
       const socialNetworks = readJson('src/config/social-networks.json')
-      const siteFr = readJson('src/i18n/fr.json')
-
       // Une clé i18n absente doit CASSER le build : un shell amputé
       // (titre manquant, section vide) passerait sinon pour un succès et
-      // viderait l'optimisation SEO sans que personne ne le voie.
-      const T = (key) => {
-        const value = siteFr[key]
+      // viderait l'optimisation SEO sans que personne ne le voie. Le refus
+      // nomme le DICTIONNAIRE lu, donc la langue fautive.
+      const traducteur = (dictionnaire, fichier) => (key) => {
+        const value = dictionnaire[key]
         if (typeof value !== 'string' || !value.trim()) {
           throw new Error(
-            `prerender-route-meta : clé i18n « ${key} » absente de src/i18n/fr.json ` +
+            `prerender-route-meta : clé i18n « ${key} » absente de ${fichier} ` +
               '(shells pré-rendus : texte de route ou accueil)'
           )
         }
@@ -106,11 +116,6 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
           .replace(/</g, '&lt;')
           .replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;')
-      // Le français des dictionnaires de page : même résolution que pageT()
-      // au runtime (la langue du build est le français), même repli global.
-      const registerT = makeRegisterTranslator('fr', T)
-      const jobsT = makeJobsTranslator('fr', T)
-
       const socialLinks = socialNetworks
         .map(({ label, env: envName }) => ({ label, url: String(env[envName] || '').trim() }))
         .filter((social) => /^https:\/\//.test(social.url))
@@ -121,31 +126,69 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
       // `import.meta.env.VITE_GOOGLE_CLIENT_ID` est inliné par Vite, on lit donc
       // sa source ici — les deux canaux décident sur la même valeur.
       const googleAuth = Boolean(String(env.VITE_GOOGLE_CLIENT_ID || '').trim())
-      const exigerCorpsDeclare = makeDeclaredBodyGuard({
-        esc, T, registerT, jobsT, pageSections, pageSectionParts,
-        conditions: googleAuth ? new Set(['google-auth']) : new Set(),
-      })
       // Le refus d'une coquille dont les BALISES ne se referment pas. Il est lu
       // par les deux canaux de lecture (ce plugin au build, les gardes de
       // scripts/), et il porte sur les DOUZE pages pré-rendues — pas seulement
       // sur l'accueil, où le défaut avait été trouvé le 27/09/2026 alors qu'il
       // était INVISIBLE à toutes les sondes de navigateur (le parseur répare).
       const exigerBalisesEquilibrees = makeEquilibreGuard({ origine: 'prerender-route-meta' })
-      const writeRouteText = makeWriteRouteText({ pageMeta, T })
-      // Le PIED DE PAGE appartient au CHROME : React le rend après `</main>`
-      // sur toutes les routes, donc les coquilles le publient de la même
-      // façon — une fois pour toutes, depuis app-chrome.js (cf. le fichier :
-      // sans lui, `main` se partage la hauteur sans le pied de page et les
-      // pages centrées verticalement se décalent de 4 à 14 px au montage).
-      const pied = piedDePage({ esc, T, socialLinks })
-      const homeShell = buildHomeShell({ esc, T, contact, socialLinks, pageSections })
-      const SHELLS = {
-        home: homeShell,
-        ...buildRouteShells({
-          esc, T, registerT, jobsT, contact, pageSections,
-          googleAuth,
-        }),
-      }
+      // ── UNE LANGUE INDEXÉE EST UN DOCUMENT (30/10/2026) ──────────────────
+      // Le corps d'une coquille ne contient AUCUN texte en dur : il vient des
+      // dictionnaires (`T` pour le global, les traducteurs de page pour
+      // /register et /jobs). Construire la même coquille avec `en` en face de
+      // `fr` publie donc une page réellement anglaise, sans une seconde écriture
+      // du balisage — c'est ce qui rend la version anglaise tenable : une seule
+      // déclaration de structure, deux lectures. Le refus de corps déclaré
+      // (declared-body.js) s'applique aux deux langues : une section oubliée en
+      // anglais casse le build au lieu de publier une page amputée.
+      const PAR_LANGUE = LANGUES_INDEXEES.map((langue) => {
+        const fichier = `src/i18n/${langue.code}.json`
+        const dictionnaire = readJson(fichier)
+        const T = traducteur(dictionnaire, fichier)
+        // Le traducteur de PAGE : même résolution que pageT() au runtime, même
+        // repli global, dans la langue du document.
+        const registerT = makeRegisterTranslator(langue.code, T)
+        const jobsT = makeJobsTranslator(langue.code, T)
+        const exigerCorpsDeclare = makeDeclaredBodyGuard({
+          esc, T, registerT, jobsT, pageSections, pageSectionParts,
+          conditions: googleAuth ? new Set(['google-auth']) : new Set(),
+        })
+        // Le PIED DE PAGE appartient au CHROME : React le rend après `</main>`
+        // sur toutes les routes, donc les coquilles le publient de la même
+        // façon — une fois pour toutes, depuis app-chrome.js (cf. le fichier :
+        // sans lui, `main` se partage la hauteur sans le pied de page et les
+        // pages centrées verticalement se décalent de 4 à 14 px au montage).
+        const pied = piedDePage({ esc, T, socialLinks })
+        const homeShell = buildHomeShell({ esc, T, contact, socialLinks, pageSections })
+        const SHELLS = {
+          home: homeShell,
+          ...buildRouteShells({
+            esc, T, registerT, jobsT, contact, pageSections,
+            googleAuth,
+          }),
+        }
+        return {
+          langue,
+          T,
+          exigerCorpsDeclare,
+          pied,
+          homeShell,
+          SHELLS,
+          writeRouteText: makeWriteRouteText({ pageMeta, T }),
+        }
+      })
+      // Le gabarit des routes privées et la 404 ne sont publiés qu'en français :
+      // ils sont noindex (un gabarit nu, une page d'erreur), donc une seconde
+      // langue n'y aurait aucun lecteur — et `app.html` sert DIX routes, il ne
+      // peut pas déclarer la langue d'aucune.
+      const FRANCAIS = PAR_LANGUE.find(({ langue }) => langue.code === LANGUE_PAR_DEFAUT)
+
+      /**
+       * Le fichier écrit pour une langue : `jobs.html` en français,
+       * `en/jobs.html` en anglais, `index.html` / `en/index.html` pour l'accueil.
+       */
+      const fichierDuDocument = (code, routePath) =>
+        fichierDansLaLangue(code, shellFileFor(routePath))
       // ── Preload du chunk lazy de chaque route ─────────────────────────
       // Le chunk de la page (Login/Jobs) ne se télécharge que quand
       // l'entrée exécute import() (waterfall réseau). En le préchargeant
@@ -186,48 +229,65 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
       // src/config/og-cards.js) : celle de sa route, sinon celle de la
       // racine — et une route du projet sans carte fait échouer le build
       // plutôt que de publier une coquille sans og:image.
-      for (const routePath of Object.keys(pageMeta)) {
-        if (routePath === '/') continue // index.html : le MÊME texte, écrit plus bas
-        const route = routePath.slice(1)
-        const card = ogCards[routePath]
-        if (!card) {
-          throw new Error(
-            `prerender-route-meta : la route pré-rendue « ${routePath} » a un titre/description ` +
-              '(src/config/page-meta.js) mais aucune carte OG — la table des cartes en dérive ' +
-              '(lighthouserc.cjs, DEPLOYMENT_PATHS). Ajouter la route là-bas (elle y est auditée ' +
-              'par Lighthouse), ou retirer son texte.'
-          )
+      for (const { langue, exigerCorpsDeclare, pied, SHELLS, writeRouteText } of PAR_LANGUE) {
+        for (const routePath of Object.keys(pageMeta)) {
+          if (routePath === '/') continue // index.html : la MÊME fonction, écrite plus bas
+          const route = routePath.slice(1)
+          // Le chemin PUBLIÉ de ce document : `/jobs` en français, `/en/jobs` en
+          // anglais. C'est lui qui devient le canonical, l'`og:url` et l'entrée
+          // `hreflang` — jamais le chemin de la route React.
+          const chemin = cheminDansLaLangue(routePath, langue.code)
+          const card = ogCards[routePath]
+          if (!card) {
+            throw new Error(
+              `prerender-route-meta : la route pré-rendue « ${routePath} » a un titre/description ` +
+                '(src/config/page-meta.js) mais aucune carte OG — la table des cartes en dérive ' +
+                '(lighthouserc.cjs, DEPLOYMENT_PATHS). Ajouter la route là-bas (elle y est auditée ' +
+                'par Lighthouse), ou retirer son texte.'
+            )
+          }
+          // Méta de la route : texte, canonical, cartes OG, URLs. `routePath`
+          // choisit les CLÉS du dictionnaire (`pageMeta`), `urlPath` l'URL que le
+          // document annonce : deux rôles, donc deux paramètres — les confondre
+          // ferait chercher `/en/jobs` dans une table qui ne connaît que `/jobs`.
+          let out = applyOgCard({
+            html, routePath, route, urlPath: chemin.slice(1), origin, card, writeRouteText, setMeta,
+          })
+          // Shell statique du LCP : injecté dans <div id="root"> (vide à
+          // l'origine) — peint immédiatement, effacé au montage React.
+          const shell = SHELLS[route] || ''
+          exigerCorpsDeclare(routePath, route, shell)
+          // Le CORPS d'abord (il appartient à shells-routes.js : le refus nomme le
+          // module à corriger), puis le document ÉCRIT plus bas (une enveloppe de
+          // chrome mal refermée est un défaut d'injection, pas de coquille).
+          exigerBalisesEquilibrees(`le corps de la page ${chemin}`, shell)
+          if (shell) {
+            // Le corps est enveloppé dans le CHROME de l'app (navbar, `.App`,
+            // `main.flex-1`) : les coquilles ne publiaient pas ces conteneurs,
+            // donc l'héritage des styles du document divergeait de React (cf.
+            // app-chrome.js — le `text-align` hérité déplaçait les bornes d'encre
+            // du texte LCP et faisait ré-élire la peinture de React).
+            out = out.replace('<div id="root"></div>', `<div id="root">${chromeDePage(shell, pied)}</div>`)
+          }
+          // Preload du chunk lazy de la route, en parallèle de l'entrée →
+          // boot React accéléré (modulepreload fetch aussi ses imports).
+          const pageChunk = chunkFiles[route]
+          if (pageChunk && !existingPreloads.has(`/${pageChunk}`)) {
+            const link = `<link rel="modulepreload" crossorigin href="/${pageChunk}">`
+            out = out.replace(
+              '<meta charset="utf-8" />',
+              `<meta charset="utf-8" />${link}`
+            )
+          }
+          // La LANGUE du document : `lang`, `og:locale`, canonical, et les
+          // alternatives `hreflang` de SA famille (les mêmes dans les deux
+          // langues, par construction).
+          out = appliquerLaLangue(out, { chemin: routePath, code: langue.code, origine: origin })
+          const fichier = fichierDuDocument(langue.code, routePath)
+          exigerBalisesEquilibrees(`la coquille pré-rendue ${chemin} → ${fichier}`, out)
+          fs.mkdirSync(path.dirname(path.join(outDir, fichier)), { recursive: true })
+          fs.writeFileSync(path.join(outDir, fichier), out, 'utf8')
         }
-        // Méta de la route : texte, canonical, cartes OG, URLs.
-        let out = applyOgCard({ html, routePath, route, origin, card, writeRouteText, setMeta })
-        // Shell statique du LCP : injecté dans <div id="root"> (vide à
-        // l'origine) — peint immédiatement, effacé au montage React.
-        const shell = SHELLS[route] || ''
-        exigerCorpsDeclare(routePath, route, shell)
-        // Le CORPS d'abord (il appartient à shells-routes.js : le refus nomme le
-        // module à corriger), puis le document ÉCRIT plus bas (une enveloppe de
-        // chrome mal refermée est un défaut d'injection, pas de coquille).
-        exigerBalisesEquilibrees(`le corps de la page ${routePath}`, shell)
-        if (shell) {
-          // Le corps est enveloppé dans le CHROME de l'app (navbar, `.App`,
-          // `main.flex-1`) : les coquilles ne publiaient pas ces conteneurs,
-          // donc l'héritage des styles du document divergeait de React (cf.
-          // app-chrome.js — le `text-align` hérité déplaçait les bornes d'encre
-          // du texte LCP et faisait ré-élire la peinture de React).
-          out = out.replace('<div id="root"></div>', `<div id="root">${chromeDePage(shell, pied)}</div>`)
-        }
-        // Preload du chunk lazy de la route, en parallèle de l'entrée →
-        // boot React accéléré (modulepreload fetch aussi ses imports).
-        const pageChunk = chunkFiles[route]
-        if (pageChunk && !existingPreloads.has(`/${pageChunk}`)) {
-          const link = `<link rel="modulepreload" crossorigin href="/${pageChunk}">`
-          out = out.replace(
-            '<meta charset="utf-8" />',
-            `<meta charset="utf-8" />${link}`
-          )
-        }
-        exigerBalisesEquilibrees(`la coquille pré-rendue ${routePath} → ${shellFileFor(routePath)}`, out)
-        fs.writeFileSync(path.join(outDir, shellFileFor(routePath)), out, 'utf8')
       }
 
       // ── Shell de l'ACCUEIL dans index.html ─────────────────────────
@@ -243,12 +303,8 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
       // boucle des routes pré-rendues (qui écarte « / » pour cette raison) :
       // sans cet appel, l'accueil serait le seul corps non vérifié — et
       // c'est exactement par là que la dérive silencieuse rentrerait.
-      exigerCorpsDeclare('/', 'home', homeShell)
-      // L'accueil passe par le MÊME refus que les onze autres : il n'est pas
-      // « déjà couvert » par le garde de scripts/check-home-shell.js, qui lit
-      // l'artefact APRÈS le build — ici, la coquille déséquilibrée n'est pas
-      // écrite du tout.
-      exigerBalisesEquilibrees("le corps de l'accueil (shells-home.js)", homeShell)
+      // (Le corps de l'accueil est VÉRIFIÉ dans la boucle des langues, plus bas :
+      // il y a un document par langue indexée, et chacun passe les MÊMES refus.)
       // Même chrome que les routes (cf. app-chrome.js) : l'accueil ne peut pas
       // être la seule page dont la coquille hérite d'un autre alignement que
       // celui que React applique au même corps.
@@ -289,25 +345,47 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
             "n'est PAS préchargée, et l'élément LCP de « / » repasserait au JavaScript."
         )
       }
-      const withHomeShell = withPreload.replace(
-        '<div id="root"></div>',
-        `<div id="root">${chromeDePage(homeShell, pied)}</div>`
-      )
-      if (withHomeShell === withPreload) {
-        throw new Error(
-          'prerender-route-meta : <div id="root"></div> introuvable dans index.html — shell accueil NON injecté'
+      // ── UN DOCUMENT PAR LANGUE, POUR « / » AUSSI ─────────────────────
+      // L'accueil passe par le MÊME refus que les onze autres : il n'est pas
+      // « déjà couvert » par le garde de scripts/check-home-shell.js, qui lit
+      // l'artefact APRÈS le build — ici, la coquille déséquilibrée n'est pas
+      // écrite du tout. Le préchargement de la photo est le même pour les deux
+      // langues (même héros, même image).
+      for (const { langue, exigerCorpsDeclare, pied, homeShell, writeRouteText } of PAR_LANGUE) {
+        const chemin = cheminDansLaLangue('/', langue.code)
+        exigerCorpsDeclare('/', 'home', homeShell)
+        exigerBalisesEquilibrees("le corps de l'accueil (shells-home.js)", homeShell)
+        const withHomeShell = withPreload.replace(
+          '<div id="root"></div>',
+          `<div id="root">${chromeDePage(homeShell, pied)}</div>`
         )
+        if (withHomeShell === withPreload) {
+          throw new Error(
+            `prerender-route-meta : <div id="root"></div> introuvable dans index.html — shell accueil NON injecté (${langue.code})`
+          )
+        }
+        const indexFinal = appliquerLaLangue(writeRouteText(withHomeShell, '/'), {
+          chemin: '/',
+          code: langue.code,
+          origine: origin,
+        })
+        exigerBalisesEquilibrees(`la page pré-rendue ${chemin}`, indexFinal)
+        // index.html porte le texte de « / » : même fonction que les sept
+        // coquilles, donc les deux canaux ne peuvent pas diverger. La langue par
+        // défaut garde SON fichier (le chemin lu dans le bundle), les autres
+        // sont écrites sous leur préfixe.
+        const destination =
+          langue.code === LANGUE_PAR_DEFAUT
+            ? indexPath
+            : path.join(outDir, fichierDuDocument(langue.code, '/'))
+        fs.mkdirSync(path.dirname(destination), { recursive: true })
+        fs.writeFileSync(destination, indexFinal, 'utf8')
       }
-      const indexFinal = writeRouteText(withHomeShell, '/')
-      exigerBalisesEquilibrees('la page pré-rendue / → index.html', indexFinal)
-      // index.html porte le texte de « / » : même fonction que les sept
-      // coquilles, donc les deux canaux ne peuvent pas diverger.
-      fs.writeFileSync(indexPath, indexFinal, 'utf8')
 
 
       // Gabarit des routes privées (/dashboard, /profile…) : nu, non
       // indexable, sans canonical ni JSON-LD (buildAppTemplate le refuse).
-      const appHtml = buildAppTemplate({ html, T, setMeta })
+      const appHtml = buildAppTemplate({ html, T: FRANCAIS.T, setMeta })
       // Les DEUX artefacts bâtis par ce plugin qui ne sont PAS des routes
       // passent le MÊME refus que les douze pages : ils étaient construits,
       // écrits, et lus par personne. C'est l'angle que ce contrôle ferme — un
@@ -321,7 +399,7 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
       fs.writeFileSync(path.join(outDir, NOM_DU_GABARIT_APP), appHtml, 'utf8')
 
       // La 404 statique : servie par Vercel pour une URL sans rewrite.
-      const notFoundPage = buildNotFoundPage({ T, contact })
+      const notFoundPage = buildNotFoundPage({ T: FRANCAIS.T, contact })
       exigerBalisesEquilibrees(`la page 404 → ${NOM_DE_LA_PAGE_404}`, notFoundPage)
       fs.writeFileSync(path.join(outDir, NOM_DE_LA_PAGE_404), notFoundPage, 'utf8')
     },

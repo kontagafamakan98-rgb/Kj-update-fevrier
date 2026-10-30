@@ -32,6 +32,10 @@ from kojo_settings import FRONTEND_APP_URL, logger
 from kojo_identifiants import identifiant_job_query, identifiant_public
 import kojo_pages_metier as pages_metier
 import kojo_pages_guides as pages_guides
+# Les langues qui ont une URL propre, et la forme des alternatives `hreflang` :
+# une seule déclaration (kojo_langues.py), comparée à celle du frontend par
+# backend/tests/test_hreflang_sitemap.py.
+import kojo_langues as langues
 from kojo_worker_og import (
     nom_complet,
     worker_meta_lines,
@@ -828,10 +832,20 @@ async def get_sitemap_xml():
     # restent indexables (une recherche de marque « kojo connexion » doit tomber
     # dessus, et un `noindex` la ferait disparaître) : c'est leur PRIORITÉ dans le
     # sitemap qui était fausse, pas leur existence.
-    static_urls = [
-        (base + "/", "daily", "1.0"),
-        (base + "/how-it-works", "monthly", "0.7"),
-        (base + "/jobs", "hourly", "0.9"),
+    # ── Une ENTRÉE PAR LANGUE INDEXÉE (30/10/2026) ────────────────────
+    # Ces huit chemins sont les pages STATIQUES pré-rendues : le frontend en
+    # publie un document par langue indexée (`/jobs` et `/en/jobs`), et chacun
+    # déclare ses `hreflang` (vite-plugins/prerender/hreflang.js). Le sitemap
+    # doit annoncer les MÊMES URL et porter les MÊMES alternatives : un sitemap
+    # qui n'énumère que le français dit au moteur que l'anglais n'existe pas, et
+    # un `hreflang` que seul le crawl découvre est une déclaration à moitié
+    # servie. Les chemins restent RELATIFS ici : l'URL publiée se DÉRIVE de la
+    # langue (`kojo_langues`), jamais recopiée huit fois avec un `/en` devant —
+    # c'est le même module qui donne les alternatives de chaque entrée.
+    static_paths = [
+        ("/", "daily", "1.0"),
+        ("/how-it-works", "monthly", "0.7"),
+        ("/jobs", "hourly", "0.9"),
         # Les QUATRE pages de confiance : un moteur (et une régie publicitaire)
         # cherche à savoir qui édite le site, comment le joindre, ce qu'il fait
         # des données ET à quelles conditions il le fait. Elles existent en pages
@@ -845,10 +859,20 @@ async def get_sitemap_xml():
         # juridique, y était. Une page indexable absente du sitemap n'est pas
         # cachée : elle est explorée moins tôt et moins souvent — et un sitemap
         # qui n'énumère pas ce qu'il prétend énumérer se lit comme complet à tort.
-        (base + "/about", "monthly", "0.6"),
-        (base + "/contact", "monthly", "0.6"),
-        (base + "/privacy", "yearly", "0.4"),
-        (base + "/terms", "yearly", "0.4"),
+        ("/about", "monthly", "0.6"),
+        ("/contact", "monthly", "0.6"),
+        ("/privacy", "yearly", "0.4"),
+        ("/terms", "yearly", "0.4"),
+    ]
+    # `(url, chemin, freq, priorité)` : `chemin` n'est renseigné que pour les
+    # pages qui ONT une alternative par langue. Les pages ville, métier et guides
+    # sont écrites en français (aucune version anglaise n'existe) : elles gardent
+    # `None`, donc aucune alternative — une page monolingue ne déclare pas de
+    # `hreflang`, c'est le fait qui la décrit.
+    static_urls = [
+        (base + langues.chemin_dans_la_langue(chemin, code), chemin, freq, prio)
+        for chemin, freq, prio in static_paths
+        for code in langues.codes()
     ]
 
     # ── Les pages VILLE et MÉTIER (27/10/2026) ───────────────────────────────
@@ -858,7 +882,7 @@ async def get_sitemap_xml():
     # derrière lui une entrée morte (un sitemap qui renvoie des 404 fait perdre
     # la confiance du crawler sur tout le fichier).
     static_urls += [
-        (base + chemin, freq, prio)
+        (base + chemin, None, freq, prio)
         for chemin, freq, prio in pages_metier.urls_sitemap()
     ]
 
@@ -868,18 +892,29 @@ async def get_sitemap_xml():
     # n'aurait, pour « combien coûte un plombier », que des listes d'offres à
     # classer ; avec eux, une page répond à la question posée avant l'offre.
     static_urls += [
-        (base + chemin, freq, prio)
+        (base + chemin, None, freq, prio)
         for chemin, freq, prio in pages_guides.urls_sitemap()
     ]
 
     lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '
-        'xmlns:mobile="http://www.google.com/schemas/sitemap-mobile/1.0">',
+        'xmlns:mobile="http://www.google.com/schemas/sitemap-mobile/1.0" '
+        'xmlns:xhtml="http://www.w3.org/1999/xhtml">',
     ]
-    for url, changefreq, priority in static_urls:
+    for url, chemin, changefreq, priority in static_urls:
+        # Les alternatives d'une page bilingue. Elles sont écrites pour CHAQUE
+        # langue de la famille, `x-default` compris — la réciproque que Google
+        # exige (une page qui pointe l'autre sans être pointée en retour est
+        # ignorée) et la même liste dans les deux entrées, par construction.
+        alternatives = "".join(
+            f'<xhtml:link rel="alternate" hreflang="{escape_xml(code_langue)}" '
+            f'href="{escape_xml(base + chemin_langue)}"/>'
+            for code_langue, chemin_langue in langues.alternatives(chemin)
+        ) if chemin else ""
         lines.append(
             f"  <url><loc>{escape_xml(url)}</loc>"
+            f"{alternatives}"
             f"<changefreq>{changefreq}</changefreq>"
             f"<priority>{priority}</priority><mobile:mobile/></url>"
         )

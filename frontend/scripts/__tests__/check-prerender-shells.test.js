@@ -48,6 +48,17 @@ import { SITE_ORIGIN, shellFileFor } from '../site-meta.js';
 // pourrait diverger de ce qu'il exige, et le cas conforme rougirait pour la
 // mauvaise raison (la leçon du 25/09/2026).
 import { PAGE_META } from '../../src/config/page-meta.js';
+// Les LANGUES INDEXÉES : la fixture dérive un document par langue de la MÊME
+// déclaration que le garde lit (préfixes d'URL, `lang`, `og:locale`, forme des
+// alternatives). Une langue ajoutée là-bas apparaît donc ici sans qu'on touche
+// au test — une liste recopiée le ferait rougir pour la mauvaise raison.
+import {
+  LANGUES_INDEXEES,
+  alternatesHreflang,
+  cheminDansLaLangue,
+  fichierDansLaLangue,
+  langueIndexee,
+} from '../../src/config/langues-indexees.js';
 // Le scope register, résolu EXACTEMENT comme le fait le garde : la fixture ne
 // peut donc pas dériver des octets que la coquille doit publier.
 import { makeScopedTranslator as makeRegisterTranslator } from '../../src/utils/pack2PageI18n/register.js';
@@ -143,11 +154,21 @@ const tempDirs = [];
 // (le dossier est son `cwd`), si bien qu'un `rmSync` immédiat le voit BUSY.
 // `maxRetries`/`retryDelay` sont FAITS pour ces codes-là, et seulement quand
 // `recursive` est vrai : c'est le délai qui manquait, pas la force.
-afterEach(() => {
-  for (const dir of tempDirs.splice(0)) {
-    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
-  }
-});
+// Le DÉLAI compte aussi : depuis qu'un document est écrit PAR LANGUE INDEXÉE
+// (`build/en/…`, un sous-dossier de plus par page), le nettoyage supprime deux
+// fois plus de fichiers et les mêmes verrous Windows s'y ajoutent. Mesuré : le
+// hook expirait à 10 000 ms sur une arborescence dont l'ASSERTION venait de
+// passer — un rouge d'outillage, pas de règle, et il tombait sur un cas
+// différent à chaque exécution. Le budget explicite ne juge rien de moins : il
+// laisse simplement le délai de suppression suivre la taille de la fixture.
+afterEach(
+  () => {
+    for (const dir of tempDirs.splice(0)) {
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    }
+  },
+  60000
+);
 
 /** La carte og:image attendue d'une coquille, LUE dans la table unique. */
 const ogTagFor = (file) => {
@@ -369,7 +390,12 @@ const rewritesFor = (files) =>
   files
     .filter((f) => !['index.html', '404.html', 'app.html'].includes(f))
     .flatMap((file) => {
-      const route = file.replace(/\.html$/, '');
+      // Une page d'index de LANGUE (`en/index.html`) est servie à son DOSSIER
+      // (`/en`, `/en/`) : c'est la forme que le build et le sitemap publient, et
+      // c'est ce que le garde exige (section « langues indexées »).
+      const route = file.endsWith('/index.html')
+        ? file.replace(/\/index\.html$/, '')
+        : file.replace(/\.html$/, '');
       return [
         { source: `/${route}`, destination: `/${file}` },
         { source: `/${route}/`, destination: `/${file}` },
@@ -410,6 +436,41 @@ const copieModules = (dir) => {
 };
 
 /**
+ * Le MÊME document, publié dans une langue indexée.
+ *
+ * Rien n'est recopié : l'URL, la langue et les alternatives viennent de la
+ * déclaration (`src/config/langues-indexees.js`), exactement comme le garde les
+ * y lit. Ce que la fixture ne traduit PAS, c'est le corps — la coquille réelle
+ * se construit depuis `src/i18n/<langue>.json` au build, et un test de garde
+ * n'a pas à rejouer la traduction pour prouver qu'un `hreflang` est cohérent.
+ * Les deux documents diffèrent donc par leur en-tête, ce qui suffit à ce que le
+ * refus « copie de la page par défaut » ne se déclenche pas à tort.
+ *
+ * @param {string} contenu   Le document de la langue par défaut.
+ * @param {string} routePath Le chemin SANS langue de la page.
+ * @param {string} code      La langue du document à produire.
+ */
+const langueDocument = (contenu, routePath, code) => {
+  const langue = langueIndexee(code);
+  const url = `${SITE_ORIGIN}${cheminDansLaLangue(routePath, code)}`;
+  const alternatives = alternatesHreflang(routePath, SITE_ORIGIN)
+    .map(({ hreflang, href }) => `<link rel="alternate" hreflang="${hreflang}" href="${href}" />`)
+    .join('');
+  const entete =
+    `<link rel="canonical" href="${url}" />` +
+    alternatives +
+    `<meta property="og:url" content="${url}" />` +
+    `<meta property="og:locale" content="${langue.ogLocale}" />`;
+  return contenu
+    .replace('<html>', `<html lang="${langue.htmlLang}">`)
+    .replace(/<link rel="canonical"[^>]*>/g, '')
+    .replace(/<link rel="alternate" hreflang="[^"]*"[^>]*>/g, '')
+    .replace(/<meta property="og:url"[^>]*>/g, '')
+    .replace(/<meta property="og:locale"[^>]*>/g, '')
+    .replace('</head>', `${entete}</head>`);
+};
+
+/**
  * Écrit une arborescence de build FIXTURE et retourne sa racine.
  * `mutate` reçoit les pages et la config de rewrites ÉCRITS, et peut les altérer
  * (retirer un fichier, vider un shell, réintroduire le catch-all, réécrire un
@@ -441,6 +502,24 @@ const fixture = (mutate) => {
       `${TETE_SHELL}<meta name="description" content="${fr[keys.description]}" />`
     );
   }
+  // ── UN DOCUMENT PAR LANGUE INDEXÉE ─────────────────────────────────────
+  // Le garde (section « langues indexées ») lit un document par langue et par
+  // page, et compare `lang`, canonical, `og:url`/`og:locale` et les alternatives
+  // `hreflang` à la déclaration. Le document français est NORMALISÉ par le même
+  // chemin (`/jobs`, `lang="fr"`, son canonical et ses alternatives) : sans
+  // cela, la fixture conformerait les pages anglaises et pas les françaises,
+  // et le premier cas négatif accuserait la fixture.
+  for (const routePath of Object.keys(PAGE_META)) {
+    const base = shellFileFor(routePath);
+    // La source est lue AVANT la boucle : la langue par défaut normalise la page
+    // en place, et dériver l'anglais de la page déjà normalisée empêcherait son
+    // `<html lang>` d'être réécrit (`<html>` n'y serait plus).
+    const source = html[base];
+    if (!source) continue;
+    for (const langue of LANGUES_INDEXEES) {
+      html[fichierDansLaLangue(langue.code, base)] = langueDocument(source, routePath, langue.code);
+    }
+  }
   const files = [...Object.keys(html), ...CLIENT_PAGES];
   let config = { rewrites: rewritesFor(files), cleanUrls: true };
 
@@ -462,6 +541,9 @@ const fixture = (mutate) => {
   }
 
   for (const [name, contenu] of Object.entries(html)) {
+    // Un document de langue vit dans `build/<préfixe>/` : ce dossier n'existe
+    // pas encore, et c'est son nom que le garde relit (section 10).
+    fs.mkdirSync(path.dirname(path.join(build, name)), { recursive: true });
     fs.writeFileSync(path.join(build, name), contenu);
   }
   fs.writeFileSync(path.join(dir, 'vercel.json'), JSON.stringify(config, null, 2));
@@ -929,6 +1011,36 @@ describe('check-prerender-shells — chaque refus sait mordre', () => {
         },
       }),
       attendu: 'app-abc123.js',
+    },
+    {
+      // ── LANGUES INDEXÉES (30/10/2026) ────────────────────────────────────
+      // LA COLLISION QUE CE § EXISTE POUR EMPÊCHER : un document anglais qui se
+      // donne le canonical du français. Les deux versions annoncent la même URL
+      // canonique, donc un moteur en fusionne une des deux et la page anglaise
+      // n'est jamais indexée — c'est le défaut silencieux du versionnement par
+      // langue, et il ne change pas un pixel de la page.
+      nom: 'document anglais déclarant le canonical du français',
+      mutate: ({ html }) => {
+        html['en/jobs.html'] = html['en/jobs.html'].replace(
+          `<link rel="canonical" href="${SITE_ORIGIN}/en/jobs" />`,
+          `<link rel="canonical" href="${SITE_ORIGIN}/jobs" />`
+        );
+      },
+      attendu: 'canonical',
+    },
+    {
+      // L'AUTRE MOITIÉ : la déclaration `hreflang` amputée. Une version annoncée
+      // depuis une langue et pas depuis l'autre est IGNORÉE par un moteur (la
+      // réciproque est la condition), donc elle ne sert à rien — et rien d'autre
+      // dans le build ne lit ces balises.
+      nom: 'alternatives hreflang amputées sur un document de langue',
+      mutate: ({ html }) => {
+        html['en/jobs.html'] = html['en/jobs.html'].replace(
+          /<link rel="alternate" hreflang="x-default"[^>]*>/,
+          ''
+        );
+      },
+      attendu: 'alternatives hreflang',
     },
   ];
 

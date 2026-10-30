@@ -46,9 +46,14 @@ export function makeWriteRouteText({ pageMeta, T }) {
 
 // Applique à une coquille les méta qui dépendent de la route : canonical,
 // carte OG (wide + variante carrée), og:url et twitter:*.
+//
+// `routePath` choisit les CLÉS du dictionnaire (`/jobs`), `urlPath` l'URL
+// PUBLIÉE (`jobs`, ou `en/jobs` pour la version anglaise). Deux rôles distincts :
+// les confondre ferait chercher `/en/jobs` dans une table de textes qui ne
+// connaît que `/jobs`, et le build échouerait sur une clé absente.
 
-export function applyOgCard({ html, routePath, route, origin, card, writeRouteText, setMeta }) {
-  const url = `${origin}/${route}`
+export function applyOgCard({ html, routePath, route, urlPath = route, origin, card, writeRouteText, setMeta }) {
+  const url = `${origin}/${urlPath}`
   const imageUrl = `${origin}${card.image}`
   let out = writeRouteText(html, routePath).replace(
     /(<link rel="canonical" href=")[^"]*(")/,

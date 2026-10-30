@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-30",
-    "motif": "la vue de page est emise par utils/vue-de-page.js, plus par utils/analytics.js (bonus JS initial, 30/10/2026)",
+    "motif": "L'internationalisation publie deux documents par page (24 au lieu de 12) : check-bundle-size.js releve le plafond du build total a 7,00 Mo, et check-prerender-shells.js juge chaque document de langue sur lang, canonical, og:locale et la liste EXACTE des alternatives hreflang, la reciproque confrontee aux fichiers ecrits. Les deux sont mutes par leur harnais : leurs etats se reenregistrent avec ce motif.",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -133,19 +133,19 @@
       "frontend/scripts/check-job-form-canari.js": "806fdaed94c92d1e1f2fc8040a4db9dba5f49b78006a1b5f81a0358cee25c797",
       "backend/kojo_routers_jobs_proposals.py": "513fa961889e9318173d989836c290c3c08556ff3289f62ba2ebb750563f43a4",
       "frontend/scripts/check-cors-preflight.js": "10ef1c5f33a3e72d5e89f69a02d6d414513c0be06899edf4b53ce0ba86793cb8",
-      "frontend/scripts/check-prerender-shells.js": "3ac51916663c3bf144220196cb68107c197e50611f3744174ce479946112b0fc",
       ".github/scripts/alerte_sondes.py": "35c6b645b431b932c6af1ed53704acc4f096da428a49e2f7461259358f137687",
       ".github/scripts/livrer.py": "7debdcaf504701b083b5c13575c41a2e2cdc2ae5b58e84d9cb62c5aadf4c8ba1",
       "backend/kojo_scheduler.py": "a66d11b182fca4236d91941b9319b3bd72577acd550f233df3afbc6551fabaf6",
       "backend/scripts/check_index_db.py": "ab9545fdb8e09f2cdabeed9865b2537f9216c4954c36ca7ea5fae656ac1212dd",
-      "frontend/scripts/check-bundle-size.js": "eb4d0647088758dd7f2030c304937e9d65bcebde8e9aef3c4a8d82ae289c2e61",
       "frontend/scripts/check-csp-contract.js": "71c1929d340956cc0c4eaeb37296f140af58afe0b575b6eb6f61b1cd6841f145",
       "frontend/scripts/check-csp-documents-production.js": "d0310634de2010955d71d445bae8a6428a2334bf78acb24c470094d3032081bc",
       "frontend/scripts/check-css-inline-budget.js": "9a20c6bdb6815dd23bd2ae02f1222290dacc954e74d1b1b99de1ccf1c3ac4127",
       "frontend/scripts/check-typo-pages-production.js": "d361b6e0bbff8db6b6855f0fdfe9d1661c1ffbda02bee7bf36ecba38d25a0e8c",
       "backend/server.py": "8e6faf9fb0ce120afa1baaf89aec78e9fb9929a894b3e495086d7bf6dc9aeee8",
       "frontend/scripts/classes-coquilles.js": "f7e12a4058f073735a48e7db6f47664cc806f5b70b1ad5148f4bed1431f80da0",
-      "frontend/scripts/check-funnel-events.js": "0548b3419ae59feac15b78317316cdf9d3650db989ff3e08dd6542d41edc8485"
+      "frontend/scripts/check-funnel-events.js": "0548b3419ae59feac15b78317316cdf9d3650db989ff3e08dd6542d41edc8485",
+      "frontend/scripts/check-bundle-size.js": "4688385113b41369fd4bba8e244de2fc7aff8f91542a90b224e45a008d0371e0",
+      "frontend/scripts/check-prerender-shells.js": "efbb287fe83a4708f0262796ac7b3d21b5a3f77ca568785fac9c80da27d458e5"
     }
   },
   "hors_perimetre": [

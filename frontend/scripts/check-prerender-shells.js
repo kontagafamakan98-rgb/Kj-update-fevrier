@@ -114,6 +114,16 @@ import { PAGE_META } from '../src/config/page-meta.js';
 // qui les écrivent, jamais d'une liste tenue ici.
 import { NOM_DU_GABARIT_APP } from '../vite-plugins/prerender/app-template.js';
 import { NOM_DE_LA_PAGE_404 } from '../vite-plugins/prerender/not-found.js';
+// Les langues INDEXÉES : la liste, leurs préfixes d'URL, la forme des
+// alternatives `hreflang` et le nom du fichier écrit pour chacune viennent de
+// cette déclaration — le build l'écrit, ce garde la relit, le sitemap la publie.
+import {
+  LANGUES_INDEXEES,
+  LANGUE_PAR_DEFAUT,
+  alternatesHreflang,
+  cheminDansLaLangue,
+  fichierDansLaLangue,
+} from '../src/config/langues-indexees.js';
 
 // Un ZÉRO publié comme preuve sociale : « 0 », « 0,0 », « 0 % » — la forme
 // seule, jamais un chiffre qui CONTIENT un zéro (« 10 », « 7j/7 »).
@@ -982,6 +992,141 @@ for (const violation of apostrophesHorsConvention(surfacesApostrophe)) {
   }
 }
 
+// 10. LES LANGUES INDEXÉES : une URL par langue, et chaque document le DIT.
+//
+// Mesuré le 30/10/2026 (constat F5) : 976 clés en cinq langues, mais UNE seule
+// surface indexable — `<html lang="fr">` sur les douze documents, une URL par
+// page, aucun `hreflang`. Le build publie désormais un document par langue
+// indexée (`build/en/jobs.html`) ; ce contrôle porte sur l'ARTEFACT, et sur les
+// quatre faits qui font qu'une page est trouvable dans SA langue :
+//
+//   1. le document existe (un `hreflang` vers un fichier absent est une
+//      déclaration fausse — c'est le refus central de cette section) ;
+//   2. il annonce SA langue (`lang`, `og:locale`) et SON URL (canonical,
+//      `og:url`) : une page anglaise qui se donne l'URL française se
+//      désindexe elle-même, et un canonical croisé entre deux langues fait
+//      fusionner les deux versions en une seule ;
+//   3. il porte EXACTEMENT les alternatives de sa famille, `x-default` compris
+//      (comparées, pas filtrées : une alternative oubliée laisse la version
+//      anglaise sans chemin entrant, une alternative en trop pointe ailleurs) ;
+//   4. il n'est pas la COPIE de la page par défaut — sans cette vérification,
+//      un dictionnaire vide publierait deux URL identiques au même contenu, ce
+//      qui est le cas que Google traite comme du contenu dupliqué.
+//
+// Et le ROUTAGE des documents préfixés est vérifié ici pour la même raison que
+// pour les pages françaises (section 6) : un fichier écrit et jamais servi est
+// une optimisation — ici une version linguistique — perdue en silence.
+{
+  const documentsAttendus = [];
+  for (const langue of LANGUES_INDEXEES) {
+    for (const routePath of Object.keys(PAGE_META)) {
+      documentsAttendus.push({
+        langue,
+        routePath,
+        fichier: fichierDansLaLangue(langue.code, shellFileFor(routePath)),
+        url: `${SITE_ORIGIN}${cheminDansLaLangue(routePath, langue.code)}`,
+      });
+    }
+  }
+  const lus = new Map();
+  for (const doc of documentsAttendus) {
+    const contenu = read(doc.fichier);
+    if (contenu) lus.set(doc.fichier, contenu);
+  }
+  if (lus.size !== documentsAttendus.length) {
+    errors.push(
+      `langues indexées : ${lus.size} document(s) lu(s) dans build/ pour ${documentsAttendus.length} ` +
+        `attendu(s) (${LANGUES_INDEXEES.length} langue(s) × ${Object.keys(PAGE_META).length} page(s), ` +
+        'src/config/langues-indexees.js × src/config/page-meta.js) — une langue déclarée sans document ' +
+        'publierait des `hreflang` qui répondent 404'
+    );
+  }
+  const urlsServies = new Set(documentsAttendus.map((doc) => doc.url));
+  for (const { langue, routePath, fichier, url } of documentsAttendus) {
+    const contenu = lus.get(fichier);
+    if (!contenu) continue;
+    const lang = (contenu.match(/<html lang="([^"]*)"/) || [])[1];
+    if (lang !== langue.htmlLang) {
+      errors.push(
+        `build/${fichier} : <html lang="${lang || ''}"> au lieu de « ${langue.htmlLang} » — le document ` +
+          `de ${cheminDansLaLangue(routePath, langue.code)} se déclarerait dans une autre langue que la sienne`
+      );
+    }
+    const canonical = (contenu.match(/<link rel="canonical" href="([^"]*)"/) || [])[1];
+    if (canonical !== url) {
+      errors.push(
+        `build/${fichier} : canonical « ${canonical || ''} » au lieu de « ${url} » — une page qui se ` +
+          "donne l'URL d'une autre langue se désindexe, et deux canonicals croisés font fusionner les deux versions"
+      )
+    }
+    for (const cle of ['og:url', 'og:locale']) {
+      const valeur = metaContents(contenu, cle)[0];
+      const attendue = cle === 'og:url' ? url : langue.ogLocale;
+      if (valeur !== attendue) {
+        errors.push(`build/${fichier} : ${cle} « ${valeur || ''} » au lieu de « ${attendue} »`)
+      }
+    }
+    // Les alternatives : la liste DÉCLARÉE, comparée à celle qui est publiée.
+    const publiees = [
+      ...contenu.matchAll(/<link rel="alternate" hreflang="([^"]*)" href="([^"]*)"/g),
+    ].map(([, hreflang, href]) => `${hreflang} ${href}`);
+    const attendues = alternatesHreflang(routePath, SITE_ORIGIN).map(
+      ({ hreflang, href }) => `${hreflang} ${href}`
+    );
+    const triees = (liste) => [...liste].sort().join(" | ");
+    if (triees(publiees) !== triees(attendues)) {
+      errors.push(
+        `build/${fichier} : alternatives hreflang « ${publiees.join(', ') || '(aucune)'} » au lieu de « ` +
+          `${attendues.join(', ')} » — chaque version linguistique doit être annoncée depuis CHAQUE autre, ` +
+          'sinon un moteur ignore la déclaration non réciproque'
+      );
+    }
+    // La RÉCIPROQUE : chaque href publié est un document que ce build a écrit.
+    for (const alternative of publiees) {
+      const href = alternative.split(' ')[1];
+      if (href && !urlsServies.has(href)) {
+        errors.push(
+          `build/${fichier} : l'alternative « ${href} » ne correspond à aucun document écrit par ce build ` +
+            `(attendu : ${[...urlsServies].join(', ')})`
+        );
+      }
+    }
+    // Et x-default désigne la langue par défaut, pas la langue du document.
+    const secours = (contenu.match(/hreflang="x-default" href="([^"]*)"/) || [])[1];
+    const urlParDefaut = `${SITE_ORIGIN}${cheminDansLaLangue(routePath, LANGUE_PAR_DEFAUT)}`;
+    if (secours !== urlParDefaut) {
+      errors.push(
+        `build/${fichier} : x-default « ${secours || ''} » au lieu de « ${urlParDefaut} » — c'est la page ` +
+          `de la langue par défaut (${LANGUE_PAR_DEFAUT}) qui doit être servie à un visiteur sans préférence`
+      );
+    }
+    // La page d'une autre langue n'est pas la COPIE de celle par défaut.
+    if (langue.code !== LANGUE_PAR_DEFAUT) {
+      const reference = lus.get(fichierDansLaLangue(LANGUE_PAR_DEFAUT, shellFileFor(routePath)));
+      if (reference && reference === contenu) {
+        errors.push(
+          `build/${fichier} : document IDENTIQUE à sa version ${LANGUE_PAR_DEFAUT} — une seconde URL pour ` +
+            'le même contenu est du contenu dupliqué : la coquille doit être construite dans la langue du ' +
+            "document (src/i18n/<langue>.json), pas recopiée de la langue par défaut"
+        );
+      }
+    }
+    // Le ROUTAGE : l'URL préfixée sert CE fichier (cf. section 6).
+    if (vercelRewrites && langue.prefixe) {
+      const chemin = cheminDansLaLangue(routePath, langue.code);
+      for (const source of [chemin, `${chemin}/`]) {
+        const regle = vercelRewrites.find((r) => r && r.source === source);
+        if (!regle || regle.destination !== `/${fichier}`) {
+          errors.push(
+            `vercel.json : rewrite « ${source} » → « /${fichier} » absent ou erroné — la version ` +
+              `${langue.htmlLang} de cette page ne serait jamais servie, et son hreflang répondrait au SPA`
+          );
+        }
+      }
+    }
+  }
+}
+
 if (errors.length) {
   console.error('❌ Pré-rendu par route invalide — ' + errors.length + ' problème(s) :');
   for (const e of errors) console.error('  ' + e);
@@ -993,6 +1138,9 @@ console.log(
     `DESCRIPTION égale à src/config/page-meta.js (${descriptionsVerifiees} comparée(s)), ` +
     `plus les ${NOM_DU_GABARIT_APP} et ${NOM_DE_LA_PAGE_404} (hors routes) lus avec la même règle, ` +
     `et les ${prerenderedPages.length} pages pré-rendues (${prerenderedPages.join(', ')}) ` +
-    `sont routées par vercel.json (sans catch-all : URL inconnue → 404). Fiches /jobs/:id servies ` +
+    `sont routées par vercel.json (sans catch-all : URL inconnue → 404), ` +
+    `et les ${LANGUES_INDEXEES.length} langues indexées (${LANGUES_INDEXEES.map((l) => l.code).join(', ')}) ` +
+    `publient ${LANGUES_INDEXEES.length * Object.keys(PAGE_META).length} documents dont le lang, le canonical ` +
+    `et les alternatives hreflang sont ceux de leur déclaration. Fiches /jobs/:id servies ` +
     `par le backend (GET /api/og/jobs/{id}).`
 );
