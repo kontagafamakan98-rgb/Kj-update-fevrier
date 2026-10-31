@@ -252,7 +252,35 @@ export const BUDGETS = {
   initialGzip: 135 * 1024, // JS initial (chunks référencés par index.html), gzip
   largestChunkGzip: 200 * 1024, // plus gros chunk JS, gzip
   totalRaw: 7.00 * 1024 * 1024, // build/ entier, brut (voir les mesures datées ci-dessus)
+  // ── PLAFOND PAR MODULE (31/10/2026) ──────────────────────────────────────
+  // Avant ce plafond, un chunk n'était borné QUE s'il était le plus gros du
+  // build (`largestChunkGzip`, 200 Ko) : le deuxième, le troisième et les
+  // cinquante-neuf suivants pouvaient chacun doubler de taille sans qu'aucun
+  // budget ne bronche, pourvu qu'ils restent sous le premier. Le budget total,
+  // lui, ne dit rien d'un module : +40 Ko de build éparpillés sur soixante
+  // chunks et +40 Ko sur UN chunk paresseux s'y lisent pareil.
+  //
+  // Mesuré sur le build du 31/10/2026 (62 chunks JS) : le plus gros module HORS
+  // chemin critique est `vendor-leaflet` à 47,5 Ko gzip ; les suivants sont
+  // `vendor-react-dom` 40,7, `vendor-sentry` 29,0 et les quatre dictionnaires
+  // (mos 26,2 / wo 26,2 / en 26,1 / bm 25,3). 56 Ko laisse donc 18 % de marge au
+  // plus gros module paresseux — et laisse `vendor-leaflet` (la carte de /jobs,
+  // chargée par `import()`) rester le point de comparaison qu'il est.
+  //
+  // Le CHEMIN CRITIQUE est exclu, et c'est une décision de non-duplication :
+  // `index.html` et ses dépendances statiques sont déjà jugés par
+  // `initialGzip` (135 Ko pour leur SOMME) et par `largestChunkGzip` — un
+  // plafond par module y rendrait un second verdict sur les mêmes octets, et
+  // l'entrée (64,1 Ko, le plus gros fichier du build) le franchirait par
+  // construction. Ici, chaque module PARESSEUX répond de lui-même.
+  chunkGzip: 56 * 1024,
 };
+
+// Plancher de LECTURE du budget par module, en NATURE et non en nombre : un
+// build où TOUT est dans le chemin critique ne juge aucun module (et c'est un
+// changement de structure, pas une mesure à zéro tolérée). Un nombre fixe aurait
+// jugé la taille des fixtures autant que celle du build.
+const AUCUN_MODULE_HORS_CRITIQUE = 0;
 
 const ko = (bytes) => `${(bytes / 1024).toFixed(1)} Ko`;
 
@@ -474,7 +502,33 @@ export const checkBundleSize = ({ root, quiet = false } = {}) => {
     );
   }
 
-  // ── Budget 4 : l'unité paresseuse est restée paresseuse ──────────────
+  // ── Budget 4 : taille de CHAQUE module hors chemin critique ────────────
+  // Un module paresseux qui grossit ne déplace pas forcément le plus gros
+  // chunk ni le total d'un octet visible : c'est ce trou que ce budget ferme.
+  // Il nomme CHAQUE fautif (pas seulement le pire), avec sa taille et le
+  // plafond, et il refuse de conclure sur un build qui ne porte presque plus
+  // de modules à juger.
+  const nomsInitiaux = new Set(initialChunks.map((c) => c.file));
+  const modulesHorsCritique = chunks.filter((c) => !nomsInitiaux.has(c.file));
+  if (modulesHorsCritique.length === AUCUN_MODULE_HORS_CRITIQUE) {
+    errors.push(
+      `budget par module : aucun module hors chemin critique sur ${chunks.length} chunk(s) ` +
+        `— tout est devenu initial, donc ce budget ne juge plus rien (et le visiteur ` +
+        `télécharge ce qu'il n'exécute pas)`
+    );
+  }
+  for (const module of modulesHorsCritique) {
+    if (module.gzip > BUDGETS.chunkGzip) {
+      errors.push(
+        `module ${module.file} : ${ko(module.gzip)} gzip > plafond ${ko(BUDGETS.chunkGzip)} ` +
+          `par module (${(module.gzip / BUDGETS.chunkGzip).toFixed(2)}×) — un module ` +
+          `paresseux qui grossit ne déplace ni le plus gros chunk ni le total : ` +
+          `le découper (\`import()\`) ou justifier le relèvement dans BUDGETS.chunkGzip`
+      );
+    }
+  }
+
+  // ── Budget 5 : l'unité paresseuse est restée paresseuse ──────────────
   // Aucune arête STATIQUE venue de l'extérieur ne doit mener à un chunk à la
   // demande : elle l'entraînerait dans le chargement de ce chunk.
   const ecartsALaDemande = auditChunksALaDemande(jsFiles);
@@ -506,12 +560,27 @@ export const checkBundleSize = ({ root, quiet = false } = {}) => {
     `  build total         : ${(totalRaw / 1024 / 1024).toFixed(2)} Mo / budget ` +
       `${(BUDGETS.totalRaw / 1024 / 1024).toFixed(2)} Mo`
   );
+  // Le plafond par module est publié AVEC son plus gros porteur : un plafond
+  // qui n'affiche que son dépassement n'a servi à aucun arbitrage.
+  const plusGrosModule = modulesHorsCritique[0] || null;
+  log(
+    `  modules (hors critique) : ${modulesHorsCritique.length} jugé(s), plus gros ` +
+      `${plusGrosModule ? `${ko(plusGrosModule.gzip)} gzip (${plusGrosModule.file})` : 'aucun'} ` +
+      `/ plafond ${ko(BUDGETS.chunkGzip)}`
+  );
   log(
     `  chunks à la demande : ${CHUNKS_A_LA_DEMANDE.join(' + ')} ` +
       `(${ecartsALaDemande.length} écart(s))`
   );
 
-  const stats = { initialGzip, largest, totalRaw, initialChunks, ecartsALaDemande };
+  const stats = {
+    initialGzip,
+    largest,
+    totalRaw,
+    initialChunks,
+    modulesHorsCritique,
+    ecartsALaDemande,
+  };
 
   if (errors.length > 0) {
     console.error(`\n❌ Budget de bundle dépassé (${errors.length} problème(s)) :`);
@@ -519,7 +588,10 @@ export const checkBundleSize = ({ root, quiet = false } = {}) => {
     return { ok: false, errors, stats };
   }
 
-  log('\n✅ Bundle dans les budgets (JS initial, plus gros chunk, build total, chunks à la demande).');
+  log(
+    '\n✅ Bundle dans les budgets (JS initial, plus gros chunk, build total, ' +
+      'taille de chaque module hors chemin critique, chunks à la demande).'
+  );
   return { ok: true, errors, stats };
 };
 

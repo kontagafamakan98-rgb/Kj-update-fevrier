@@ -56,6 +56,7 @@ from kojo_metrics import (
     rendre as render_metrics,
 )
 from kojo_payments import (
+    diagnostic as paiement_diagnostic,
     init_paydunya_circuit,
     paydunya_circuit_state,
     refresh_paydunya_circuit_from_db,
@@ -84,25 +85,21 @@ from kojo_settings import APP_ENV, APP_REVISION, APP_VERSION, FRONTEND_APP_URL, 
 # ---------------------------------------------------------------------------
 # Sentry (monitoring d'erreurs, OPTIONNEL — activé si SENTRY_DSN est défini)
 # ---------------------------------------------------------------------------
-def _init_sentry():
-    dsn = os.environ.get('SENTRY_DSN', '').strip()
-    if not dsn:
-        return
-    try:
-        import sentry_sdk
-        sentry_sdk.init(
-            dsn=dsn,
-            environment=APP_ENV,
-            traces_sample_rate=0.1,
-            # Ne jamais envoyer de PII (emails, téléphones) à Sentry par défaut
-            send_default_pii=False,
-        )
-        logger.info("✅ Sentry activé (backend)")
-    except Exception as exc:  # pragma: no cover - dépend de la config serveur
-        logger.warning(f"⚠️ Sentry non initialisé (backend): {exc}")
+# L'initialisation vit dans `kojo_sentry` DEPUIS le 31/10/2026, et pas ici : elle
+# retient ce qu'elle a obtenu (actif, absent, refusé) pour que `/health` puisse
+# le PUBLIER. Avant, l'échec d'initialisation était avalé par un `except` local :
+# un DSN expiré laissait le serveur se déclarer en bonne santé en n'envoyant
+# plus une seule erreur — et la seule façon de le savoir était d'ouvrir les
+# secrets Fly. Le message d'une exception n'est plus journalisé tel quel non
+# plus : `sentry_sdk` y recopie le DSN.
+from kojo_sentry import diagnostic as sentry_diagnostic
+from kojo_sentry import initialiser as initialiser_sentry
 
-
-_init_sentry()
+_etat_sentry = initialiser_sentry(environnement=APP_ENV)
+if _etat_sentry["state"] == "ok":
+    logger.info("✅ Sentry activé (backend)")
+else:
+    logger.warning("⚠️ Sentry %s : %s", _etat_sentry["state"], sentry_diagnostic()["motif"])
 
 # Routers par domaine (chacun exporte `router`)
 from kojo_routers_auth import router as auth_router
@@ -205,10 +202,23 @@ async def _health_payload() -> dict:
             "failure_threshold": circuit["failure_threshold"],
             "remaining_cooldown_seconds": int(circuit["remaining_cooldown_seconds"]),
         },
+        # La même paire que ci-dessus ne distingue PAS « clés absentes », « aucun
+        # paiement depuis le redémarrage » et « dernier paiement réussi » — trois
+        # situations, une seule lecture. Ce bloc les sépare : `configured`,
+        # `state` (ok / echec / inconnu), `cause` classée, `motif` actionnable, et
+        # les dates des derniers appels. Jamais une clé, jamais le mode
+        # test/live, jamais une référence de facture (cf. kojo_payments).
+        "paiement": paiement_diagnostic(),
         # La cause de la dernière panne de l'assistant, classée (cf.
         # kojo_ai_gateway.diagnostic). `state: "inconnu"` quand aucun appel n'a
         # eu lieu depuis le démarrage : un silence n'est pas un vert.
         "ai_gateway": ai_gateway_diagnostic(),
+        # Les erreurs REMONTENT-elles ? `configured` n'est vrai que si le DSN
+        # est posé ET que l'initialisation a réussi ; `inactif` (DSN absent) et
+        # `echec` (DSN refusé) demandent deux remèdes différents. Ni le DSN, ni
+        # sa clé, ni son hôte d'ingestion ne sont publiés : `/health` est une
+        # réponse publique (cf. kojo_sentry).
+        "sentry": sentry_diagnostic(),
     }
 
 
@@ -294,7 +304,12 @@ async def _paydunya_monitor_payload() -> dict:
             "failure_threshold": circuit["failure_threshold"],
             "remaining_cooldown_seconds": int(circuit["remaining_cooldown_seconds"]),
         },
+        # Le MÊME diagnostic que /health : un moniteur d'infra qui n'interroge
+        # que cette route doit pouvoir dire POURQUOI le circuit est ouvert, pas
+        # seulement qu'il l'est. `timestamp` reste : c'est la date de CE relevé,
+        # et un moniteur qui la lit ne doit pas la perdre pour un ajout.
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "paiement": paiement_diagnostic(),
     }
     return payload, circuit["state"]
 

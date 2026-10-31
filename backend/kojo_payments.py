@@ -302,6 +302,203 @@ def is_paydunya_circuit_open() -> bool:
     return paydunya_circuit_state()["state"] == "open"
 
 
+# ── L'ÉTAT DU DERNIER APPEL, PUBLIÉ PAR /health ────────────────────────────
+#
+# CE QUE CE BLOC FERME (31/10/2026). `/health` publiait, pour le paiement,
+# `paydunya_circuit: {state: closed, consecutive_failures: 0}` — et cette paire
+# se lit EXACTEMENT PAREIL dans trois situations qui n'ont rien à voir :
+# (1) les clés PayDunya sont absentes, aucun paiement ne peut aboutir ; (2) les
+# clés sont posées et aucun paiement n'a eu lieu depuis le redémarrage ;
+# (3) les clés sont posées et le dernier paiement a réussi. C'est la famille de
+# défaut que `kojo_ai_gateway.diagnostic` a fermée le 27/10 pour l'assistant, et
+# que l'audit du 31/10 a nommée pour le paiement : « `paydunya_circuit: closed`,
+# 0 échec consécutif ; mode live non vérifiable sans secret ».
+#
+# Le remède n'est pas d'exposer les clés (jamais) ni le mode test/live (c'est un
+# indicateur exploitable : annoncer publiquement qu'on encaisse en test dirait à
+# un attaquant qu'un faux paiement peut suffire) : c'est de garder la CAUSE
+# CLASSÉE — un statut HTTP, un genre d'échec — et de la publier. `cause`,
+# `last_status` et les trois dates suffisent à choisir entre « poser les clés »,
+# « renouveler la clé refusée », « attendre le quota » et « incident PayDunya ».
+# Rien d'autre ne sort : ni montant, ni référence de facture, ni numéro.
+#
+# L'état est PAR PROCESS, comme celui du gateway IA : remis à zéro au
+# redémarrage, et `state: "inconnu"` dit le silence au lieu de le faire passer
+# pour un vert. Le COMPTEUR d'échecs, lui, reste celui du circuit (partagé, lu
+# en base) : deux compteurs auraient divergé.
+_diagnostic = {
+    "cause": "",
+    "last_status": None,
+    "last_call_at": None,
+    "last_failure_at": None,
+    "last_success_at": None,
+}
+
+# Ce que chaque statut HTTP veut dire pour qui doit RÉPARER. Une phrase par
+# statut, parce que « 401 » et « 429 » n'appellent pas la même personne.
+MOTIFS_PAR_STATUT = {
+    400: (
+        "requête refusée (400) : paramètres de facture refusés — vérifier le "
+        "canal PayDunya et le montant envoyés"
+    ),
+    401: "clés refusées (401) : renouveler PAYDUNYA_MASTER_KEY et PAYDUNYA_PRIVATE_KEY",
+    403: "accès refusé (403) : clé sans droit sur cette action — vérifier PAYDUNYA_TOKEN",
+    404: (
+        "route PayDunya introuvable (404) : vérifier PAYDUNYA_MODE (test et live "
+        "n'ont pas la même base d'URL)"
+    ),
+    429: "quota PayDunya atteint (429) : trop de requêtes — réessayer plus tard",
+}
+
+# Ce que chaque genre d'échec veut dire quand il n'y a pas de statut à lire.
+MOTIFS_PAR_CAUSE = {
+    "non_configure": (
+        "paiement non configuré : PAYDUNYA_MASTER_KEY, PAYDUNYA_PRIVATE_KEY ou "
+        "PAYDUNYA_TOKEN absent — aucun paiement ne peut aboutir (`/health` dit "
+        "`configured: false`) ; poser le secret sur Fly puis redéployer"
+    ),
+    "reseau": (
+        "PayDunya injoignable (réseau) : ni DNS, ni TLS, ni réponse dans le délai "
+        "— vérifier l'hôte et la connectivité sortante de la machine"
+    ),
+    "illisible": (
+        "réponse PayDunya sans JSON exploitable : le fournisseur répond, mais pas "
+        "dans son contrat — vérifier le journal applicatif"
+    ),
+    "cles_refusees": (
+        "PayDunya refuse les clés (401/403) : renouveler PAYDUNYA_MASTER_KEY / "
+        "PAYDUNYA_PRIVATE_KEY / PAYDUNYA_TOKEN dans le tableau de bord"
+    ),
+    "quota": "quota PayDunya atteint (429) : réessayer plus tard, ou vérifier le plan du compte",
+    "fournisseur": (
+        "PayDunya en panne (5xx) : incident côté fournisseur — le circuit s'ouvre "
+        "au seuil, aucune intervention côté Kojo"
+    ),
+    "requete_refusee": (
+        "PayDunya refuse la requête (4xx hors clés/quota) : paramètre ou ressource "
+        "inconnue — lire le journal applicatif, le motif publié ne dit pas le corps"
+    ),
+    "circuit_ouvert": (
+        "circuit PayDunya ouvert : appels suspendus pendant le refroidissement "
+        "(fail fast) — réouverture automatique, aucune intervention"
+    ),
+}
+
+
+def _maintenant() -> str:
+    """L'instant en ISO 8601 UTC — la même forme que `timestamp` de /health."""
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _noter_succes(statut=None) -> None:
+    """Un appel qui a ABOUTI (HTTP lisible) : date la réussite et le statut.
+
+    Le genre d'échec précédent est CONSERVÉ (il explique une reprise), et
+    `state` dit déjà « ok » — même règle que le diagnostic du gateway IA.
+    """
+    _diagnostic["last_status"] = int(statut) if isinstance(statut, int) else None
+    _diagnostic["last_call_at"] = _maintenant()
+    _diagnostic["last_success_at"] = _diagnostic["last_call_at"]
+
+
+def _noter_echec(exc, statut=None) -> None:
+    """Mémorise un échec CLASSÉ : genre, statut HTTP s'il y en a un, dates.
+
+    `statut` est passé explicitement quand l'échec vient du CORPS et non du
+    transport (un 200 dont le JSON ne se lit pas) : la réponse existe encore à
+    ce moment-là, et le statut obtenu est justement ce qu'un diagnostic
+    cherche. À défaut il se lit sur l'exception (erreur HTTP).
+
+    Le message de l'exception n'est PAS retenu : `requests` y recopie l'URL
+    appelée, et une URL PayDunya porte l'identifiant de facture. Ce qui est
+    publié est le genre, pas la requête.
+    """
+    if statut is None:
+        reponse = getattr(exc, "response", None)
+        if reponse is not None:
+            statut = getattr(reponse, "status_code", None)
+    statut = int(statut) if isinstance(statut, int) else None
+    if isinstance(exc, ValueError):
+        cause = "illisible"
+    elif statut is None:
+        cause = "reseau"
+    elif statut in (401, 403):
+        cause = "cles_refusees"
+    elif statut == 429:
+        cause = "quota"
+    elif statut >= 500:
+        cause = "fournisseur"
+    else:
+        cause = "requete_refusee"
+    _diagnostic["cause"] = cause
+    _diagnostic["last_status"] = statut
+    _diagnostic["last_call_at"] = _maintenant()
+    _diagnostic["last_failure_at"] = _diagnostic["last_call_at"]
+
+
+def _motif_paiement(etat: str, cause: str, circuit: dict) -> str:
+    """La phrase actionnable d'un état d'échec, vide quand il n'y en a pas.
+
+    Le circuit OUVERT passe avant la cause du dernier appel : c'est l'état qui
+    explique pourquoi plus rien ne part, même si le dernier échec était un 500.
+    """
+    if etat != "echec":
+        return ""
+    if circuit["state"] == "open":
+        return (
+            f"circuit ouvert après {circuit['consecutive_failures']} échecs réseau "
+            f"consécutifs : appels PayDunya suspendus {int(circuit['remaining_cooldown_seconds'])} s "
+            "(fail fast), réouverture automatique"
+        )
+    if cause == "non_configure":
+        return MOTIFS_PAR_CAUSE["non_configure"]
+    statut = _diagnostic["last_status"]
+    if isinstance(statut, int) and statut in MOTIFS_PAR_STATUT:
+        return MOTIFS_PAR_STATUT[statut]
+    return MOTIFS_PAR_CAUSE.get(cause, "")
+
+
+def diagnostic() -> dict:
+    """L'état du paiement, publiable tel quel par /health (aucun secret).
+
+    `state` a TROIS valeurs, jamais deux : `ok` (le dernier appel a abouti),
+    `echec` (clés absentes, ou dernier appel en échec, ou circuit ouvert) et
+    `inconnu` (configuré, mais aucun appel depuis le redémarrage). Un paiement
+    jamais exercé ne se lit pas comme un paiement sain.
+    """
+    circuit = paydunya_circuit_state()
+    configure = is_paydunya_configured()
+    if not configure:
+        etat, cause = "echec", "non_configure"
+    elif circuit["state"] == "open" or circuit["consecutive_failures"] > 0:
+        etat, cause = "echec", (_diagnostic["cause"] or "circuit_ouvert")
+    elif _diagnostic["last_success_at"]:
+        etat, cause = "ok", ""
+    else:
+        etat, cause = "inconnu", ""
+    return {
+        "configured": configure,
+        "state": etat,
+        "cause": cause,
+        "motif": _motif_paiement(etat, cause, circuit),
+        "last_status": _diagnostic["last_status"],
+        "consecutive_failures": circuit["consecutive_failures"],
+        "failure_threshold": circuit["failure_threshold"],
+        "circuit": circuit["state"],
+        "remaining_cooldown_seconds": int(circuit["remaining_cooldown_seconds"]),
+        "last_call_at": _diagnostic["last_call_at"],
+        "last_failure_at": _diagnostic["last_failure_at"],
+        "last_success_at": _diagnostic["last_success_at"],
+    }
+
+
+def reinitialiser_diagnostic() -> None:
+    """Remet l'état de diagnostic à zéro (démarrage, ou test qui isole son cas)."""
+    _diagnostic.update(
+        cause="", last_status=None, last_call_at=None, last_failure_at=None, last_success_at=None
+    )
+
+
 def _circuit_record_success() -> None:
     _paydunya_circuit.update({"state": "closed", "consecutive_failures": 0, "opened_at": 0.0})
     _schedule_circuit_persist()
@@ -355,9 +552,20 @@ def _paydunya_call(method: str, url: str, *, json: Optional[Dict[str, Any]] = No
         response = requests.request(method, url, headers=get_paydunya_headers(), json=json, timeout=timeout)
         response.raise_for_status()
         data = response.json()
-    except (requests.RequestException, ValueError):
+    except ValueError as exc:
+        # Corps illisible : la réponse EXISTE, et son statut est ce qu'un
+        # diagnostic cherche (un 200 dont le JSON ne se lit pas n'est pas un
+        # échec réseau, et le circuit ne doit pas s'ouvrir pour lui).
+        _noter_echec(exc, statut=getattr(response, "status_code", None))
         _circuit_record_failure()
         raise
+    except requests.RequestException as exc:
+        # La CAUSE est gardée AVANT de relancer : l'appelant convertit l'échec
+        # en 502, et sans cette ligne la seule trace vivrait dans les journaux.
+        _noter_echec(exc)
+        _circuit_record_failure()
+        raise
+    _noter_succes(getattr(response, "status_code", None))
     _circuit_record_success()
     return data
 

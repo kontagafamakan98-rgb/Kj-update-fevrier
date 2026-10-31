@@ -6,6 +6,13 @@ name: Backend health probe (daily)
 # 2. Vérifie la connexion persistante à la base MongoDB (database == connected).
 # 3. Vérifie l'état du circuit breaker PayDunya (paydunya_circuit.state == closed).
 #    Échoue immédiatement et alerte si le circuit est ouvert ('open').
+# 3 bis. Juge le DIAGNOSTIC de paiement (`paiement` dans /health, 31/10/2026) :
+#    la paire `closed` / 0 échec ne disait pas si les clés existent, si un
+#    paiement a été exercé, ni POURQUOI il a échoué. La sonde refuse un bloc
+#    absent (révision à redéployer), `configured: false`, `state: echec` (en
+#    publiant son motif) et toute contradiction entre les deux lectures du même
+#    circuit ; `inconnu` (configuré, aucune vente depuis le déploiement) est
+#    publié en WARN — zéro vente n'est pas une panne.
 # 4. Vérifie /monitor/email : le fournisseur email ACTIF répond et son
 #    expéditeur est utilisable — un fournisseur muet échoue en le NOMMANT
 #    (clé refusée, domaine non vérifié, expéditeur inactif, jeton révoqué,

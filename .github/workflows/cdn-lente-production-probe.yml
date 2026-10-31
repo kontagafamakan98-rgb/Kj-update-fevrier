@@ -1,0 +1,101 @@
+name: CDN lente (TTFB + LCP de production, daily)
+
+# ─── Pourquoi cette sonde existe ────────────────────────────────────────────
+# Le dépôt vérifiait des FAITS (révision servie, actifs, SEO, typographie, CSP) et
+# des POIDS (budgets de bundle, de CSS), mais jamais la grandeur que le visiteur
+# ressent : le temps avant le premier octet utile et l'instant où le plus grand
+# élément de la page est peint. Un bord CDN froid, une image LCP servie depuis
+# l'origine au lieu du bord : rien de tout cela ne change un statut HTTP, un
+# canonical ou un octet de bundle, donc rien de tout cela ne rougissait nulle part.
+#
+# `check-cdn-lente-production.js` mesure les 12 routes de
+# `src/config/page-meta.js` (dérivées, jamais recopiées : une route ajoutée là-bas
+# est mesurée le lendemain) et PUBLIE chaque jour le TTFB et le LCP de chacune,
+# médiane, minimum et maximum, dans le résumé du job — VERT COMPRIS.
+#
+# CE QUE LA SONDE REFUSE D'ÊTRE, et c'est la décision la plus importante :
+#  * un détecteur de bord froid. Mesuré le 31/10/2026 : « / » rend 9 668 ms de
+#    TTFB au premier chargement, 388 ms au second. Chaque route paie donc une
+#    CHAUFFE JETÉE avant ses trois mesures ;
+#  * un juge de performance. Un chiffre mesuré depuis un runner GitHub, à travers
+#    Internet, borne la machine et le trajet, pas le site — les budgets de
+#    performance vivent dans `lighthouserc*.cjs`, sur un artefact local et un
+#    profil réseau fixé. Les plafonds ici sont LARGES (1 500 ms de TTFB, 4 000 ms
+#    de LCP, soit ~7× et ~6× les médianes mesurées : 215–223 ms et 436–664 ms) :
+#    ils attrapent « la page ne répond plus », la tendance se lit dans les
+#    nombres publiés.
+#
+# Trois sorties, jamais deux : 0 conforme, 1 refus nommé (statut ≠ 200, aucune
+# candidate LCP lue, médiane au-dessus d'un plafond), 2 prémisse (aucune route
+# lisible, corpus vide, navigateur indisponible) — une prémisse rougit le run et
+# n'est jamais un vert.
+#
+# Aucune invocation sur PR : une PR ne sert pas la production. Le cron est relevé
+# par l'alerte des sondes (`sondes-sante.yml`), comme les autres.
+on:
+  schedule:
+    # 07:44 UTC : après les sondes de document (07:04 → 07:40) et AVANT l'alerte
+    # des sondes (07:50), pour que le verdict du matin porte sur ce run-là.
+    - cron: '44 7 * * *'
+  workflow_dispatch:
+    inputs:
+      base:
+        description: "Origine à mesurer (défaut : vide = production)"
+        required: false
+        default: ""
+      echantillons:
+        description: "Mesures par route, chauffe exclue (défaut : 3)"
+        required: false
+        default: "3"
+
+permissions:
+  contents: read
+
+# Deux passes simultanées mesureraient deux fois le même bord et brouilleraient
+# la tendance : les runs s'enchaînent.
+concurrency:
+  group: cdn-lente-production
+  cancel-in-progress: false
+
+jobs:
+  cdn-lente:
+    name: TTFB et LCP des 12 routes de production
+    runs-on: ubuntu-latest
+    # Plafond : 12 routes × (1 chauffe + 3 mesures) ≈ 70 s mesurées le
+    # 31/10/2026, plus l'installation de Chromium (~1 à 2 min). Une sonde qui ne
+    # conclut pas doit rougir, pas patienter jusqu'à l'abandon.
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Installer les dépendances (Playwright compris)
+        run: npm ci
+
+      # Chromium et ses bibliothèques système : la sonde lit un VRAI LCP, elle a
+      # donc besoin d'un moteur de rendu, pas d'un fetch.
+      - name: Installer Chromium
+        run: npx playwright install --with-deps chromium
+
+      # Les entrées passent par `env`, jamais interpolées dans le script : une
+      # saisie libre ne doit pas pouvoir être lue comme du shell. Une origine
+      # vide n'est PAS transmise (sinon elle écraserait le défaut par du vide).
+      - name: Mesurer le TTFB et le LCP, puis publier le coût
+        env:
+          BASE: ${{ inputs.base }}
+          ECHANTILLONS: ${{ inputs.echantillons }}
+        run: |
+          set -euo pipefail
+          ARGS=()
+          if [ -n "${BASE:-}" ]; then ARGS+=(--base "$BASE"); fi
+          if [ -n "${ECHANTILLONS:-}" ]; then ARGS+=(--echantillons "$ECHANTILLONS"); fi
+          node scripts/check-cdn-lente-production.js "${ARGS[@]}"

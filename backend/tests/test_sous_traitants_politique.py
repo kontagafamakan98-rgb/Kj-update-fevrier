@@ -46,7 +46,12 @@ FOURNISSEURS = (
     ("PayDunya", "app.paydunya.com", ("kojo_payments.py",)),
     ("Cloudinary", "api.cloudinary.com", ("kojo_settings.py",)),
     ("Google", "oauth2.googleapis.com", ("kojo_routers_auth.py",)),
-    ("Sentry", "SENTRY_DSN", ("server.py",)),
+    # Sentry : la lecture du DSN a DEMENAGE le 31/10/2026 de `server.py` vers
+    # `kojo_sentry.py` (l'etat d'initialisation y est retenu pour etre publie
+    # par /health). La preuve suit le code : la laisser sur `server.py`
+    # n'aurait plus tenu qu'a un commentaire, et un commentaire ne remonte
+    # aucune erreur.
+    ("Sentry", "SENTRY_DSN", ("kojo_sentry.py",)),
 )
 
 # Les prestataires qu'aucune ligne de code n'appelle : leur usage est un
