@@ -141,7 +141,12 @@ def test_check_health_success(probe):
         assert probe.check_health(HEALTH_URL) == 0
 
 
-def test_check_health_fails_on_paydunya_open(probe):
+def test_check_health_fails_on_paydunya_open(probe, capsys):
+    # Le refus doit NOMMER le circuit ouvert, pas seulement rendre 1 : depuis le
+    # diagnostic de paiement (31/10/2026) le même incident rend aussi le bloc
+    # `paiement` en échec, donc un simple `== 1` restait vrai la branche
+    # « circuit ouvert » neutralisée — la mutation déclarée
+    # (`health-probe: paydunya open tolere`) ne prouvait plus rien.
     payload = {
         "status": "healthy",
         "database": "connected",
@@ -162,6 +167,7 @@ def test_check_health_fails_on_paydunya_open(probe):
     with patch("urllib.request.urlopen",
                side_effect=[make_fake_response(200, payload), email_ok(), composite_ok()]):
         assert probe.check_health(HEALTH_URL) == 1
+    assert "CIRCUIT BREAKER PAYDUNYA OUVERT" in capsys.readouterr().out
 
 
 def test_check_health_fails_on_database_disconnected(probe):
