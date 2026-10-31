@@ -194,6 +194,36 @@ describe('AlerteEmploi', () => {
     expect(screen.getByLabelText('jobAlertCategory')).toHaveValue('plumbing');
   });
 
+  it('un 200 qui n’a rien écrit ne s’annonce PAS comme un succès', async () => {
+    // Mesuré le 31/10/2026 en production : `/metrics` montrait la collection
+    // `job_alerts` vide (aucune provenance, aucune date d'acquisition) pendant
+    // que la carte pouvait annoncer « enregistré ». Un 200 dont la réponse ne
+    // porte aucune veille active est donc un ÉCHEC, pas un succès.
+    api.put.mockResolvedValue({ active: false, category: null, city: null });
+
+    rendre();
+
+    await screen.findByLabelText('jobAlertCategory');
+    await userEvent.click(screen.getByRole('button', { name: 'jobAlertSave' }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('jobAlertError'));
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(screen.queryByText('jobAlertActive')).not.toBeInTheDocument();
+  });
+
+  it('un arrêt qui n’a pas coupé la veille se voit aussi', async () => {
+    api.get.mockResolvedValue({ active: true, category: null, city: null, country: 'senegal' });
+    api.delete.mockResolvedValue({ active: true });
+
+    rendre();
+
+    const arreter = await screen.findByRole('button', { name: 'jobAlertStop' });
+    await userEvent.click(arreter);
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('jobAlertError'));
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
   it('une lecture impossible est DITE, et ne casse pas la page', async () => {
     api.get.mockRejectedValue(new Error('HTTP 500'));
 

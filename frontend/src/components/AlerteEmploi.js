@@ -112,7 +112,16 @@ const AlerteEmploi = ({
         // page d'où elle est née.
         origin: origine,
       });
-      setAlerte(donnees || { active: true });
+      // UN 200 NE PROUVE PAS L'ÉCRITURE (31/10/2026). Mesuré sur `/jobs` : la
+      // carte annonçait « enregistré » alors que la collection `job_alerts`
+      // restait vide — un succès d'AFFICHAGE sur une veille qui n'existe pas,
+      // donc l'inverse du seul service que cette carte rend. La preuve est dans
+      // la réponse : le serveur rend la veille qu'il vient d'écrire, et elle
+      // est ACTIVE. Tout le reste est un échec, et se dit comme tel.
+      if (!donnees || donnees.active !== true) {
+        throw new Error(t('jobAlertError'));
+      }
+      setAlerte(donnees);
       setEtat('pret');
       toast.success(t('jobAlertSaved'));
     } catch (error) {
@@ -126,7 +135,13 @@ const AlerteEmploi = ({
     setEnvoi(true);
     try {
       const donnees = await api.delete('/job-alerts');
-      setAlerte(donnees || { active: false });
+      // Même règle à l'arrêt : une veille encore ACTIVE dans la réponse n'a pas
+      // été coupée, et le dire « arrêtée » laisserait partir des emails que le
+      // visiteur vient de refuser.
+      if (!donnees || donnees.active !== false) {
+        throw new Error(t('jobAlertError'));
+      }
+      setAlerte(donnees);
       toast.success(t('jobAlertStopped'));
     } catch (error) {
       toast.error((error && error.message) || t('jobAlertError'));
