@@ -1238,6 +1238,15 @@
       "preuve": "backend/tests/test_metrics_collecte.py",
       "runner": "pytest",
       "motif": "sonde de PRODUCTION (cron .github/workflows/metriques-collecte.yml) : elle lit GET /metrics avec METRICS_TOKEN et juge la CHAINE de collecte — route servie par le jeton, six familles des veilles emploi presentes, exposition lisible, et FRAICHEUR de l'acquisition (0 = jamais, date future, age au-dela des 30 jours declares par METRIQUES.md). Le defaut qu'elle ferme a ete mesure le 30/10/2026 : la route repondait 401 sur l'hote du backend (jeton pose sur la machine) mais le depot n'avait aucun secret METRICS_TOKEN et aucun collecteur versionne, donc provenance et fraicheur etaient publiees dans le vide. Hors du perimetre de ci.yml parce qu'elle interroge un service deploye et qu'un jeton absent y est le defaut lui-meme, pas une premisse."
+    },
+    {
+      "chemin": "backend/scripts/semer_alerte_emploi.py",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "backend/tests/test_veille_emploi_production.py",
+      "runner": "pytest",
+      "motif": "ecriture de PRODUCTION (.github/workflows/veille-emploi-production.yml, dispatchable) : il se connecte en TRAVAILLEUR CI, ecrit la veille emploi par PUT /api/job-alerts — la route que le navigateur appelle depuis /jobs — puis RELIT ce que le serveur a enregistre. Le defaut qu'il ferme a ete mesure le 31/10/2026 : les quatre series de provenance et la jauge de fraicheur des veilles avaient un lecteur quotidien (metriques-collecte.yml, vert) et valaient 0, parce que rien dans le depot n'ecrivait de veille et que le seul compte provisionnable par la CI etait un CLIENT, refuse en 403 par une route reservee aux travailleurs. Il refuse une provenance hors vocabulaire ou des identifiants absents AVANT toute requete, et juge la CHARGE rendue plutot que le 200 (veille inactive, provenance reecrite par $setOnInsert, relecture divergente). Deliberement NON planifie : une veille ecrite par un cron ferait mesurer la fraicheur de ce workflow au lieu de celle des visiteurs.",
+      "hors_mutation": "aucune mutation n'est declaree ici, et c'est assume : le script n'ecrit pas dans le depot, il ecrit dans la production, donc la neutralisation d'une de ses lignes ne rougit que contre un service deploye — le harnais, qui rejoue hors ligne, n'aurait rien a mesurer. Ses refus sont verrouilles par ses cas (provenance hors vocabulaire sans requete, 403 nommant --type worker, 200 sans veille active, provenance reecrite, relecture divergente, transport mort en premisse, et une passe ENTIERE contre un serveur HTTP reel)"
     }
   ],
   "rejeux": [

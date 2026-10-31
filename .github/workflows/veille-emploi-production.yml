@@ -1,0 +1,147 @@
+name: Veille emploi de production (compte travailleur CI + écriture réelle)
+
+# ─── La seule chose qui manquait à la jauge de fraîcheur des veilles ─────────
+# Mesuré le 31/10/2026 : `/metrics` publie `kojo_alertes_emploi_plus_recente_
+# timestamp_seconds` depuis le 30/10, son lecteur quotidien
+# (`metriques-collecte.yml`) est vert, et la jauge vaut **0** — c'est-à-dire
+# « aucune veille datee, jamais ». La mécanique de collecte était donc prouvée
+# et son OBJET absent : rien dans le dépôt n'écrivait de veille emploi, et la
+# seule mesure qui dit si les pages ville et métier produisent quelque chose
+# restait muette.
+#
+# Ce workflow est ce chemin-là, et il écrit pour de VRAI :
+#   1. il refuse AVANT toute écriture si l'un des secrets manque, en le nommant
+#      (un compte provisionné avec un mot de passe vide serait « créé » puis
+#      impossible à connecter) ;
+#   2. il provisionne le compte TRAVAILLEUR dédié en base de production
+#      (`provision_ci_test_account.py --type worker`) — idempotent : une
+#      rotation de mot de passe passe par le même chemin ;
+#   3. il écrit la veille par `PUT /api/job-alerts` avec les identifiants de ce
+#      compte, puis RELIT `GET /api/job-alerts` : c'est la relecture qui prouve
+#      l'écriture, pas le 200.
+#
+# POURQUOI CE N'EST PAS PLANIFIÉ (et c'est une décision, pas un oubli) : une
+# veille réécrite chaque matin par un cron ferait mesurer la fraîcheur de CE
+# workflow au lieu de celle des visiteurs — la jauge répondrait « acquisition
+# fraîche » sur un corpus qui ne contient que la CI, c'est-à-dire exactement la
+# confusion qu'elle existe pour éviter. Ce workflow s'exécute donc à la demande
+# (`workflow_dispatch`), quand on veut prouver la chaîne ou alimenter la mesure.
+#
+# Ce qu'il ne fait pas : aucune lecture de `/metrics` (c'est la sonde de 07:48
+# UTC qui juge la collecte, une fois par jour), et aucune écriture hors de la
+# veille de CE compte — il ne touche ni aux missions, ni aux autres comptes.
+#
+# Secrets requis (Settings → Secrets and variables → Actions) :
+#   MONGO_URL               chaîne de connexion qui ÉCRIT `users` en production
+#                           (le même secret que `backup-db.yml`)
+#   VEILLE_EMPLOI_EMAIL     adresse du compte travailleur dédié (jamais l'adresse
+#                           d'une personne : ce compte écrit une veille)
+#   VEILLE_EMPLOI_PASSWORD  son mot de passe (rotation = relancer ce workflow)
+on:
+  workflow_dispatch:
+    inputs:
+      categorie:
+        description: "Catégorie de la veille (catalogue : plumbing, electrical, …)"
+        required: true
+        default: plumbing
+        type: string
+      ville:
+        description: "Ville de la veille, en NOM (Bamako, Abidjan, …)"
+        required: true
+        default: Bamako
+        type: string
+      pays:
+        description: "Pays (slug du référentiel géographique : mali, senegal, …)"
+        required: true
+        default: mali
+        type: string
+      origine:
+        description: "Provenance déclarée : metier | ville | directe"
+        required: true
+        default: metier
+        type: choice
+        options:
+          - metier
+          - ville
+          - directe
+
+permissions:
+  contents: read
+
+# Deux écritures simultanées sur le MÊME document de veille : la seconde serait
+# une mise à jour sans provenance (elle existait déjà), donc un refus au
+# moment le plus inutile. Les runs s'enchaînent.
+concurrency:
+  group: veille-emploi-production
+  cancel-in-progress: false
+
+jobs:
+  veille-emploi-production:
+    name: Écriture d'une veille emploi réelle
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Les mêmes versions que la production (`backend/requirements.txt` est la
+      # liste épinglée) : un pymongo dérivé se connecterait peut-être, mais on
+      # ne veut pas l'apprendre ici.
+      - name: Installer les dépendances du provisionnement
+        run: pip install -r backend/requirements.txt
+
+      # Le refus AVANT écriture : sans MONGO_URL le compte n'existe pas, sans
+      # identifiants il ne peut pas se connecter — les deux sont des refus
+      # nommés, pas des prémisses, parce que le remède est dans nos mains.
+      - name: Vérifier que les trois secrets sont posés
+        env:
+          MONGO_URL: ${{ secrets.MONGO_URL }}
+          VEILLE_EMPLOI_EMAIL: ${{ secrets.VEILLE_EMPLOI_EMAIL }}
+          VEILLE_EMPLOI_PASSWORD: ${{ secrets.VEILLE_EMPLOI_PASSWORD }}
+        run: |
+          set -euo pipefail
+          MANQUANT=0
+          for NOM in MONGO_URL VEILLE_EMPLOI_EMAIL VEILLE_EMPLOI_PASSWORD; do
+            if [ -z "${!NOM:-}" ]; then
+              echo "::error::Secret $NOM manquant — la veille emploi de production ne peut pas être écrite."
+              MANQUANT=1
+            fi
+          done
+          if [ "$MANQUANT" -ne 0 ]; then
+            echo "::error::Poser les trois secrets (gh secret set ...), le compte travailleur étant créé par ce même workflow."
+            echo "::error::Sans eux la jauge kojo_alertes_emploi_plus_recente_timestamp_seconds reste à 0, ce qui se lit comme une acquisition tarie."
+            exit 1
+          fi
+
+      - name: Provisionner le compte travailleur dédié (--type worker)
+        env:
+          MONGO_URL: ${{ secrets.MONGO_URL }}
+          VEILLE_EMPLOI_EMAIL: ${{ secrets.VEILLE_EMPLOI_EMAIL }}
+          VEILLE_EMPLOI_PASSWORD: ${{ secrets.VEILLE_EMPLOI_PASSWORD }}
+        run: |
+          set -euo pipefail
+          CI_PASSWORD="$VEILLE_EMPLOI_PASSWORD" \
+            python backend/scripts/provision_ci_test_account.py \
+            "$MONGO_URL" "$VEILLE_EMPLOI_EMAIL" --type worker
+
+      # Les entrées passent par `env`, jamais interpolées dans le script : une
+      # saisie libre ne doit pas pouvoir être lue comme du shell.
+      - name: Écrire la veille emploi en production (puis la relire)
+        env:
+          VEILLE_EMPLOI_EMAIL: ${{ secrets.VEILLE_EMPLOI_EMAIL }}
+          VEILLE_EMPLOI_PASSWORD: ${{ secrets.VEILLE_EMPLOI_PASSWORD }}
+          CATEGORIE: ${{ inputs.categorie }}
+          VILLE: ${{ inputs.ville }}
+          PAYS: ${{ inputs.pays }}
+          ORIGINE: ${{ inputs.origine }}
+        run: |
+          set -euo pipefail
+          python backend/scripts/semer_alerte_emploi.py \
+            --categorie "$CATEGORIE" \
+            --ville "$VILLE" \
+            --pays "$PAYS" \
+            --origine "$ORIGINE"
