@@ -32,6 +32,30 @@ def make_fake_response(status_code=200, json_data=None):
     return mock_resp
 
 
+def paiement(state="inconnu", **extra):
+    """Bloc `paiement` de /health, cohérent par défaut avec un circuit fermé.
+
+    `inconnu` est le défaut parce que c'est l'état d'une production qui n'a pas
+    encore encaissé depuis son déploiement : configuré, jamais exercé.
+    """
+    bloc = {
+        "configured": True,
+        "state": state,
+        "cause": "",
+        "motif": "",
+        "last_status": None,
+        "consecutive_failures": 0,
+        "failure_threshold": 5,
+        "circuit": "closed",
+        "remaining_cooldown_seconds": 0,
+        "last_call_at": None,
+        "last_failure_at": None,
+        "last_success_at": None,
+    }
+    bloc.update(extra)
+    return bloc
+
+
 def sante_ok(**extra):
     payload = {
         "status": "healthy",
@@ -41,6 +65,7 @@ def sante_ok(**extra):
             "consecutive_failures": 0,
             "remaining_cooldown_seconds": 0,
         },
+        "paiement": paiement(),
     }
     payload.update(extra)
     return make_fake_response(200, payload)
@@ -108,6 +133,7 @@ def test_check_health_success(probe):
             "consecutive_failures": 0,
             "remaining_cooldown_seconds": 0
         },
+        "paiement": paiement(),
         "revision": "abcdef1234"
     }
     with patch("urllib.request.urlopen",
@@ -123,7 +149,15 @@ def test_check_health_fails_on_paydunya_open(probe):
             "state": "open",
             "consecutive_failures": 5,
             "remaining_cooldown_seconds": 60
-        }
+        },
+        "paiement": paiement(
+            state="echec",
+            cause="reseau",
+            motif="circuitPaydunya ouvert",
+            circuit="open",
+            consecutive_failures=5,
+            remaining_cooldown_seconds=60,
+        ),
     }
     with patch("urllib.request.urlopen",
                side_effect=[make_fake_response(200, payload), email_ok(), composite_ok()]):
@@ -137,7 +171,8 @@ def test_check_health_fails_on_database_disconnected(probe):
         "paydunya_circuit": {
             "state": "closed",
             "consecutive_failures": 0
-        }
+        },
+        "paiement": paiement(),
     }
     with patch("urllib.request.urlopen",
                side_effect=[make_fake_response(200, payload), email_ok(), composite_ok()]):
@@ -312,3 +347,151 @@ def test_les_moniteurs_sont_derives_de_l_url_de_sante(probe):
 def test_l_origine_ne_garde_pas_le_chemin_ni_la_requete(probe):
     assert probe._origine("https://hote.test/api/v1/health?x=1") == "https://hote.test"
     assert probe._url_de("https://hote.test/", "/monitor/email") == "https://hote.test/monitor/email"
+
+
+# ---------------------------------------------------------------------------
+# Diagnostic de paiement : trois états, pas deux
+# ---------------------------------------------------------------------------
+
+def test_paiement_non_configure_fait_echouer_et_nomme_le_remede(probe, capsys):
+    """Clés absentes : `closed` + 0 échec le lisait comme un paiement sain.
+
+    Mesuré le 31/10/2026 par l'audit : « `paydunya_circuit: closed`, 0 échec
+    consécutif ; mode live non vérifiable sans secret » — trois situations pour
+    une seule lecture. Le bloc `paiement` les sépare, et cette sonde refuse la
+    première : sans clés, aucun paiement ne peut aboutir.
+    """
+    with patch("urllib.request.urlopen", side_effect=[
+        sante_ok(paiement=paiement(
+            "echec",
+            configured=False,
+            cause="non_configure",
+            motif="paiement non configuré : PAYDUNYA_MASTER_KEY, PAYDUNYA_PRIVATE_KEY "
+                   "ou PAYDUNYA_TOKEN absent",
+        )),
+        email_ok(),
+        composite_ok(),
+    ]):
+        code = probe.check_health(HEALTH_URL)
+
+    sortie = capsys.readouterr().out
+    assert code == 1
+    assert "PAIEMENT NON CONFIGURE" in sortie
+    assert "PAYDUNYA_MASTER_KEY" in sortie
+
+
+def test_paiement_en_echec_publie_son_motif(probe, capsys):
+    """Un échec sans motif public ne se répare pas : il doit sortir du run."""
+    with patch("urllib.request.urlopen", side_effect=[
+        sante_ok(paiement=paiement(
+            "echec", cause="cles_refusees", last_status=401,
+            motif="PayDunya refuse les clés (401/403) : renouveler PAYDUNYA_MASTER_KEY",
+        )),
+        email_ok(),
+        composite_ok(),
+    ]):
+        code = probe.check_health(HEALTH_URL)
+
+    sortie = capsys.readouterr().out
+    assert code == 1
+    assert "PAIEMENT EN ECHEC" in sortie
+    assert "cles_refusees" in sortie and "renouveler" in sortie
+
+
+def test_paiement_jamais_exerce_n_est_pas_une_panne(probe, capsys):
+    """`inconnu` = configuré, aucune vente depuis le déploiement.
+
+    Ce n'est PAS un rouge : le site n'a pas encore encaissé, et une sonde qui
+    rougirait là-dessus dirait « panne » à la place de « zéro vente ». Le fait
+    est publié, et la distinction avec `ok` reste lisible.
+    """
+    with patch("urllib.request.urlopen", side_effect=[sante_ok(), email_ok(), composite_ok()]):
+        code = probe.check_health(HEALTH_URL)
+
+    sortie = capsys.readouterr().out
+    assert code == 0
+    assert "[WARN] Paiement" in sortie
+    assert "aucun appel depuis le demarrage" in sortie
+
+
+def test_paiement_ok_publie_le_dernier_appel(probe, capsys):
+    with patch("urllib.request.urlopen", side_effect=[
+        sante_ok(paiement=paiement(
+            "ok", last_status=200,
+            last_call_at="2026-10-31T14:00:00+00:00",
+            last_success_at="2026-10-31T14:00:00+00:00",
+        )),
+        email_ok(),
+        composite_ok(),
+    ]):
+        code = probe.check_health(HEALTH_URL)
+
+    sortie = capsys.readouterr().out
+    assert code == 0
+    assert "[OK] Paiement" in sortie and "2026-10-31T14:00:00" in sortie
+
+
+def test_un_backend_sans_diagnostic_de_paiement_echoue_en_disant_de_redeployer(probe, capsys):
+    """Une révision antérieure au diagnostic ne doit pas passer pour saine."""
+    payload = {
+        "status": "healthy",
+        "database": "connected",
+        "paydunya_circuit": {"state": "closed", "consecutive_failures": 0,
+                             "remaining_cooldown_seconds": 0},
+    }
+    with patch("urllib.request.urlopen",
+               side_effect=[make_fake_response(200, payload), email_ok(), composite_ok()]):
+        code = probe.check_health(HEALTH_URL)
+
+    sortie = capsys.readouterr().out
+    assert code == 1
+    assert "anterieure au diagnostic de paiement" in sortie
+
+
+def test_un_bloc_paiement_incomplet_nomme_le_champ_absent(probe, capsys):
+    bloc = paiement()
+    del bloc["motif"]
+    with patch("urllib.request.urlopen",
+               side_effect=[sante_ok(paiement=bloc), email_ok(), composite_ok()]):
+        code = probe.check_health(HEALTH_URL)
+
+    sortie = capsys.readouterr().out
+    assert code == 1
+    assert "incomplet" in sortie and "motif" in sortie
+
+
+def test_un_health_qui_se_contredit_echoue(probe, capsys):
+    """Deux lectures du même circuit dans la même réponse doivent s'accorder."""
+    with patch("urllib.request.urlopen", side_effect=[
+        sante_ok(paiement=paiement(consecutive_failures=3)),
+        email_ok(),
+        composite_ok(),
+    ]):
+        code = probe.check_health(HEALTH_URL)
+
+    sortie = capsys.readouterr().out
+    assert code == 1
+    assert "se contredit" in sortie and "consecutive_failures" in sortie
+
+
+def test_un_composite_qui_contredit_le_diagnostic_echoue(probe, capsys):
+    """Le composite est une SECONDE lecture : la désaccord doit sortir."""
+    composite = make_fake_response(200, {
+        "service": "composite",
+        "circuit": "degraded",
+        "total": 4,
+        "down": 1,
+        "threshold": 2,
+        "providers": {
+            "paydunya": {"circuit": "down"},
+            "email": {"circuit": "ok", "provider": "resend"},
+            "brevo": {"circuit": "ok"},
+            "cloudinary": {"circuit": "ok"},
+        },
+    })
+    with patch("urllib.request.urlopen", side_effect=[sante_ok(), email_ok(), composite]):
+        code = probe.check_health(HEALTH_URL)
+
+    sortie = capsys.readouterr().out
+    assert code == 1
+    assert "composite /monitor dit paydunya 'down'" in sortie

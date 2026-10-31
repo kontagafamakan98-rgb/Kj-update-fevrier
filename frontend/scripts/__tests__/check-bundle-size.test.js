@@ -83,14 +83,20 @@ ${preloaded.map((r) => `<link rel="modulepreload" crossorigin href="/assets/${r}
   return root;
 };
 
-// Build « sain » : JS initial modeste, gros chunk LAZY (présent mais non
-// référencé par index.html → hors du budget de JS initial).
+// Build « sain » : JS initial modeste, chunk LAZY le plus gros du build
+// (présent mais non référencé par index.html → hors du budget de JS initial).
+//
+// Sa taille est celle d'un module RÉEL : 48 Ko, comme `vendor-leaflet` sur le
+// build du 31/10/2026. C'est ce que le plafond par module exige — une fixture
+// à 150 Ko (celle d'avant ce budget) décrit un module paresseux que le garde
+// refuse désormais, et un « build sain » qui porterait un cas interdit ne
+// prouverait que la complaisance du garde.
 const healthyBuild = () =>
   makeBuild({
     chunks: {
       'index-entry.js': 40 * 1024,
       'vendor-react.js': 40 * 1024,
-      'vendor-sentry-chunk.js': 150 * 1024,
+      'vendor-sentry-chunk.js': 48 * 1024,
     },
     initial: ['vendor-react.js'],
   });
@@ -159,6 +165,76 @@ describe('check-bundle-size — budgets réellement appliqués', () => {
 
     expect(result.ok).toBe(false);
     expect(result.errors.join('\n')).toMatch(/build total .+ > budget /);
+  });
+
+  it('échoue si un module paresseux franchit le PLAFOND PAR MODULE (31/10/2026)', () => {
+    // Le trou que ce budget ferme : sous l'ancien garde, seul
+    // `largestChunkGzip` (200 Ko) bornait un module paresseux — il pouvait donc
+    // atteindre 199 Ko sans un rouge, et les autres modules n'étaient bornés
+    // par RIEN. Ici, 70 Ko suffisent à rougir.
+    const root = makeBuild({
+      chunks: { 'index-entry.js': 40 * 1024, 'vendor-lourd.js': 70 * 1024 },
+      initial: ['index-entry.js'],
+    });
+    const result = checkBundleSize({ root, quiet: true });
+
+    expect(result.ok).toBe(false);
+    const message = result.errors.join('\n');
+    expect(message).toMatch(/module vendor-lourd\.js : .+ gzip > plafond .+ par module/);
+    expect(message).toContain('56.0 Ko');
+  });
+
+  it('nomme CHAQUE module au-dessus du plafond, pas seulement le plus gros', () => {
+    // L'ancien garde ne savait dire qu'un nom : celui du plus gros chunk. Deux
+    // modules qui débordent ensemble se lisaient donc comme un seul.
+    const root = makeBuild({
+      chunks: {
+        'index-entry.js': 40 * 1024,
+        'module-a.js': 70 * 1024,
+        'module-b.js': 60 * 1024,
+      },
+      initial: ['index-entry.js'],
+    });
+    const result = checkBundleSize({ root, quiet: true });
+
+    expect(result.ok).toBe(false);
+    const noms = result.errors
+      .filter((e) => e.startsWith('module '))
+      .map((e) => e.match(/^module ([^ ]+) :/)[1]);
+    expect(noms.sort()).toEqual(['module-a.js', 'module-b.js']);
+  });
+
+  it('ne juge PAS le chemin critique avec ce plafond (déjà borné par le JS initial)', () => {
+    // `index.html` et ses dépendances statiques sont bornés par `initialGzip` :
+    // un second verdict sur les mêmes octets rendrait deux rouges pour un fait.
+    const root = makeBuild({
+      chunks: {
+        'index-entry.js': 64 * 1024,
+        'vendor-react.js': 40 * 1024,
+        'module-paresseux.js': 20 * 1024,
+      },
+      initial: ['index-entry.js', 'vendor-react.js'],
+    });
+    const result = checkBundleSize({ root, quiet: true });
+
+    expect(result.errors.filter((e) => e.startsWith('module '))).toEqual([]);
+    expect(result.stats.modulesHorsCritique.map((c) => c.file)).toContain(
+      'module-paresseux.js'
+    );
+    expect(result.stats.modulesHorsCritique.map((c) => c.file)).not.toContain(
+      'index-entry.js'
+    );
+  });
+
+  it('échoue si TOUT est dans le chemin critique (le budget ne jugerait plus rien)', () => {
+    const root = makeBuild({
+      chunks: { 'index-entry.js': 40 * 1024 },
+      initial: ['index-entry.js', 'vendor-leaflet-carte.js', 'JobsMap-carte.js', 'Jobs-page.js'],
+    });
+    const result = checkBundleSize({ root, quiet: true });
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toMatch(/aucun module hors chemin critique/);
   });
 
   it('échoue si index.html référence un chunk absent (build incohérent)', () => {
@@ -265,5 +341,9 @@ describe('check-bundle-size — garde anti-dérive des budgets', () => {
     expect(BUDGETS.initialGzip).toBeLessThanOrEqual(200 * 1024);
     expect(BUDGETS.largestChunkGzip).toBeLessThanOrEqual(300 * 1024);
     expect(BUDGETS.totalRaw).toBeLessThanOrEqual(8 * 1024 * 1024);
+    // Le plafond par module est PLUS serré que le plus gros chunk : c'est un
+    // budget de module, pas une seconde tolérance pour le même fichier.
+    expect(BUDGETS.chunkGzip).toBeLessThanOrEqual(100 * 1024);
+    expect(BUDGETS.chunkGzip).toBeLessThanOrEqual(BUDGETS.largestChunkGzip);
   });
 });

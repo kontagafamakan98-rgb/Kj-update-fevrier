@@ -17,6 +17,13 @@ Vérifie :
    fournisseurs down) échoue et nomme les fournisseurs down ; un seul
    fournisseur transitoirement down est publié en WARN, sans échec — c'est le
    contrat du seuil (une panne isolée qui flappe n'alerte pas).
+7. Le DIAGNOSTIC DE PAIEMENT (`paiement` de /health, 31/10/2026) : la paire
+   `closed` / 0 échec ne distinguait pas « clés absentes », « configuré, jamais
+   exercé » et « dernier paiement réussi ». Le bloc les sépare ; la sonde
+   refuse un bloc absent (révision à redéployer), un champ manquant,
+   `configured: false`, `state: echec` (en publiant son motif) et toute
+   contradiction entre les deux lectures du même circuit — `inconnu` est
+   publié en WARN, parce que zéro vente n'est pas une panne.
 
 Les deux moniteurs sont dérivés de l'origine de `--url`, donc un seul drapeau
 suffit ; ils vivent hors `/api` comme `/health`.
@@ -36,6 +43,20 @@ DEFAULT_HEALTH_URL = "https://api.kojoforafrica.cc.cd/health"
 CHEMIN_MONITEUR_EMAIL = "/monitor/email"
 CHEMIN_MONITEUR_COMPOSITE = "/monitor"
 AGENT = "KojoHealthMonitor/1.0"
+
+# Les champs que le bloc `paiement` doit porter pour qu'un diagnostic soit
+# possible. Un bloc amputé (déploiement partiel, sérialisation oubliée) ne se
+# juge pas à moitié : il est refusé en nommant ce qui manque.
+CHAMPS_PAIEMENT = (
+    "configured",
+    "state",
+    "circuit",
+    "cause",
+    "motif",
+    "consecutive_failures",
+    "failure_threshold",
+    "remaining_cooldown_seconds",
+)
 
 
 def _origine(url: str) -> str:
@@ -129,12 +150,17 @@ def _verifier_email(origine: str, timeout: int) -> list:
     return [f"FOURNISSEUR EMAIL MUET (provider={provider}, configure={configure}) : {detail}"]
 
 
-def _verifier_composite(origine: str, timeout: int) -> list:
+def _verifier_composite(origine: str, timeout: int, fournisseurs=None) -> list:
     """`/monitor` : la panne est-elle agrégée au point de déclencher l'alerte ?
 
     Le seuil décide : un 503 est un échec (au moins `threshold` fournisseurs
     down) ; un 200 « dégradé » est publié en WARN, parce qu'une panne isolée qui
     flappe ne doit pas alerter — c'est le contrat du composite.
+
+    `fournisseurs`, quand il est fourni, reçoit les `providers` lus : c'est une
+    SECONDE lecture du même circuit PayDunya dans la même passe, et
+    `_verifier_paiement` la confronte au bloc `paiement` de /health. Aucune
+    requête supplémentaire n'est faite pour cela.
     """
     url = _url_de(origine, CHEMIN_MONITEUR_COMPOSITE)
     print(f"[PROBE] Healthcheck composite : {url}")
@@ -145,6 +171,8 @@ def _verifier_composite(origine: str, timeout: int) -> list:
         return [f"Healthcheck composite /monitor inutilisable : {erreur}"]
 
     providers = payload.get("providers") or {}
+    if fournisseurs is not None:
+        fournisseurs.update(providers)
     down = [
         nom for nom, info in providers.items()
         if isinstance(info, dict) and info.get("circuit") not in (None, "ok")
@@ -169,6 +197,99 @@ def _verifier_composite(origine: str, timeout: int) -> list:
     print(f"[ERREUR] Composite au-dela du seuil : {', '.join(down)} "
           f"(down={payload.get('down')}/{total}, seuil {seuil})")
     return [f"PRODUCTION DEGRADEE : {len(down)} fournisseur(s) down : {', '.join(down)}"]
+
+def _verifier_paiement(data: dict, paydunya_composite=None) -> list:
+    """Le bloc `paiement` de /health : TROIS états, pas deux.
+
+    CE QU'IL FERME (31/10/2026). `/health` ne publiait que
+    `paydunya_circuit: {state: closed, consecutive_failures: 0}` — la MÊME
+    lecture pour « les clés sont absentes, aucun paiement ne peut aboutir »,
+    « les clés sont posées et aucun paiement n'a eu lieu » et « le dernier
+    paiement a réussi ». L'audit du 31/10 l'a écrit tel quel. Le bloc `paiement`
+    sépare ces trois cas ; cette sonde le JUGE, sinon le fait serait publié pour
+    personne.
+
+    ÉCHEC (nommé) : bloc absent — la révision servie est antérieure au
+    diagnostic, il faut redéployer —, champ manquant, `configured: false`,
+    `state: echec` (le motif est publié, un échec sans remède ne se répare pas),
+    et toute CONTRADICTION entre les deux lectures du même circuit dans la même
+    réponse (`paydunya_circuit` contre `paiement`) ou avec le composite.
+
+    PAS un échec : `state: inconnu` — « configuré, jamais exercé » est le fait
+    d'un site qui n'a pas encore vendu, pas une panne ; il est PUBLIÉ. Et
+    `state: ok` publie le statut et la date du dernier appel réussi.
+    """
+    bloc = data.get("paiement")
+    if not isinstance(bloc, dict):
+        return [
+            "le backend deploye ne publie pas de bloc 'paiement' dans /health : la "
+            "revision servie est anterieure au diagnostic de paiement — redeployer"
+        ]
+
+    manquants = [champ for champ in CHAMPS_PAIEMENT if champ not in bloc]
+    if manquants:
+        return [f"bloc 'paiement' incomplet : champ(s) absent(s) {', '.join(manquants)}"]
+
+    erreurs = []
+    configure = bloc.get("configured")
+    etat = bloc.get("state")
+    circuit_paiement = bloc.get("circuit")
+    cause = bloc.get("cause") or ""
+    motif = (bloc.get("motif") or "").strip()
+
+    if etat not in ("ok", "echec", "inconnu"):
+        erreurs.append(
+            f"bloc 'paiement' : etat inconnu {etat!r} (attendu ok, echec ou inconnu)"
+        )
+
+    if configure is False:
+        erreurs.append(f"PAIEMENT NON CONFIGURE : {motif or 'aucun motif publie'}")
+    elif etat == "echec":
+        erreurs.append(
+            f"PAIEMENT EN ECHEC (cause={cause}, circuit={circuit_paiement}) : "
+            f"{motif or 'aucun motif publie'} — un echec sans motif ne se repare pas"
+        )
+    elif etat == "inconnu":
+        print(
+            "[WARN] Paiement : configure, aucun appel depuis le demarrage (aucune vente "
+            "depuis ce deploiement) — fait publie, pas une panne"
+        )
+    elif etat == "ok":
+        print(
+            f"[OK] Paiement : dernier appel reussi (statut {bloc.get('last_status')}, "
+            f"{bloc.get('last_success_at')})"
+        )
+
+    # Deux lectures du MÊME circuit dans la MÊME reponse : elles doivent
+    # s'accorder, sinon l'une des deux est fausse et le diagnostic ment.
+    circuit = data.get("paydunya_circuit") if isinstance(data.get("paydunya_circuit"), dict) else {}
+    if circuit.get("state") != circuit_paiement:
+        erreurs.append(
+            "/health se contredit : paydunya_circuit.state="
+            f"{circuit.get('state')!r} mais paiement.circuit={circuit_paiement!r}"
+        )
+    if circuit.get("consecutive_failures") != bloc.get("consecutive_failures"):
+        erreurs.append(
+            "/health se contredit : paydunya_circuit.consecutive_failures="
+            f"{circuit.get('consecutive_failures')!r} mais "
+            f"paiement.consecutive_failures={bloc.get('consecutive_failures')!r}"
+        )
+
+    if isinstance(paydunya_composite, dict):
+        verdict = paydunya_composite.get("circuit")
+        attendu_down = circuit_paiement == "open"
+        if verdict == "ok" and attendu_down:
+            erreurs.append(
+                "le composite /monitor dit paydunya 'ok' alors que /health dit circuit 'open'"
+            )
+        elif verdict == "down" and not attendu_down:
+            erreurs.append(
+                "le composite /monitor dit paydunya 'down' alors que /health dit "
+                f"circuit {circuit_paiement!r}"
+            )
+
+    return erreurs
+
 
 def check_health(url: str, timeout: int = 15) -> int:
     print(f"[PROBE] Interrogation de la sante backend : {url}")
@@ -250,7 +371,12 @@ def check_health(url: str, timeout: int = 15) -> int:
     # seul passage doit dire tout ce qui ne va pas, pas la premiere panne.
     origine = _origine(url)
     errors.extend(_verifier_email(origine, timeout))
-    errors.extend(_verifier_composite(origine, timeout))
+    fournisseurs = {}
+    errors.extend(_verifier_composite(origine, timeout, fournisseurs))
+    # 4. Le diagnostic de paiement : la paire `closed` / 0 échec ci-dessus ne dit
+    #    ni si les clés existent, ni si un paiement a été exercé, ni pourquoi il
+    #    a échoué. Le composite donne une SECONDE lecture du même circuit.
+    errors.extend(_verifier_paiement(data, fournisseurs.get("paydunya")))
 
     if errors:
         print("\n[ERREUR] ANOMALIES DETECTEES SUR LA PRODUCTION :")
