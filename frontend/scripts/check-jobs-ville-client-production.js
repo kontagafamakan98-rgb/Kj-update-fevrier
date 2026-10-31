@@ -103,6 +103,14 @@ import { makeScopedTranslator } from '../src/utils/pack2PageI18n/jobs.js';
 
 export const DEFAULT_BASE = SITE_ORIGIN;
 
+/**
+ * L'origine d'API à juger, quand elle n'est pas celle dérivée du site (`--api`).
+ *
+ * Une preview vit sur un autre hôte que la production, et son API n'a pas
+ * forcément d'`api.` en face : c'est l'entrée qui le dit, jamais une déduction.
+ */
+export const API_ENV = 'API_A_JUGER';
+
 /** La famille de cette sonde — ce qu'un rouge prononcé ici veut dire. */
 export const FAMILLE = 'jobs, client venu d’une page ville';
 
@@ -253,23 +261,90 @@ const LIRE_LIENS_VILLE = () => {
 };
 
 /**
+ * L'origine de l'API, DÉRIVÉE du site jugé (`https://api.<hôte>`).
+ *
+ * Pourquoi deux origines : sur le web la session est UNIQUEMENT le cookie
+ * httpOnly posé par le backend, et `vercel.json` proxyie `/api/:path*` vers
+ * l'API. Selon que le build parle par ce proxy ou directement à l'API, le
+ * cookie vit sur l'origine du SITE ou sur celle de l'API ; une lecture sur la
+ * mauvaise origine ne porte aucun cookie et rend 401 alors que la session est
+ * parfaitement valide. Les deux sont donc demandées.
+ *
+ * Une base locale (`localhost`, `127.*`) n'a pas d'`api.` en face : la fonction
+ * rend `''` et la sonde ne demande que l'origine du site.
+ *
+ * @param {string} base Origine du site jugé.
+ * @returns {string}
+ */
+export const origineApi = (base = DEFAULT_BASE) => {
+  try {
+    const analyse = new URL(base);
+    if (/^(localhost|127\.|\[::1\])/i.test(analyse.hostname)) return '';
+    return `${analyse.protocol}//api.${analyse.hostname}`;
+  } catch (_erreur) {
+    return '';
+  }
+};
+
+/**
+ * Les adresses de `/api/auth/me` à interroger, DÉDUPLIQUÉES : d'abord l'origine
+ * du site (le proxy de `vercel.json`), puis celle de l'API.
+ *
+ * @param {string} base Origine du site jugé.
+ * @param {string} [api] Origine d'API explicite (`--api`, sinon dérivée).
+ * @returns {string[]}
+ */
+export const cheminsCompte = (base = DEFAULT_BASE, api = '') => {
+  const adresses = [`${base}${AUTH_ME_PATH}`];
+  const origine = api || origineApi(base);
+  if (origine && origine !== base) adresses.push(`${origine}${AUTH_ME_PATH}`);
+  return [...new Set(adresses)];
+};
+
+/**
  * Le compte connecté, lu par l'API que la page interroge elle-même.
  *
+ * CE QUE LES DEUX PREMIÈRES PASSES DE PRODUCTION ONT MESURÉ (31/10/2026) :
+ * la première lisait `/api/auth/me` relatif au SITE (`HTTP 401`) ; la seconde,
+ * croyant à un jeton porté, cherchait `localStorage['token']` et n'en trouvait
+ * aucun. Les deux ont la même cause, écrite dans `AuthContext` : sur le web la
+ * session est UNIQUEMENT le cookie httpOnly du backend, et l'application parle
+ * à l'API sur `api.<hôte>` — donc une requête relative au site ne porte pas ce
+ * cookie. La sonde ne pouvait donc JAMAIS rendre un verdict. Elle demande
+ * maintenant les DEUX origines et retient la première qui répond 200.
+ *
+ * Aucun en-tête `Authorization` : le web n'en envoie pas (seul le shell natif
+ * Capacitor en a un), donc en ajouter un ferait juger un canal que le web
+ * n'utilise pas.
+ *
  * @param {object} page Page Playwright (ou doublure).
- * @returns {Promise<{statut: number, type: string}>}
+ * @param {string[]} chemins Adresses absolues à interroger, dans l'ordre.
+ * @returns {Promise<{statut: number, type: string, chemin: string, lus: Array}>}
  */
-const lireLeCompte = (page) =>
-  page.evaluate(async (chemin) => {
-    try {
-      const reponse = await fetch(chemin, { credentials: 'include' });
-      if (!reponse.ok) return { statut: reponse.status, type: '' };
-      const corps = await reponse.json();
-      const compte = corps && (corps.user || corps);
-      return { statut: reponse.status, type: String((compte && compte.user_type) || '') };
-    } catch (erreur) {
-      return { statut: 0, type: '', erreur: String((erreur && erreur.message) || erreur) };
+export const lireLeCompte = (page, chemins = [`${DEFAULT_BASE}${AUTH_ME_PATH}`]) =>
+  page.evaluate(async (adresses) => {
+    const lus = [];
+    for (const chemin of adresses) {
+      try {
+        const reponse = await fetch(chemin, { credentials: 'include' });
+        if (!reponse.ok) {
+          lus.push({ chemin, statut: reponse.status });
+          continue;
+        }
+        const corps = await reponse.json();
+        const compte = corps && (corps.user || corps);
+        return {
+          statut: reponse.status,
+          type: String((compte && compte.user_type) || ''),
+          chemin,
+          lus: [...lus, { chemin, statut: reponse.status }],
+        };
+      } catch (erreur) {
+        lus.push({ chemin, statut: 0, erreur: String((erreur && erreur.message) || erreur) });
+      }
     }
-  }, AUTH_ME_PATH);
+    return { statut: lus.length ? lus[lus.length - 1].statut : 0, type: '', chemin: '', lus };
+  }, chemins);
 
 /**
  * Les paramètres d'arrivée, lus dans l'URL RÉELLE de /jobs.
@@ -426,6 +501,7 @@ export function jugerVisiteOrdinaire(releve) {
  */
 async function uneTentative({
   base,
+  api = '',
   ville,
   email,
   password,
@@ -476,12 +552,16 @@ async function uneTentative({
     checked.push(`connexion : formulaire servi ${LOGIN_PATH}, sortie de la page de connexion`);
 
     // ── 2. LE COMPTE EST-IL BIEN UN CLIENT ? ───────────────────────────────
-    const compte = await lireLeCompte(page);
+    const compte = await lireLeCompte(page, cheminsCompte(base, api));
     if (compte.statut !== 200) {
+      const detail = (compte.lus || [])
+        .map((lu) => `${lu.chemin} → ${lu.statut || 'injoignable'}`)
+        .join(', ');
       errors.push(
         premisse(
-          `session non lue après connexion : GET ${AUTH_ME_PATH} → HTTP ${compte.statut}. Rien ne peut ` +
-            'être dit du rôle du compte, donc rien de ce qu’un client voit.'
+          `session non lue après connexion : GET ${AUTH_ME_PATH} → ${detail}. Aucune des deux ` +
+            'origines (celle du site, celle de l’API) ne porte de session : rien ne peut être dit ' +
+            'du rôle du compte, donc rien de ce qu’un client voit.'
         )
       );
       return { ok: false, premisse: true, errors, notices, checked, cout };
@@ -496,7 +576,7 @@ async function uneTentative({
       );
       return { ok: false, premisse: true, errors, notices, checked, cout };
     }
-    checked.push(`compte : GET ${AUTH_ME_PATH} → 200, user_type=client`);
+    checked.push(`compte : GET ${compte.chemin || AUTH_ME_PATH} → 200, user_type=client`);
 
     // ── 3. LA PAGE VILLE, ET SON LIEN ──────────────────────────────────────
     const cheminVille = `/emplois/${ville.slug}`;
@@ -638,6 +718,7 @@ export async function runJobsVilleClientProbe({
   ville = '',
   email = process.env.LHCI_CI_EMAIL || process.env.LHCI_TEST_EMAIL || '',
   password = process.env.LHCI_CI_PASSWORD || process.env.LHCI_TEST_PASSWORD || '',
+  api = process.env[API_ENV] || '',
   launch = defaultLaunch,
   bypassToken = process.env[BYPASS_ENV] || '',
   attempts = ATTEMPTS,
@@ -702,6 +783,7 @@ export async function runJobsVilleClientProbe({
     try {
       dernier = await uneTentative({
         base: cleanBase,
+        api,
         ville: choisie,
         email,
         password,
@@ -800,6 +882,7 @@ export function parseArguments(argv = []) {
     const flag = argv[index];
     const suivant = argv[index + 1];
     if (flag === '--base' && suivant) options.base = suivant;
+    else if (flag === '--api' && suivant) options.api = suivant;
     else if (flag === '--ville' && suivant) options.ville = suivant;
     else if (flag === '--tentatives' && suivant) options.attempts = Number(suivant);
     else if (flag === '--delai' && suivant) options.delayMs = Number(suivant) * 1000;
