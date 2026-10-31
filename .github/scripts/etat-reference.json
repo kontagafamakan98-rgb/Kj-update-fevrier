@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-10-31",
-    "motif": "31/10/2026 : (1) /health publie l'etat de Sentry (kojo_sentry) ; (2) budget par MODULE hors chemin critique (chunkGzip 56 Ko) ; (3) sonde CDN lente (TTFB/LCP, chauffe jetee) avec @playwright/test ; (4) /health et /monitor/paydunya publient le DIAGNOSTIC DE PAIEMENT (configured / state ok-echec-inconnu / cause classee / motif / dates, sans cle ni mode) et la sonde quotidienne check_health_probe.py le juge : bloc absent = redeployer, configured false ou state echec = refus avec motif, inconnu = WARN (zero vente n'est pas une panne), et toute contradiction entre les deux lectures du circuit est refusee ; et /monitor/paydunya GARDE son timestamp en publiant ce diagnostic (un moniteur qui lit la date du releve ne la perd pas pour un ajout) ; et (5) la sonde « jobs, client venu d'une page ville » (31/10/2026) suit le parcours reel d'un client depuis /emplois/{slug} jusqu'a /jobs et juge la carte de la regle, l'absence des deux autres cartes, et l'absence de la regle sur une visite ordinaire",
+    "motif": "31/10/2026 : la sonde jobs/ville client lit le compte sur les DEUX origines (site via le proxy /api, puis api.<hote>) et en cookie httpOnly seulement — la lecture precedente rendait 401 sur toute la production, donc la sonde rendait une premisse a chaque run ; le compte est juge par la premiere origine qui repond 200, et l'echec des deux est une premisse qui nomme leurs statuts",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/alerte_sondes.py": "35c6b645b431b932c6af1ed53704acc4f096da428a49e2f7461259358f137687",
@@ -150,7 +150,7 @@
       "frontend/scripts/validate-vercel-json.mjs": "16a56835e1fb299821c3a1dd7fa4d0957982a970a493e98ed8855d06fc563518",
       "frontend/scripts/verre-contraste.js": "0304f01ae4ccd2fea6db62cff8badcb4085d3a34622f49416ed8944c377c688c",
       "backend/server.py": "26e735b4dd5ca7b9bde4a98975cea410c189190d9cf215cdd6450376d16fa824",
-      "frontend/scripts/check-jobs-ville-client-production.js": "b141a0eb73ae7726e34eee34bc7dbf64a4617b709f7d3704b50347797993e079"
+      "frontend/scripts/check-jobs-ville-client-production.js": "e6506d53e6540ee060605048595ca0149d2ac70cdc11dbed6c03f424ff3c2e9d"
     }
   },
   "hors_perimetre": [
