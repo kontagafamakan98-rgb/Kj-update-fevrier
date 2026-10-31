@@ -1,0 +1,113 @@
+name: Jobs client depuis une page ville (daily)
+
+# ─── Pourquoi cette sonde existe, et pourquoi elle est séparée ───────────────
+# Les pages ville (`/emplois/{slug}`, servies par le backend) portent un bouton
+# dont le lien est `/jobs?alerte=1&ville=<nom>&origine=ville`. Mesuré le
+# 31/10/2026 : un CLIENT connecté qui suivait ce bouton arrivait sur /jobs où
+# RIEN ne se passait à l'endroit exact où le clic l'avait déposé — le bloc de
+# promesse est réservé aux visiteurs sans compte, la carte interactive aux
+# travailleurs. Le lien mentait sur sa destination.
+#
+# Le bloc qui dit la règle a été écrit, et `frontend/src/pages/__tests__/
+# Jobs.test.jsx` prouve le COMPORTEMENT React. Il ne peut pas dire ce que le
+# DÉPLOIEMENT sert : un bundle en retard, un `?alerte` perdu en route, une
+# session non restaurée sur /jobs qui fait peindre la vue ANONYME à un client —
+# trois pannes dont le test unitaire reste vert. Seul un compte client réel,
+# dans un vrai navigateur, sur l'origine publique, les voit.
+#
+# Elle est séparée des autres sondes à compte (session, exposition du jeton)
+# parce qu'elles jugent trois faits différents, avec trois corrections
+# différentes : ici, c'est la page d'ARRIVÉE d'un lien commercial.
+#
+# ─── Les trois sorties, jamais deux ────────────────────────────────────────
+# 0 : la règle est peinte pour un client venu d'une page ville, avec ses textes
+#     et son action, sans les deux autres cartes — et elle ne l'est pas sur une
+#     visite ordinaire.
+# 1 : un refus NOMMÉ (lien disparu de la page ville, mauvais paramètres, carte
+#     absente ou incomplète, promesse anonyme ou carte travailleur peinte).
+# 2 : PRÉMISSE — compte CI absent, connexion impossible, compte qui n'est plus
+#     un client, page ville injoignable. Le run est rouge et le dit : une
+#     prémisse n'est jamais un vert, mais elle n'accuse pas le code de la PR.
+#
+# Aucune écriture : la sonde se connecte en LECTURE, n'ouvre ni ne règle de
+# veille (`backend/scripts/semer_alerte_emploi.py` fait ça, et il est
+# dispatchable pour cette raison), et jette son contexte à chaque tentative.
+# Aucun identifiant de session ne sort : le relevé ne porte que des présences,
+# des textes de page et des chemins.
+#
+# PRÉPRODUCTION (une preview Vercel) : l'entrée `site` en juge une autre. Le
+# jeton de contournement vient d'un SECRET et jamais d'une entrée de dispatch
+# (une entrée est publiée dans les journaux du run) ; sur le cron, l'entrée est
+# vide et la surface jugée reste la production.
+on:
+  schedule:
+    # 07:44 UTC : après les sondes de document (07:04 → 07:40) — décalé pour ne
+    # pas leur disputer le runner.
+    - cron: '44 7 * * *'
+  workflow_dispatch:
+    inputs:
+      site:
+        description: "Origine frontend à juger (défaut : vide = production)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Jobs client depuis une page ville (production)
+    runs-on: ubuntu-latest
+    # Plafond : sans lui, une production qui ne répond plus laisserait le job
+    # patienter jusqu'à l'abandon du runner au lieu de rougir.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Cache Playwright Chromium binaries
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            playwright-browsers-${{ runner.os }}-
+
+      - name: Install Playwright Chromium dependencies (and binary if cache miss)
+        working-directory: frontend
+        run: |
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+            npx playwright install-deps chromium
+          else
+            npx playwright install --with-deps chromium
+          fi
+
+      # La sonde refuse de conclure, en les nommant, si les secrets manquent.
+      # Ils passent par `env` : une commande de `run:` est publiée dans les
+      # journaux du run, donc une valeur de secret n'y a pas sa place.
+      - name: "Juger /jobs pour un client venu d'une page ville (règle peinte, deux autres cartes absentes)"
+        working-directory: frontend
+        env:
+          LHCI_CI_EMAIL: ${{ secrets.LHCI_CI_EMAIL }}
+          LHCI_CI_PASSWORD: ${{ secrets.LHCI_CI_PASSWORD }}
+          LHCI_TEST_EMAIL: ${{ secrets.LHCI_TEST_EMAIL }}
+          LHCI_TEST_PASSWORD: ${{ secrets.LHCI_TEST_PASSWORD }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          SITE_A_JUGER: ${{ inputs.site }}
+        run: |
+          arguments=()
+          if [ -n "$SITE_A_JUGER" ]; then
+            arguments+=(--base "$SITE_A_JUGER")
+          fi
+          node scripts/check-jobs-ville-client-production.js ${arguments[@]+"${arguments[@]}"}

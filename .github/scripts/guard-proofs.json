@@ -1247,6 +1247,30 @@
       "runner": "pytest",
       "motif": "ecriture de PRODUCTION (.github/workflows/veille-emploi-production.yml, dispatchable) : il se connecte en TRAVAILLEUR CI, ecrit la veille emploi par PUT /api/job-alerts — la route que le navigateur appelle depuis /jobs — puis RELIT ce que le serveur a enregistre. Le defaut qu'il ferme a ete mesure le 31/10/2026 : les quatre series de provenance et la jauge de fraicheur des veilles avaient un lecteur quotidien (metriques-collecte.yml, vert) et valaient 0, parce que rien dans le depot n'ecrivait de veille et que le seul compte provisionnable par la CI etait un CLIENT, refuse en 403 par une route reservee aux travailleurs. Il refuse une provenance hors vocabulaire ou des identifiants absents AVANT toute requete, et juge la CHARGE rendue plutot que le 200 (veille inactive, provenance reecrite par $setOnInsert, relecture divergente). Deliberement NON planifie : une veille ecrite par un cron ferait mesurer la fraicheur de ce workflow au lieu de celle des visiteurs.",
       "hors_mutation": "aucune mutation n'est declaree ici, et c'est assume : le script n'ecrit pas dans le depot, il ecrit dans la production, donc la neutralisation d'une de ses lignes ne rougit que contre un service deploye — le harnais, qui rejoue hors ligne, n'aurait rien a mesurer. Ses refus sont verrouilles par ses cas (provenance hors vocabulaire sans requete, 403 nommant --type worker, 200 sans veille active, provenance reecrite, relecture divergente, transport mort en premisse, et une passe ENTIERE contre un serveur HTTP reel)"
+    },
+    {
+      "chemin": "frontend/scripts/check-cdn-lente-production.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-cdn-lente-production.test.js",
+      "runner": "vitest",
+      "motif": "sonde de PRODUCTION (cron .github/workflows/cdn-lente-production-probe.yml) : elle mesure le TTFB et le LCP des routes de src/config/page-meta.js (derivees, jamais recopiees) dans un vrai Chromium et publie chaque jour la mediane, le minimum et le maximum de chacune, VERT COMPRIS. Le defaut qu'elle ferme a ete mesure le 31/10/2026 : le depot verifiait des FAITS (revision servie, actifs, SEO, typographie, CSP) et des POIDS (bundle, CSS), jamais la grandeur que le visiteur ressent — une origine dont le bord ne repond plus, ou une image LCP servie depuis l'origine au lieu du bord, ne change ni statut HTTP ni canonical ni octet de bundle. Le premier chargement de « / » a rendu 9 668 ms de TTFB contre 388 ms au second : chaque route paie donc une CHAUFFE JETEE avant ses mesures, sinon la sonde serait un detecteur de bord froid. Trois sorties, jamais deux : 1 pour un refus nomme (statut != 200, aucune candidate LCP lue, mediane au-dessus d'un plafond), 2 = PREMISSE (corpus sous le plancher, origine inutilisable, navigateur indisponible, aucune route lisible) ; une premisse rougit le run et n'est jamais un vert. Les plafonds sont LARGES (1 500 ms / 4 000 ms, ~7x et ~6x les medianes mesurees) : ils attrapent « la page ne repond plus », la tendance se lit dans les nombres publies."
+    },
+    {
+      "chemin": "backend/kojo_payments.py",
+      "role": "garde",
+      "invoque_par": "test",
+      "preuve": "backend/tests/test_paiement_diagnostic.py",
+      "runner": "pytest",
+      "motif": "l'etat du paiement publie par /health (bloc `paiement`) : `configured`, `state` (ok / echec / inconnu), `cause` classee, `motif` actionnable, `last_status`, les dates des derniers appels. Le defaut qu'il ferme a ete mesure le 31/10/2026 : `/health` ne publiait que `paydunya_circuit: {state: closed, consecutive_failures: 0}` — la MEME lecture pour « cles absentes, aucun paiement ne peut aboutir », « configure et jamais exerce » et « dernier paiement reussi », et l'audit l'a ecrit tel quel. Trois regles : (1) un appel jamais exerce se lit `inconnu`, jamais `ok` (un silence n'est pas un vert) ; (2) chaque echec est CLASSE avec son remede — cles refusees 401/403, quota 429, fournisseur 5xx, reseau, corps illisible — et le message d'une exception n'est pas propage, `requests` y recopiant l'URL (donc l'identifiant de facture) ; (3) ni une cle, ni le mode test/live (un attaquant qui lit « test » sait qu'un faux paiement suffit), ni une reference de facture ne sortent : /health est PUBLIQUE."
+    },
+    {
+      "chemin": "frontend/scripts/check-jobs-ville-client-production.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-jobs-ville-client-production.test.js",
+      "runner": "vitest",
+      "motif": "le seul fait que ni `Jobs.test.jsx` ni les gardes de document ne peuvent voir : ce que le DÉPLOIEMENT sert à un CLIENT connecté qui arrive d'une page ville. Le test de composant prouve le comportement React (client + `?alerte=1` ⇒ la règle), pas qu'un bundle déployé le peint, ni que le lien de `/emplois/{slug}` mène encore là, ni que la session est restaurée sur /jobs — un client à qui la page sert la vue ANONYME passe tous les tests unitaires. La sonde suit donc le PARCOURS RÉEL avec le compte client de la CI : connexion par le formulaire servi, lecture du rôle (`GET /api/auth/me` doit dire `client`, sinon prémisse), page ville, CLIC sur son lien d'alerte (une URL tapée ne prouverait pas que le bouton mène où il dit), puis /jobs : la carte de la règle est peinte avec les textes du dictionnaire dans la langue du document, son action mène à `/create-job`, et les DEUX autres cartes (promesse d'un visiteur sans compte, carte travailleur) sont ABSENTES dans le même relevé ; enfin /jobs SANS paramètre, où la règle ne doit pas être peinte — c'est cette absence qui fait de la présence une réponse au LIEN. Trois sorties : 0 vert, 1 refus nommé, 2 prémisse (compte absent, connexion impossible, rôle qui n'est plus client, page ville injoignable), et le COÛT de la passe est publié sur le vert comme sur le rouge. Aucune écriture : elle ne crée ni ne règle de veille."
     }
   ],
   "rejeux": [
@@ -4985,9 +5009,10 @@
         "scripts/__tests__/check-css-inline-budget.test.js",
         "--reporter=default"
       ],
-      "cwd": "frontend",  "attend": [
-   "de CSS inline > budget "
-  ]
+      "cwd": "frontend",
+      "attend": [
+        "de CSS inline > budget "
+      ]
     },
     {
       "id": "css-inline: plancher de la feuille critique neutralise",
@@ -7026,6 +7051,148 @@
       "cwd": "backend",
       "attend": [
         "FAILED tests/test_metrics_collecte.py::TestLaFraicheurDeLAcquisition::test_une_acquisition_tarie_est_nommee_avec_son_age"
+      ]
+    },
+    {
+      "id": "cdn: un bord froid redevient une mesure",
+      "garde": "frontend/scripts/check-cdn-lente-production.js",
+      "cible": "frontend/scripts/check-cdn-lente-production.js",
+      "trouve": "      await mesurer(route);",
+      "remplace": "      // await mesurer(route);  # mutation declaree : chauffe retiree",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-cdn-lente-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-cdn-lente-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "JETTE le premier chargement de chaque route"
+      ]
+    },
+    {
+      "id": "cdn: un LCP au-dessus du plafond ne rougit plus",
+      "garde": "frontend/scripts/check-cdn-lente-production.js",
+      "cible": "frontend/scripts/check-cdn-lente-production.js",
+      "trouve": "    if (releve.lcp > budgets.lcpMs) {",
+      "remplace": "    if (false && releve.lcp > budgets.lcpMs) {  // mutation declaree",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-cdn-lente-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-cdn-lente-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse un LCP au-dessus du plafond"
+      ]
+    },
+    {
+      "id": "bundle: un module paresseux peut depasser le plafond par module",
+      "garde": "frontend/scripts/check-bundle-size.js",
+      "cible": "frontend/scripts/check-bundle-size.js",
+      "trouve": "    if (module.gzip > BUDGETS.chunkGzip) {",
+      "remplace": "    if (false && module.gzip > BUDGETS.chunkGzip) {  // mutation declaree",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-bundle-size.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-bundle-size.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "franchit le PLAFOND PAR MODULE"
+      ]
+    },
+    {
+      "id": "bundle: un build tout en chemin critique ne juge plus aucun module",
+      "garde": "frontend/scripts/check-bundle-size.js",
+      "cible": "frontend/scripts/check-bundle-size.js",
+      "trouve": "  if (modulesHorsCritique.length === AUCUN_MODULE_HORS_CRITIQUE) {",
+      "remplace": "  if (false && modulesHorsCritique.length === AUCUN_MODULE_HORS_CRITIQUE) {  // mutation declaree",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-bundle-size.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-bundle-size.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "TOUT est dans le chemin critique"
+      ]
+    },
+    {
+      "id": "paiement: non configure lu comme sain",
+      "garde": "backend/scripts/check_health_probe.py",
+      "cible": "backend/scripts/check_health_probe.py",
+      "trouve": "    if configure is False:",
+      "remplace": "    if False and configure is False:  # mutation declaree",
+      "runner": "python",
+      "preuve": "backend/tests/test_health_probe.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_health_probe.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_health_probe.py::test_paiement_non_configure_fait_echouer_et_nomme_le_remede"
+      ]
+    },
+    {
+      "id": "paiement: un appel jamais exerce se lit ok (le silence devient un vert)",
+      "garde": "backend/kojo_payments.py",
+      "cible": "backend/kojo_payments.py",
+      "trouve": "        etat, cause = \"inconnu\", \"\"",
+      "remplace": "        etat, cause = \"ok\", \"\"  # mutation declaree",
+      "runner": "python",
+      "preuve": "backend/tests/test_paiement_diagnostic.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_paiement_diagnostic.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_paiement_diagnostic.py::TestLEtatPublie::test_jamais_appele_se_lit_inconnu_jamais_ok"
+      ]
+    },
+    {
+      "id": "jobs page ville, client : carte de la regle absente acceptee",
+      "garde": "frontend/scripts/check-jobs-ville-client-production.js",
+      "cible": "frontend/scripts/check-jobs-ville-client-production.js",
+      "trouve": "  if (!releve.reservee) {",
+      "remplace": "  if (false && !releve.reservee) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-jobs-ville-client-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-jobs-ville-client-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "nomme la VUE ANONYME quand la carte de la règle manque à un client"
       ]
     }
   ]
