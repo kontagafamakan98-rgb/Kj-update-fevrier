@@ -57,7 +57,23 @@ fr: {
   premierArrivantsLead:
     'Aucune mission n’est ouverte aujourd’hui. Publiez la vôtre, recevez les nouvelles par email, ou écrivez-nous sur WhatsApp.',
   premierArrivantsWatch: 'Recevoir les missions par email',
-  premierArrivantsWhatsApp: 'Écrire sur WhatsApp'
+  premierArrivantsWhatsApp: 'Écrire sur WhatsApp',
+  // ── UN CLIENT NE PEUT PAS AVOIR DE VEILLE, ET LA PAGE LE DIT (31/10/2026)
+  // Mesuré ce jour : un client connecté qui arrivait d'une page ville ou
+  // métier (`/jobs?alerte=1&ville=Bamako`) ne voyait RIEN à l'endroit où le
+  // bouton l'avait déposé — le bloc de promesse n'est peint que pour un
+  // visiteur sans compte, la carte interactive que pour un travailleur. Le
+  // lien avait donc menti sur sa destination, et l'écran laissait croire à une
+  // panne. Ces trois clés disent la règle ET pourquoi elle existe.
+  //
+  // Deux règles de rédaction, celles des pages ville et métier : aucune offre
+  // promise (la veille prévient, elle ne stocke rien), et le MÉCANISME est dit
+  // — l'alerte s'active depuis un compte travailleur, et c'est elle qui
+  // prévient les travailleurs quand un client publie.
+  jobAlertReservedTitle: 'Les alertes emploi sont réservées aux travailleurs',
+  jobAlertReservedLead:
+    'Une veille envoie par email les missions qui correspondent à des critères. Sur un compte client, elle vous renverrait le catalogue que vous publiez vous-même — c’est pourquoi elle s’active depuis un compte travailleur. Quand vous publiez une mission, ce sont les travailleurs qui ont une veille qui sont prévenus.',
+  jobAlertReservedAction: 'Publier une mission'
 },
 en: {
   searchPlaceholder: 'Title or description...',
@@ -89,7 +105,11 @@ en: {
   premierArrivantsLead:
     'No mission is open right now. Post yours, get new ones by email, or message us on WhatsApp.',
   premierArrivantsWatch: 'Get missions by email',
-  premierArrivantsWhatsApp: 'Message us on WhatsApp'
+  premierArrivantsWhatsApp: 'Message us on WhatsApp',
+  jobAlertReservedTitle: 'Job alerts are for workers',
+  jobAlertReservedLead:
+    'An alert emails the missions that match your criteria. On a client account it would send you back the catalogue you publish yourself, which is why it is enabled from a worker account. When you post a mission, the workers who set an alert are the ones notified.',
+  jobAlertReservedAction: 'Post a mission'
 }
 };
 dict.wo = withBase(dict.fr, {  searchPlaceholder: 'Tur walla melokaan...',
