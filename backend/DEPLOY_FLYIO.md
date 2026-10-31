@@ -415,26 +415,37 @@ Valeurs de référence contrôlées : `backend/fly.toml [env]` (config de prod),
 sont ignorées) et `backend/DEPLOY_FLYIO.md` (bloc `fly secrets set`, les
 placeholders `...` ignorés).
 
-### 4ter. Métriques Prometheus (optionnel)
+### 4ter. Métriques Prometheus (deux secrets, un lecteur)
 
 `GET /metrics` publie les compteurs que le backend tient déjà (bus temps réel,
-flux SSE, repli du rate-limiter, échecs de révocation) au format texte
-Prometheus. La route est **fermée par défaut** : sans `METRICS_TOKEN` elle
-répond 503 nommée, avec un jeton absent ou faux 401 — jamais 200.
+flux SSE, repli du rate-limiter, échecs de révocation, corpus de la place de
+marché, provenance ET fraîcheur des veilles emploi) au format texte Prometheus.
+La route est **fermée par défaut** : sans `METRICS_TOKEN` elle répond 503
+nommée, avec un jeton absent ou faux 401 — jamais 200.
 
 ```bash
-# Activer la collecte (secret, jamais dans fly.toml)
+# 1. Ouvrir la route — secret de la MACHINE (jamais dans fly.toml)
 fly secrets set METRICS_TOKEN=<jeton> -a kojo-backend
 
-# Vérifier
+# 2. Donner un LECTEUR à ces chiffres — secret du DÉPÔT (même valeur)
+gh secret set METRICS_TOKEN
+
+# Vérifier (l'hôte du BACKEND : l'origine du site répond 404 sur ce chemin)
 curl -fsS -H "Authorization: Bearer <jeton>" \
   https://api.kojoforafrica.cc.cd/metrics | head
 ```
 
+Le backend démarre sans le premier secret — c'est un choix d'exploitation, pas
+une panne —, mais la collecte n'existe qu'avec les **DEUX** : route fermée, la
+réponse est 503 ; sans le secret du dépôt, le lecteur quotidien
+([`.github/workflows/metriques-collecte.yml`](../.github/workflows/metriques-collecte.yml),
+[`scripts/check_metrics_collecte.py`](scripts/check_metrics_collecte.py)) refuse
+en nommant l'absence. Mesuré le 30/10/2026 : seul le premier était posé, donc
+les séries étaient publiées et lues par personne.
+
 La collecte (bloc `scrape_configs`, cadence de 30 s, rotation du jeton, liste
-des familles exposées et ce que ces chiffres ne disent pas) est décrite dans
-[`METRIQUES.md`](METRIQUES.md). Le jeton est OPTIONNEL côté déploiement : son
-absence n'empêche pas le backend de démarrer, elle éteint la collecte.
+des familles exposées, le lecteur quotidien, le seuil de fraîcheur et ce que ces
+chiffres ne disent pas) est décrite dans [`METRIQUES.md`](METRIQUES.md).
 
 ## 5. Mettre à jour le frontend Vercel
 

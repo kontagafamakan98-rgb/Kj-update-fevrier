@@ -1230,6 +1230,14 @@
       "runner": "vitest",
       "motif": "le processus DÉTACHÉ qui démonte la pile d'une passe morte sur un poste où `kill -TERM` ne livre aucun signal (Windows/TerminateProcess) : il interroge la vie de la passe une fois par seconde, arrête les pid(s) que l'état nomme quand elle a disparu, et sort sans rien détruire si l'état est illisible. Il n'écrit aucun chiffre et ne juge rien",
       "hors_mutation": "aucune mutation ne peut rougir : la veille ne lit pas le dépôt, elle lit l'état d'une passe. Ses trois branches (passe morte + état présent → arrêt et retrait, état disparu → sortie, état illisible → rien détruit) sont verrouillées par ses 7 cas, et modifier l'outil ne change aucun verdict du dépôt"
+    },
+    {
+      "chemin": "backend/scripts/check_metrics_collecte.py",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "backend/tests/test_metrics_collecte.py",
+      "runner": "pytest",
+      "motif": "sonde de PRODUCTION (cron .github/workflows/metriques-collecte.yml) : elle lit GET /metrics avec METRICS_TOKEN et juge la CHAINE de collecte — route servie par le jeton, six familles des veilles emploi presentes, exposition lisible, et FRAICHEUR de l'acquisition (0 = jamais, date future, age au-dela des 30 jours declares par METRIQUES.md). Le defaut qu'elle ferme a ete mesure le 30/10/2026 : la route repondait 401 sur l'hote du backend (jeton pose sur la machine) mais le depot n'avait aucun secret METRICS_TOKEN et aucun collecteur versionne, donc provenance et fraicheur etaient publiees dans le vide. Hors du perimetre de ci.yml parce qu'elle interroge un service deploye et qu'un jeton absent y est le defaut lui-meme, pas une premisse."
     }
   ],
   "rejeux": [
@@ -6988,6 +6996,27 @@
       "cwd": "frontend",
       "attend": [
         "refuse un document dont le lang n’est pas celui de sa langue"
+      ]
+    },
+    {
+      "id": "collecte: une acquisition tarie n'est plus jugee",
+      "garde": "backend/scripts/check_metrics_collecte.py",
+      "cible": "backend/scripts/check_metrics_collecte.py",
+      "trouve": "                if age_jours > age_max_jours:",
+      "remplace": "                if age_jours > age_max_jours and False:  # mutation declaree",
+      "runner": "python",
+      "preuve": "backend/tests/test_metrics_collecte.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_metrics_collecte.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_metrics_collecte.py::TestLaFraicheurDeLAcquisition::test_une_acquisition_tarie_est_nommee_avec_son_age"
       ]
     }
   ]
