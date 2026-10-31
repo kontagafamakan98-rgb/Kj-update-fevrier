@@ -488,6 +488,61 @@ describe('Jobs — la promesse d’alerte, dans le document pour un visiteur san
   });
 });
 
+describe('Jobs — un CLIENT venu d’une page ville apprend POURQUOI il n’a pas de veille', () => {
+  // Mesuré le 31/10/2026 : le bouton d'une page ville ou métier dépose un
+  // client connecté sur `/jobs?alerte=1&ville=…`, et RIEN ne s'y peignait à
+  // cet endroit — le bloc de promesse est réservé aux visiteurs sans compte, la
+  // carte interactive aux travailleurs. Le lien mentait alors sur sa
+  // destination, et l'écran se lisait comme une panne.
+  const client = () => {
+    AUTH.current = { user: { user_type: 'client', country: 'mali' } };
+    jobsAPI.getAll.mockResolvedValue([]);
+  };
+
+  it('dit la règle quand il arrive avec `?alerte=1`, au lieu de ne rien peindre', () => {
+    client();
+    SEARCH_PARAMS.current = new URLSearchParams('alerte=1&ville=Bamako&origine=ville');
+
+    render(<Jobs />);
+
+    // Le titre, le texte ET l'action : le bloc n'est pas qu'un refus, il dit
+    // ce qu'un client peut faire (publier une mission).
+    expect(screen.getByText(jobsT('jobAlertReservedTitle'))).toBeTruthy();
+    expect(screen.getByText(jobsT('jobAlertReservedLead'))).toBeTruthy();
+    expect(screen.getByText(jobsT('jobAlertReservedAction'))).toBeTruthy();
+    // La promesse des visiteurs sans compte n'est pas peinte à sa place :
+    // « créez un compte » serait faux pour quelqu'un qui en a un.
+    expect(screen.queryByText(fr.jobAlertTitle)).toBeNull();
+    // Et la carte interactive NON plus : une veille lui enverrait le catalogue
+    // qu'il publie lui-même.
+    expect(ALERTE.current).toEqual([]);
+  });
+
+  it('ne lui parle pas d’alerte sur une visite ordinaire de /jobs', () => {
+    // Sans le paramètre, il n'a rien demandé : parler d'une règle qui ne le
+    // concerne pas serait du bruit sur la page la plus visitée du site.
+    client();
+
+    render(<Jobs />);
+
+    expect(screen.queryByText(jobsT('jobAlertReservedTitle'))).toBeNull();
+    expect(screen.queryByText(jobsT('jobAlertReservedLead'))).toBeNull();
+  });
+
+  it('n’affiche pas ce bloc à un TRAVAILLEUR venu du même lien', () => {
+    // Lui a le droit d'activer une veille : la carte interactive est montée, et
+    // deux explications contradictoires ne peuvent pas coexister.
+    AUTH.current = { user: { id: 'worker-1', user_type: 'worker', country: 'mali' } };
+    SEARCH_PARAMS.current = new URLSearchParams('alerte=1&ville=Bamako&origine=ville');
+    jobsAPI.getAll.mockResolvedValue([JOB_A]);
+
+    render(<Jobs />);
+
+    expect(screen.queryByText(jobsT('jobAlertReservedTitle'))).toBeNull();
+    return waitFor(() => expect(ALERTE.current.length).toBeGreaterThan(0));
+  });
+});
+
 describe('Jobs — la PROVENANCE transmise à la carte d’alerte', () => {
   // `/jobs` est la page d'ARRIVÉE de tous les liens d'alerte : elle ne peut pas
   // deviner d'où vient le visiteur. C'est le lien qui le déclare (`&origine=`,

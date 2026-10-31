@@ -405,6 +405,46 @@ export default function Jobs() {
         </section>
       )}
 
+      {/* ── UN CLIENT ARRIVÉ D'UNE PAGE VILLE : LA RÈGLE, PAS LE SILENCE ────
+          Mesuré le 31/10/2026 : le bloc de promesse ci-dessus n'est peint que
+          pour un visiteur SANS compte, et la carte interactive
+          (`AlerteEmploi`) que pour un TRAVAILLEUR. Un client connecté qui
+          suivait le bouton d'une page ville ou métier (`?alerte=1&ville=…`)
+          arrivait donc sur une page où RIEN ne se passait à l'endroit exact
+          où le bouton l'avait déposé : le lien mentait sur sa destination, et
+          l'écran ressemblait à une panne. Une règle de produit qui n'est dite
+          nulle part se lit comme un défaut.
+
+          Ce n'est PAS conditionné par le rôle seul : sans `?alerte=1`, un
+          client lit `/jobs` comme tout le monde et la page ne lui parle pas
+          d'une chose qu'il n'a pas demandée. Le bloc apparaît là où le clic
+          l'a amené, et nulle part ailleurs.
+
+          Réserve assumée : ce texte n'est pas dans la coquille pré-rendue, et
+          ne peut pas l'être (une coquille est statique, elle ne connaît pas la
+          session). Un bloc déclaré dans le plan de la route aurait d'ailleurs
+          fait ÉCHOUER le build : `exigerCorpsDeclare` exige que TOUT champ
+          `*Key` du plan soit publié par la coquille. Ses classes, elles, sont
+          celles de la promesse (pagePlan.alerteCarteClass…) — un client et un
+          visiteur voient la même carte au même endroit, et aucune règle CSS
+          n'est ajoutée pour ce cas. */}
+      {user?.user_type === 'client' && alerteDemandee && (
+        <section
+          className={pagePlan.alerteCarteClass}
+          aria-labelledby="alerte-emploi-reservee"
+        >
+          <h2 id="alerte-emploi-reservee" className={pagePlan.alerteTitreClass}>
+            {pageT('jobAlertReservedTitle')}
+          </h2>
+          <p className={pagePlan.alerteTexteClass}>{pageT('jobAlertReservedLead')}</p>
+          <div className={pagePlan.alerteActionsClass}>
+            <LienVue to="/create-job" className={pagePlan.alerteBoutonClass}>
+              {pageT('jobAlertReservedAction')}
+            </LienVue>
+          </div>
+        </section>
+      )}
+
       {/* Onglets : découverte / candidatures / missions. Présentés comme un
           sélecteur unique quand il y en a plusieurs : c'est le même contrôle
           (un jeu d'options dont une seule est active), pas trois boutons
