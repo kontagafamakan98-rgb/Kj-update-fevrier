@@ -774,6 +774,37 @@ export const PAGE_SECTIONS = {
     // L'élément élu : le PARAGRAPHE d'introduction, pas le titre animé —
     // mesuré le 20/10/2026 après l'animation de `.titre-page`.
     lcpChamp: 'introClass',
+
+    // ── LA PROMESSE D'ALERTE EMPLOI, DANS LE DOCUMENT SERVI (30/10/2026) ─
+    // Mesuré ce jour sur le HTML pré-rendu de /jobs (109 568 o) : le titre, la
+    // bande de date, l'intro, la bascule liste/carte — et AUCUNE occurrence de
+    // la promesse d'alerte. Elle n'existait qu'APRÈS le chargement des données
+    // (le titre de l'état vide, « Soyez prévenu avant les autres ») ou pour un
+    // travailleur CONNECTÉ (la carte `AlerteEmploi`), c'est-à-dire jamais pour
+    // un crawler et jamais dans la première image — alors que c'est le seul
+    // chemin de RETOUR du produit (une veille, un email, une mission).
+    //
+    // Le bloc est donc peint par la COQUILLE aussi, et par la page pour un
+    // visiteur SANS compte : deux canaux, UN propriétaire (ce plan) pour les
+    // classes comme pour les clés, donc la coquille ne peut pas publier autre
+    // chose que ce que la page peint. Un travailleur connecté voit la carte
+    // INTERACTIVE à la place (elle lit et écrit la veille) : les deux ne se
+    // peignent jamais ensemble, et c'est ce qui empêche « Alertes emploi »
+    // d'apparaître deux fois dans la même page.
+    //
+    // Aucune clé i18n nouvelle : les quatre existent déjà dans les cinq
+    // dictionnaires, et une clé ajoutée ici aurait exigé une traduction
+    // wolof/bambara/mooré pour deux phrases qui n'en ont jamais eu.
+    alerteCarteClass: 'carte-publique carte-editoriale mb-6',
+    alerteTitreClass: 'text-base font-semibold text-stone-900',
+    alerteTexteClass: 'mt-1 text-sm text-stone-600',
+    alerteActionsClass: 'mt-3 flex flex-wrap gap-3',
+    alerteBoutonClass: 'bouton bouton-encre',
+    alerteBoutonClairClass: 'bouton bouton-clair',
+    alerteTitreKey: 'jobAlertTitle',
+    alerteTexteKey: 'jobAlertIntro',
+    alerteInscriptionKey: 'createAccount',
+    alerteConnexionKey: 'signIn',
   },
 
   '/login': {

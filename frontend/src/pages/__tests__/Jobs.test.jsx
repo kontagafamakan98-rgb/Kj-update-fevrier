@@ -448,31 +448,43 @@ describe('Jobs — le premier paint ne dépend pas de la réponse de l’API', (
   });
 });
 
-describe('Jobs — un lien d’alerte venu d’une page ville ou métier', () => {
-  // Les pages `/emplois/{ville}` et `/metiers/{metier}` ne démarrent pas React :
-  // leur bouton d'alerte arrive ici avec `?alerte=1` et ses critères. Sans ce
-  // bloc, un visiteur anonyme y verrait une page filtrée SANS la promesse qui
-  // l'a amené (la carte d'alerte n'existe que pour un travailleur connecté) —
-  // le bouton aurait menti sur sa destination.
-  it('ouvre une carte d’alerte pour un visiteur sans compte, avec les deux portes', async () => {
-    SEARCH_PARAMS.current = new URLSearchParams('alerte=1&ville=Bamako');
+describe('Jobs — la promesse d’alerte, dans le document pour un visiteur sans compte', () => {
+  // Elle n'est PAS conditionnée par `?alerte=1` : mesuré le 30/10/2026, le
+  // document pré-rendu de /jobs ne portait aucune occurrence de la promesse,
+  // qui n'existait qu'après la réponse de l'API ou pour un travailleur
+  // connecté. Un crawler et la première image ne savaient donc pas que cette
+  // page OFFRE une veille — le seul chemin de retour du produit.
+  it('peint la promesse SANS paramètre, avec les deux portes', async () => {
+    SEARCH_PARAMS.current = new URLSearchParams('');
     jobsAPI.getAll.mockResolvedValue([JOB_A]);
 
     render(<Jobs />);
 
     expect(await screen.findByText(fr.jobAlertTitle)).toBeTruthy();
-    // Les deux portes, et les clés existantes : aucune promesse sur l'offre.
+    // Le texte exact de la promesse : celui que la coquille pré-rendue publie.
+    expect(screen.getByText(fr.jobAlertIntro)).toBeTruthy();
+    // Les deux portes, et des clés existantes : aucune promesse sur l'offre.
     expect(screen.getByText(fr.createAccount)).toBeTruthy();
     expect(screen.getByText(fr.signIn)).toBeTruthy();
+    // La carte INTERACTIVE n'est pas montée pour un visiteur sans compte :
+    // les deux ne se peignent jamais ensemble (le titre serait deux fois là).
+    expect(ALERTE.current).toEqual([]);
   });
 
-  it('sans le paramètre, aucune carte d’alerte n’est poussée à un visiteur anonyme', async () => {
+  it('ne la peint pas pour un CLIENT connecté, qui publie ce catalogue', () => {
+    SEARCH_PARAMS.current = new URLSearchParams('');
+    AUTH.current = { user: { user_type: 'client', country: 'mali' } };
     jobsAPI.getAll.mockResolvedValue([]);
 
     render(<Jobs />);
 
-    await screen.findByText(VIDE);
+    // Le bloc est STATIQUE : il est peint au premier rendu, ou pas du tout —
+    // inutile d'attendre la réponse de l'API pour le constater.
     expect(screen.queryByText(fr.jobAlertTitle)).toBeNull();
+    // Et la carte interactive ne lui est pas montée non plus : une veille lui
+    // enverrait le catalogue qu'il publie lui-même.
+    expect(ALERTE.current).toEqual([]);
+    AUTH.current = { user: null };
   });
 });
 
