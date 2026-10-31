@@ -37,9 +37,12 @@ import {
   SELECTEUR_MONTAGE,
   SELECTEUR_RESERVEE,
   TITRE_ERREUR,
+  cheminsCompte,
   jugerArrivee,
   jugerVisiteOrdinaire,
+  lireLeCompte,
   main,
+  origineApi,
   parametresArrivee,
   phraseCout,
   premisse,
@@ -523,6 +526,109 @@ describe('jobs client depuis une page ville — le parcours', () => {
 // ---------------------------------------------------------------------------
 // 3. Les trois sorties, et le coût publié dans tous les cas.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// 3 bis. La lecture du compte — le JETON PORTÉ, pas seulement le cookie.
+//
+// La première passe de production (31/10/2026) a rendu une prémisse sur toute
+// l'origine : `/api/auth/me` répondait 401 parce que la lecture n'envoyait qu'un
+// cookie, alors que l'application s'authentifie par `localStorage['token']`
+// (`src/services/api.js`). Ces cas fixent la lecture qui aurait laissé la sonde
+// incapable de rendre un verdict, quel que soit l'état du produit.
+// ---------------------------------------------------------------------------
+describe('jobs client depuis une page ville — le compte lu par le cookie', () => {
+  /**
+   * Page doublure qui EXÉCUTE la fonction évaluée, avec un `fetch` qui répond
+   * par statut, dans l'ordre des adresses demandées.
+   */
+  const pageAvecStatuts = (statuts = [401]) => {
+    const appels = [];
+    let index = 0;
+    return {
+      appels,
+      evaluate: async (fonction, argument) => {
+        const fauxFetch = async (chemin, options) => {
+          appels.push({ chemin, options });
+          const statut = statuts[Math.min(index, statuts.length - 1)];
+          index += 1;
+          return {
+            ok: statut >= 200 && statut < 300,
+            status: statut,
+            json: async () => ({ user: { user_type: 'client' } }),
+          };
+        };
+        const execute = new Function(
+          'fetch',
+          `return (${fonction.toString()})(${JSON.stringify(argument)});`,
+        );
+        return execute(fauxFetch);
+      },
+    };
+  };
+
+  it('dérive l’origine de l’API du site jugé, et les deux adresses du compte', () => {
+    expect(origineApi('https://kojoforafrica.cc.cd')).toBe('https://api.kojoforafrica.cc.cd');
+    expect(origineApi('http://localhost:3000')).toBe('');
+    expect(cheminsCompte('https://kojoforafrica.cc.cd')).toEqual([
+      'https://kojoforafrica.cc.cd/api/auth/me',
+      'https://api.kojoforafrica.cc.cd/api/auth/me',
+    ]);
+    // Une origine d'API EXPLICITE l'emporte sur la déduction (preview).
+    expect(cheminsCompte('https://preview.test', 'https://api-preview.test')).toEqual([
+      'https://preview.test/api/auth/me',
+      'https://api-preview.test/api/auth/me',
+    ]);
+    // Une seule adresse quand les deux origines sont la même (local).
+    expect(cheminsCompte('http://localhost:3000')).toEqual(['http://localhost:3000/api/auth/me']);
+  });
+
+  it('demande les deux origines en cookie, et retient la première qui répond 200', async () => {
+    const page = pageAvecStatuts([401, 200]);
+    const chemins = cheminsCompte('https://kojoforafrica.cc.cd');
+    const compte = await lireLeCompte(page, chemins);
+    expect(compte.statut).toBe(200);
+    expect(compte.type).toBe('client');
+    expect(compte.chemin).toBe('https://api.kojoforafrica.cc.cd/api/auth/me');
+    expect(page.appels.map((appel) => appel.chemin)).toEqual(chemins);
+    // Aucun en-tête Authorization : le web n'envoie QUE le cookie httpOnly
+    // (AuthContext) — en ajouter un ferait juger un canal que le web n'utilise
+    // pas, et un jeton inexistant ferait rendre 401 à tort.
+    for (const appel of page.appels) {
+      expect(appel.options.credentials).toBe('include');
+      expect(appel.options.headers).toBeUndefined();
+    }
+  });
+
+  it('quand les deux origines refusent, le dit avec LEURS statuts (prémisse, jamais un vert)', async () => {
+    const page = pageAvecStatuts([401, 403]);
+    const compte = await lireLeCompte(page, cheminsCompte('https://kojoforafrica.cc.cd'));
+    expect(compte.statut).toBe(403);
+    expect(compte.lus).toEqual([
+      { chemin: 'https://kojoforafrica.cc.cd/api/auth/me', statut: 401 },
+      { chemin: 'https://api.kojoforafrica.cc.cd/api/auth/me', statut: 403 },
+    ]);
+  });
+
+  it('arrête le parcours sur une session illisible, sans rien dire de la page ville', async () => {
+    const { launch } = navigateur({
+      compte: {
+        statut: 401,
+        type: '',
+        chemin: '',
+        lus: [
+          { chemin: `${BASE}/api/auth/me`, statut: 401 },
+          { chemin: 'https://api.kojo-jobs-ville.test/api/auth/me', statut: 401 },
+        ],
+      },
+    });
+    const resultat = await runJobsVilleClientProbe({ launch, email: 'a@b.c', password: 'x', quiet: true });
+    expect(resultat.premisse).toBe(true);
+    expect(resultat.ok).toBe(false);
+    expect(resultat.errors.join(' ')).toContain('session non lue après connexion');
+    expect(resultat.errors.join(' ')).toContain('401');
+    expect(resultat.checked.join(' ')).not.toContain('/emplois/');
+  });
+});
+
 describe('jobs client depuis une page ville — les trois sorties', () => {
   const resultat = (modifications = {}) => ({
     ok: false,
