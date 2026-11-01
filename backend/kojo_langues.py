@@ -26,9 +26,19 @@ from __future__ import annotations
 
 # La MÊME liste que `LANGUES_INDEXEES` du frontend : code + préfixe d'URL.
 # `prefixe` vide = langue par défaut, celle dont l'URL n'a pas bougé.
+#
+# Les CINQ langues de l'interface depuis le 01/11/2026 : le frontend publie un
+# document par langue et par page pré-rendue (les dictionnaires sont à parité et
+# sans copie du français, cf. `frontend/src/config/langues-indexees.js`), donc le
+# sitemap doit énumérer les mêmes URL — un sitemap qui n'annonce que deux langues
+# dit au moteur que les trois autres n'existent pas, et leurs `hreflang` ne
+# seraient alors que des déclarations que seul le crawl découvrirait.
 LANGUES_INDEXEES: tuple[dict[str, str], ...] = (
     {"code": "fr", "prefixe": "", "html_lang": "fr"},
     {"code": "en", "prefixe": "en", "html_lang": "en"},
+    {"code": "wo", "prefixe": "wo", "html_lang": "wo"},
+    {"code": "bm", "prefixe": "bm", "html_lang": "bm"},
+    {"code": "mos", "prefixe": "mos", "html_lang": "mos"},
 )
 
 LANGUE_PAR_DEFAUT = "fr"

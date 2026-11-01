@@ -1271,6 +1271,13 @@
       "preuve": "frontend/scripts/__tests__/check-jobs-ville-client-production.test.js",
       "runner": "vitest",
       "motif": "le seul fait que ni `Jobs.test.jsx` ni les gardes de document ne peuvent voir : ce que le DÉPLOIEMENT sert à un CLIENT connecté qui arrive d'une page ville. Le test de composant prouve le comportement React (client + `?alerte=1` ⇒ la règle), pas qu'un bundle déployé le peint, ni que le lien de `/emplois/{slug}` mène encore là, ni que la session est restaurée sur /jobs — un client à qui la page sert la vue ANONYME passe tous les tests unitaires. La sonde suit donc le PARCOURS RÉEL avec le compte client de la CI : connexion par le formulaire servi, lecture du rôle (`GET /api/auth/me` doit dire `client`, sinon prémisse), page ville, CLIC sur son lien d'alerte (une URL tapée ne prouverait pas que le bouton mène où il dit), puis /jobs : la carte de la règle est peinte avec les textes du dictionnaire dans la langue du document, son action mène à `/create-job`, et les DEUX autres cartes (promesse d'un visiteur sans compte, carte travailleur) sont ABSENTES dans le même relevé ; enfin /jobs SANS paramètre, où la règle ne doit pas être peinte — c'est cette absence qui fait de la présence une réponse au LIEN. Trois sorties : 0 vert, 1 refus nommé, 2 prémisse (compte absent, connexion impossible, rôle qui n'est plus client, page ville injoignable), et le COÛT de la passe est publié sur le vert comme sur le rouge. Aucune écriture : elle ne crée ni ne règle de veille."
+    },
+    {
+      "chemin": "frontend/scripts/check-taille-sources.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-taille-sources.test.js",
+      "runner": "vitest"
     }
   ],
   "rejeux": [
@@ -7193,6 +7200,26 @@
       "cwd": "frontend",
       "attend": [
         "nomme la VUE ANONYME quand la carte de la règle manque à un client"
+      ]
+    },
+    {
+      "id": "taille-sources: un fichier au-dessus de son plafond passe",
+      "garde": "frontend/scripts/check-taille-sources.js",
+      "cible": "frontend/scripts/check-taille-sources.js",
+      "trouve": "      depasse: f.lignes > plafond,",
+      "remplace": "      depasse: false && f.lignes > plafond,",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-taille-sources.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-taille-sources.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse un fichier AU-DESSUS du plafond par défaut"
       ]
     }
   ]

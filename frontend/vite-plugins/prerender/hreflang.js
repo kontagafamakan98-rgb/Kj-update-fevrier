@@ -1,5 +1,6 @@
 // LA LANGUE D'UN DOCUMENT PRÉ-RENDU, ÉCRITE DANS SON `<head>` — une fois, pour
-// les deux langues.
+// CHAQUE langue de `LANGUES_INDEXEES` (deux au 30/10/2026, cinq depuis le
+// 01/11/2026 ; le code ci-dessous ne connaît aucun nombre).
 //
 // Ce module ne décide RIEN : la liste des langues, leurs préfixes et la liste
 // `hreflang` d'une page viennent de src/config/langues-indexees.js, et les

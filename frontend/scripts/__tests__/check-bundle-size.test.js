@@ -4,6 +4,7 @@ import os from 'os';
 import path from 'path';
 import { randomBytes } from 'crypto';
 import { checkBundleSize, estChunkALaDemande, BUDGETS } from '../check-bundle-size';
+import { LANGUES_INDEXEES } from '../../src/config/langues-indexees';
 
 // Tests du garde-fou « budget de taille du bundle » (scripts/check-bundle-size.js).
 //
@@ -340,7 +341,23 @@ describe('check-bundle-size — garde anti-dérive des budgets', () => {
     // l'infini : au-delà, ce n'est plus un budget.
     expect(BUDGETS.initialGzip).toBeLessThanOrEqual(200 * 1024);
     expect(BUDGETS.largestChunkGzip).toBeLessThanOrEqual(300 * 1024);
-    expect(BUDGETS.totalRaw).toBeLessThanOrEqual(8 * 1024 * 1024);
+    // Le total brut est le SEUL budget qui suit le nombre de LANGUES INDEXÉES :
+    // chaque langue ajoutée écrit douze documents de plus dans `build/`. Son
+    // plafond anti-dérive se DÉRIVE donc de la déclaration
+    // (`src/config/langues-indexees.js`), il n'est pas recopié ici.
+    //
+    // La droite passe par les TROIS points mesurés — 1 langue 5,61 Mo,
+    // 2 langues 6,92 Mo, 5 langues 10,87 Mo —, soit ~1,32 Mo par langue de plus
+    // que la première (douze documents de ~115 Ko) et 4,30 Mo de socle (les
+    // actifs, la feuille critique, les douze documents français). L'allocation
+    // de 1,45 Mo par langue laisse ~10 % au-dessus de la pente mesurée : de quoi
+    // absorber un document qui grossit, pas un changement d'architecture.
+    //
+    // Ce que ce plafond NE permet PAS : relever le budget sans ajouter de
+    // langue. C'est exactement la dérive que le garde existe pour arrêter, et
+    // c'est pourquoi il lit la liste au lieu de porter un nombre.
+    const plafondTotalMo = 4.30 + 1.45 * LANGUES_INDEXEES.length;
+    expect(BUDGETS.totalRaw).toBeLessThanOrEqual(plafondTotalMo * 1024 * 1024);
     // Le plafond par module est PLUS serré que le plus gros chunk : c'est un
     // budget de module, pas une seconde tolérance pour le même fichier.
     expect(BUDGETS.chunkGzip).toBeLessThanOrEqual(100 * 1024);

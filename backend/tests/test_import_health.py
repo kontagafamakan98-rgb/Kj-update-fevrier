@@ -43,6 +43,9 @@ Le pas de CI les rend visibles en ajoutant `--capture=tee-sys` (pytest capture l
 """
 import importlib
 import importlib.util
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -229,6 +232,101 @@ def test_l_annotation_nomme_le_module_casse_et_decompte_les_manquants():
         "::error title=Module qui ne s'importe plus::backend/fantome.py — "
         "NameError: name 'x' is not defined"
     )
+
+
+class _ConsoleCp1252:
+    """Une console qui n'a NI `reconfigure` NI tolérance : cp1252 STRICT.
+
+    C'est la console réelle de la mesure : sur un Windows dont la sortie est
+    redirigée, `sys.stdout.encoding` vaut cp1252 et un caractère hors de cette
+    table lève — le cas que la reconfiguration du module couvre en temps normal.
+    """
+
+    encoding = "cp1252"
+
+    def __init__(self):
+        self.ecrit = ""
+
+    def write(self, texte):
+        texte.encode("cp1252")  # lève UnicodeEncodeError, comme la vraie console
+        self.ecrit += texte
+
+    def flush(self):
+        pass
+
+
+class TestAvertissementDeDemarrage:
+    """Un message d'import ne dépend JAMAIS de l'encodage du terminal.
+
+    Mesuré le 01/11/2026 : `kojo_settings` imprimait « ⚠️ pywebpush non installé »
+    AVANT de reconfigurer ses flux en UTF-8 — donc sous `PYTHONIOENCODING=cp1252`
+    avec pywebpush absent, l'import lui-même levait `UnicodeEncodeError:
+    'charmap' codec can't encode character '\u26a0'`, et les 2 399 tests tombaient
+    en erreur de collecte. La CI ne le voyait pas (ses captures sont en UTF-8),
+    un poste Windows sans le paquet si. Les deux cas ci-dessous sont les deux
+    chemins de la correction : la reconfiguration passe en premier, et le repli
+    ASCII rattrape le cas où elle échoue.
+    """
+
+    def test_l_import_survit_a_une_console_cp1252(self):
+        """Le chemin mesuré : console cp1252, pywebpush absent, import OK.
+
+        Sous-processus RÉEL (même interpréteur, même module) : `sys.modules` du
+        processus de test est déjà chargé, donc simuler l'absence de pywebpush
+        sur place ne prouverait rien de l'import initial.
+        """
+        script = (
+            "import sys\n"
+            "sys.modules['pywebpush'] = None\n"
+            "import kojo_settings\n"
+            "print('IMPORT OK', kojo_settings.WEBPUSH_AVAILABLE)\n"
+        )
+        env = {**os.environ, "PYTHONIOENCODING": "cp1252", "PYTHONUTF8": "0"}
+        resultat = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=str(BACKEND_DIR),
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=120,
+        )
+
+        assert resultat.returncode == 0, (
+            "l'import de kojo_settings échoue sur une console cp1252 :\n"
+            f"{resultat.stdout}\n{resultat.stderr}"
+        )
+        assert "IMPORT OK False" in resultat.stdout, (
+            "la prémisse du cas n'est pas tenue : pywebpush devrait être absent "
+            f"donc l'avertissement imprimé\n{resultat.stdout}"
+        )
+        assert "pywebpush non install" in resultat.stdout, (
+            f"l'avertissement n'est plus imprimé du tout\n{resultat.stdout}"
+        )
+        assert "UnicodeEncodeError" not in resultat.stderr, resultat.stderr
+
+    def test_l_avertissement_retombe_en_ascii_quand_la_console_le_refuse(
+        self, monkeypatch
+    ):
+        """Contre-épreuve du repli : sans `reconfigure` possible, on perd l'icône
+        et JAMAIS l'import.
+
+        Une console acceptant tous les caractères rendrait ce cas vert sans rien
+        prouver : celle-ci encode en cp1252 strict, et n'expose pas `reconfigure`.
+        """
+        kojo_settings = importlib.import_module("kojo_settings")
+        assert not hasattr(_ConsoleCp1252(), "reconfigure"), "prémisse : aucun reconfigure"
+        console = _ConsoleCp1252()
+        monkeypatch.setattr(sys, "stdout", console)
+
+        kojo_settings._avertir("⚠️ pywebpush non installé")
+
+        assert "pywebpush non install" in console.ecrit, (
+            "le repli a perdu le message au lieu de perdre l'icône"
+        )
+        assert "⚠" not in console.ecrit, "le repli n'a pas remplacé le caractère refusé"
+        console.ecrit.encode("cp1252")  # et ce qui est sorti est bien écrivable
 
 
 def test_le_garde_echoue_quand_un_module_ne_s_importe_plus(tmp_path):
