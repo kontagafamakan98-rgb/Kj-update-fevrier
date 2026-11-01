@@ -24,6 +24,12 @@ Vérifie :
    `configured: false`, `state: echec` (en publiant son motif) et toute
    contradiction entre les deux lectures du même circuit — `inconnu` est
    publié en WARN, parce que zéro vente n'est pas une panne.
+8. Les LANGUES SERVIES (`langues` de /health, 01/11/2026) : le nombre de
+   langues indexées et, pour chacune, le nombre de documents que le sitemap
+   publie — la question que la sonde `hreflang` met 61 requêtes et 11 s à
+   trancher. Un bloc absent est un refus nommé (révision antérieure), un volume
+   qui ne tombe pas juste aussi. Ce qu'elle ne dit pas : le `lang`, le
+   `canonical` et la réciprocité des documents SERVIES restent à la sonde.
 
 Les deux moniteurs sont dérivés de l'origine de `--url`, donc un seul drapeau
 suffit ; ils vivent hors `/api` comme `/health`.
@@ -56,6 +62,18 @@ CHAMPS_PAIEMENT = (
     "consecutive_failures",
     "failure_threshold",
     "remaining_cooldown_seconds",
+)
+
+# Les champs que le bloc `langues` doit porter (01/11/2026). Un bloc amputé ne se
+# juge pas à moitié : il est refusé en nommant ce qui manque.
+CHAMPS_LANGUES = (
+    "indexees",
+    "defaut",
+    "documents_par_langue",
+    "urls_par_langue",
+    "pages",
+    "alternatives_par_page",
+    "portee",
 )
 
 
@@ -197,6 +215,87 @@ def _verifier_composite(origine: str, timeout: int, fournisseurs=None) -> list:
     print(f"[ERREUR] Composite au-dela du seuil : {', '.join(down)} "
           f"(down={payload.get('down')}/{total}, seuil {seuil})")
     return [f"PRODUCTION DEGRADEE : {len(down)} fournisseur(s) down : {', '.join(down)}"]
+
+def _verifier_langues(data: dict) -> list:
+    """Le bloc `langues` de /health : combien de langues, et combien de documents.
+
+    CE QU'IL FERME (01/11/2026). La question « combien de langues le site sert-il,
+    et combien de documents chacune ? » ne se lisait qu'en lançant la sonde
+    `hreflang` sur la production : 61 requêtes et 11 s. `/health` publie
+    desormais la DECLARATION du sitemap, et cette sonde la juge : un bloc absent
+    (revision anterieure au deploiement) est un refus nomme, pas un silence, et
+    un volume qui ne tombe pas juste est un refus — un compte faux se lit comme
+    une couverture, ce qui est pire que pas de compte du tout.
+
+    Ce que la sonde NE juge PAS, et qui reste a la sonde `hreflang` : le `lang`
+    des documents servis, leur `canonical` et la reciprocite des alternatives.
+    Le bloc dit ce que le sitemap ENUMERE ; l'origine du site dit ce qu'elle
+    SERT, et ce sont deux faits differents.
+    """
+    bloc = data.get("langues")
+    if not isinstance(bloc, dict):
+        return [
+            "le backend deploye ne publie pas de bloc 'langues' dans /health : le "
+            "volume des langues servies n'est pas lisible — la revision servie est "
+            "anterieure a ce bloc, redeployer"
+        ]
+
+    manquants = [champ for champ in CHAMPS_LANGUES if champ not in bloc]
+    if manquants:
+        return [f"bloc 'langues' incomplet : champ(s) absent(s) {', '.join(manquants)}"]
+
+    codes = bloc.get("indexees")
+    if not isinstance(codes, list) or len(codes) < 2:
+        return [
+            "bloc 'langues' : 'indexees' doit etre une liste d'au moins deux codes "
+            f"(lu : {codes!r}) — un site monolingue n'a pas de hreflang a publier"
+        ]
+
+    erreurs = []
+    defaut = bloc.get("defaut")
+    if defaut not in codes:
+        erreurs.append(f"bloc 'langues' : la langue par defaut {defaut!r} n'est pas indexee")
+
+    documents = bloc.get("documents_par_langue") or {}
+    urls = bloc.get("urls_par_langue") or {}
+    for nom, table in (("documents_par_langue", documents), ("urls_par_langue", urls)):
+        if not isinstance(table, dict) or set(table) != set(codes):
+            erreurs.append(
+                f"bloc 'langues' : '{nom}' ne couvre pas exactement les langues "
+                f"declarees ({sorted(set(table) ^ set(codes))} en ecart)"
+            )
+    if erreurs:
+        return erreurs
+
+    muettes = [code for code in codes if int(documents.get(code) or 0) < 1]
+    if muettes:
+        erreurs.append(
+            "bloc 'langues' : " + ", ".join(muettes) + " n'annonce aucun document — "
+            "une langue sans document n'a pas d'URL a servir"
+        )
+
+    pages = bloc.get("pages") or {}
+    if pages.get("total") != sum(int(nombre or 0) for nombre in urls.values()):
+        erreurs.append(
+            "/health se contredit : pages.total="
+            f"{pages.get('total')!r} mais urls_par_langue totalise "
+            f"{sum(int(nombre or 0) for nombre in urls.values())}"
+        )
+
+    if not str(bloc.get("portee") or "").strip():
+        erreurs.append(
+            "bloc 'langues' : 'portee' est vide — un volume publie sans portee se "
+            "lit comme une mesure des documents servis"
+        )
+
+    if not erreurs:
+        par_langue = documents.get(codes[0])
+        print(
+            f"[OK] Langues : {len(codes)} ({', '.join(codes)}), {par_langue} document(s) "
+            f"par langue, {sum(int(nombre or 0) for nombre in urls.values())} URL publiee(s)"
+        )
+    return erreurs
+
 
 def _verifier_paiement(data: dict, paydunya_composite=None) -> list:
     """Le bloc `paiement` de /health : TROIS états, pas deux.
@@ -377,6 +476,10 @@ def check_health(url: str, timeout: int = 15) -> int:
     #    ni si les clés existent, ni si un paiement a été exercé, ni pourquoi il
     #    a échoué. Le composite donne une SECONDE lecture du même circuit.
     errors.extend(_verifier_paiement(data, fournisseurs.get("paydunya")))
+    # 5. Les LANGUES SERVIES (01/11/2026) : combien de langues, combien de
+    #    documents chacune — la question que la sonde hreflang met 11 s et 61
+    #    requêtes à trancher sur les documents servis.
+    errors.extend(_verifier_langues(data))
 
     if errors:
         print("\n[ERREUR] ANOMALIES DETECTEES SUR LA PRODUCTION :")
