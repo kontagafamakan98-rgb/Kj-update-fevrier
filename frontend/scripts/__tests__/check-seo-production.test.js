@@ -16,6 +16,7 @@ import { describe, expect, it } from 'vitest';
 import {
   INTEGRATIONS,
   LIVE_JOB_STATUSES,
+  MAX_JOB_PAGES,
   PUBLIC_JOBS_PATH,
   TENTATIVES_PAGE,
   analyzeSeoServedHtml,
@@ -310,10 +311,14 @@ describe('section Pages — le sitemap servi, page par page', () => {
   // `jobsBody` : la charge utile de l'API publique des missions (`undefined` =
   // aucune fiche servie, `null` = API non servie). C'est la seconde source des
   // fiches, donc elle fait partie du harnais au même titre que le sitemap.
-  const run = (over = {}, sitemapXml = SITEMAP_XML, seen, jobsBody) =>
+  // `graine` est un NUMÉRO DE PASSE : elle décide quelle fenêtre du sitemap (et
+  // des fiches) est lue. Un cas qui porte sur la fenêtre doit la FIXER, sinon la
+  // graine du jour rend le verdict dépendant du calendrier.
+  const run = (over = {}, sitemapXml = SITEMAP_XML, seen, jobsBody, graine) =>
     runSeoProductionReport({
       base: SITE_ORIGIN,
       fetchImpl: trackingFetch({ ...SERVED_PAGES, ...over }, sitemapXml, seen, jobsBody),
+      ...(graine === undefined ? {} : { graine }),
     });
 
   it('lit chaque page du sitemap et ne redemande pas l’accueil déjà lu', async () => {
@@ -467,8 +472,9 @@ describe('section Pages — le sitemap servi, page par page', () => {
     expect(result.manquantes).toEqual([]);
     const log = result.notices.join('\n');
     expect(log).toContain('fiches /jobs/:id : 1 sur 1 vérifiée(s)');
-    expect(log).toContain('Échantillon borné à 3');
-    // La notice dit ce que l'échantillon NE couvre pas.
+    // La notice dit dans quelle fenêtre la fiche a été lue, et ce que
+    // l'échantillon NE couvre pas.
+    expect(log).toContain("toutes dans la fenêtre d'une passe");
     expect(log).toContain('check-og-job-200.js');
   });
 
@@ -501,15 +507,85 @@ describe('section Pages — le sitemap servi, page par page', () => {
     expect(result.notices.join('\n')).toContain('1 disparue(s) entre la lecture et sa vérification');
   });
 
-  it('borne l’échantillon à 3 fiches même si le sitemap en annonce cinq', async () => {
+  it('borne la fenêtre à 3 fiches par passe, et la fait TOURNER d’une passe à l’autre', async () => {
     const ids = ['a', 'b', 'c', 'd', 'e'];
-    const seen = [];
-    await run(
-      Object.fromEntries(ids.map((id) => [`/jobs/${id}`, pageFor(`/jobs/${id}`)])),
-      withJobs(...ids),
-      seen,
+    const pages = Object.fromEntries(ids.map((id) => [`/jobs/${id}`, pageFor(`/jobs/${id}`)]));
+    const lire = async (graine) => {
+      const seen = [];
+      const result = await run(pages, withJobs(...ids), seen, undefined, graine);
+      return {
+        result,
+        fiches: seen
+          .filter((p) => /^\/jobs\/[a-e]$/.test(p))
+          .map((p) => p.slice('/jobs/'.length)),
+      };
+    };
+
+    const passe1 = await lire(0);
+    const passe2 = await lire(1);
+
+    // Trois par passe : le coût d'un run ne bouge pas avec le corpus…
+    expect(passe1.fiches).toEqual(['a', 'b', 'c']);
+    // …et la passe 2 ne relit pas les trois mêmes. Sans cela, une fiche au-delà
+    // de la troisième n'était jugée par AUCUNE passe, jamais.
+    expect(passe2.fiches).not.toEqual(passe1.fiches);
+    expect(passe1.result.jobSample.fenetreFiches).toMatchObject({ passe: 1, tours: 2 });
+    expect(passe2.result.jobSample.fenetreFiches).toMatchObject({ passe: 2, tours: 2 });
+    // Deux passes couvrent les cinq fiches : la couverture est complète.
+    expect(new Set([...passe1.fiches, ...passe2.fiches])).toEqual(new Set(ids));
+    // La première passe DIT ce qu'elle laisse, en le nommant.
+    expect(passe1.result.jobSample.nonJugees).toHaveLength(2);
+    expect(passe1.result.notices.join('\n')).toContain(
+      'fiches /jobs/:id non jugées par la passe 1/2 (2) : /jobs/d, /jobs/e',
     );
-    expect(seen.filter((p) => /^\/jobs\/[a-e]$/.test(p))).toEqual(['/jobs/a', '/jobs/b', '/jobs/c']);
+    // Les fiches hors fenêtre ne sont pas des défauts.
+    expect(passe1.result.manquantes).toEqual([]);
+  });
+
+  it('ne laisse pas une fiche de l’API prendre la place d’une fiche du sitemap', async () => {
+    // Deux budgets, pas un : la fenêtre du CORPUS (les fiches du sitemap) et le
+    // DÉTECTEUR de complétude (les fiches servies sans être au sitemap). Un
+    // détecteur qui consommerait la fenêtre ferait perdre du corpus à chaque
+    // run, alors qu'une fiche non découvrable est déjà refusée en défaut.
+    const sitemapIds = ['s1', 's2', 's3'];
+    const apiIds = ['v1', 'v2', 'v3'];
+    const pages = Object.fromEntries(
+      [...sitemapIds, ...apiIds].map((id) => [`/jobs/${id}`, pageFor(`/jobs/${id}`)]),
+    );
+    const result = await run(pages, withJobs(...sitemapIds), undefined, publicJobsBody(...apiIds), 0);
+
+    const lues = result.jobPages.map(({ url }) => url.split('/').pop());
+    expect(lues).toEqual(expect.arrayContaining(sitemapIds));
+    expect(lues).toEqual(expect.arrayContaining(apiIds));
+    expect(result.jobSample.horsSitemap).toBe(3);
+    expect(result.jobSample.total).toBe(6);
+  });
+
+  it('nomme les fiches de l’API qu’elle n’a pas jugées, et dit qu’elles ne tournent pas', async () => {
+    // Six candidates (trois par statut vivant), trois lues : les autres ne sont
+    // pas tues pour autant, et la notice dit POURQUOI elles ne reviendront pas à
+    // la passe suivante — c'est le corpus du sitemap qui tourne, pas le détecteur.
+    const parStatut = { open: ['v1', 'v2', 'v3'], in_progress: ['v4', 'v5', 'v6'] };
+    const fetchImpl = async (url) => {
+      const cible = new URL(url);
+      if (cible.pathname === PUBLIC_JOBS_PATH) {
+        const liste = parStatut[cible.searchParams.get('status')] || [];
+        const limite = Number(cible.searchParams.get('limit')) || liste.length;
+        const corps = JSON.stringify(liste.slice(0, limite).map((id) => ({ id, status: 'open' })));
+        return { ok: true, status: 200, text: async () => corps };
+      }
+      const html = { ...SERVED_PAGES, '/sitemap.xml': SITEMAP_XML }[cible.pathname];
+      return { ok: html !== undefined, status: html === undefined ? 404 : 200, text: async () => html ?? '' };
+    };
+
+    const result = await runSeoProductionReport({ base: SITE_ORIGIN, fetchImpl, graine: 0 });
+    const log = result.notices.join('\n');
+
+    expect(result.jobSample.sampled).toBe(MAX_JOB_PAGES);
+    expect(result.jobSample.apiNonJugees).toHaveLength(3);
+    expect(log).toContain("servies par l'API publique (/api/jobs) et non jugées (3)");
+    expect(log).toContain('/jobs/v4, /jobs/v5, /jobs/v6');
+    expect(log).toContain('ce sont les fiches du sitemap qui tournent');
   });
 
   it('dit l’échantillon vide quand AUCUNE des deux sources ne sert de fiche', async () => {

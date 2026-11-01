@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-11-01",
-    "motif": "01/11/2026 - /health publie le volume des langues servies (bloc langues : codes, documents par langue, URL par langue, portee) et la sonde de sante le JUGE (bloc absent, volume faux, langue sans document, portee vide)",
+    "motif": "les fiches /jobs/:id sont lues par une fenetre tournante (MAX_JOB_PAGES par passe, meme graine que les pages) au lieu d'un plafond fixe qui ne jugeait que les trois premieres",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/alerte_sondes.py": "35c6b645b431b932c6af1ed53704acc4f096da428a49e2f7461259358f137687",
@@ -122,7 +122,6 @@
       "frontend/scripts/check-reliquats-css.js": "afc399893d24bf9831bc9c0094b695746bb0a7ddbe5c06e7f65f9adde936a219",
       "frontend/scripts/check-retard-main.js": "b9c98e4c23382b24d1ce361acc7ea5d0cc6dc166d83ab288402f76436d205e61",
       "frontend/scripts/check-script-deps.js": "cf8bf0065da33c9e22343025176b0f74434a93d85760c2d56f94f53ef8b04af6",
-      "frontend/scripts/check-seo-production.js": "45d28215eedcbfee0ff6f7315b00df2c8fce799e0b47ea3965e8e8d396941154",
       "frontend/scripts/check-session-reload-production.js": "80247fa35e7b1467b3c0a9f4c66f1ff994dbcfd857795c2b6f74f2d78fd484ca",
       "frontend/scripts/check-shell-remote-resources.js": "892f772d7c2ab1a41b03b0dc05d29b470d7c0c9bc6ce0355599b5a8c020d2822",
       "frontend/scripts/check-shell-text-provenance.js": "eedaecfb08a9586588fa1bbf94285b807898ca49e2f98c3090dcaed921747fc6",
@@ -151,7 +150,8 @@
       "frontend/scripts/validate-vercel-json.mjs": "16a56835e1fb299821c3a1dd7fa4d0957982a970a493e98ed8855d06fc563518",
       "frontend/scripts/verre-contraste.js": "0304f01ae4ccd2fea6db62cff8badcb4085d3a34622f49416ed8944c377c688c",
       "backend/scripts/check_health_probe.py": "689a95295c8e687ef676d60356d7b28f6bc93bbebe6d9b8ee21b650da1a6bf34",
-      "backend/server.py": "c6e9713b31635965e00272bb2b1f52177a64f82ffd3797e35fcaf52c107e6cbd"
+      "backend/server.py": "c6e9713b31635965e00272bb2b1f52177a64f82ffd3797e35fcaf52c107e6cbd",
+      "frontend/scripts/check-seo-production.js": "4542a97783c83da992e93df906fbdc997bf18bbff8347f8f99d136dd8bc9c7f7"
     }
   },
   "hors_perimetre": [
