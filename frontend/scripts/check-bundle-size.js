@@ -248,10 +248,31 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 // cinq langues, une seule surface indexable, aucun `hreflang`), donc elle est
 // REFUSÉE — et écrite, pour qu'un prochain relèvement ne se lise pas comme un
 // abandon.
+// ── 01/11/2026 : 7,00 → 11,20 Mo, POUR LES TROIS DERNIÈRES LANGUES ───────
+// Le budget du 30/10 avait été relevé pour UNE langue de plus (`en`). Le
+// 01/11, `wo`, `bm` et `mos` sont indexées à leur tour : `LANGUES_INDEXEES`
+// porte cinq entrées, le build écrit donc TROIS fois douze documents de plus
+// dans `build/wo/`, `build/bm/` et `build/mos/`.
+// MESURÉ : **11 399 676 o / 196 fichiers** contre 7 257 540 o / 160 la veille,
+// soit +4 142 136 o dont 99,5 % sont ces trente-six documents (115 059 o de
+// moyenne : CSS critique inliné + les 45 liens du pied de page + la coquille).
+// Le JS initial ne bouge pas d'un octet (133,1 Ko gzip sur 135, il ne DÉPEND
+// pas des langues : les dictionnaires sont des chunks paresseux), et un HTML
+// part compressé par Vercel — ce budget mesure la TAILLE DU BUILD, pas ce que
+// le visiteur télécharge.
+// CE QUE CE RELÈVEMENT N'EST PAS : une dérive. Il paie la même décision que
+// celle du 30/10, appliquée à trois langues au lieu d'une — une URL et un
+// `hreflang` réciproque par langue indexée. La baisse possible reste celle qui
+// est ÉCRITE comme REFUSÉE depuis le 27/10 : sortir le bloc de maillage des
+// coquilles hors accueil rendrait ces liens invisibles au crawler qui ne lit
+// que le document servi. Ce qui changerait vraiment le coût serait de servir
+// les documents d'une langue à la DEMANDE (un rendu par requête plutôt qu'un
+// fichier par page) : c'est une architecture, pas un réglage, et elle n'est pas
+// prise ici.
 export const BUDGETS = {
   initialGzip: 135 * 1024, // JS initial (chunks référencés par index.html), gzip
   largestChunkGzip: 200 * 1024, // plus gros chunk JS, gzip
-  totalRaw: 7.00 * 1024 * 1024, // build/ entier, brut (voir les mesures datées ci-dessus)
+  totalRaw: 11.20 * 1024 * 1024, // build/ entier, brut (voir les mesures datées ci-dessus)
   // ── PLAFOND PAR MODULE (31/10/2026) ──────────────────────────────────────
   // Avant ce plafond, un chunk n'était borné QUE s'il était le plus gros du
   // build (`largestChunkGzip`, 200 Ko) : le deuxième, le troisième et les

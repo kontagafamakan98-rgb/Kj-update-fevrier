@@ -17,6 +17,11 @@ import { buildHomeShell } from './prerender/shells-home.js'
 // jamais un littéral recopié dans index.html, qui ne suivrait pas un changement
 // de photo et laisserait l'image LCP hors du chemin critique, en silence.
 import { PHOTO_HEROS_SIZES, srcsetHeros } from '../src/config/photos-heros.js'
+// La coupure du TITRE du héros : les deux rendus (coquille et page React) en
+// dérivent la queue accentuée avec CETTE fonction, donc la condition
+// « le titre se coupe » se lit avec elle aussi — une seconde règle de coupure
+// ferait exiger l'accent d'un document que React ne l'aurait pas peint.
+import { couperLeTitre } from '../src/config/page-sections.js'
 import { buildRouteShells } from './prerender/shells-routes.js'
 import { chromeDePage, piedDePage } from './prerender/app-chrome.js'
 import { makeDeclaredBodyGuard } from './prerender/declared-body.js'
@@ -139,7 +144,7 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
       // `fr` publie donc une page réellement anglaise, sans une seconde écriture
       // du balisage — c'est ce qui rend la version anglaise tenable : une seule
       // déclaration de structure, deux lectures. Le refus de corps déclaré
-      // (declared-body.js) s'applique aux deux langues : une section oubliée en
+      // (declared-body.js) s'applique à CHAQUE langue : une section oubliée en
       // anglais casse le build au lieu de publier une page amputée.
       const PAR_LANGUE = LANGUES_INDEXEES.map((langue) => {
         const fichier = `src/i18n/${langue.code}.json`
@@ -149,9 +154,23 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
         // repli global, dans la langue du document.
         const registerT = makeRegisterTranslator(langue.code, T)
         const jobsT = makeJobsTranslator(langue.code, T)
+        // ── LES CONDITIONS DE BUILD, PAR LANGUE ────────────────────────────
+        // `google-auth` est un drapeau (le client Google est-il configuré au
+        // build ?) ; `titre-accent` est une DONNÉE (le titre du héros de CETTE
+        // langue se coupe-t-il en deux ?). Les deux rendus peignent l'`<em
+        // class="accent-heros">` sous cette seule condition, donc le refus de
+        // corps déclaré doit la lire de la même façon — sinon il exige d'une
+        // coquille wolof une classe que sa page ne peint pas (mesuré le
+        // 01/11/2026 : aucune virgule dans les trois titres wolof, bambara et
+        // mooré, la coupure n'a donc pas lieu).
+        const titreHeros = dictionnaire[pageSections['/'].titleKey]
+        const conditions = new Set([
+          ...(googleAuth ? ['google-auth'] : []),
+          ...(couperLeTitre(titreHeros)[1] ? ['titre-accent'] : []),
+        ])
         const exigerCorpsDeclare = makeDeclaredBodyGuard({
           esc, T, registerT, jobsT, pageSections, pageSectionParts,
-          conditions: googleAuth ? new Set(['google-auth']) : new Set(),
+          conditions,
         })
         // Le PIED DE PAGE appartient au CHROME : React le rend après `</main>`
         // sur toutes les routes, donc les coquilles le publient de la même

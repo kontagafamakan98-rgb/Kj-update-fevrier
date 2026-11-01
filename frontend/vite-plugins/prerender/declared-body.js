@@ -20,7 +20,35 @@ import { texteVisible } from '../../scripts/texte-visible.js';
 const CLES_CONDITIONNELLES = {
   googleLogin: 'google-auth',
   googleSignup: 'google-auth',
-}
+  // Le SÉPARATEUR « ou » (mesuré le 01/11/2026) appartient à la MÊME condition :
+  // dans `src/pages/Register.js`, `src/pages/Login.js` et les deux coquilles, il
+  // ne se peint QUE sous le bouton Google, puisqu'il sépare ce bouton des champs.
+  // Le plan, lui, le déclare sans condition (`orSeparatorKey`), donc le garde
+  // l'exigeait d'une coquille construite SANS `VITE_GOOGLE_CLIENT_ID`.
+  // Ce faux refus-là n'a jamais été vu tant que les langues indexées étaient
+  // `fr` et `en` : le contrôle cherche le texte déclaré dans le FLUX VISIBLE
+  // **ou** dans la chaîne brute du corps, et « ou » comme « or » sont des
+  // sous-chaînes partout (« bouton », « focus », « border », « for ») — deux
+  // faux verts. En déclarant `wo`, « walla » n'est sous-chaîne de rien et le
+  // build a refusé. Le texte reste exigé quand la condition est vraie.
+  orSeparator: 'google-auth',
+};
+
+// Une CLASSE du plan est publiée elle aussi (c'est ce qui empêche la coquille de
+// dessiner autre chose que React), mais elle peut dépendre de la DONNÉE et non
+// d'un drapeau de build. `accent-heros` est de ce cas : les deux canaux
+// n'ouvrent leur `<em>` QUE si le titre du héros se coupe en deux, et
+// `couperLeTitre` ne coupe que sur une ponctuation (`/[,;:]/`). Mesuré le
+// 01/11/2026 : « Trouvez un travailleur de confiance, payez… » a une virgule,
+// « Jëmmel liggéeykat ak kliyan ci Afrik bu Sowwu » n'en a pas — et le build
+// refusait la coquille wolof pour une classe que React ne peint pas non plus.
+// La condition est donc lue dans la DONNÉE (`titre-accent`, calculée par
+// prerender-route-meta.js avec la même fonction que les deux rendus), jamais
+// posée en dur : inventer une queue accentuée en wolof pour satisfaire le garde
+// aurait changé le dessin de la page.
+const CLASSES_CONDITIONNELLES = {
+  'accent-heros': 'titre-accent',
+};
 
 export function makeDeclaredBodyGuard({
   esc, T, registerT, jobsT, pageSections, pageSectionParts, conditions = new Set(),
@@ -44,7 +72,11 @@ export function makeDeclaredBodyGuard({
     const requises = cles.filter(
       (cle) => !CLES_CONDITIONNELLES[cle] || conditions.has(CLES_CONDITIONNELLES[cle])
     )
-    const attendus = [...requises.map(traduire), ...textes]
+    const textesRequis = textes.filter(
+      (texte) =>
+        !CLASSES_CONDITIONNELLES[texte] || conditions.has(CLASSES_CONDITIONNELLES[texte])
+    )
+    const attendus = [...requises.map(traduire), ...textesRequis]
     // Le texte déclaré est cherché dans le FLUX VISIBLE de la coquille, pas dans
     // sa chaîne brute : un `<br>` ou un `<em>` à l'intérieur d'un titre ne
     // change pas ce qu'un lecteur lit. Les deux membres de la comparaison

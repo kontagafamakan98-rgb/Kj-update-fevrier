@@ -504,7 +504,10 @@ export async function runHreflangProbe({
       const problemes = jugerSitemap({ xml: sitemap.corps });
       errors.push(...problemes);
       if (!problemes.length) {
-        checked.push(`  ✓ sitemap (${blocs.length} entrée(s), deux langues par page publiée)`);
+        checked.push(
+          `  ✓ sitemap (${blocs.length} entrée(s), ` +
+            `${LANGUES_INDEXEES.length} langue(s) par page publiée)`
+        );
       }
     }
   }

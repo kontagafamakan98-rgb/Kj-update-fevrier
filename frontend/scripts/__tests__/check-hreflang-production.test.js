@@ -181,7 +181,14 @@ describe('documents par langue — lang, canonical, alternatives réciproques', 
 
     expect(resultat.ok).toBe(false);
     const messages = resultat.errors.join('\n');
-    expect(messages).toMatch(/1 alternative\(s\) hreflang au lieu de 3/);
+    // Le compte attendu se DÉRIVE de la déclaration, il ne se recopie pas : il
+    // valait « 3 » du temps des deux langues indexées (fr, en, x-default), et
+    // une liste figée aurait rendu ce cas VERT le jour où une troisième langue
+    // a rejoint la famille — sur une liste amputée, donc. Mesuré le 01/11/2026 :
+    // cinq langues indexées, l'attendu vaut 6.
+    const attendues = alternatesHreflang('/jobs', SITE_ORIGIN).length;
+    expect(attendues).toBe(LANGUES_INDEXEES.length + 1); // la famille + x-default
+    expect(messages).toMatch(new RegExp(`1 alternative\\(s\\) hreflang au lieu de ${attendues}`));
     // Et le fait est dit DEUX fois : la déclaration manque, ET la famille ne
     // publie pas la même liste — deux lectures d'une seule faute.
     expect(messages).toMatch(/ne publient pas la même liste hreflang/);

@@ -7,12 +7,26 @@
 // anglaise existait, et un visiteur anglophone n'y arrivait qu'en cliquant le
 // sélecteur du site.
 //
-// Deux langues sont INDEXÉES, et pas cinq : `fr` et `en` ont une version écrite
-// de chaque page pré-rendue (les coquilles se construisent depuis les
-// dictionnaires, cf. vite-plugins/prerender-route-meta.js), alors que `wo`,
-// `bm` et `mos` n'ont pas encore de page complète à publier. Un `hreflang` vers
-// une page qui n'existe pas est une déclaration fausse — c'est la règle que les
-// gardes tiennent (scripts/check-prerender-shells.js).
+// Les CINQ langues de l'interface sont indexées depuis le 01/11/2026, et c'est
+// une conséquence MESURÉE, pas une ambition : les cinq dictionnaires portent les
+// mêmes 976 clés à parité (`i18nParity.test.js`), aucune valeur de `wo`/`bm`/`mos`
+// n'est une copie du français ou de l'anglais et la dette de traduction y est
+// vide depuis le 20/10/2026 (`i18nLangue.test.js`) — donc les coquilles se
+// construisent dans ces trois langues avec le même code, sans une ligne de plus
+// (cf. vite-plugins/prerender-route-meta.js, qui boucle sur cette liste).
+//
+// Ce qui avait retenu la déclaration au 30/10/2026 était l'inverse de ce qu'on
+// croyait : ce n'était pas une traduction absente, c'était un doute de QUALITÉ
+// (`src/i18n/alertes-emploi-revue-native.md` : les 27 termes inventés ou
+// empruntés attendent une relecture par un locuteur natif). Publier une page
+// n'est pas certifier sa langue : le fait publié ici est « cette URL existe et
+// se déclare comme le wolof, le bambara ou le mooré », et les gardes tiennent
+// les trois propriétés qui le rendent vrai (document écrit, `lang`, alternatives
+// réciproques). La relecture native reste une dette de CONTENU, déclarée.
+//
+// Un `hreflang` vers une page qui n'existe pas reste une déclaration fausse :
+// c'est la règle que les gardes tiennent (scripts/check-prerender-shells.js),
+// et c'est elle qui a fait de ce fichier la seule porte à ouvrir.
 //
 // Ce que ce fichier décide, et qui d'autre le lit :
 //   • le PRÉFIXE d'URL de chaque langue (`''` pour la langue par défaut, donc
@@ -30,10 +44,15 @@ export const LANGUES_INDEXEES = [
   // La langue par défaut : AUCUN préfixe, donc l'URL d'une page est celle
   // qu'elle avait avant le 30/10/2026 (`/jobs`), et le `x-default` pointe ici.
   { code: 'fr', prefixe: '', htmlLang: 'fr', ogLocale: 'fr_FR' },
-  // L'anglais, seule autre langue dont les douze pages sont écrites de bout en
-  // bout (elles se construisent depuis src/i18n/en.json, pas depuis un
-  // dictionnaire partiel).
+  // L'anglais — la langue qui a servi de seconde preuve le 30/10/2026.
   { code: 'en', prefixe: 'en', htmlLang: 'en', ogLocale: 'en_US' },
+  // Les trois langues nationales du marché (Sénégal, Mali, Burkina Faso).
+  // `og:locale` porte le TERRITOIRE de référence de chaque langue, comme
+  // `fr_FR`/`en_US` : annoncer `wo` sans région ferait publier un `og:locale`
+  // que les réseaux sociaux lisent mal (la forme attendue est langue_PAYS).
+  { code: 'wo', prefixe: 'wo', htmlLang: 'wo', ogLocale: 'wo_SN' },
+  { code: 'bm', prefixe: 'bm', htmlLang: 'bm', ogLocale: 'bm_ML' },
+  { code: 'mos', prefixe: 'mos', htmlLang: 'mos', ogLocale: 'mos_BF' },
 ];
 
 /** La langue d'une URL sans préfixe — celle que le `x-default` désigne. */
