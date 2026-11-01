@@ -61,6 +61,19 @@
  * absentes par construction, et quatre « ABSENT » ne diraient rien de la
  * production.
  *
+ * TROIS SORTIES en mode strict, jamais deux (comme les sondes de document) :
+ * 1 = refus nommé (une intégration requise absente, une page qui répond 404, un
+ * sitemap muet) ; 2 = PRÉMISSE (une page du sitemap n'a pas pu être LUE) ;
+ * 0 = vert. Mesuré le 01/11/2026 sur `main`, après la livraison des cinq
+ * langues : `/emplois/bamako` a dépassé le délai de 15 s au moment où
+ * `deploy-fly` venait de remplacer la machine Fly, et la sonde a rendu un 1 qui
+ * disait « le sitemap annonce une page que la production ne sert pas » — la page
+ * répondait 200 en 0,3 s une minute plus tard. Un délai n'est pas une mesure
+ * d'absence : la page est demandée DEUX fois (`TENTATIVES_PAGE`), et si elle
+ * reste illisible elle est publiée en `::warning` « Page non mesurée » et la
+ * sonde sort en 2 — bruyante, jamais verte, sans accuser la production de ce
+ * qu'elle n'a pas constaté.
+ *
  * Usage : cd frontend && node scripts/check-seo-production.js [--base URL]
  */
 import path from 'node:path';
@@ -354,17 +367,52 @@ export async function readPublicJobs(base, fetchImpl, { limit = MAX_JOB_PAGES } 
 }
 
 /**
+ * Combien de fois une page est DEMANDÉE avant d'être dite non mesurée.
+ *
+ * Mesuré le 01/11/2026, sur `main` après la livraison des cinq langues :
+ * `/emplois/bamako` a dépassé le délai de 15 s au moment précis où la sonde
+ * stricte tournait juste après `deploy-fly`, et la CI est passée ROUGE sur
+ * « le sitemap annonce une page que la production ne sert pas » — une phrase
+ * FAUSSE : la page répondait 200 en 0,3 s une minute plus tard, et la machine
+ * Fly venait d'être remplacée. Un délai réseau n'est pas une mesure d'absence.
+ */
+export const TENTATIVES_PAGE = 2;
+export const ATTENTE_TENTATIVE_MS = 2000;
+
+/**
  * Défauts d'une page vis-à-vis de sa PROPRE adresse, chacun nommant la page et
  * ce qui manque — un rouge muet obligerait à relire le script.
  *
  * Le canonical est confronté à la page elle-même, pas seulement à l'origine :
  * une route qui annoncerait le canonical d'une AUTRE page a bien une adresse
  * canonique, mais elle envoie les crawlers ailleurs.
+ *
+ * DEUX CLASSES, jamais mélangées : un statut HTTP qui n'est pas 2xx est une
+ * MESURE (la production répond ça, le sitemap annonce donc une page qu'elle ne
+ * sert pas) ; une erreur de TRANSPORT après `TENTATIVES_PAGE` demandes est un
+ * défaut de mesure (la page n'a pas été jugée) et ne doit jamais se lire comme
+ * un constat sur ce que la production sert.
+ *
+ * @returns {{defects: string[], premisses: string[]}}
  */
-export function pageDefects({ url, html, error }) {
+export function pageDefects({ url, html, error, illisible }) {
   const path = pathOf(url);
+  if (illisible) {
+    return {
+      defects: [],
+      premisses: [
+        `${path} : NON MESURÉE après ${TENTATIVES_PAGE} tentatives (${illisible}) — la page n'est pas ` +
+          'jugée, et ce n’est pas un constat sur ce que la production sert (relancer la sonde).',
+      ],
+    };
+  }
   if (error) {
-    return [`${path} : non lisible (${error}) — le sitemap annonce une page que la production ne sert pas.`];
+    return {
+      defects: [
+        `${path} : non lisible (${error}) — le sitemap annonce une page que la production ne sert pas.`,
+      ],
+      premisses: [],
+    };
   }
   const { title, description, canonical } = analyzePageMetadata(html);
   const defects = [];
@@ -383,22 +431,36 @@ export function pageDefects({ url, html, error }) {
       `${path} : canonical ${canonical} — ÉCART : désigne ${normalizePathname(pathOf(canonical))} au lieu de cette page.`,
     );
   }
-  return defects;
+  return { defects, premisses: [] };
 }
 
-/** Lit une page du sitemap ; jamais d'exception, l'erreur devient un défaut nommé. */
+/**
+ * Lit une page du sitemap ; jamais d'exception.
+ *
+ * Une réponse HTTP est RENDUE telle quelle (`error` = `HTTP 404`), parce qu'elle
+ * est une mesure. Une erreur de TRANSPORT (délai dépassé, connexion coupée) est
+ * rejouée une fois — c'est exactement le cas mesuré le 01/11/2026 après un
+ * déploiement Fly — puis rendue en `illisible`, une prémisse.
+ */
 async function readPage(url, fetchImpl) {
-  try {
-    const response = await fetchImpl(url, {
-      redirect: 'follow',
-      headers: PROBE_HEADERS,
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!response.ok) return { url, error: `HTTP ${response.status}` };
-    return { url, html: await response.text() };
-  } catch (error) {
-    return { url, error: error.message };
+  let derniere;
+  for (let tentative = 1; tentative <= TENTATIVES_PAGE; tentative += 1) {
+    try {
+      const response = await fetchImpl(url, {
+        redirect: 'follow',
+        headers: PROBE_HEADERS,
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!response.ok) return { url, error: `HTTP ${response.status}` };
+      return { url, html: await response.text() };
+    } catch (error) {
+      derniere = error?.message || String(error);
+      if (tentative < TENTATIVES_PAGE) {
+        await new Promise((resolve) => setTimeout(resolve, ATTENTE_TENTATIVE_MS));
+      }
+    }
   }
+  return { url, illisible: derniere };
 }
 
 /**
@@ -436,7 +498,7 @@ async function checkSitemapPages({
       pathOf(url) === '/' && homeHtml !== undefined
         ? { url, html: homeHtml }
         : await readPage(url, fetchImpl);
-    checked.push({ url, defects: pageDefects(page) });
+    checked.push({ url, ...pageDefects(page) });
   }
 
   // Les fiches à juger : celles du SITEMAP d'abord (ce qu'un crawler découvre),
@@ -457,7 +519,9 @@ async function checkSitemapPages({
     sampled.push(
       page.error
         ? { url, source, disparue: page.error }
-        : { url, source, defects: pageDefects(page) }
+        : page.illisible
+          ? { url, source, illisible: page.illisible }
+          : { url, source, ...pageDefects(page) }
     );
   }
 
@@ -557,8 +621,15 @@ export function jobSampleNotices({
   }
 
   const disparues = checked.filter(({ disparue }) => disparue);
+  const nonLues = checked.filter(({ illisible }) => illisible);
+  const premisses = nonLues.map(
+    ({ url }) =>
+      `${pathOf(url)} : NON MESURÉE (${TENTATIVES_PAGE} tentatives) — fiche non jugée ; ce n’est pas une ` +
+        'disparition constatée, relancer la sonde.',
+  );
   const notes = [`${sampled} sur ${total} vérifiée(s)`];
   if (disparues.length) notes.push(`${disparues.length} disparue(s) entre la lecture et sa vérification (non jugées)`);
+  if (nonLues.length) notes.push(`${nonLues.length} non lue(s) (défaut de mesure, non jugées)`);
   if (horsSitemap) notes.push(`${horsSitemap} venue(s) de l'${apiNommee} (absente(s) du sitemap)`);
   const résumé =
     `Pages — fiches /jobs/:id : ${notes.join(' ; ')} (canonical, title, description) : ` +
@@ -566,8 +637,9 @@ export function jobSampleNotices({
     ` — sources lues : ${sitemap} du sitemap, ${api} de l'${apiNommee}. ` +
     `Échantillon borné à ${MAX_JOB_PAGES} : la carte OG et le verrou 404 restent à check-og-job-200.js.`;
   return {
-    notices: [résumé, ...[...défauts, ...trousDeSource].map((d) => `Pages — ${d}`)],
+    notices: [résumé, ...[...défauts, ...trousDeSource].map((d) => `Pages — ${d}`), ...premisses.map((p) => `Pages — ${p}`)],
     défauts: [...défauts, ...trousDeSource],
+    premisses,
     avertissements: [],
   };
 }
@@ -592,12 +664,18 @@ export function pagesNotices({ checked = [], total = 0, truncated = 0, jobs = {}
         ...echantillon.notices,
       ],
       défauts: echantillon.défauts,
+      premisses: echantillon.premisses || [],
       avertissements: echantillon.avertissements,
     };
   }
   const notes = [];
   if (truncated) notes.push(`${truncated} page(s) au-delà du plafond de ${MAX_PAGES}`);
   const défauts = checked.filter(({ defects }) => defects.length > 0).flatMap(({ defects }) => defects);
+  // Les pages que le TRANSPORT n'a pas permis de lire : une prémisse, jamais un
+  // défaut — le résumé le dit, sinon un run rouge laisserait croire qu'on a
+  // constaté une absence.
+  const premisses = checked.flatMap(({ premisses: p }) => p || []);
+  if (premisses.length) notes.push(`${premisses.length} page(s) NON MESURÉE(S)`);
   const résumé =
     `Pages — ${checked.length}/${total} page(s) du sitemap vérifiée(s) (canonical, title, description) : ` +
     (défauts.length ? `${défauts.length} défaut(s) nommé(s) ci-dessous` : 'conformes') +
@@ -605,8 +683,14 @@ export function pagesNotices({ checked = [], total = 0, truncated = 0, jobs = {}
     '.';
   const echantillon = jobSampleNotices(jobs);
   return {
-    notices: [résumé, ...défauts.map((d) => `Pages — ${d}`), ...echantillon.notices],
+    notices: [
+      résumé,
+      ...défauts.map((d) => `Pages — ${d}`),
+      ...premisses.map((p) => `Pages — ${p}`),
+      ...echantillon.notices,
+    ],
     défauts: [...défauts, ...echantillon.défauts],
+    premisses: [...premisses, ...(echantillon.premisses || [])],
     avertissements: echantillon.avertissements,
   };
 }
@@ -687,6 +771,10 @@ export async function runSeoProductionReport({
   return {
     skipped: false,
     manquantes,
+    // Les pages qu'un défaut de TRANSPORT a empêchées d'être jugées : publiées
+    // en `::warning`, et refusées (code 2) quand rien d'autre ne rougit — une
+    // sonde qui n'a pas mesuré ne se déclare jamais verte.
+    premisses: pagesRapport.premisses || [],
     analyse: analysis,
     pages: pages.checked,
     jobPages: pages.jobs.checked,
@@ -707,6 +795,16 @@ export async function runSeoProductionReport({
       ...pagesRapport.notices,
     ],
   };
+}
+
+/**
+ * Le code de sortie du mode STRICT — trois classes, jamais deux, et la plus
+ * grave gagne : un refus nommé (1) prime sur une prémisse (2), qui prime sur un
+ * vert (0). Une sonde qui n'a pas mesuré ne sort JAMAIS en 0.
+ */
+export function codeDeSortieStrict({ skipped = false, manquantes = [], premisses = [] } = {}) {
+  if (skipped || manquantes.length) return 1;
+  return premisses.length ? 2 : 0;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
@@ -735,6 +833,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
   for (const avertissement of result.avertissements || []) {
     console.log(`::warning title=Surface aveugle (corpus vide)::${avertissement}`);
   }
+  // Une page que le TRANSPORT n'a pas laissé lire est BRUYANTE dans les deux
+  // modes : elle n'est pas un défaut, mais elle ne doit pas disparaître non plus.
+  for (const premisse of result.premisses || []) {
+    console.log(`::warning title=Page non mesurée::${premisse}`);
+  }
   if (strict) {
     // Une sonde qui ne peut pas conclure échoue : un « sans verdict » vert
     // voudrait dire « rien de cassé » alors que rien n'a été mesuré.
@@ -744,6 +847,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
     for (const echec of echecs) {
       console.error(`::error title=SEO production::${echec}`);
     }
-    process.exitCode = echecs.length ? 1 : 0;
+    // ── TROIS SORTIES, JAMAIS DEUX (cf. les sondes de document) : 1 = refus
+    //    nommé (la production a répondu quelque chose de fautif) ; 2 =
+    //    PRÉMISSE (la page n'a pas pu être lue, rien n'a été jugé) ; 0 = vert.
+    //    Mesuré le 01/11/2026 : un délai réseau après `deploy-fly` a rendu un 1
+    //    qui accusait le sitemap d'annoncer une page non servie.
+    process.exitCode = codeDeSortieStrict({ ...result, manquantes: echecs });
   }
 }

@@ -2309,8 +2309,8 @@
       "id": "seo-production: fiche /jobs/:id lue mais jamais jugee",
       "garde": "frontend/scripts/check-seo-production.js",
       "cible": "frontend/scripts/check-seo-production.js",
-      "trouve": "        : { url, source, defects: pageDefects(page) }",
-      "remplace": "        : { url, source, defects: [] }",
+      "trouve": "          : { url, source, ...pageDefects(page) }",
+      "remplace": "          : { url, source, defects: [], premisses: [] }",
       "runner": "node",
       "preuve": "frontend/scripts/__tests__/check-seo-production.test.js",
       "commande": [
@@ -2323,6 +2323,26 @@
       "cwd": "frontend",
       "attend": [
         "refuse une fiche dont la description manque, en la nommant"
+      ]
+    },
+    {
+      "id": "seo-production: une page non lue accusee d'etre absente",
+      "garde": "frontend/scripts/check-seo-production.js",
+      "cible": "frontend/scripts/check-seo-production.js",
+      "trouve": "  return { url, illisible: derniere };",
+      "remplace": "  return { url, error: derniere };",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-seo-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-seo-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "une page qui expire deux fois est NON MESURÉE"
       ]
     },
     {

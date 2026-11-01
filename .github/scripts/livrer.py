@@ -791,6 +791,19 @@ def verifier_seo_production_strict() -> bool:
     if res.returncode == 0:
         log_succes("SEO production : sonde stricte verte.")
         return True
+    if res.returncode == 2:
+        # MESURÉ le 01/11/2026 : juste après `deploy-fly`, `/emplois/bamako` a
+        # dépassé le délai de lecture et la CI a rendu un « le sitemap annonce une
+        # page que la production ne sert pas » — faux, la page répondait 0,3 s plus
+        # tard. Une page ILLISIBLE est une prémisse (code 2), pas un écart de
+        # configuration : nommer la bonne cause évite de faire poser une variable
+        # `VITE_*` qui n'a rien à voir.
+        log_erreur(
+            "SEO production : la sonde stricte n'a pas pu JUGER (code 2 — une page du sitemap "
+            "n'a pas été lue après deux tentatives). Ce n'est pas un écart de configuration : "
+            "lire l'avertissement `Page non mesurée` ci-dessus, puis relancer la livraison."
+        )
+        return False
     log_erreur(
         f"SEO production : la sonde stricte a refusé (code {res.returncode}). Corriger "
         "l'intégration nommée ci-dessus (variable Vercel à poser, puis redéploiement) : "
