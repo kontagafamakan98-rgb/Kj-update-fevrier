@@ -56,6 +56,7 @@ import {
   PHOTOS_HEROS,
   VARIANTES_HEROS,
 } from '../src/config/photos-heros.js';
+import { PAGE_SECTIONS } from '../src/config/page-sections.js';
 
 const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const DOSSIER_PUBLIC = path.join(RACINE, 'public', 'assets');
@@ -143,6 +144,34 @@ export const empreinteFichier = (chemin) => {
 };
 
 /**
+ * Les encodages publiés par les PHOTOS DE SECTION de l'accueil, par nom de
+ * fichier.
+ *
+ * Le contrôle « aucun fichier publié ne doit échapper à la déclaration » lit
+ * TOUT encodage (`.avif`, `.webp`) du dossier, parce qu'un résidu bien nommé
+ * serait précisément celui qu'on ne verrait pas. Mais le dossier ne contient pas
+ * que des variantes du héros : la photo du parcours et les trois de la galerie y
+ * vivent aussi, et depuis le 01/11/2026 elles y sont en WebP (elles étaient en
+ * JPEG, seules images du document dans ce cas). Leur domicile est
+ * `src/config/page-sections.js`, que la page et sa coquille lisent toutes deux —
+ * donc c'est LUI qu'on interroge, au lieu d'une liste de noms recopiée ici :
+ * remplacer une photo de la galerie n'aurait alors plus demandé de toucher ce
+ * garde.
+ *
+ * @param {object} [plans] Plans de page (défaut : la déclaration réelle).
+ * @returns {Set<string>} Noms de fichiers servis par une section.
+ */
+export function encodagesDeSections(plans = PAGE_SECTIONS) {
+  const noms = new Set();
+  const accueil = plans['/'] || {};
+  const chemins = [accueil.photoEtapes, ...(accueil.galerie || []).map((entree) => entree.image)];
+  for (const chemin of chemins) {
+    if (chemin) noms.add(path.basename(chemin));
+  }
+  return noms;
+}
+
+/**
  * Les variantes DÉCLARÉES par la config, par nom de fichier.
  *
  * La config est l'autorité — c'est elle que le composant et la coquille lisent —
@@ -191,6 +220,7 @@ export function verifierHeros({
   photos = PHOTOS_HEROS,
   formats = PHOTO_HEROS_FORMATS,
   largeurs = PHOTO_HEROS_LARGEURS,
+  autresPublies = encodagesDeSections(),
 } = {}) {
   const erreurs = [];
   const controles = [];
@@ -335,11 +365,12 @@ export function verifierHeros({
   } catch (error) {
     erreurs.push(`dossier des photos illisible : ${dossier} (${error.message}).`);
   }
-  const orphelins = surDisque.filter((f) => !declareesParNom.has(f));
+  const orphelins = surDisque.filter((f) => !declareesParNom.has(f) && !autresPublies.has(f));
   if (orphelins.length) {
     erreurs.push(
       `encodage(s) publié(s) sans variante déclarée : ${orphelins.join(', ')} — aucun élément de ` +
-        'src/config/photos-heros.js ne les sert (résidu d\'une campagne précédente, ou faute de frappe dans un nom).'
+        'src/config/photos-heros.js (ni photo de src/config/page-sections.js) ne les sert ' +
+        "(résidu d'une campagne précédente, ou faute de frappe dans un nom)."
     );
   }
   if (surDisque.length < declareesParNom.size) {

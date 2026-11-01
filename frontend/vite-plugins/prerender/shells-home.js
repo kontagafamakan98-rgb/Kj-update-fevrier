@@ -22,11 +22,11 @@ import { couperLeTitre } from '../../src/config/page-sections.js'
 // coquille → React remplacerait une boîte par une autre, et l'élément LCP de
 // « / » serait ré-élu par le JavaScript).
 import {
-  PHOTOS_HEROS,
   PHOTO_HEROS_FORMATS,
   PHOTO_HEROS_LARGEUR,
   PHOTO_HEROS_HAUTEUR,
   PHOTO_HEROS_SIZES,
+  sourceImageHeros,
   srcsetHeros,
 } from '../../src/config/photos-heros.js'
 import { svgDeLIcone, svgDuDrapeau } from './icons-serveur.js'
@@ -229,9 +229,13 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // (voir le commentaire de src/pages/Home.js). C'est elle que React peint à
     // son premier rendu — l'alternance ne commence qu'après — donc les deux
     // canaux peignent la même boîte, et l'élément LCP de « / » reste la peinture
-    // du document. `alt=""` des deux côtés (la photo illustre le texte qui la
-    // précède ; un texte de remplacement est un texte publié, donc il
-    // appartiendrait au dictionnaire).
+    // du document. `alt` : LE TEXTE DE REMPLACEMENT VIENT DU DICTIONNAIRE
+    // (`heroPhotoAlt`, cinq langues) des deux côtés — il était `alt=""`, donc
+    // l'image était comptée « sans alt » par un audit du document servi, alors
+    // que c'est la photo du premier écran. Le `src` publie le WEBP 720
+    // (`sourceImageHeros`), comme React : un JPEG dans le `src` faisait lire
+    // « image non moderne » à quiconque ne lit pas la négociation du `<picture>`,
+    // et ne servait plus à aucun navigateur d'après 2020.
     `<div class="${heroIllustrationClass}">`,
     `<span class="${heroIllustrationFondClass}" aria-hidden="true"></span>`,
     // `decoding="sync"` : MÊME attribut que src/components/PhotoDuHeros.js, et
@@ -251,7 +255,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `<picture>${PHOTO_HEROS_FORMATS.map(
       (format) =>
         `<source type="image/${format}" srcset="${esc(srcsetHeros(0, format))}" sizes="${esc(PHOTO_HEROS_SIZES)}">`
-    ).join('')}<img src="${esc(PHOTOS_HEROS[0])}" alt="" width="${PHOTO_HEROS_LARGEUR}" height="${PHOTO_HEROS_HAUTEUR}" fetchpriority="high" decoding="sync" class="${heroIllustrationImageClass}"></picture>`,
+    ).join('')}<img src="${esc(sourceImageHeros(0))}" alt="${esc(T('heroPhotoAlt'))}" width="${PHOTO_HEROS_LARGEUR}" height="${PHOTO_HEROS_HAUTEUR}" fetchpriority="high" decoding="sync" class="${heroIllustrationImageClass}"></picture>`,
     `</div>`,
     `</div>`,
     `</section>`,
@@ -319,13 +323,17 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // que la liste ci-dessus) et les images sont déclarées par le plan — la
     // coquille publie donc exactement ce que React publie, y compris les
     // attributs de dimension qui réservent la boîte (aucun décalage au chargement).
+    // L'`alt` EST LE NOM DU MÉTIER, celui de la légende : c'est le seul texte que
+    // le dictionnaire possède pour cette photo, et un `alt=""` la retirait du nom
+    // accessible du lien (le texte voisin ne le remplace pas). Les fichiers sont
+    // des WebP (voir src/config/page-sections.js).
     `<section class="${sectionClass} ${sandClass}">`,
     `<div class="${CONTENEUR_CLASS}">`,
     `<div class="${galerieGrilleClass}">`,
     ...homePlan.galerie.map(
       ({ labelKey, image }) =>
         `<a href="/jobs?category=${labelKey}" class="${galerieCarteClass}">` +
-        `<img src="${esc(image)}" alt="" width="800" height="1000" loading="lazy" decoding="async">` +
+        `<img src="${esc(image)}" alt="${esc(T(labelKey))}" width="800" height="1000" loading="lazy" decoding="async">` +
         `<span class="${galerieLegendeClass}">${esc(T(labelKey))}</span>` +
         `</a>`
     ),
@@ -360,7 +368,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `<h2 class="${headClass}">${esc(T('howItWorksTitle'))}</h2>`,
     `<p class="${sectionIntroClass}">${esc(T('homeHowItWorksSubtitle'))}</p>`,
     `<div class="${cadrePhotoClass}">`,
-    `<img src="${esc(photoEtapes)}" alt="" width="800" height="1000" loading="lazy" decoding="async">`,
+    `<img src="${esc(photoEtapes)}" alt="${esc(T('gardening'))}" width="800" height="1000" loading="lazy" decoding="async">`,
     `</div>`,
     `</div>`,
     `<div class="${listeClass}">`,
@@ -392,7 +400,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `<div class="${panneauClass}">`,
     `<div class="${panneauArtClass}">`,
     `<span class="${panneauOrbeClass}" aria-hidden="true"></span>`,
-    `<img src="/assets/kojo-paiement-securise.svg" alt="" width="620" height="500" loading="lazy" decoding="async" class="${panneauImageClass}">`,
+    `<img src="/assets/kojo-paiement-securise.svg" alt="${esc(T('securePayments'))}" width="620" height="500" loading="lazy" decoding="async" class="${panneauImageClass}">`,
     `<span class="${panneauEstampilleClass}">${svgDeLIcone(homePlan.icone, 'heros')}${esc(T('securePayments'))}</span>`,
     `</div>`,
     `<div>`,

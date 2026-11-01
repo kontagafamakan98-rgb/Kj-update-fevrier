@@ -285,6 +285,30 @@ describe("le verdict : l'arbre sain de la fixture", () => {
     expect(resultat.controles.join('\n')).toContain(`${NB_PHOTOS_FIXTURE * 4} variante(s) pesée(s)`);
   });
 
+  it('ne compte pas comme résidu une photo DÉCLARÉE par une section de page', () => {
+    // Le dossier `public/assets` ne contient pas que les variantes du héros :
+    // la photo du parcours et les trois de la galerie y vivent aussi (en WebP
+    // depuis le 01/11/2026) et leur domicile est src/config/page-sections.js.
+    // Sans cette exception, la bascule a rendu ce garde ROUGE sur quatre
+    // fichiers que la page et sa coquille publient toutes les deux — un refus
+    // porté sur du contenu légitime, c'est-à-dire le genre de faux rouge qui
+    // finit par faire désactiver un garde. Le nom employé ici est celui du
+    // domicile RÉEL : le cas prouve donc que le câblage existe, et pas
+    // seulement que la règle tolère un nom.
+    const contexte = construire((ctx) => {
+      ctx.fichiers.set('kojo-jardinage.webp', webp(800, 1000, 400));
+    });
+    expect(verdict(contexte).erreurs.join('\n')).not.toMatch(/sans variante déclarée/);
+    // Et le cas n'est pas vert par vacuité : le MÊME genre de fichier, que
+    // personne ne déclare, reste refusé.
+    const sansDomicile = construire((ctx) => {
+      ctx.fichiers.set('photo-sans-domicile.webp', webp(800, 1000, 400));
+    });
+    expect(verdict(sansDomicile).erreurs.join('\n')).toMatch(
+      /encodage\(s\) publié\(s\) sans variante déclarée : photo-sans-domicile\.webp/
+    );
+  });
+
   it('refuse un manifeste VIDE plutôt que de rester vert en ne pesant rien', () => {
     const resultat = verdict(
       construire((ctx) => {

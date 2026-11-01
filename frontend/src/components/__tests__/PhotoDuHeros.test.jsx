@@ -13,6 +13,7 @@ import {
   PHOTO_HEROS_LARGEURS,
   PHOTO_HEROS_SIZES,
   VARIANTES_HEROS,
+  sourceImageHeros,
   srcsetHeros,
 } from '../../config/photos-heros';
 // Le libellé attendu n'est PAS recopié ici : il est lu dans le dictionnaire que
@@ -65,9 +66,13 @@ import fr from '../../i18n/fr.json';
 //      « / » doit rester l'unique image de la page. C'est le même contrat que
 //      la règle 4, vu depuis le contrôle.
 //  10. LES DEUX FORMATS SONT PUBLIÉS, DANS L'ORDRE DU CONFIG, avec leurs deux
-//      largeurs, leur `sizes`, et un `<img>` JPEG en DERNIER recours : c'est ce
-//      qui fait choisir au navigateur un fichier jusqu'à trois fois plus léger
-//      que le JPEG. Ces cas prouvent la STRUCTURE du balisage ; les octets
+//      largeurs, leur `sizes`, et un `<img>` en DERNIER recours qui publie le
+//      WEBP 720 (et non plus le JPEG, 01/11/2026) : c'est ce qui fait choisir au
+//      navigateur un fichier jusqu'à trois fois plus léger que le JPEG. Un JPEG
+//      dans le `src` n'était lu comme « image moderne » par aucun vérificateur
+//      qui ne négocie pas le `<picture>`, et ne servait plus à aucun navigateur
+//      d'après 2020 — le fichier publié sort donc de `sourceImageHeros`. Ces cas
+//      prouvent la STRUCTURE du balisage ; les octets
 //      réellement téléchargés se mesurent en navigateur
 //      (`e2e/heros-format.spec.js`).
 //  11. LE PRÉCHARGEMENT SUIT LE CHOIX DU NAVIGATEUR, ET ATTEND QU'IL CHOISISSE.
@@ -167,10 +172,17 @@ describe('la photo du héros (et son alternance)', () => {
   it('publie la PREMIÈRE photo, avec la boîte réservée par les dimensions réelles', () => {
     render(<PhotoDuHeros className="cadre-image" />);
     const img = image();
-    expect(img.getAttribute('src')).toBe(PHOTOS_HEROS[0]);
+    // Le fichier PUBLIÉ est le WebP 720 (le JPEG reste sur disque, il est la
+    // source des variantes, mais plus aucun document ne le cite).
+    expect(img.getAttribute('src')).toBe(sourceImageHeros(0));
+    expect(img.getAttribute('src')).toMatch(/\.webp$/);
     expect(img.getAttribute('width')).toBe(String(PHOTO_HEROS_LARGEUR));
     expect(img.getAttribute('height')).toBe(String(PHOTO_HEROS_HAUTEUR));
-    expect(img.getAttribute('alt')).toBe('');
+    // Le texte de remplacement vient du dictionnaire : un `alt=""` laissait
+    // l'image du premier écran hors du nom accessible de la page, et un audit
+    // du document servi la comptait « sans alt ».
+    expect(img.getAttribute('alt')).toBe(fr.heroPhotoAlt);
+    expect(img.getAttribute('alt')).not.toBe('');
     expect(img.className).toBe('cadre-image');
     // La photo de tête est celle du LCP : elle part en priorité haute.
     expect(img.getAttribute('fetchpriority')).toBe('high');
@@ -233,7 +245,7 @@ describe('la photo du héros (et son alternance)', () => {
     // L'`<img>` est le DERNIER enfant du `<picture>` : c'est le repli, et le
     // SEUL nœud image de la page — l'élément LCP reste unique.
     expect(picture.lastElementChild.tagName).toBe('IMG');
-    expect(picture.lastElementChild.getAttribute('src')).toBe(PHOTOS_HEROS[0]);
+    expect(picture.lastElementChild.getAttribute('src')).toBe(sourceImageHeros(0));
     expect(document.querySelectorAll('img')).toHaveLength(1);
   });
 
@@ -257,14 +269,14 @@ describe('la photo du héros (et son alternance)', () => {
 
   it('alterne au bout du délai, puis REVIENT à la première photo', () => {
     render(<PhotoDuHeros />);
-    expect(image().getAttribute('src')).toBe(PHOTOS_HEROS[0]);
+    expect(image().getAttribute('src')).toBe(sourceImageHeros(0));
     // Un tour complet : chaque pas montre la photo suivante, et le dernier
     // ramène à la première (le modulo, et non un index qui déborde).
     for (let pas = 1; pas <= PHOTOS_HEROS.length; pas += 1) {
       act(() => {
         vi.advanceTimersByTime(PHOTO_HEROS_DELAI_MS);
       });
-      expect(image().getAttribute('src')).toBe(PHOTOS_HEROS[pas % PHOTOS_HEROS.length]);
+      expect(image().getAttribute('src')).toBe(sourceImageHeros(pas % PHOTOS_HEROS.length));
     }
   });
 
@@ -298,7 +310,7 @@ describe('la photo du héros (et son alternance)', () => {
       act(() => {
         vi.advanceTimersByTime(PHOTO_HEROS_DELAI_MS);
       });
-      expect(image().getAttribute('src')).toBe(PHOTOS_HEROS[1]);
+      expect(image().getAttribute('src')).toBe(sourceImageHeros(1));
     } finally {
       window.matchMedia = matchMediaVrai;
     }

@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-11-01",
-    "motif": "les fiches /jobs/:id sont lues par une fenetre tournante (MAX_JOB_PAGES par passe, meme graine que les pages) au lieu d'un plafond fixe qui ne jugeait que les trois premieres",
+    "motif": "01/11/2026 : le garde lit aussi src/config/page-sections.js — les quatre photos de section de l'accueil sont passées du JPEG au WebP, et le contrôle « aucun encodage publié sans déclaration » les refusait comme des résidus alors que deux canaux les publient. La règle n'a pas bougé (un fichier que rien ne déclare reste refusé) ; c'est la liste des domiciles interrogés qui s'allonge. Preuve ajoutée : scripts/__tests__/check-hero-images.test.js (le nom réel kojo-jardinage.webp n'est plus un résidu, un nom que personne ne déclare l'est toujours). Rappel de la référence précédente : les fiches /jobs/:id sont lues par une fenêtre tournante (MAX_JOB_PAGES par passe, même graine que les pages) au lieu d'un plafond fixe qui ne jugeait que les trois premières.",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/alerte_sondes.py": "35c6b645b431b932c6af1ed53704acc4f096da428a49e2f7461259358f137687",
@@ -98,7 +98,6 @@
       "frontend/scripts/check-funnel-events.js": "0548b3419ae59feac15b78317316cdf9d3650db989ff3e08dd6542d41edc8485",
       "frontend/scripts/check-generated-icons.js": "77a863dfbfa23145f74528e1a04489802fd4bc03dd4db0eaeeb44883ffec9e69",
       "frontend/scripts/check-git-branches.js": "ca59cb244f206e5461769d290c3d10165a34d025a05b47d8463cb30a4accbc87",
-      "frontend/scripts/check-hero-images.js": "c6f263a3744dde61ca954a943cca3b0f0253ff52d918618d1aac915c90512a2e",
       "frontend/scripts/check-home-shell.js": "d146088dc555deda0993924a4b4f5d7697d3c05a4107a7d9575cee6fd37ce080",
       "frontend/scripts/check-hreflang-production.js": "397128bbb0f5f1014f97afa7aca835f0ba1b5b0da2ceffcbc6dd13e1cc7b8457",
       "frontend/scripts/check-job-form-canari.js": "806fdaed94c92d1e1f2fc8040a4db9dba5f49b78006a1b5f81a0358cee25c797",
@@ -151,7 +150,8 @@
       "frontend/scripts/verre-contraste.js": "0304f01ae4ccd2fea6db62cff8badcb4085d3a34622f49416ed8944c377c688c",
       "backend/scripts/check_health_probe.py": "689a95295c8e687ef676d60356d7b28f6bc93bbebe6d9b8ee21b650da1a6bf34",
       "backend/server.py": "c6e9713b31635965e00272bb2b1f52177a64f82ffd3797e35fcaf52c107e6cbd",
-      "frontend/scripts/check-seo-production.js": "4542a97783c83da992e93df906fbdc997bf18bbff8347f8f99d136dd8bc9c7f7"
+      "frontend/scripts/check-seo-production.js": "4542a97783c83da992e93df906fbdc997bf18bbff8347f8f99d136dd8bc9c7f7",
+      "frontend/scripts/check-hero-images.js": "21a17fbcbf1e2d6bf2f36a735b11e0b5b3f4a3c9dce5a851015a3af832f34038"
     }
   },
   "hors_perimetre": [
