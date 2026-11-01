@@ -213,6 +213,37 @@ export const srcsetHeros = (index, format) => {
 };
 
 /**
+ * Le fichier que l'`<img>` du `<picture>` publie : la variante WEBP de la source
+ * entière (720).
+ *
+ * L'`<img>` portait le JPEG, c'est-à-dire le dernier recours du `<picture>`.
+ * Deux choses l'ont fait changer de fichier (01/11/2026) :
+ *
+ *   • un audit du document servi a compté cinq `<img>` dont le `src` était
+ *     encore un JPEG (`kojo-hero.jpg`, les trois photos de la galerie, celle du
+ *     parcours). Le `<picture>` servait bien de l'AVIF et du WebP à un
+ *     navigateur, mais un lecteur qui ne lit que l'attribut `src` — un
+ *     vérificateur d'accessibilité ou de performance, un crawler — n'y voyait
+ *     qu'un JPEG : le site était jugé comme s'il ne publiait aucun format
+ *     moderne, alors que les variantes existaient depuis le 08/10/2026 ;
+ *   • le JPEG n'est un candidat pour PERSONNE : les navigateurs qui lisent
+ *     l'AVIF prennent l'AVIF, ceux qui lisent le WebP prennent le WebP, et le
+ *     dernier recours ne servait plus qu'à ceux d'avant 2020 (Safari ≤ 13, qui
+ *     ne fait pas tourner cette application React).
+ *
+ * Ce que cela NE change PAS : les six JPEG et les 24 variantes restent sur
+ * disque. Les JPEG sont la SOURCE dont `scripts/gen-hero-images.py` dérive les
+ * variantes, et c'est dans leurs en-têtes (marqueur SOF) que le test du composant
+ * relit la géométrie de l'alternance. Et aucun fichier n'est publié deux fois :
+ * l'`<img>` publie le WebP 720, les deux `<source>` publient les deux largeurs.
+ */
+export const sourceImageHeros = (index) => {
+  const variantes = VARIANTES_HEROS[index];
+  if (!variantes) throw new Error(`photo de héros inconnue : ${index}`);
+  return variantes.webp[PHOTO_HEROS_LARGEUR];
+};
+
+/**
  * De la variante CHOISIE par le navigateur à celle de la photo suivante.
  *
  * Sert au préchargement du cran suivant (PhotoDuHeros) : le navigateur a déjà

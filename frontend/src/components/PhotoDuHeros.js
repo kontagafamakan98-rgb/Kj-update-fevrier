@@ -73,11 +73,24 @@
 //
 // ── LES VARIANTES AVIF ET WEBP, ET LE PRÉCHARGEMENT QUI LES SUIT (08/10/2026) ─
 // La photo est publiée dans un `<picture>` : un `<source>` AVIF puis un WebP
-// (chacun avec ses deux largeurs en `srcset`), et l'`<img>` JPEG en dernier
-// recours. C'est LE MÊME balisage que celui de la coquille pré-rendue, construit
+// (chacun avec ses deux largeurs en `srcset`), puis l'`<img>`. C'est LE MÊME
+// balisage que celui de la coquille pré-rendue, construit
 // depuis le même module (src/config/photos-heros.js) — un canal qui publierait
 // un autre jeu de variantes ferait télécharger un fichier au premier paint et un
 // AUTRE à la bascule.
+//
+// L'`<img>` PUBLIE LE WEBP 720, PLUS LE JPEG (01/11/2026). Le `src` portait le
+// JPEG, c'est-à-dire le dernier recours : un audit du document servi comptait
+// cette image parmi celles « encore en JPEG », parce qu'il lit l'attribut `src`
+// et pas la négociation du `<picture>` — et ce JPEG ne servait plus à aucun
+// navigateur capable de faire tourner l'application. Le fichier publié sort de
+// `sourceImageHeros` (src/config/photos-heros.js), lu par les deux canaux ; les
+// six JPEG restent sur disque, ils sont la SOURCE des variantes.
+//
+// ET L'`<img>` PORTE UN TEXTE DE REMPLACEMENT (`heroPhotoAlt`) : il était
+// `alt=""`, donc absent du nom accessible de la page et compté « sans alt » par
+// le même audit. Le texte vient du dictionnaire (les cinq langues), jamais
+// d'une chaîne écrite ici.
 //
 // CE QUI NE CHANGE PAS, et c'est la condition : l'`<img>` reste LE SEUL nœud
 // image, avec ses `width`/`height` réels, son `fetchpriority="high"`, son
@@ -109,6 +122,7 @@ import {
   PHOTO_HEROS_LARGEUR,
   PHOTO_HEROS_SIZES,
   memeVarianteQue,
+  sourceImageHeros,
   srcsetHeros,
 } from '../config/photos-heros';
 
@@ -178,7 +192,7 @@ export default function PhotoDuHeros({ className }) {
       // n'en a pas besoin (et un préchargement qui n'arrive jamais doit coûter
       // zéro, pas une image vide).
       const image = new Image();
-      image.src = memeVarianteQue(choisieSurLaPage, indexSuivant) || PHOTOS_HEROS[indexSuivant];
+      image.src = memeVarianteQue(choisieSurLaPage, indexSuivant) || sourceImageHeros(indexSuivant);
       if (typeof image.decode === 'function') image.decode().catch(() => {});
     };
     const affichee = refImage.current;
@@ -209,9 +223,9 @@ export default function PhotoDuHeros({ className }) {
   const libelle = t(enPause ? 'heroRotationResume' : 'heroRotationPause');
 
   // Le `<picture>` : deux `<source>` par format, avec leurs deux largeurs, puis
-  // l'`<img>`. L'ORDRE des sources est celui de `PHOTO_HEROS_FORMATS` (AVIF
-  // d'abord, le plus léger) : c'est le premier format que le navigateur SAIT
-  // lire qui gagne, et le JPEG reste ce qu'il obtient s'il n'en connaît aucun.
+  // l'`<img>`, qui publie le WebP 720 de la photo (`sourceImageHeros`). L'ORDRE
+  // des sources est celui de `PHOTO_HEROS_FORMATS` (AVIF d'abord, le plus
+  // léger) : c'est le premier format que le navigateur SAIT lire qui gagne.
   return (
     <>
       <picture>
@@ -225,8 +239,11 @@ export default function PhotoDuHeros({ className }) {
         ))}
         <img
           ref={refImage}
-          src={PHOTOS_HEROS[index]}
-          alt=""
+          src={sourceImageHeros(index)}
+          // Le texte de remplacement est celui du dictionnaire : une photo de
+          // travailleur en situation est le SUJET de la page, donc elle se
+          // décrit — un `alt=""` la retirait du nom accessible de la page.
+          alt={t('heroPhotoAlt')}
           width={PHOTO_HEROS_LARGEUR}
           height={PHOTO_HEROS_HAUTEUR}
           fetchpriority="high"

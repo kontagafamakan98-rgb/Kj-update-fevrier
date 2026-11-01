@@ -353,10 +353,14 @@ export default function Home() {
               non plus : la boîte est réservée avant le chargement par
               `width`/`height` (les dimensions RÉELLES du fichier).
 
-              `alt=""` : les photos ILLUSTRENT le texte qui les précède, elles ne
-              disent rien qu'il faille lire — et un texte de remplacement est un
-              texte publié, donc il appartient au dictionnaire, pas à une chaîne
-              écrite ici (scripts/shell-text-provenance.js). */}
+              `alt={t('heroPhotoAlt')}` (01/11/2026) : la photo portait `alt=""`,
+              au motif qu'elle illustre le texte qui la précède. Un audit du
+              document servi la comptait donc parmi les images SANS texte de
+              remplacement, et un lecteur d'écran sautait la seule image du
+              premier écran. Le texte est une CLÉ du dictionnaire (cinq
+              langues) — la règle antérieure reste vraie : un texte de
+              remplacement est un texte publié, donc il n'est pas écrit ici
+              (scripts/shell-text-provenance.js). */}
           <div className={heroIllustrationClass}>
             <span className={heroIllustrationFondClass} aria-hidden="true"></span>
             <PhotoDuHeros className={heroIllustrationImageClass} />
@@ -446,7 +450,14 @@ export default function Home() {
           <div className={galerieGrilleClass}>
             {galerie.map(({ labelKey, image }) => (
               <Link key={labelKey} to={`/jobs?category=${labelKey}`} className={galerieCarteClass}>
-                <img src={image} alt="" width="800" height="1000" loading="lazy" decoding="async" />
+                <img
+                  src={image}
+                  alt={t(labelKey)}
+                  width="800"
+                  height="1000"
+                  loading="lazy"
+                  decoding="async"
+                />
                 <span className={galerieLegendeClass}>{t(labelKey)}</span>
               </Link>
             ))}
@@ -491,7 +502,7 @@ export default function Home() {
               <div className={cadrePhotoClass}>
                 <img
                   src={photoEtapes}
-                  alt=""
+                  alt={t('gardening')}
                   width="800"
                   height="1000"
                   loading="lazy"
@@ -545,7 +556,7 @@ export default function Home() {
               <span className={panneauOrbeClass} aria-hidden="true"></span>
               <img
                 src="/assets/kojo-paiement-securise.svg"
-                alt=""
+                alt={t('securePayments')}
                 width="620"
                 height="500"
                 loading="lazy"

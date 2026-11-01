@@ -26,6 +26,7 @@ import { describe, it, expect } from 'vitest';
 
 import {
   LANGUES_INDEXEES,
+  LANGUE_PAR_DEFAUT,
   alternatesHreflang,
   cheminDansLaLangue,
 } from '../../src/config/langues-indexees.js';
@@ -33,6 +34,7 @@ import { PAGE_META } from '../../src/config/page-meta.js';
 import { GROUPES_LIENS_SEO } from '../../src/config/liens-seo.js';
 import { SITE_ORIGIN } from '../site-meta.js';
 import {
+  CHEMIN_HEALTH,
   CHEMIN_SITEMAP,
   MARQUEUR_DE_PAGE,
   blocsDuSitemap,
@@ -97,12 +99,51 @@ function sitemapDe({ routes = ROUTES, monolingues = [MONOLINGUE] } = {}) {
 }
 
 /**
+ * Le bloc `langues` que `/health` publierait pour la fixture.
+ *
+ * Il est DÉRIVÉ du même jeu que le sitemap servi — routes, pages monolingues —
+ * donc il dit, par construction, la même chose que lui. Chaque cas en mute un
+ * champ pour vérifier le refus qui le nomme : un bloc recopié à la main aurait
+ * fait rentrer dans la fixture exactement ce que la sonde doit confronter.
+ *
+ * Les totaux (`pages.total`, `pages.monolingues`, `urls_par_langue` de la langue
+ * par défaut) sont présents, comme dans la vraie réponse, mais la sonde ne les
+ * confronte pas : le sitemap servi porte aussi des fiches de mission et des
+ * profils travailleurs que le bloc ne décrit pas (voir
+ * `mesuresDuBlocLangues`). Un cas le prouve plus bas.
+ */
+function blocLanguesDe({ routes = ROUTES, monolingues = [MONOLINGUE] } = {}) {
+  const codes = LANGUES_INDEXEES.map((langue) => langue.code);
+  return {
+    indexees: codes,
+    defaut: LANGUE_PAR_DEFAUT,
+    documents_par_langue: Object.fromEntries(codes.map((code) => [code, routes.length])),
+    urls_par_langue: {
+      ...Object.fromEntries(codes.map((code) => [code, routes.length])),
+      [LANGUE_PAR_DEFAUT]: routes.length + monolingues.length,
+    },
+    pages: {
+      multilingues: routes.length,
+      monolingues: monolingues.length,
+      total: routes.length * codes.length + monolingues.length,
+    },
+    alternatives_par_page: alternatesHreflang('/', '').length,
+    portee:
+      'declaration du sitemap (URL par langue) ; les documents servis se lisent sur l origine du site',
+  };
+}
+
+/**
  * Le jeu de réponses d'une passe, indexé par URL ABSOLUE.
  *
  * Aucun réseau : chaque cas mute une seule réponse et vérifie le refus qui la
  * nomme. Le cas HTTP réel, plus bas, prouve les URL demandées.
  */
-function reponses({ pages = {}, sitemap = sitemapDe() } = {}) {
+function reponses({
+  pages = {},
+  sitemap = sitemapDe(),
+  sante = { statut: 200, corps: JSON.stringify({ status: 'ok', langues: blocLanguesDe() }) },
+} = {}) {
   const parUrl = new Map();
   for (const route of ROUTES) {
     for (const langue of LANGUES_INDEXEES) {
@@ -114,6 +155,7 @@ function reponses({ pages = {}, sitemap = sitemapDe() } = {}) {
     parUrl.set(`${BASE}${chemin}`, { statut: 200, corps: '', ...reponse });
   }
   parUrl.set(`${BASE}${CHEMIN_SITEMAP}`, { statut: 200, corps: sitemap });
+  parUrl.set(`${BASE}${CHEMIN_HEALTH}`, sante);
   return async (url) => {
     const reponse = parUrl.get(url);
     if (!reponse) throw new Error(`URL inattendue : ${url}`);
@@ -121,8 +163,10 @@ function reponses({ pages = {}, sitemap = sitemapDe() } = {}) {
   };
 }
 
+// `healthBase` : `/health` vit sur l'origine du backend en production (le site
+// ne le proxifie pas). La fixture sert tout depuis la même origine.
 const lancer = (options = {}) =>
-  runHreflangProbe({ base: BASE, fetchImpl: reponses(options), quiet: true });
+  runHreflangProbe({ base: BASE, healthBase: BASE, fetchImpl: reponses(options), quiet: true });
 
 describe('documents par langue — lang, canonical, alternatives réciproques', () => {
   it('la fixture entière est conforme, et la passe le DIT', async () => {
@@ -135,8 +179,11 @@ describe('documents par langue — lang, canonical, alternatives réciproques', 
     // d'un seul côté.
     expect(resultat.pages).toHaveLength(ROUTES.length * LANGUES_INDEXEES.length);
     expect(resultat.pages).toContain(`${BASE}${cheminDansLaLangue('/jobs', EN.code)}`);
-    expect(resultat.cout.requetes).toBe(ROUTES.length * LANGUES_INDEXEES.length + 1);
+    // Les documents, le sitemap, ET le bloc `langues` de /health : le coût dit
+    // aussi ce que la passe a confronté.
+    expect(resultat.cout.requetes).toBe(ROUTES.length * LANGUES_INDEXEES.length + 2);
     expect(resultat.checked.join('\n')).toContain('sitemap');
+    expect(resultat.checked.join('\n')).toContain('bloc langues de /health');
   });
 
   it('refuse un document dont le lang n’est pas celui de sa langue', async () => {
@@ -296,6 +343,145 @@ describe('sitemap — les deux versions de chaque page publiée', () => {
   });
 });
 
+describe('bloc langues de /health — confronté à ce qui est servi', () => {
+  const sante = (bloc) => ({ statut: 200, corps: JSON.stringify({ status: 'ok', langues: bloc }) });
+
+  it('refuse un bloc qui n’annonce pas les langues du site', async () => {
+    // Le cas mesuré qui motive la lecture : un backend déployé en retard annonce
+    // deux langues pendant que le frontend en sert cinq. Les deux réponses sont
+    // « vraies » prises séparément, et rien d'autre ne le dit.
+    const amputees = LANGUES_INDEXEES.slice(0, 2).map((langue) => langue.code);
+    const resultat = await lancer({ sante: sante({ ...blocLanguesDe(), indexees: amputees }) });
+
+    expect(resultat.ok).toBe(false);
+    const messages = resultat.errors.join('\n');
+    expect(messages).toMatch(/annonce 2 langue\(s\) indexée\(s\)/);
+    expect(messages).toContain(amputees.join(', '));
+    expect(messages).toContain(LANGUES_INDEXEES.map((langue) => langue.code).join(', '));
+    expect(messages).toContain('backend en retard sur le frontend');
+  });
+
+  it('refuse un bloc qui déclare une AUTRE langue par défaut', async () => {
+    const autre = LANGUES_INDEXEES.find((langue) => langue.prefixe).code;
+    const resultat = await lancer({ sante: sante({ ...blocLanguesDe(), defaut: autre }) });
+
+    expect(resultat.ok).toBe(false);
+    const messages = resultat.errors.join('\n');
+    expect(messages).toMatch(new RegExp(`« ${autre} » comme langue par défaut`));
+    expect(messages).toContain(LANGUE_PAR_DEFAUT);
+  });
+
+  it('refuse un nombre de documents qui ne suit pas le sitemap servi', async () => {
+    const bloc = blocLanguesDe();
+    const cible = LANGUES_INDEXEES.find((langue) => langue.prefixe).code;
+    const resultat = await lancer({
+      sante: sante({
+        ...bloc,
+        documents_par_langue: { ...bloc.documents_par_langue, [cible]: 3 },
+      }),
+    });
+
+    expect(resultat.ok).toBe(false);
+    expect(resultat.errors.join('\n')).toMatch(
+      new RegExp(`annonce 3 document\\(s\\) en « ${cible} », le sitemap servi en énumère ${ROUTES.length}`)
+    );
+  });
+
+  it('refuse un nombre d’URL qui ne suit pas les entrées d’une langue préfixée', async () => {
+    const bloc = blocLanguesDe();
+    const cible = LANGUES_INDEXEES[LANGUES_INDEXEES.length - 1].code;
+    const resultat = await lancer({
+      sante: sante({ ...bloc, urls_par_langue: { ...bloc.urls_par_langue, [cible]: 2 } }),
+    });
+
+    expect(resultat.ok).toBe(false);
+    expect(resultat.errors.join('\n')).toMatch(
+      new RegExp(`annonce 2 URL en « ${cible} », le sitemap servi en énumère ${ROUTES.length}`)
+    );
+  });
+
+  it('refuse un nombre de pages multilingues qui ne suit pas le sitemap', async () => {
+    const bloc = blocLanguesDe();
+    const resultat = await lancer({
+      sante: sante({ ...bloc, pages: { ...bloc.pages, multilingues: 4 } }),
+    });
+
+    expect(resultat.ok).toBe(false);
+    expect(resultat.errors.join('\n')).toMatch(/annonce 4 page\(s\) multilingue\(s\)/);
+  });
+
+  it('refuse un nombre d’alternatives par page qui ne suit pas les documents', async () => {
+    const resultat = await lancer({
+      sante: sante({ ...blocLanguesDe(), alternatives_par_page: 9 }),
+    });
+
+    expect(resultat.ok).toBe(false);
+    expect(resultat.errors.join('\n')).toMatch(/annonce 9 alternative\(s\) par page/);
+  });
+
+  it('refuse un /health qui répond 200 sans publier le bloc', async () => {
+    // Sans bloc, il n'y a RIEN à confronter : c'est un refus nommé (la révision
+    // déployée est antérieure au 01/11/2026), pas une prémisse — le /health a
+    // répondu, il ne publie simplement pas le fait.
+    const resultat = await lancer({ sante: { statut: 200, corps: JSON.stringify({ status: 'ok' }) } });
+
+    expect(resultat.premisse).toBe(false);
+    expect(resultat.ok).toBe(false);
+    expect(resultat.errors.join('\n')).toContain('ne publie pas de bloc « langues »');
+  });
+
+  it('ne rougit PAS sur les fiches de mission, que le bloc ne compte pas', async () => {
+    // Le sitemap porte aussi des fiches `/jobs/:id` et des profils `/workers/:id`
+    // (écrits en français, sans alternative). Le bloc ne les décrit pas : les
+    // compter ferait rougir la sonde sur du contenu qu'il n'a jamais prétendu
+    // décrire. C'est la raison pour laquelle les TOTAUX ne sont pas confrontés,
+    // et ce cas est la preuve que la limite est tenue.
+    const avecFiche = sitemapDe().replace(
+      '</urlset>',
+      `<url><loc>${SITE_ORIGIN}/jobs/abc123</loc><changefreq>daily</changefreq></url></urlset>`
+    );
+
+    const resultat = await lancer({ sitemap: avecFiche });
+
+    expect(resultat.errors).toEqual([]);
+    expect(resultat.ok).toBe(true);
+    expect(resultat.premisse).toBe(false);
+  });
+
+  it('un /health illisible est une prémisse, jamais un vert', async () => {
+    const fetchImpl = reponses();
+    const resultat = await runHreflangProbe({
+      base: BASE,
+      healthBase: BASE,
+      quiet: true,
+      fetchImpl: async (url, options) => {
+        if (url.endsWith(CHEMIN_HEALTH)) throw new Error('ETIMEDOUT');
+        return fetchImpl(url, options);
+      },
+    });
+
+    expect(resultat.premisse).toBe(true);
+    expect(resultat.ok).toBe(false);
+    expect(resultat.notices.join(' ')).toContain(CHEMIN_HEALTH);
+  });
+
+  it('un /health qui répond 500 est une prémisse', async () => {
+    const resultat = await lancer({ sante: { statut: 500, corps: 'boom' } });
+
+    expect(resultat.premisse).toBe(true);
+    expect(resultat.ok).toBe(false);
+    expect(resultat.notices.join(' ')).toContain('HTTP 500');
+  });
+
+  it('un corps qui n’est pas du JSON est une prémisse', async () => {
+    const resultat = await lancer({ sante: { statut: 200, corps: '<html>proxy</html>' } });
+
+    expect(resultat.premisse).toBe(true);
+    expect(resultat.ok).toBe(false);
+    expect(resultat.notices.join(' ')).toContain("n'est pas du JSON");
+  });
+});
+
 describe('prémisses — une passe qui n’a pas mesuré ne vaut pas un vert', () => {
   it('un corpus vide est une prémisse, pas un succès', async () => {
     const resultat = await runHreflangProbe({ base: BASE, routes: [], quiet: true });
@@ -380,6 +566,29 @@ describe('le VERDICT (0/1/2) se juge sans réseau', () => {
     expect(texte).toContain('langues-indexees.js');
   });
 
+  it('rend 1 quand le bloc de /health contredit le site servi', async () => {
+    // Le verdict est éprouvé sur une VRAIE passe (fetch injecté), pas sur un
+    // objet fabriqué : c'est la contradiction qui doit rendre 1.
+    const resultat = await lancer({
+      sante: {
+        statut: 200,
+        corps: JSON.stringify({ status: 'ok', langues: { ...blocLanguesDe(), indexees: ['fr'] } }),
+      },
+    });
+    expect(resultat.premisse).toBe(false);
+    expect(resultat.ok).toBe(false);
+
+    const lignes = [];
+    const code = await main([], {
+      run: async () => resultat,
+      log: (ligne) => lignes.push(ligne),
+      error: (ligne) => lignes.push(ligne),
+    });
+
+    expect(code).toBe(1);
+    expect(lignes.join('\n')).toContain('langues');
+  });
+
   it('rend 2 sur une prémisse, jamais 0', async () => {
     const { code, texte } = await sortie({
       ok: false,
@@ -418,6 +627,11 @@ describe('la passe entière contre un serveur HTTP réel', () => {
         res.end(xml);
         return;
       }
+      if (chemin === CHEMIN_HEALTH) {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ status: 'ok', langues: blocLanguesDe() }));
+        return;
+      }
       const document = documents.get(chemin);
       if (!document) {
         res.writeHead(404, { 'content-type': 'text/html' });
@@ -436,12 +650,16 @@ describe('la passe entière contre un serveur HTTP réel', () => {
       // change où l'on LIT, jamais ce que la page doit déclarer.
       const resultat = await runHreflangProbe({
         base: `http://127.0.0.1:${port}`,
+        // `/health` vit sur l'origine du backend : la fixture le sert depuis la
+        // même, et le cas prouve que la passe le DEMANDE.
+        healthBase: `http://127.0.0.1:${port}`,
         quiet: true,
       });
 
       expect(resultat.errors).toEqual([]);
       expect(resultat.ok).toBe(true);
-      expect(demandes).toHaveLength(ROUTES.length * LANGUES_INDEXEES.length + 1);
+      expect(demandes).toHaveLength(ROUTES.length * LANGUES_INDEXEES.length + 2);
+      expect(demandes).toContain(CHEMIN_HEALTH);
       expect(new Set(demandes).size).toBe(demandes.length);
     } finally {
       await new Promise((resolve) => serveur.close(resolve));

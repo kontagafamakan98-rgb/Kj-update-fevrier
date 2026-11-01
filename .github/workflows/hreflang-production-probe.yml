@@ -27,10 +27,25 @@ name: Documents par langue et sitemap bilingue (daily)
 #       deux versions de chaque page qu'il publie ;
 #   1 — refus nommé (statut, coquille SPA servie, lang faux, canonical croisé,
 #       alternative manquante ou en trop, sitemap à moitié bilingue, alternative
-#       sur une page monolingue) ;
-#   2 — prémisse : corpus vide, aucune page lisible, ou SITEMAP ILLISIBLE — sans
-#       lui l'énumération n'a pas été jugée, et un vert dirait qu'elle l'a été.
-#       Une prémisse rougit le run.
+#       sur une page monolingue, ou bloc `langues` de /health qui contredit ce
+#       qui est servi) ;
+#   2 — prémisse : corpus vide, aucune page lisible, SITEMAP ILLISIBLE, ou
+#       /health illisible (transport, statut non-200, corps qui n'est pas du
+#       JSON) — la partie concernée n'a pas été jugée, et un vert dirait qu'elle
+#       l'a été. Une prémisse rougit le run.
+#
+# ─── Le bloc `langues` de /health, confronté (01/11/2026) ────────────────────
+# Le bloc publie le VOLUME des langues depuis le 01/11/2026, et la sonde de
+# santé du backend le juge pour lui-même. Ce que celle-ci ajoute est la seule
+# chose qu'aucune autre ne dit : le confronter à ce qu'elle VIENT DE MESURER —
+# parce qu'un bloc bien formé peut décrire un autre site que celui qui est
+# servi, et c'est ce qui arrive quand le backend déployé est en retard sur le
+# frontend (il annonce deux langues et un volume d'avant, chaque moitié étant
+# « vraie »). Il est lu sur l'origine du BACKEND, pas sur celle du site :
+# vercel.json ne proxifie que /api/** et /sitemap.xml, donc ${SITE_ORIGIN}/health
+# répondrait 404. Les TOTAUX ne sont pas confrontés (le sitemap porte aussi des
+# fiches /jobs/:id et des profils /workers/:id, que le bloc ne décrit pas) :
+# c'est écrit dans la sonde et prouvé par un de ses cas.
 #
 # Aucune URL n'est recopiée : la sonde lit `src/config/page-meta.js` (les routes
 # pré-rendues), `src/config/langues-indexees.js` (langues, préfixes, alternatives)

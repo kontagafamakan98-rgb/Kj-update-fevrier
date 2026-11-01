@@ -16,7 +16,14 @@ import {
 import { ESPION_CLS, clsDesDecalages, decrireDecalage } from './helpers/cls.js';
 // LE DÉLAI EST CELUI DU COMPOSANT, LU DANS SON DOMICILE : la sonde attend
 // l'intervalle que la page applique, elle ne recopie pas 15 000 ms.
-import { PHOTOS_HEROS, PHOTO_HEROS_DELAI_MS } from '../src/config/photos-heros.js';
+import { PHOTOS_HEROS, PHOTO_HEROS_DELAI_MS, sourceImageHeros } from '../src/config/photos-heros.js';
+// LE `src` PUBLIÉ N'EST PAS LE FICHIER DISQUE (01/11/2026) : l'`<img>` pose la
+// variante WEBP 720 de chaque photo (`sourceImageHeros`, lue par le composant ET
+// par la coquille), plus le JPEG. La sonde juge donc les SOURCES PUBLIÉES, et
+// elle les dérive du même domicile que les deux canaux — un chemin recopié ici
+// aurait fait rougir la suite sur une page juste (mesuré : « la photo de
+// référence /assets/kojo-hero.webp n'appartient pas à la liste déclarée »).
+const SOURCES_PUBLIEES = PHOTOS_HEROS.map((_, index) => sourceImageHeros(index));
 // La règle d'avance est PARTAGÉE avec son test : elle est pure, donc elle se
 // prouve sur le journal d'un rouge réel sans monter une page.
 import { ecartsSousLIntervalle } from './helpers/rotation.js';
@@ -275,11 +282,11 @@ test.describe('la rotation du héros, cran par cran', () => {
         // Elle peut MANQUER — mesuré (CPU ×6) : `.cadre-image` est absent au
         // moment du départ, React ayant vidé la racine sans avoir encore peint le
         // héros. Le repli n'est pas une supposition : la coquille publie la
-        // PREMIÈRE photo déclarée et l'alternance part de l'index 0
+        // PREMIÈRE source publiée et l'alternance part de l'index 0
         // (`useState(0)` dans `PhotoDuHeros.js`), donc la source courante d'un
-        // héros pas encore peint est cette première photo — lue dans son domicile,
+        // héros pas encore peint est cette première source — lue dans son domicile,
         // jamais recopiée ici.
-        const reference = depart.lecture.src || PHOTOS_HEROS[0];
+        const reference = depart.lecture.src || SOURCES_PUBLIEES[0];
 
         // ── On attend ${CRANS} CRANS — c'est-à-dire ${CRANS} CHANGEMENTS de
         // source, la règle écartant les enregistrements qui reposent la même : une
@@ -333,15 +340,15 @@ test.describe('la rotation du héros, cran par cran', () => {
         // de référence lue dans la page, donc la sonde ne suppose plus que
         // l'observation commence sur la première photo : c'est vrai sur un poste,
         // et faux sur un hôte où la lecture du départ a manqué le montage.
-        const indexDepart = PHOTOS_HEROS.indexOf(reference);
+        const indexDepart = SOURCES_PUBLIEES.indexOf(reference);
         expect(
           indexDepart,
-          `« / » (${taille}) : la photo de référence « ${reference} » n'appartient pas à la liste ` +
-            `déclarée (${PHOTOS_HEROS.join(', ')}) — la suite ne peut pas être jugée cran par cran.`
+          `« / » (${taille}) : la photo de référence « ${reference} » n'est pas une source ` +
+            `publiée (${SOURCES_PUBLIEES.join(', ')}) — la suite ne peut pas être jugée cran par cran.`
         ).not.toBe(-1);
         const suiteAttendue = Array.from(
           { length: CRANS },
-          (_, i) => PHOTOS_HEROS[(indexDepart + 1 + i) % PHOTOS_HEROS.length]
+          (_, i) => SOURCES_PUBLIEES[(indexDepart + 1 + i) % SOURCES_PUBLIEES.length]
         );
         expect(
           crans.map((c) => c.src),

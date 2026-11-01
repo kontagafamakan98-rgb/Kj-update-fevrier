@@ -470,8 +470,17 @@ export const PAGE_SECTIONS = {
     // flottaison et en `lazy`, donc hors du premier écran et hors du graphe du
     // LCP. Aucune légende : il n'existe pas de clé de dictionnaire pour une
     // phrase sous cette photo, et la seule source de texte du site est
-    // src/i18n/*.json.
-    photoEtapes: '/assets/kojo-jardinage.jpg',
+    // src/i18n/*.json — son texte de remplacement est donc `gardening`, le nom
+    // de métier du dictionnaire, et non une phrase écrite ici.
+    //
+    // LE FICHIER EST UN WEBP, ET LE JPEG N'EST PLUS PUBLIÉ (01/11/2026) : les
+    // quatre photos de section (celle-ci et les trois de la galerie) étaient
+    // servies en JPEG, seules images du document dans ce cas. Elles sont
+    // ré-encodées en WebP depuis les JPEG d'origine, puis les JPEG sont
+    // RETIRÉS : un fichier que plus aucun document ne cite ne servirait qu'à
+    // être copié dans chaque déploiement. Mesuré, les quatre : 462 581 o de
+    // JPEG → 323 030 o de WebP (−30,2 %).
+    photoEtapes: '/assets/kojo-jardinage.webp',
 
     // ── LA GALERIE : trois métiers en photo ──────────────────────────────
     // La page parlait de travailleurs sans en montrer un seul. Les trois
@@ -481,10 +490,19 @@ export const PAGE_SECTIONS = {
     // `public/assets/`, ré-échantillonnées à 800 × 1 000 et recompressées (voir
     // src/index.css) : elles sont SOUS la ligne de flottaison, en `lazy`, donc
     // hors du graphe du LCP.
+    // `labelKey` sert DEUX fois, et c'est voulu : c'est le nom du métier écrit
+    // en légende, et c'est aussi son TEXTE DE REMPLACEMENT (`alt`). Les deux
+    // canaux publiaient `alt=""` : un audit d'accessibilité du document servi
+    // comptait donc ces trois photos parmi les images SANS texte de
+    // remplacement. Une légende ne le remplace pas — elle est à côté de
+    // l'image, pas dans le nom accessible du lien qui la porte. Le nom de
+    // métier est le seul texte que le dictionnaire possède déjà pour cette
+    // photo (les cinq langues le traduisent), donc c'est lui qu'on publie — et
+    // non une phrase inventée pour l'occasion.
     galerie: [
-      { labelKey: 'plumbing', image: '/assets/kojo-metier-plomberie.jpg' },
-      { labelKey: 'electrical', image: '/assets/kojo-metier-electricite.jpg' },
-      { labelKey: 'carpentry', image: '/assets/kojo-metier-menuiserie.jpg' },
+      { labelKey: 'plumbing', image: '/assets/kojo-metier-plomberie.webp' },
+      { labelKey: 'electrical', image: '/assets/kojo-metier-electricite.webp' },
+      { labelKey: 'carpentry', image: '/assets/kojo-metier-menuiserie.webp' },
     ],
     // Les faits de l'accueil — des FAITS VÉRIFIABLES, jamais des compteurs
     // inventés. Les deux anciens (« 1 000+ travailleurs », « 500+ projets »)
