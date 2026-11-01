@@ -1235,6 +1235,17 @@ jobs:
         working-directory: frontend
         run: node scripts/check-bundle-size.js
 
+      # Le budget ci-dessus juge les ARTEFACTS : un fichier source de 3 000 lignes
+      # peut produire un chunk de 4 Ko sans qu'aucun budget ne bronche (mesuré le
+      # 31/10/2026 : index.css 3 463, kojo_scheduler.py 1 934, page-sections.js
+      # 1 668, JobDetails.js 1 236 lignes, aucune borne). Ce pas juge la SOURCE :
+      # plafond par défaut sur tout fichier (un fichier neuf ne peut pas naître
+      # gros) et dérogations DATÉES, motivées et portant une cible de réduction.
+      # Couvert par scripts/__tests__/check-taille-sources.test.js.
+      - name: Check source file size caps
+        working-directory: frontend
+        run: node scripts/check-taille-sources.js
+
       # Hygiène des branches locales et des réfs distantes : refuse en CI une branche
       # fusionnée périmée ou une réf distante orpheline.
       - name: Check git branches hygiene
