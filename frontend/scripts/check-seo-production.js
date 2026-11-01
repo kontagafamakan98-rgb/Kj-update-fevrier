@@ -36,9 +36,13 @@
  *    verdict **nomme les pages qu'il n'a pas jugées** et la passe qu'il a lue. Avant, seule l'accueil était sondée : le
  *    sitemap annonçait huit pages dont sept n'étaient jamais lues, donc une page
  *    servie sans description (ou avec le canonical d'une autre) restait
- *    silencieuse. Les fiches `/jobs/:id` sont ensuite échantillonnées
- *    (`MAX_JOB_PAGES`) et jugées sur les trois mêmes métadonnées ; leur carte OG
- *    et le verrou 404 après suppression restent à `check-og-job-200.js`.
+ *    silencieuse. Les fiches `/jobs/:id` sont ensuite jugées sur les trois mêmes
+ *    métadonnées, avec la MÊME mécanique : mesuré le 01/11/2026, la sonde en
+ *    jugeait trois au plus et TOUJOURS les trois premières, si bien qu'une fiche
+ *    au-delà n'était jugée par aucune passe. La fenêtre des fiches tourne donc
+ *    aussi (`MAX_JOB_PAGES` par passe, même graine), et le verdict NOMME les
+ *    fiches laissées aux passes suivantes ; leur carte OG et le verrou 404 après
+ *    suppression restent à `check-og-job-200.js`.
  *
  *    Ces fiches ont DEUX sources, et c'est le point qui manquait : le sitemap
  *    (ce qu'un crawler découvre) ET l'API publique des missions
@@ -355,20 +359,27 @@ export function graineFenetre({ graine, env = process.env, jour = new Date() } =
 }
 
 /**
- * Plafond de fiches `/jobs/:id` échantillonnées.
+ * Budget de fiches `/jobs/:id` PAR PASSE — la fenêtre tourne, comme les pages.
  *
- * Le sitemap en admet jusqu'à 9 000 et l'échantillon ne peut pas les couvrir :
- * il vérifie que la FORME de la fiche tenue par le backend annonce bien
+ * Le sitemap en admet jusqu'à 9 000 et une passe ne peut pas les couvrir : elle
+ * vérifie que la FORME de la fiche tenue par le backend annonce bien
  * `canonical`/`title`/`description`, sur des missions réelles. Ce que
  * `check-og-job-200.js` possède déjà — la carte OG, ses variantes, le verrou
  * 404 après suppression — n'est PAS rejoué ici, et l'échantillon ne prétend pas
- * couvrir les fiches qu'il n'a pas lues (la notice le dit).
+ * couvrir les fiches qu'il n'a pas lues (la notice les NOMME).
  *
- * Le plafond borne l'UNION des deux sources (sitemap puis API publique) : c'est
- * un coût de lecture, pas une couverture — les fiches du sitemap passent en
- * premier, parce que ce sont celles qu'un crawler découvre.
+ * Mesuré le 01/11/2026 : le plafond était FIXE, donc la sonde jugeait toujours
+ * les trois premières fiches du sitemap et une fiche au-delà de la troisième
+ * n'était jugée par AUCUNE passe, jamais — le même angle mort que les 64 pages
+ * du sitemap, fermé le même jour. La fenêtre de `MAX_JOB_PAGES` TOURNE donc avec
+ * la MÊME graine que celle des pages : une fiche est jugée une passe sur `tours`.
+ *
+ * Deux budgets, pas un : `MAX_JOB_PAGES` borne la fenêtre du SITEMAP (le corpus,
+ * qui tourne) ET la lecture du DÉTECTEUR d'API (les fiches vivantes absentes du
+ * sitemap, dont l'absence est déjà un défaut). Le coût d'une passe reste de six
+ * lectures au plus, quel que soit le nombre de missions vivantes.
  */
-const MAX_JOB_PAGES = 3;
+export const MAX_JOB_PAGES = 3;
 
 /**
  * Statuts dont la fiche est PUBLIQUE et indexable — exactement ceux que le
@@ -429,6 +440,41 @@ export async function readPublicJobs(base, fetchImpl, { limit = MAX_JOB_PAGES } 
     }
   }
   return { urls, live: urls.length, erreurs };
+}
+
+/**
+ * QUI est jugé cette passe, et QUI ne l'est pas.
+ *
+ * Le SITEMAP est le corpus : c'est ce qu'un crawler découvre, et c'est lui qui
+ * tourne. L'API PUBLIQUE est un DÉTECTEUR de trou de découverte : elle dit
+ * quelles fiches vivantes sont servies SANS être au sitemap, et elle est lue sur
+ * un échantillon borné qui ne prend JAMAIS la place d'une fiche du corpus dans la
+ * fenêtre — sinon un détecteur ferait perdre du corpus à chaque run.
+ *
+ * @returns {{aLire: Array<{url: string, source: 'sitemap'|'api'}>, total: number,
+ *   fichesSitemap: number, nonJugees: string[], apiSeules: number,
+ *   apiNonJugees: string[], fenetre: object}}
+ */
+export function fenetreFiches({ sitemap = [], api = [], graine = 0, max = MAX_JOB_PAGES } = {}) {
+  const fenetre = fenetreTournante({ total: sitemap.length, max, graine });
+  const aJuger = fenetre.indexes.map((index) => sitemap[index]);
+  // Ce que CETTE passe laisse aux suivantes : nommé, jamais sous-entendu.
+  const nonJugees = sitemap.filter((url) => !aJuger.includes(url));
+  const apiSeules = (api || []).filter((url) => !sitemap.includes(url));
+  const apiJugees = apiSeules.slice(0, max);
+  const apiNonJugees = apiSeules.slice(apiJugees.length);
+  return {
+    aLire: [
+      ...aJuger.map((url) => ({ url, source: 'sitemap' })),
+      ...apiJugees.map((url) => ({ url, source: 'api' })),
+    ],
+    total: sitemap.length + apiSeules.length,
+    fichesSitemap: sitemap.length,
+    nonJugees,
+    apiSeules: apiSeules.length,
+    apiNonJugees,
+    fenetre,
+  };
 }
 
 /**
@@ -574,16 +620,18 @@ async function checkSitemapPages({
     checked.push({ url, ...pageDefects(page) });
   }
 
-  // Les fiches à juger : celles du SITEMAP d'abord (ce qu'un crawler découvre),
-  // puis celles de l'API PUBLIQUE — c'est cette seconde liste qui fait juger des
-  // fiches que le sitemap n'énumère pas. L'union est bornée au plafond.
-  const fiches = jobPages.map((url) => ({ url, source: 'sitemap' }));
-  for (const url of apiJobs.urls || []) {
-    if (!fiches.some((fiche) => fiche.url === url)) fiches.push({ url, source: 'api' });
-  }
+  // Les fiches à juger : la FENÊTRE TOURNANTE des fiches du sitemap (le corpus,
+  // même graine que les pages), puis un détecteur borné des fiches que l'API
+  // publique sert SANS qu'elles soient au sitemap. Ce que la fenêtre laisse aux
+  // passes suivantes est NOMMÉ dans le verdict, jamais sous-entendu.
+  const fiches = fenetreFiches({
+    sitemap: jobPages,
+    api: apiJobs.urls || [],
+    graine,
+  });
 
   const sampled = [];
-  for (const { url, source } of fiches.slice(0, MAX_JOB_PAGES)) {
+  for (const { url, source } of fiches.aLire) {
     const page = await readPage(url, fetchImpl);
     // Une fiche peut être clôturée entre la lecture qui l'a listée et sa
     // lecture : un 404 n'est PAS un défaut (une mission vivante disparaît
@@ -606,11 +654,14 @@ async function checkSitemapPages({
     jobs: {
       checked: sampled,
       sampled: sampled.length,
-      total: fiches.length,
-      sitemap: jobPages.length,
+      total: fiches.total,
+      sitemap: fiches.fichesSitemap,
       api: apiJobs.live || 0,
       apiErreurs: apiJobs.erreurs || [],
-      horsSitemap: fiches.filter((fiche) => fiche.source === 'api').length,
+      horsSitemap: fiches.apiSeules,
+      fenetreFiches: fiches.fenetre,
+      nonJugees: fiches.nonJugees,
+      apiNonJugees: fiches.apiNonJugees,
     },
   };
 }
@@ -632,6 +683,9 @@ export function jobSampleNotices({
   api = 0,
   apiErreurs = [],
   horsSitemap = 0,
+  fenetreFiches: fenetre = null,
+  nonJugees = [],
+  apiNonJugees = [],
 } = {}) {
   const défauts = checked.filter(({ defects }) => defects?.length).flatMap(({ defects }) => defects);
   const trousDeSource = [];
@@ -705,13 +759,47 @@ export function jobSampleNotices({
   if (disparues.length) notes.push(`${disparues.length} disparue(s) entre la lecture et sa vérification (non jugées)`);
   if (nonLues.length) notes.push(`${nonLues.length} non lue(s) (défaut de mesure, non jugées)`);
   if (horsSitemap) notes.push(`${horsSitemap} venue(s) de l'${apiNommee} (absente(s) du sitemap)`);
+  if (nonJugees.length) notes.push(`${nonJugees.length} du sitemap hors fenêtre cette passe`);
+  if (apiNonJugees.length) notes.push(`${apiNonJugees.length} de l'${apiNommee} non jugée(s)`);
+  const fenetreTexte =
+    fenetre && fenetre.tours > 1
+      ? `Fenêtre ${fenetre.passe}/${fenetre.tours} des fiches du sitemap (${MAX_JOB_PAGES} par passe : ` +
+        `l'échantillon tourne, couverture complète en ${fenetre.tours} passes)`
+      : sitemap === 0
+        ? `Aucune fiche au sitemap : ${api} fiche(s) lue(s) par le SEUL détecteur d'API ` +
+          `(${MAX_JOB_PAGES} par passe au plus)`
+        : `Fiches du sitemap : ${sitemap}, toutes dans la fenêtre d'une passe (${MAX_JOB_PAGES} au plus)`;
   const résumé =
     `Pages — fiches /jobs/:id : ${notes.join(' ; ')} (canonical, title, description) : ` +
     (défauts.length ? `${défauts.length} défaut(s) nommé(s) ci-dessous` : 'conformes') +
     ` — sources lues : ${sitemap} du sitemap, ${api} de l'${apiNommee}. ` +
-    `Échantillon borné à ${MAX_JOB_PAGES} : la carte OG et le verrou 404 restent à check-og-job-200.js.`;
+    `${fenetreTexte} ; la carte OG et le verrou 404 restent à check-og-job-200.js.`;
+
+  // ── CE QUI N'A PAS ÉTÉ JUGÉ, nommé : le budget n'est plus un angle mort, la
+  //    fenêtre tourne, et la passe dit quelles fiches elle laisse aux suivantes.
+  const noticesNonJugees = [];
+  if (nonJugees.length) {
+    noticesNonJugees.push(
+      `Pages — fiches /jobs/:id non jugées par la passe ${fenetre?.passe || 1}/${fenetre?.tours || 1} ` +
+        `(${nonJugees.length}) : ${nonJugees.map((url) => pathOf(url)).join(', ')} — échantillonnage ` +
+        'tournant, couverture complète en autant de passes.',
+    );
+  }
+  if (apiNonJugees.length) {
+    noticesNonJugees.push(
+      `Pages — fiches /jobs/:id servies par l'${apiNommee} et non jugées (${apiNonJugees.length}) : ` +
+        `${apiNonJugees.map((url) => pathOf(url)).join(', ')} — l'API est un DÉTECTEUR borné ` +
+        `(${MAX_JOB_PAGES} par passe), pas le corpus : ce sont les fiches du sitemap qui tournent.`,
+    );
+  }
+
   return {
-    notices: [résumé, ...[...défauts, ...trousDeSource].map((d) => `Pages — ${d}`), ...premisses.map((p) => `Pages — ${p}`)],
+    notices: [
+      résumé,
+      ...[...défauts, ...trousDeSource].map((d) => `Pages — ${d}`),
+      ...premisses.map((p) => `Pages — ${p}`),
+      ...noticesNonJugees,
+    ],
     défauts: [...défauts, ...trousDeSource],
     premisses,
     avertissements: [],

@@ -987,8 +987,14 @@ est confronté à la page ELLE-MÊME, pas seulement à l'origine : une route qui
 annonce le `canonical` d'une autre a bien une adresse canonique, mais elle envoie
 les crawlers ailleurs. Avant cette passe, le sitemap annonçait huit pages dont
 sept n'étaient jamais lues — une page servie sans description restait
-silencieuse. Les fiches `/jobs/:id` du sitemap sont ensuite **échantillonnées**
-(`MAX_JOB_PAGES` = 3) et jugées sur les trois MÊMES métadonnées ; ce que
+silencieuse. Les fiches `/jobs/:id` du sitemap sont ensuite jugées sur les trois
+MÊMES métadonnées, avec la MÊME fenêtre tournante que les pages : **3 par passe**
+(`MAX_JOB_PAGES`), même graine, et une notice **NOMME** les
+fiches laissées aux passes suivantes — mesuré le 01/11/2026, le plafond était
+FIXE : une fiche au-delà de la troisième n'était jugée par AUCUNE passe, jamais.
+L'API publique des missions reste lue à part, comme DÉTECTEUR de trou de
+découverte (une fiche servie et absente de tout sitemap est un défaut) ; ses
+fiches non jugées sont nommées aussi ; ce que
 `check-og-job-200.js` possède déjà — la carte OG, ses variantes, le verrou 404
 après suppression — n'est pas rejoué ici. Une fiche **disparue** entre la lecture
 du sitemap et sa lecture (404) n'est PAS un défaut : une mission se clôture
@@ -2737,7 +2743,7 @@ Les angles morts ci-dessous restent **actifs et assumés** : un vert en CI ne pr
 | **4. Aucun run sur branche de travail** | Pousser sur une branche locale ne déclenche aucun run GitHub Actions (§1) ; le code n'est validé qu'à la PR. | Choix de coût assumé : la suite complète (~13 min) est réservée à `main` et aux PRs vers `main`. |
 | **5. Garde CORS exécutée sur `main` uniquement** | La sonde CORS teste l'interaction en ligne du site avec l'API déployée : une rupture introduite sur une PR n'est visible qu'après merge. | Mesuré sur la production réelle : les réessais (6 × 15 s) absorbent le déploiement Fly simultané. |
 | **6. Périmètre navigateur Playwright E2E** | La suite E2E tourne sous Chromium headless uniquement ; elle ne couvre ni WebKit/Safari, ni Firefox, ni les terminaux mobiles physiques. | Valide 9 parcours clés (GPS, formulaires, auth, centre de notifications, LCP de /contact, géométrie du LCP de chaque route pré-rendue) et la CSP réelle sous Chromium ; les spécificités Safari/iOS restent manuelles. |
-| **7. Limites de la sonde SEO quotidienne** | La sonde stricte quotidienne n'échantillonne que 3 fiches `/jobs/:id` (sur ~9 000) et 20 pages max ; l'`Age` du cache edge n'est pas prouvé. | Un sitemap valide et 3 fiches représentatives suffisent pour bloquer les dérives globales sans saturer Vercel. |
+| **7. Limites de la sonde SEO quotidienne** | La sonde stricte quotidienne juge **20 pages** et **3 fiches `/jobs/:id` par passe** ; l'`Age` du cache edge n'est pas prouvé. | Depuis le 01/11/2026 les deux fenêtres **TOURNENT** (même graine) : la couverture est complète en `tours` passes, et chaque verdict NOMME les pages et les fiches qu'il laisse aux suivantes — un plafond fixe jugeait toujours les mêmes, donc une fiche au-delà de la troisième n'était lue par personne. Le coût d'un run ne bouge pas. |
 | **8. `check-og-reproducible.js` est un outil local** | Le diagnostic de reproductibilité octet pour octet des cartes OG sort en notice sans Pillow ou sans la police de référence. | Classé `role: "outil"` dans `guard-proofs.json` : diagnostic d'atelier manuel, pas un gate bloquant de CI. |
 | **9. `mesure-alignement-app.mjs` est un outil local** | La mesure de l'alignement (ce que tiennent les centures explicites, `.App { text-align: center }` ayant été retirée) n'est PAS dans la CI : elle exige un navigateur installé et un build à jour, et elle n'imprime aucun verdict. | Classé `role: "outil"` dans `guard-proofs.json` : instrument d'atelier rejouable (`npm run build && node scripts/mesure-alignement-app.mjs`), appelé par la procédure écrite dans le commentaire d'alignement de `src/App.css`. Ce sont les gardes — `check-app-chrome.test.js` et `check-prerender-shells.js` — qui prononcent le verdict et empêchent la dérive silencieuse. |
 
