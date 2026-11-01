@@ -120,6 +120,10 @@ from kojo_routers_job_alerts import router as job_alerts_router
 # propriétaire de l'écriture (`$setOnInsert`), donc la mesure et le document ne
 # peuvent pas décrire deux vocabulaires différents.
 from kojo_job_alerts import compter_par_origine as compter_alertes_par_origine
+# `bloc_langues` : le volume publié par langue (01/11/2026), publié par /health —
+# il vit dans le module qui DÉTIENT la déclaration du sitemap, donc les deux
+# compteurs (celui du sitemap et celui de /health) ne peuvent pas diverger.
+from kojo_sitemap_declaration import bloc_langues
 from kojo_routers_public import router as public_router
 from kojo_routers_reviews import router as reviews_router
 from kojo_routers_support import router as support_router
@@ -219,6 +223,12 @@ async def _health_payload() -> dict:
         # sa clé, ni son hôte d'ingestion ne sont publiés : `/health` est une
         # réponse publique (cf. kojo_sentry).
         "sentry": sentry_diagnostic(),
+        # LES LANGUES SERVIES (01/11/2026) : cinq langues ont une URL propre, et
+        # ce bloc dit combien de documents chacune publie — la question que la
+        # sonde `hreflang` met 61 requêtes et 11 s à trancher, répondue ici en
+        # un appel. Il publie la DÉCLARATION du sitemap, pas les documents :
+        # `portee`, dans la réponse, dit où se lisent `lang` et `canonical`.
+        "langues": bloc_langues(),
     }
 
 

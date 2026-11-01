@@ -56,6 +56,34 @@ def paiement(state="inconnu", **extra):
     return bloc
 
 
+def langues(codes=("fr", "en", "wo", "bm", "mos"), documents=7, monolingues=45):
+    """Bloc `langues` de /health, cohérent par défaut avec 5 langues.
+
+    Les cinq codes sont ceux de la production du 01/11/2026 ; `documents` est le
+    nombre de pages multilingues (7 dans `PAGES_STATIQUES`) et `monolingues` les
+    villes, métiers et guides, qui ne comptent que dans la langue par défaut.
+    """
+    urls = {code: documents for code in codes}
+    urls[codes[0]] = documents + monolingues
+    return {
+        "indexees": list(codes),
+        "defaut": codes[0],
+        "documents_par_langue": {code: documents for code in codes},
+        "urls_par_langue": urls,
+        "pages": {
+            "multilingues": documents,
+            "monolingues": monolingues,
+            "total": documents * len(codes) + monolingues,
+        },
+        "alternatives_par_page": len(codes) + 1,
+        "portee": (
+            "declaration du sitemap (URL par langue) ; les documents servis — "
+            "lang, canonical, reciprocite des hreflang — se lisent sur l'origine "
+            "du site, avec frontend/scripts/check-hreflang-production.js"
+        ),
+    }
+
+
 def sante_ok(**extra):
     payload = {
         "status": "healthy",
@@ -66,6 +94,7 @@ def sante_ok(**extra):
             "remaining_cooldown_seconds": 0,
         },
         "paiement": paiement(),
+        "langues": langues(),
     }
     payload.update(extra)
     return make_fake_response(200, payload)
@@ -134,6 +163,7 @@ def test_check_health_success(probe):
             "remaining_cooldown_seconds": 0
         },
         "paiement": paiement(),
+        "langues": langues(),
         "revision": "abcdef1234"
     }
     with patch("urllib.request.urlopen",
@@ -501,3 +531,78 @@ def test_un_composite_qui_contredit_le_diagnostic_echoue(probe, capsys):
     sortie = capsys.readouterr().out
     assert code == 1
     assert "composite /monitor dit paydunya 'down'" in sortie
+
+
+# ---------------------------------------------------------------------------
+# Langues servies : un appel couvre le VOLUME que la sonde hreflang mesure
+# ---------------------------------------------------------------------------
+
+def test_les_langues_servies_sont_publiees_et_comptees(probe, capsys):
+    """Le bloc doit pouvoir se lire sans lancer la sonde hreflang."""
+    with patch("urllib.request.urlopen",
+               side_effect=[sante_ok(), email_ok(), composite_ok()]):
+        code = probe.check_health(HEALTH_URL)
+
+    sortie = capsys.readouterr().out
+    assert code == 0
+    assert "Langues : 5" in sortie
+    assert "7 document(s) par langue" in sortie
+    assert "80 URL" in sortie
+
+
+def test_un_backend_sans_bloc_langues_echoue_en_disant_de_redeployer(probe, capsys):
+    """Une révision antérieure au bloc ne doit pas passer pour une couverture."""
+    payload = {
+        "status": "healthy",
+        "database": "connected",
+        "paydunya_circuit": {"state": "closed", "consecutive_failures": 0,
+                             "remaining_cooldown_seconds": 0},
+        "paiement": paiement(),
+    }
+    with patch("urllib.request.urlopen",
+               side_effect=[make_fake_response(200, payload), email_ok(), composite_ok()]):
+        code = probe.check_health(HEALTH_URL)
+
+    sortie = capsys.readouterr().out
+    assert code == 1
+    assert "ne publie pas de bloc 'langues'" in sortie
+    assert "redeployer" in sortie
+
+
+def test_un_volume_de_langues_qui_ne_tombe_pas_juste_echoue(probe, capsys):
+    """`pages.total` et la somme des URL par langue décrivent le MÊME ensemble."""
+    bloc = langues()
+    bloc["pages"] = {**bloc["pages"], "total": 999}
+    with patch("urllib.request.urlopen",
+               side_effect=[sante_ok(langues=bloc), email_ok(), composite_ok()]):
+        code = probe.check_health(HEALTH_URL)
+
+    sortie = capsys.readouterr().out
+    assert code == 1
+    assert "se contredit" in sortie and "pages.total" in sortie
+
+
+def test_une_langue_sans_document_est_refusee(probe, capsys):
+    """Une langue indexée qui n'annonce aucun document n'a pas d'URL à servir."""
+    bloc = langues()
+    bloc["documents_par_langue"] = {**bloc["documents_par_langue"], "mos": 0}
+    with patch("urllib.request.urlopen",
+               side_effect=[sante_ok(langues=bloc), email_ok(), composite_ok()]):
+        code = probe.check_health(HEALTH_URL)
+
+    sortie = capsys.readouterr().out
+    assert code == 1
+    assert "mos" in sortie and "aucun document" in sortie
+
+
+def test_un_volume_sans_portee_est_refuse(probe, capsys):
+    """Un compte publié sans portée se lit comme une mesure des documents."""
+    bloc = langues()
+    bloc["portee"] = "   "
+    with patch("urllib.request.urlopen",
+               side_effect=[sante_ok(langues=bloc), email_ok(), composite_ok()]):
+        code = probe.check_health(HEALTH_URL)
+
+    sortie = capsys.readouterr().out
+    assert code == 1
+    assert "portee" in sortie

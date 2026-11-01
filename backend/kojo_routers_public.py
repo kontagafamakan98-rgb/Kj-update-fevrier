@@ -36,6 +36,10 @@ import kojo_pages_guides as pages_guides
 # une seule déclaration (kojo_langues.py), comparée à celle du frontend par
 # backend/tests/test_hreflang_sitemap.py.
 import kojo_langues as langues
+# La déclaration du sitemap (pages statiques) et le bloc `langues` de /health :
+# un seul proprietaire, pour que l'enumeration et le compte ne puissent pas
+# diverger (cf. kojo_sitemap_declaration.py).
+from kojo_sitemap_declaration import PAGES_STATIQUES
 from kojo_worker_og import (
     nom_complet,
     worker_meta_lines,
@@ -833,37 +837,12 @@ async def get_sitemap_xml():
     # dessus, et un `noindex` la ferait disparaître) : c'est leur PRIORITÉ dans le
     # sitemap qui était fausse, pas leur existence.
     # ── Une ENTRÉE PAR LANGUE INDEXÉE (30/10/2026) ────────────────────
-    # Ces huit chemins sont les pages STATIQUES pré-rendues : le frontend en
-    # publie un document par langue indexée (`/jobs` et `/en/jobs`), et chacun
-    # déclare ses `hreflang` (vite-plugins/prerender/hreflang.js). Le sitemap
-    # doit annoncer les MÊMES URL et porter les MÊMES alternatives : un sitemap
-    # qui n'énumère que le français dit au moteur que l'anglais n'existe pas, et
-    # un `hreflang` que seul le crawl découvre est une déclaration à moitié
-    # servie. Les chemins restent RELATIFS ici : l'URL publiée se DÉRIVE de la
-    # langue (`kojo_langues`), jamais recopiée huit fois avec un `/en` devant —
-    # c'est le même module qui donne les alternatives de chaque entrée.
-    static_paths = [
-        ("/", "daily", "1.0"),
-        ("/how-it-works", "monthly", "0.7"),
-        ("/jobs", "hourly", "0.9"),
-        # Les QUATRE pages de confiance : un moteur (et une régie publicitaire)
-        # cherche à savoir qui édite le site, comment le joindre, ce qu'il fait
-        # des données ET à quelles conditions il le fait. Elles existent en pages
-        # pré-rendues depuis le 19/09/2026 ; les lister ici est ce qui les rend
-        # DÉCOUVRABLES sans lien entrant.
-        #
-        # `/terms` MANQUAIT (mesuré le 26/10/2026) : la page répond 200, elle est
-        # pré-rendue, sa balise `robots` vaut `index, follow` et son HTML pèse
-        # 105 553 o — mais le sitemap ne la citait pas, alors que son commentaire
-        # annonçait « les trois pages de confiance » et que /privacy, sa jumelle
-        # juridique, y était. Une page indexable absente du sitemap n'est pas
-        # cachée : elle est explorée moins tôt et moins souvent — et un sitemap
-        # qui n'énumère pas ce qu'il prétend énumérer se lit comme complet à tort.
-        ("/about", "monthly", "0.6"),
-        ("/contact", "monthly", "0.6"),
-        ("/privacy", "yearly", "0.4"),
-        ("/terms", "yearly", "0.4"),
-    ]
+    # La liste des pages statiques vit dans `kojo_sitemap_declaration`
+    # (`PAGES_STATIQUES`) : ce sitemap l'énumère, et le bloc `langues` de
+    # `/health` en compte les documents par langue (01/11/2026). Deux copies de
+    # cette liste auraient divergé au premier ajout de page — l'une des deux
+    # aurait publié un compte faux sans que rien ne rougisse.
+    static_paths = PAGES_STATIQUES
     # `(url, chemin, freq, priorité)` : `chemin` n'est renseigné que pour les
     # pages qui ONT une alternative par langue. Les pages ville, métier et guides
     # sont écrites en français (aucune version anglaise n'existe) : elles gardent

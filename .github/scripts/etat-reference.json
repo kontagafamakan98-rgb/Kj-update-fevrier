@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-11-01",
-    "motif": "01/11/2026 — la sonde SEO couvre enfin les 84 pages du sitemap : fenêtre tournante de 20 pages par passe (GITHUB_RUN_NUMBER / KOJO_SEO_PAS / jour), 5 passes pour la couverture complète, et les pages hors fenêtre sont NOMMÉES dans le verdict au lieu d'être un angle mort avoué",
+    "motif": "01/11/2026 - /health publie le volume des langues servies (bloc langues : codes, documents par langue, URL par langue, portee) et la sonde de sante le JUGE (bloc absent, volume faux, langue sans document, portee vide)",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/alerte_sondes.py": "35c6b645b431b932c6af1ed53704acc4f096da428a49e2f7461259358f137687",
@@ -71,11 +71,9 @@
       "backend/scripts/check_ai_assistant_probe.py": "2ce9e4a4acca1a3cdd2a651ee976e14cfda9db09fee76b0f5f61ecf9fd42d94d",
       "backend/scripts/check_atlas_backups.py": "e41a5b799d7128cfa98e6e34424ad30988a88274a302c484c48c9e8aa0b44c83",
       "backend/scripts/check_deployed_revision.py": "bcd6ef28eab30e1365db3cf3c41b3eb203f6578177e93102cc9830bad82113ae",
-      "backend/scripts/check_health_probe.py": "637f9065310cc0eabfa00422de596fa2d92b3fc7ea2e0c159deeb978058f1b75",
       "backend/scripts/check_index_db.py": "ab9545fdb8e09f2cdabeed9865b2537f9216c4954c36ca7ea5fae656ac1212dd",
       "backend/scripts/check_metrics_collecte.py": "88efd93fe9a9377e959730f215d9c5ff23378cb17c9e01f5aca9ab8b025fd2dd",
       "backend/scripts/verifier_depot_sauvegarde.py": "165d97d983076e2f03a0ed09950c703935963aef53a917db7b7d70e404f63866",
-      "backend/server.py": "26e735b4dd5ca7b9bde4a98975cea410c189190d9cf215cdd6450376d16fa824",
       "frontend/scripts/audit_api_returns.cjs": "2e54a6a80a65df023c7d75695a0ea00657d3ee7d40bcaa5d42ca12fa9308afa7",
       "frontend/scripts/audit_tdz.cjs": "09472576d4460656934a5c7a1856959b1d56cd343f0932b4286696797063cc32",
       "frontend/scripts/budget-de-vivacite.js": "3d4beed04f288d57bc0636599f77371f4d9343cf5d9c926eec4f53d111c33c7b",
@@ -151,7 +149,9 @@
       "frontend/scripts/retard-main.js": "eef5724dae66bc8e17fbb50e0be1c426b9eba4ceb24c04808c8fdb0f8dacad37",
       "frontend/scripts/style-layout-budgets.cjs": "db93353a147d9be6e84999ea065d3b3df5d08871a62fe943f3346bc80d68ede9",
       "frontend/scripts/validate-vercel-json.mjs": "16a56835e1fb299821c3a1dd7fa4d0957982a970a493e98ed8855d06fc563518",
-      "frontend/scripts/verre-contraste.js": "0304f01ae4ccd2fea6db62cff8badcb4085d3a34622f49416ed8944c377c688c"
+      "frontend/scripts/verre-contraste.js": "0304f01ae4ccd2fea6db62cff8badcb4085d3a34622f49416ed8944c377c688c",
+      "backend/scripts/check_health_probe.py": "689a95295c8e687ef676d60356d7b28f6bc93bbebe6d9b8ee21b650da1a6bf34",
+      "backend/server.py": "c6e9713b31635965e00272bb2b1f52177a64f82ffd3797e35fcaf52c107e6cbd"
     }
   },
   "hors_perimetre": [
