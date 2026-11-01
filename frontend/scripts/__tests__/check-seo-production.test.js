@@ -17,7 +17,9 @@ import {
   INTEGRATIONS,
   LIVE_JOB_STATUSES,
   PUBLIC_JOBS_PATH,
+  TENTATIVES_PAGE,
   analyzeSeoServedHtml,
+  codeDeSortieStrict,
   noticeFor,
   readPublicJobs,
   runSeoProductionReport,
@@ -383,6 +385,68 @@ describe('section Pages — le sitemap servi, page par page', () => {
       },
     });
     expect(missing.manquantes.join('\n')).toContain('/how-it-works : non lisible (HTTP 404)');
+    // Un statut est une MESURE : il n'y a rien de « non mesuré » à publier.
+    expect(missing.premisses).toEqual([]);
+  });
+
+  // ── Délai réseau ≠ page absente (mesuré le 01/11/2026, `main`) ────────────
+  // Après la livraison des cinq langues, `/emplois/bamako` a dépassé le délai de
+  // lecture au moment où `deploy-fly` venait de remplacer la machine Fly : la CI
+  // est passée rouge sur « le sitemap annonce une page que la production ne sert
+  // pas », une phrase FAUSSE (la page répondait 200 en 0,3 s une minute plus
+  // tard). Ces deux cas tiennent les deux moitiés de la correction.
+  const fetchQuiExpire = (chemin, { uneFois = false } = {}) => {
+    let vues = 0;
+    const impl = async (url) => {
+      const pathname = new URL(url).pathname;
+      if (pathname === chemin && (!uneFois || vues === 0)) {
+        vues += 1;
+        throw new Error('The operation was aborted due to timeout');
+      }
+      if (pathname === chemin) vues += 1;
+      // L'API publique répond « aucune fiche vivante » : une autre source que
+      // celle du sitemap, et son silence est le cas normal (cf. la fixture).
+      const html = {
+        ...SERVED_PAGES,
+        '/sitemap.xml': SITEMAP_XML,
+        [PUBLIC_JOBS_PATH]: PUBLIC_JOBS_EMPTY,
+      }[pathname];
+      return { ok: html !== undefined, status: html === undefined ? 404 : 200, text: async () => html ?? '' };
+    };
+    return { impl, appels: () => vues };
+  };
+
+  it('une page qui expire deux fois est NON MESURÉE, jamais accusée d’être absente', async () => {
+    const double = fetchQuiExpire('/how-it-works');
+    const result = await runSeoProductionReport({
+      base: SITE_ORIGIN,
+      strict: true,
+      fetchImpl: double.impl,
+    });
+
+    // Elle est DEMANDÉE deux fois : un délai n'est pas une réponse.
+    expect(double.appels()).toBe(TENTATIVES_PAGE);
+    // Aucune accusation : ce n'est pas un constat sur ce que la production sert.
+    expect(result.manquantes).toEqual([]);
+    const texte = result.notices.join('\n');
+    expect(texte).toContain('/how-it-works : NON MESURÉE');
+    expect(texte).not.toContain('le sitemap annonce une page que la production ne sert pas');
+    expect(result.premisses.join('\n')).toContain('relancer la sonde');
+    // Et elle reste BRUYANTE : une prémisse n'est pas un silence.
+    expect(texte).toContain('1 page(s) NON MESURÉE(S)');
+  });
+
+  it('une page rejouée après un délai est jugée normalement', async () => {
+    const double = fetchQuiExpire('/how-it-works', { uneFois: true });
+    const result = await runSeoProductionReport({
+      base: SITE_ORIGIN,
+      strict: true,
+      fetchImpl: double.impl,
+    });
+
+    expect(double.appels()).toBe(2);
+    expect(result.manquantes).toEqual([]);
+    expect(result.premisses).toEqual([]);
   });
 
   // ── Échantillon des fiches /jobs/:id ──────────────────────────────
@@ -652,6 +716,24 @@ describe('le mode STRICT — celui qui met fin au silence (F9)', () => {
 
     expect(result.skipped).toBe(true);
     expect(result.manquantes).toEqual([]);
+  });
+});
+
+describe('codeDeSortieStrict — trois sorties, jamais deux', () => {
+  it('sort en 1 quand un refus est nommé, même si une page n’a pas été lue', () => {
+    expect(codeDeSortieStrict({ manquantes: ['/jobs : <title> ABSENT'], premisses: ['/x : NON MESURÉE'] })).toBe(1);
+  });
+
+  it('sort en 2 quand rien n’a été jugé sans qu’aucun refus ne soit nommé', () => {
+    expect(codeDeSortieStrict({ manquantes: [], premisses: ['/x : NON MESURÉE'] })).toBe(2);
+  });
+
+  it('sort en 0 seulement quand tout a été jugé', () => {
+    expect(codeDeSortieStrict({ manquantes: [], premisses: [] })).toBe(0);
+  });
+
+  it('une sonde sans verdict ne sort jamais en 0', () => {
+    expect(codeDeSortieStrict({ skipped: true })).toBe(1);
   });
 });
 
