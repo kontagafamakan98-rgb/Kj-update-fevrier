@@ -13,6 +13,41 @@ from typing import Any, Dict
 from dotenv import load_dotenv
 import cloudinary
 
+# LA RECONFIGURATION DES FLUX PASSE EN PREMIER, AVANT TOUT `print`.
+#
+# Elle vivait plus bas, juste après l'avertissement pywebpush — donc le premier
+# message du module s'imprimait dans l'encodage de la CONSOLE (cp1252 sur un
+# Windows redirecté), pas dans celui que le module venait d'installer. Mesuré le
+# 01/11/2026 : `PYTHONIOENCODING=cp1252` + pywebpush absent rendent l'import
+# impossible (`UnicodeEncodeError: 'charmap' codec can't encode character
+# '\u26a0'`), donc les 2 399 tests tombent en erreur de collecte sur une machine
+# où le paquet n'est pas installé — la CI, dont les captures sont en UTF-8, ne le
+# voit jamais. Un module importé par tout le backend ne peut pas dépendre de
+# l'encodage du terminal qui l'importe.
+for stream in (sys.stdout, sys.stderr):
+    if hasattr(stream, "reconfigure"):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
+def _avertir(texte):
+    """Avertissement de DÉMARRAGE : il ne doit JAMAIS empêcher l'import.
+
+    La reconfiguration ci-dessus couvre le cas courant, mais elle peut échouer
+    (`stream` sans `reconfigure`, sortie remplacée par un harnais) — et un
+    caractère hors de l'encodage de la console lève alors `UnicodeEncodeError`
+    AVANT que le journal existe. Le repli ASCII perd une icône, jamais le
+    démarrage : c'est le seul comportement acceptable pour un message qui
+    s'imprime avant que quoi que ce soit soit configurable.
+    """
+    try:
+        print(texte)
+    except UnicodeEncodeError:
+        print(texte.encode("ascii", "replace").decode("ascii"))
+
+
 # Web Push (VAPID) - Sans Firebase
 # Détection de disponibilité SANS importer de noms inutilisés (l'usage réel
 # de pywebpush vit dans kojo_shared.py). find_spec évite un ImportError au
@@ -23,17 +58,9 @@ try:
 except Exception:
     WEBPUSH_AVAILABLE = False
 if not WEBPUSH_AVAILABLE:
-    # logger n'est pas encore initialisé ici — on utilise print()
+    # logger n'est pas encore initialisé ici — on utilise _avertir()
     # Le message sera répété via logger une fois le logging configuré.
-    print("⚠️ pywebpush non installé - notifications push désactivées")
-
-# Configure logging for West Africa production
-for stream in (sys.stdout, sys.stderr):
-    if hasattr(stream, "reconfigure"):
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except Exception:
-            pass
+    _avertir("⚠️ pywebpush non installé - notifications push désactivées")
 
 # Journal rotatif : chemin ABSOLU, JAMAIS dans l'arbre du dépôt.
 #
@@ -94,7 +121,7 @@ def _handlers_de_journal(chemin):
             encoding='utf-8'
         ))
     except OSError as exc:
-        print("⚠️ journal fichier indisponible (%s) — sortie standard seule" % exc)
+        _avertir("⚠️ journal fichier indisponible (%s) — sortie standard seule" % exc)
     return handlers
 
 
