@@ -2326,6 +2326,26 @@
       ]
     },
     {
+      "id": "seo-production: la fenetre des pages ne tourne plus",
+      "garde": "frontend/scripts/check-seo-production.js",
+      "cible": "frontend/scripts/check-seo-production.js",
+      "trouve": "  const passe = ((Math.trunc(graine) % tours) + tours) % tours;",
+      "remplace": "  const passe = 0;",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-seo-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-seo-production.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "couvre toutes les pages en"
+      ]
+    },
+    {
       "id": "seo-production: une page non lue accusee d'etre absente",
       "garde": "frontend/scripts/check-seo-production.js",
       "cible": "frontend/scripts/check-seo-production.js",

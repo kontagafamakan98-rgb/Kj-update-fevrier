@@ -20,6 +20,8 @@ import {
   TENTATIVES_PAGE,
   analyzeSeoServedHtml,
   codeDeSortieStrict,
+  fenetreTournante,
+  graineFenetre,
   noticeFor,
   readPublicJobs,
   runSeoProductionReport,
@@ -716,6 +718,101 @@ describe('le mode STRICT — celui qui met fin au silence (F9)', () => {
 
     expect(result.skipped).toBe(true);
     expect(result.manquantes).toEqual([]);
+  });
+});
+
+// ── Fenêtre TOURNANTE des pages du sitemap (01/11/2026) ──────────────────────
+// Mesuré ce jour : 85 URL au sitemap, 20 jugées, « 64 page(s) au-delà du
+// plafond » — 64 pages qu'AUCUNE sonde de production ne jugeait. Ces cas
+// tiennent les deux moitiés de la correction : le coût d'une passe ne bouge pas,
+// et la couverture devient complète en `tours` passes, en le DISANT.
+describe('fenêtre tournante des pages du sitemap', () => {
+  it('couvre toutes les pages en `tours` passes, sans en juger une deux fois par passe', () => {
+    const total = 84;
+    const vues = new Set();
+    let tours = 0;
+    for (let graine = 0; graine < 20; graine += 1) {
+      const fenetre = fenetreTournante({ total, max: 20, graine });
+      tours = fenetre.tours;
+      // 20 pages par passe, distinctes : une fenêtre qui répéterait un index
+      // jugerait moins de pages qu'elle ne le prétend.
+      expect(fenetre.indexes.length).toBe(Math.min(20, total));
+      expect(new Set(fenetre.indexes).size).toBe(fenetre.indexes.length);
+      fenetre.indexes.forEach((index) => vues.add(index));
+      if (fenetre.passe === fenetre.tours) break;
+    }
+    expect(tours).toBe(5);
+    expect(vues.size).toBe(total);
+  });
+
+  it('revient à la première fenêtre après un tour complet (un cycle, pas une dérive)', () => {
+    const premier = fenetreTournante({ total: 84, max: 20, graine: 0 });
+    const apresUnTour = fenetreTournante({ total: 84, max: 20, graine: 5 });
+    expect(apresUnTour.passe).toBe(1);
+    expect(apresUnTour.indexes).toEqual(premier.indexes);
+    // Et la deuxième passe est bien DISJOINTE de la première.
+    const deuxieme = fenetreTournante({ total: 84, max: 20, graine: 1 });
+    expect(deuxieme.indexes.filter((i) => premier.indexes.includes(i))).toEqual([]);
+  });
+
+  it('un sitemap plus court que la fenêtre est jugé en entier, sans plan à annoncer', () => {
+    const fenetre = fenetreTournante({ total: 3, max: 20, graine: 7 });
+    expect(fenetre.tours).toBe(1);
+    expect(fenetre.indexes).toEqual([0, 1, 2]);
+  });
+
+  it('résout la graine : explicite, puis KOJO_SEO_PAS, puis le numéro de run, puis le jour', () => {
+    const jour = new Date('2026-11-01T10:00:00Z');
+    expect(graineFenetre({ graine: 12, env: { KOJO_SEO_PAS: '3' }, jour })).toBe(12);
+    expect(graineFenetre({ env: { KOJO_SEO_PAS: '3', GITHUB_RUN_NUMBER: '99' }, jour })).toBe(3);
+    expect(graineFenetre({ env: { GITHUB_RUN_NUMBER: '99' }, jour })).toBe(99);
+    expect(graineFenetre({ env: {}, jour })).toBe(Math.floor(jour.getTime() / 86400000));
+  });
+
+  it('publie les pages qu’elle n’a pas jugées, et les juge à la passe suivante', async () => {
+    // 25 pages : la fenêtre en juge 20, cinq restent pour la passe suivante.
+    const locs = Array.from({ length: 25 }, (_, i) => `${SITE_ORIGIN}/p${i + 1}`);
+    const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${locs.map((loc) => `  <url><loc>${loc}</loc></url>`).join('\n')}
+</urlset>`;
+    const fetchTout = async (url) => {
+      const pathname = new URL(url).pathname;
+      if (pathname === '/sitemap.xml') return { ok: true, status: 200, text: async () => sitemap };
+      if (pathname === PUBLIC_JOBS_PATH) return { ok: true, status: 200, text: async () => PUBLIC_JOBS_EMPTY };
+      // L'accueil porte les quatre intégrations : la section PAGES n'est pas
+      // celle qui les juge, mais un accueil nu les déclarerait manquantes.
+      if (pathname === '/') return { ok: true, status: 200, text: async () => CONFIGURED_HTML };
+      return { ok: true, status: 200, text: async () => pageFor(pathname) };
+    };
+
+    const passe1 = await runSeoProductionReport({ base: SITE_ORIGIN, fetchImpl: fetchTout, graine: 0 });
+    const passe2 = await runSeoProductionReport({ base: SITE_ORIGIN, fetchImpl: fetchTout, graine: 1 });
+
+    expect(passe1.pages.length).toBe(20);
+    expect(passe1.fenetre.tours).toBe(2);
+    expect(passe1.nonJugees.map((u) => new URL(u).pathname)).toEqual([
+      '/p21', '/p22', '/p23', '/p24', '/p25',
+    ]);
+    const texte1 = passe1.notices.join('\n');
+    expect(texte1).toContain('non jugées par la passe 1/2 (5)');
+    expect(texte1).toContain('/p25');
+    expect(texte1).toContain('couverture complète en 2 passes');
+    // Aucune accusation : ce qui n'est pas jugé n'est pas un défaut.
+    expect(passe1.manquantes).toEqual([]);
+
+    // La passe suivante juge ce que la première avait laissé — et, 25 n'étant pas
+    // un multiple de 20, sa fenêtre boucle sur le début. Ce qu'elle ne fait pas :
+    // laisser une page sans jamais la juger sur un cycle complet.
+    const passe2Chemins = passe2.pages.map(({ url }) => new URL(url).pathname);
+    for (const chemin of ['/p21', '/p22', '/p23', '/p24', '/p25']) {
+      expect(passe2Chemins).toContain(chemin);
+    }
+    const union = new Set([
+      ...passe1.pages.map(({ url }) => new URL(url).pathname),
+      ...passe2Chemins,
+    ]);
+    expect(union.size).toBe(25);
   });
 });
 

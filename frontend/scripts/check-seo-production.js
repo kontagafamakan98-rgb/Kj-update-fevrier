@@ -27,7 +27,13 @@
  *    maintenant nommé, au lieu de se déduire d'une carte OG cassée.
  *
  * 3. PAGES — chaque page du sitemap est lue et doit annoncer son `canonical`,
- *    son `<title>` et sa `description`. Avant, seule l'accueil était sondée : le
+ *    son `<title>` et sa `description`. Mesuré le 01/11/2026 : le sitemap
+ *    annonçait **85 URL** et la passe en jugeait **20**, en publiant `64 page(s)
+ *    au-delà du plafond` — un angle mort que le résumé avouait sans que personne
+ *    ne le ferme. La fenêtre de 20 pages **TOURNE** donc d'une passe à l'autre
+ *    (`fenetreTournante`, graine = `GITHUB_RUN_NUMBER`, `KOJO_SEO_PAS`, ou le
+ *    jour en local) : cinq passes couvrent les 84 pages du site, et chaque
+ *    verdict **nomme les pages qu'il n'a pas jugées** et la passe qu'il a lue. Avant, seule l'accueil était sondée : le
  *    sitemap annonçait huit pages dont sept n'étaient jamais lues, donc une page
  *    servie sans description (ou avec le canonical d'une autre) restait
  *    silencieuse. Les fiches `/jobs/:id` sont ensuite échantillonnées
@@ -286,8 +292,67 @@ function pathOf(url) {
 /** Une fiche mission `/jobs/:id` du sitemap (et non la liste `/jobs`). */
 const JOB_DETAIL = /^\/jobs\/[^/]+\/?$/;
 
-/** Plafond de pages lues : borne le coût quotidien si un sitemap en annonce trop. */
+/**
+ * Le budget d'une passe, en pages du SITE — il ne bouge pas.
+ *
+ * Mesuré le 01/11/2026 : le sitemap sert **85 URL**, la passe en jugeait **20**
+ * et publiait « 64 page(s) au-delà du plafond » — ces 64 pages n'étaient jugées
+ * par AUCUNE sonde de production, jamais. Le coût d'une passe ne peut pas
+ * couvrir 84 pages sans allonger chaque run ; c'est donc l'ÉCHANTILLON qui
+ * tourne : la même fenêtre de 20 pages avance d'un cran à chaque passe, si bien
+ * que la couverture est complète en ``tours`` passes — et les pages hors
+ * fenêtre sont NOMMÉES dans le verdict, au lieu d'être sous-entendues.
+ */
 const MAX_PAGES = 20;
+
+/**
+ * La fenêtre tournante de cette passe.
+ *
+ * `graine` est un NUMÉRO DE PASSE, pas un offset : deux passes successives
+ * lisent deux fenêtres disjointes, et `tours` passes lisent toutes les pages.
+ * Le calcul est déterministe pour une graine donnée — un run peut donc être
+ * rejoué à l'identique, et le verdict nomme la passe qu'il a jugée.
+ *
+ * @returns {{passe: number, tours: number, offset: number, indexes: number[], from: number, to: number}}
+ */
+export function fenetreTournante({ total = 0, max = MAX_PAGES, graine = 0 } = {}) {
+  if (!Number.isFinite(total) || total <= 0) {
+    return { passe: 0, tours: 0, offset: 0, indexes: [], from: 0, to: 0 };
+  }
+  const taille = Math.min(max, total);
+  const tours = Math.ceil(total / taille);
+  const passe = ((Math.trunc(graine) % tours) + tours) % tours;
+  const offset = passe * taille;
+  const indexes = [];
+  for (let i = 0; i < taille; i += 1) indexes.push((offset + i) % total);
+  return {
+    passe: passe + 1,
+    tours,
+    offset,
+    indexes,
+    from: offset + 1,
+    // Une fenêtre qui boucle annonce ses deux morceaux : « 81..84 + 1..16 ».
+    to: Math.min(offset + taille, total),
+  };
+}
+
+/**
+ * La GRAINE de la passe, résolue dans cet ordre : l'option explicite (tests,
+ * rejeu), `KOJO_SEO_PAS` (une passe forcée à la main), `GITHUB_RUN_NUMBER`
+ * (chaque run avance d'un cran), puis le JOUR (UTC) en local.
+ *
+ * Le jour est en dernier et non en premier : en CI, deux runs le même jour
+ * (le cron et le push de `main`) doivent lire deux fenêtres DIFFÉRENTES, sinon
+ * la couverture n'avance pas là où elle sert le plus.
+ */
+export function graineFenetre({ graine, env = process.env, jour = new Date() } = {}) {
+  if (Number.isInteger(graine)) return graine;
+  const pas = String(env.KOJO_SEO_PAS ?? '').trim();
+  if (/^\d+$/.test(pas)) return Number.parseInt(pas, 10);
+  const run = String(env.GITHUB_RUN_NUMBER ?? '').trim();
+  if (/^\d+$/.test(run)) return Number.parseInt(run, 10);
+  return Math.floor(jour.getTime() / 86400000);
+}
 
 /**
  * Plafond de fiches `/jobs/:id` échantillonnées.
@@ -464,18 +529,20 @@ async function readPage(url, fetchImpl) {
 }
 
 /**
- * Les pages du sitemap à vérifier : les pages du SITE (toutes, jusqu'au
- * plafond) et un ÉCHANTILLON borné des fiches `/jobs/:id`.
+ * Les pages du sitemap à vérifier : la FENÊTRE tournante des pages du SITE, et
+ * un ÉCHANTILLON borné des fiches `/jobs/:id`.
  *
  * @returns {Promise<{checked: Array<{url: string, defects: string[]}>, total: number,
- *   truncated: number, jobs: {checked: Array, sampled: number, total: number,
- *   sitemap: number, api: number, apiErreurs: string[], horsSitemap: number}}>}
+ *   fenetre: object, nonJugees: string[], jobs: {checked: Array, sampled: number,
+ *   total: number, sitemap: number, api: number, apiErreurs: string[],
+ *   horsSitemap: number}}>}
  */
 async function checkSitemapPages({
   locs = [],
   fetchImpl,
   homeHtml,
   apiJobs = { urls: [], live: 0, erreurs: [] },
+  graine = 0,
 }) {
   const sitePages = [];
   const jobPages = [];
@@ -491,8 +558,14 @@ async function checkSitemapPages({
     if (!cible.includes(loc)) cible.push(loc);
   }
 
+  const fenetre = fenetreTournante({ total: sitePages.length, max: MAX_PAGES, graine });
+  const aLire = fenetre.indexes.map((index) => sitePages[index]);
+  // Les pages que CETTE passe ne juge pas. Elles sont nommées dans le verdict :
+  // une couverture partielle qui ne se déclare pas est le silence que ce garde
+  // existe pour fermer.
+  const nonJugees = sitePages.filter((url) => !aLire.includes(url));
   const checked = [];
-  for (const url of sitePages.slice(0, MAX_PAGES)) {
+  for (const url of aLire) {
     // L'accueil est déjà lu pour les intégrations : ne pas le redemander.
     const page =
       pathOf(url) === '/' && homeHtml !== undefined
@@ -528,7 +601,8 @@ async function checkSitemapPages({
   return {
     checked,
     total: sitePages.length,
-    truncated: sitePages.length - checked.length,
+    fenetre,
+    nonJugees,
     jobs: {
       checked: sampled,
       sampled: sampled.length,
@@ -652,7 +726,14 @@ export function jobSampleNotices({
  *   défauts sont ceux que le mode strict refuse ; les avertissements sont les
  *   surfaces aveugles DÉCLARÉES (corpus vide), publiées en `::warning`.
  */
-export function pagesNotices({ checked = [], total = 0, truncated = 0, jobs = {}, error }) {
+export function pagesNotices({
+  checked = [],
+  total = 0,
+  fenetre = null,
+  nonJugees = [],
+  jobs = {},
+  error,
+}) {
   if (error) {
     // Le sitemap est la source des pages du SITE, pas celle des fiches : celles
     // que l'API publique sert sont jugées quand même, et la section le dit au
@@ -669,7 +750,13 @@ export function pagesNotices({ checked = [], total = 0, truncated = 0, jobs = {}
     };
   }
   const notes = [];
-  if (truncated) notes.push(`${truncated} page(s) au-delà du plafond de ${MAX_PAGES}`);
+  const tourne = fenetre && fenetre.tours > 1;
+  if (tourne) {
+    notes.push(
+      `fenêtre ${fenetre.passe}/${fenetre.tours} du sitemap (pages ${fenetre.from}..${fenetre.to}), ` +
+        `${nonJugees.length} hors fenêtre`,
+    );
+  }
   const défauts = checked.filter(({ defects }) => defects.length > 0).flatMap(({ defects }) => defects);
   // Les pages que le TRANSPORT n'a pas permis de lire : une prémisse, jamais un
   // défaut — le résumé le dit, sinon un run rouge laisserait croire qu'on a
@@ -682,15 +769,28 @@ export function pagesNotices({ checked = [], total = 0, truncated = 0, jobs = {}
     (notes.length ? ` (${notes.join(' ; ')})` : '') +
     '.';
   const echantillon = jobSampleNotices(jobs);
+  // CE QUI N'A PAS ÉTÉ JUGÉ, nommé. Le plafond n'est plus un angle mort : la
+  // fenêtre tourne, et la passe dit quelles pages elle laisse aux suivantes (et
+  // en combien de passes la couverture est complète).
+  const noticeNonJugees = tourne
+    ? [
+        `Pages — non jugées par la passe ${fenetre.passe}/${fenetre.tours} (${nonJugees.length}) : ` +
+          `${nonJugees.map((url) => pathOf(url)).join(', ')} — échantillonnage tournant, couverture ` +
+          `complète en ${fenetre.tours} passes.`,
+      ]
+    : [];
   return {
     notices: [
       résumé,
       ...défauts.map((d) => `Pages — ${d}`),
       ...premisses.map((p) => `Pages — ${p}`),
+      ...noticeNonJugees,
       ...echantillon.notices,
     ],
     défauts: [...défauts, ...echantillon.défauts],
     premisses: [...premisses, ...(echantillon.premisses || [])],
+    fenetre,
+    nonJugees,
     avertissements: echantillon.avertissements,
   };
 }
@@ -706,6 +806,9 @@ export async function runSeoProductionReport({
   base = process.env.KOJO_LHCI_BASE_URL || SITE_ORIGIN,
   fetchImpl = fetch,
   strict = false,
+  graine,
+  env = process.env,
+  jour,
 } = {}) {
   const cleanBase = String(base).trim().replace(/\/+$/, '');
   // « Base locale » : la question appartient à `isLoopbackUrl`
@@ -754,6 +857,9 @@ export async function runSeoProductionReport({
     fetchImpl,
     homeHtml: html,
     apiJobs,
+    // La fenêtre tourne d'une passe à l'autre : deux runs successifs ne jugent
+    // pas les mêmes 20 pages, mais `tours` passes les jugent toutes.
+    graine: graineFenetre({ graine, env, jour }),
   });
   const pagesRapport = pagesNotices(sitemap.error ? { error: sitemap.error, jobs: pages.jobs } : pages);
   const presentes = INTEGRATIONS.filter(({ key }) => analysis[key].present);
@@ -775,6 +881,9 @@ export async function runSeoProductionReport({
     // en `::warning`, et refusées (code 2) quand rien d'autre ne rougit — une
     // sonde qui n'a pas mesuré ne se déclare jamais verte.
     premisses: pagesRapport.premisses || [],
+    // Ce que la passe a jugé, et ce qu'elle laisse aux suivantes.
+    fenetre: pages.fenetre || null,
+    nonJugees: pages.nonJugees || [],
     analyse: analysis,
     pages: pages.checked,
     jobPages: pages.jobs.checked,
