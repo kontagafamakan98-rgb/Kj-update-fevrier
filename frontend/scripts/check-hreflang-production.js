@@ -35,7 +35,9 @@
  *   • l'origine publiée : `SITE_ORIGIN` (`scripts/site-meta.js`), parce que les
  *     `canonical` et `hreflang` sont ABSOLUS dans les documents pré-rendus. Un
  *     `--base` de preview change où l'on DEMANDE les pages, jamais ce qu'elles
- *     doivent déclarer.
+ *     doivent déclarer ;
+ *   • le bloc `langues` de `/health` (`API_ORIGIN`, 01/11/2026) — voir plus bas
+ *     ce qu'il sert à confronter.
  *
  * ── Trois sorties, jamais deux ─────────────────────────────────────────────
  * 0 = chaque page déclarée sert, dans chaque langue, son `lang`, son
@@ -44,11 +46,32 @@
  * 1 = refus nommé (statut inattendu, coquille SPA servie à la place du
  *     document, `lang` faux, `canonical` croisé, alternative manquante ou en
  *     trop, sitemap à moitié bilingue, alternative déclarée sur une page
- *     monolingue) ;
+ *     monolingue, **ou bloc `langues` de `/health` qui contredit ce qui est
+ *     servi** — autres langues indexées, autre langue par défaut, volume par
+ *     langue ou nombre d'alternatives qui ne suit pas le sitemap) ;
  * 2 = prémisse : corpus vide (la déclaration n'a pas été lue), aucune page
- *     lisible, ou SITEMAP ILLISIBLE — la sonde n'a alors pas jugé
- *     l'énumération, et un vert dirait qu'elle l'a fait. Une prémisse rougit
- *     le run.
+ *     lisible, SITEMAP ILLISIBLE, ou `/health` illisible (transport, statut
+ *     non-200, corps qui n'est pas du JSON) — la sonde n'a alors pas jugé la
+ *     partie concernée, et un vert dirait qu'elle l'a fait. Une prémisse
+ *     rougit le run.
+ *
+ * ── POURQUOI ELLE LIT `langues` DE `/health` (01/11/2026) ──────────────
+ * Le bloc publie le VOLUME des langues (combien de documents chacune) depuis le
+ * 01/11/2026, et la sonde de santé du backend le juge pour lui-même. Ce que
+ * celle-ci ajoute tient en une phrase : le confronter à ce qu'elle VIENT DE
+ * MESURER. Un bloc parfaitement bien formé peut décrire un autre site que celui
+ * qui est servi — c'est ce qui arrive quand le backend déployé est en retard sur
+ * le frontend, et rien d'autre ne le dit : il annonce deux langues, un volume
+ * d'avant, et chaque moitié est « vraie ». Sont confrontés : la liste des
+ * langues, la langue par défaut, les documents par langue, les URL par langue
+ * PRÉFIXÉE, les pages multilingues et les alternatives par page.
+ *
+ * Ce qui n'est PAS confronté, et pourquoi : les TOTAUX (`pages.total`,
+ * `pages.monolingues`, `urls_par_langue` de la langue par défaut). Le sitemap
+ * servi porte aussi des fiches de mission (`/jobs/:id`) et des profils
+ * travailleurs (`/workers/:id`), écrits en français, sans alternative, et que le
+ * bloc ne décrit pas : les compter ferait rougir la sonde sur du contenu qu'il
+ * n'a jamais prétendu décrire.
  *
  * ── Ce qu'elle ne dit pas, écrit plutôt que tu ─────────────────────────────
  *   • elle lit ce qui est SERVI, pas ce que le moteur en fait : un `hreflang`
@@ -66,6 +89,10 @@
  *   node scripts/check-hreflang-production.js                    # production
  *   node scripts/check-hreflang-production.js --base https://…   # une preview
  *   node scripts/check-hreflang-production.js --route /jobs      # une page
+ *
+ * `KOJO_HEALTH_BASE_URL` déplace la lecture de `/health` (défaut :
+ * `API_ORIGIN`, qui est l'origine du backend — le site ne proxifie que
+ * `/api/**` et `/sitemap.xml`, donc `${SITE_ORIGIN}/health` répondrait 404).
  */
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -73,12 +100,16 @@ import { pathToFileURL } from 'node:url';
 import {
   LANGUES_INDEXEES,
   LANGUE_DE_SECOURS,
+  LANGUE_PAR_DEFAUT,
   alternatesHreflang,
   cheminDansLaLangue,
+  cheminSansPrefixe,
+  langueDuChemin,
+  prefixeDeLaLangue,
 } from '../src/config/langues-indexees.js';
 import { PAGE_META } from '../src/config/page-meta.js';
 import { GROUPES_LIENS_SEO } from '../src/config/liens-seo.js';
-import { SITE_ORIGIN } from './site-meta.js';
+import { API_ORIGIN, SITE_ORIGIN } from './site-meta.js';
 
 /** L'origine interrogée par défaut (production). */
 export const DEFAULT_BASE = SITE_ORIGIN;
@@ -106,6 +137,26 @@ export const PAGES_OBLIGATOIRES = ['/', '/jobs'];
 
 /** Le sitemap servi par l'origine du site (rewrite Vercel → `/api/sitemap.xml`). */
 export const CHEMIN_SITEMAP = '/sitemap.xml';
+
+/**
+ * Le bloc de santé qui publie la DÉCLARATION des langues (`langues`).
+ *
+ * Il vit sur l'origine du BACKEND, pas sur celle du site : `vercel.json` ne
+ * proxifie que `/api/**` et `/sitemap.xml`, donc `${SITE_ORIGIN}/health`
+ * répondrait 404. Depuis le 01/11/2026 ce bloc publie `indexees`, `defaut`,
+ * `documents_par_langue`, `urls_par_langue`, `pages`, `alternatives_par_page` et
+ * `portee` (`backend/kojo_sitemap_declaration.bloc_langues`), et la sonde de
+ * santé du backend le juge DÉJÀ pour lui-même. Ce que cette sonde-ci en fait est
+ * différent, et c'est la raison de la lecture : le confronter à ce qu'elle
+ * VIENT DE MESURER. Un bloc peut être parfaitement bien formé et décrire un
+ * AUTRE site que celui qui est servi — c'est exactement ce qui arrive quand le
+ * backend déployé est en retard sur le frontend : il annonce deux langues et un
+ * volume d'avant, et rien dans le bloc ne le dit.
+ */
+export const CHEMIN_HEALTH = '/health';
+
+/** L'origine du backend qui sert `/health` (jamais celle du site : voir plus haut). */
+export const HEALTH_ORIGIN = API_ORIGIN;
 
 /**
  * La marque d'une page PRÉ-RENDUE, par opposition à la coquille de
@@ -349,6 +400,183 @@ export function jugerSitemap({ xml }) {
 }
 
 /**
+ * Ce que le SITEMAP SERVI énumère, du point de vue du bloc `langues`.
+ *
+ * On ne compte pas des URL « en général » : on compte les entrées qui portent
+ * des alternatives `hreflang` — c'est la marque d'une page MULTILINGUE. Un
+ * sitemap porte aussi des fiches de mission (`/jobs/:id`) et des profils
+ * travailleurs (`/workers/:id`), qui sont écrits en français, ne déclarent
+ * aucune alternative, et que le bloc ne décrit PAS (`kojo_sitemap_declaration`
+ * ne compte que les pages statiques et les pages ville/métier/guide). Les
+ * compter dans `urls_par_langue` ferait rougir la sonde sur du contenu que le
+ * bloc n'a jamais prétendu décrire — c'est la raison pour laquelle les totaux
+ * (`pages.total`, `pages.monolingues`, `urls_par_langue` de la langue par
+ * défaut) ne sont pas confrontés, et que ce qui l'est se lit sur les entrées à
+ * alternatives.
+ *
+ * @param {{xml: string, base?: string}} entree
+ * @returns {{parLangue: Map<string, {total: number, documents: number}>,
+ *   multilingues: number, alternativesParPage: number|null, entrees: number}}
+ */
+export function mesuresDuBlocLangues({ xml, base = strip(SITE_ORIGIN) } = {}) {
+  const parLangue = new Map(LANGUES_INDEXEES.map((langue) => [langue.code, { total: 0, documents: 0 }]));
+  /** @type {Map<string, Set<string>>} chemin sans langue → langues qui le publient */
+  const groupes = new Map();
+  const longueurs = new Set();
+  let entrees = 0;
+
+  for (const bloc of blocsDuSitemap(xml)) {
+    if (!bloc.loc.startsWith(base)) continue;
+    entrees += 1;
+    const chemin = bloc.loc.slice(base.length) || '/';
+    const code = langueDuChemin(chemin) || LANGUE_PAR_DEFAUT;
+    const stats = parLangue.get(code);
+    // Une langue que la DÉCLARATION ne porte pas est déjà signalée comme un
+    // écart de toutes les autres comparaisons ; la compter ici ajouterait un
+    // second refus pour une seule faute.
+    if (!stats) continue;
+    stats.total += 1;
+    if (!bloc.alternatives.length) continue;
+    stats.documents += 1;
+    longueurs.add(bloc.alternatives.length);
+    const sansLangue = cheminSansPrefixe(chemin);
+    if (!groupes.has(sansLangue)) groupes.set(sansLangue, new Set());
+    groupes.get(sansLangue).add(code);
+  }
+
+  const multilingues = [...groupes.values()].filter(
+    (codes) => codes.size === LANGUES_INDEXEES.length
+  ).length;
+
+  return {
+    parLangue,
+    multilingues,
+    alternativesParPage: longueurs.size ? Math.max(...longueurs) : null,
+    entrees,
+  };
+}
+
+/**
+ * Confronte le bloc `langues` de `/health` à ce qui vient d'être MESURÉ.
+ *
+ * Trois questions, et trois façons de se contredire :
+ *
+ *   1. la FAMILLE — le bloc annonce-t-il les langues que le site sert ? C'est le
+ *      cas de panne le plus probable : le backend Fly déployé en retard annonce
+ *      deux langues quand le frontend en sert cinq, et les deux réponses sont
+ *      « vraies » prises séparément ;
+ *   2. le VOLUME — `documents_par_langue`, `urls_par_langue` (langues préfixées),
+ *      `pages.multilingues` et `alternatives_par_page` disent-ils ce que le
+ *      sitemap servi énumère ? Un bloc calculé depuis une autre déclaration
+ *      publie un nombre faux sans que rien ne rougisse ailleurs ;
+ *   3. la LANGUE PAR DÉFAUT — le préfixe vide et le `x-default` en dépendent.
+ *
+ * Ce qui n'est PAS confronté est écrit plus haut (les totaux, que les fiches de
+ * mission et les profils travailleurs gonflent de bonne foi).
+ *
+ * @param {{bloc: object, mesures: object}} entree
+ * @returns {string[]} Les refus (vide = les deux récits sont d'accord).
+ */
+export function jugerBlocLangues({ bloc, mesures }) {
+  const problemes = [];
+  const attenduesCodes = LANGUES_INDEXEES.map((langue) => langue.code);
+
+  if (!bloc || typeof bloc !== 'object' || Array.isArray(bloc)) {
+    return [
+      `${HEALTH_ORIGIN}${CHEMIN_HEALTH} ne publie pas de bloc « langues » : la révision déployée du ` +
+        'backend est antérieure au 01/11/2026, ou le proxy rend le /health d’un autre hôte. Le ' +
+        'volume des langues n’a donc pas pu être confronté à ce qui est servi — redéployer le backend.',
+    ];
+  }
+
+  const annoncees = Array.isArray(bloc.indexees) ? bloc.indexees.map(String) : [];
+  if (JSON.stringify(annoncees) !== JSON.stringify(attenduesCodes)) {
+    problemes.push(
+      `/health annonce ${annoncees.length} langue(s) indexée(s) (${annoncees.join(', ') || 'aucune'}) ` +
+        `alors que la sonde en juge ${attenduesCodes.length} (${attenduesCodes.join(', ')}) : les deux ` +
+        `récits ne décrivent pas le même site — un backend en retard sur le frontend annonce un site ` +
+        `plus petit qu’il n’est servi, et c’est exactement le cas que ce bloc existe pour rendre visible.`
+    );
+  }
+
+  if (String(bloc.defaut || '') !== LANGUE_PAR_DEFAUT) {
+    problemes.push(
+      `/health déclare « ${bloc.defaut || '(aucune)'} » comme langue par défaut, alors que la ` +
+        `déclaration des URL (src/config/langues-indexees.js) met « ${LANGUE_PAR_DEFAUT} » sans préfixe : ` +
+        `le préfixe vide et le x-default désignent donc deux langues différentes.`
+    );
+  }
+
+  const attenduesAlternatives = alternatesHreflang('/', '').length;
+  if (mesures.alternativesParPage !== null && Number(bloc.alternatives_par_page) !== attenduesAlternatives) {
+    problemes.push(
+      `/health annonce ${bloc.alternatives_par_page} alternative(s) par page, alors que le sitemap servi ` +
+        `en porte ${mesures.alternativesParPage} et que la déclaration en produit ${attenduesAlternatives} ` +
+        `(une par langue indexée, x-default compris) : le compte et les documents ne décrivent pas la ` +
+        `même famille.`
+    );
+  }
+
+  // ── Le volume, langue par langue ────────────────────────────────────────
+  const documentsAnnonces = bloc.documents_par_langue || {};
+  const urlsAnnoncees = bloc.urls_par_langue || {};
+  for (const code of attenduesCodes) {
+    const mesure = mesures.parLangue.get(code) || { total: 0, documents: 0 };
+    const annonce = Number(documentsAnnonces[code]);
+    if (!Number.isFinite(annonce)) {
+      problemes.push(
+        `/health ne publie pas de nombre de documents pour « ${code} » (documents_par_langue) : ` +
+          `un volume muet sur une langue annoncée ne peut pas être confronté au sitemap.`
+      );
+    } else if (annonce !== mesure.documents) {
+      problemes.push(
+        `/health annonce ${annonce} document(s) en « ${code} », le sitemap servi en énumère ` +
+          `${mesure.documents} : le bloc compte la déclaration, le sitemap énumère ce qui est publié — ` +
+          `les deux doivent dire le même nombre, sinon une langue perd ses pages sans que rien ne rougisse.`
+      );
+    }
+    // Pour une langue PRÉFIXÉE, toutes ses entrées de sitemap sont des pages
+    // multilingues (les fiches de mission et les profils, écrits en français,
+    // n'ont pas de préfixe) : le total est donc comparable. Pour la langue par
+    // défaut, non — voir le commentaire de mesuresDuBlocLangues.
+    if (prefixeDeLaLangue(code)) {
+      const annonceesUrls = Number(urlsAnnoncees[code]);
+      if (!Number.isFinite(annonceesUrls)) {
+        problemes.push(
+          `/health ne publie pas de nombre d’URL pour « ${code} » (urls_par_langue) : le volume par ` +
+            `langue ne peut pas être confronté au sitemap servi.`
+        );
+      } else if (annonceesUrls !== mesure.total) {
+        problemes.push(
+          `/health annonce ${annonceesUrls} URL en « ${code} », le sitemap servi en énumère ` +
+            `${mesure.total} : une langue préfixée ne contient que ses pages multilingues, donc les deux ` +
+            `nombres sont le même fait et doivent être égaux.`
+        );
+      }
+    }
+  }
+
+  const pages = bloc.pages || {};
+  if (mesures.multilingues) {
+    const annoncees = Number(pages.multilingues);
+    if (!Number.isFinite(annoncees)) {
+      problemes.push(
+        '/health ne publie pas de nombre de pages multilingues (pages.multilingues) : la moitié ' +
+          'du volume n’est pas confrontée au sitemap servi.'
+      );
+    } else if (annoncees !== mesures.multilingues) {
+      problemes.push(
+        `/health annonce ${annoncees} page(s) multilingue(s), le sitemap servi en énumère ` +
+          `${mesures.multilingues} (une entrée à alternatives dans chaque langue) : un nombre qui ne ` +
+          `suit pas les entrées est un chiffre qui mentira au prochain lecteur.`
+      );
+    }
+  }
+
+  return problemes;
+}
+
+/**
  * Lit une URL sans masquer un statut par une erreur de lecture.
  *
  * @returns {Promise<{statut: number, corps: string, erreur: string}>}
@@ -384,8 +612,16 @@ export async function runHreflangProbe({
   routes,
   fetchImpl = fetch,
   quiet = false,
+  // `/health` vit sur l'origine du BACKEND (voir `HEALTH_ORIGIN`). Le défaut
+  // n'est pas `base` : le site ne proxifie que `/api/**` et `/sitemap.xml`, donc
+  // `${base}/health` répondrait 404 en production. Une preview pointe le MÊME
+  // backend pour son sitemap (le rewrite `/sitemap.xml` est absolu), donc lire
+  // le bloc là où il vit ne mélange pas deux objets — et `KOJO_HEALTH_BASE_URL`
+  // existe pour une origine mesurée localement.
+  healthBase = process.env.KOJO_HEALTH_BASE_URL || HEALTH_ORIGIN,
 } = {}) {
   const BASE = strip(base);
+  const HEALTH_BASE = strip(healthBase);
   const log = (...args) => {
     if (!quiet) console.log(...args);
   };
@@ -488,6 +724,7 @@ export async function runHreflangProbe({
     log(`⚠️ ${notices[notices.length - 1]}`);
     return result;
   }
+  let sitemapJuge = false;
   if (sitemap.statut !== 200) {
     errors.push(
       `${BASE}${CHEMIN_SITEMAP} répond HTTP ${sitemap.statut} : le sitemap n'est pas servi, donc aucune ` +
@@ -501,6 +738,7 @@ export async function runHreflangProbe({
           `passerait pour conforme à une règle qui ne juge que ce qu'il publie.`
       );
     } else {
+      sitemapJuge = true;
       const problemes = jugerSitemap({ xml: sitemap.corps });
       errors.push(...problemes);
       if (!problemes.length) {
@@ -508,6 +746,73 @@ export async function runHreflangProbe({
           `  ✓ sitemap (${blocs.length} entrée(s), ` +
             `${LANGUES_INDEXEES.length} langue(s) par page publiée)`
         );
+      }
+    }
+  }
+
+  // ── 4. Le bloc `langues` de /health, confronté à CE QUI VIENT D'ÊTRE MESURÉ ──
+  // Le bloc existe depuis le 01/11/2026 et publie le volume par langue. Il est
+  // jugé pour lui-même par la sonde de santé du backend (bloc absent, total qui
+  // ne somme pas, langue sans document) ; ce qui manquait, et que seule cette
+  // sonde-ci peut dire, c'est si le bloc et le SITE SERVI racontent la même
+  // chose. Le cas mesuré qui motive la lecture : un backend déployé en retard
+  // annonce deux langues pendant que le frontend en sert cinq.
+  const mesures = sitemapJuge ? mesuresDuBlocLangues({ xml: sitemap.corps }) : null;
+  if (!mesures) {
+    notices.push(
+      "le bloc `langues` de /health n'a pas été confronté : le sitemap n'a pas été lu (voir le refus " +
+        'ci-dessus), et c’est lui qui porte les volumes à comparer.'
+    );
+  } else {
+    requetes += 1;
+    const sante = await lire({
+      url: `${HEALTH_BASE}${CHEMIN_HEALTH}`,
+      fetchImpl,
+      accept: 'application/json',
+    });
+    if (sante.erreur) {
+      // Le bloc est un fait publié par un AUTRE déploiement que les documents :
+      // ne pas pouvoir le lire n'accuse pas le site, mais interdit de dire que
+      // la confrontation a eu lieu.
+      result.premisse = true;
+      notices.push(
+        `${MARQUE_PREMISSE} : ${HEALTH_BASE}${CHEMIN_HEALTH} n'a pas pu être lu (${sante.erreur}) — le ` +
+          `bloc « langues » n'a pas été confronté à ce qui est servi, et les documents seuls ne ` +
+          `disent pas si le backend annonce le même site.`
+      );
+      log(`⚠️ ${notices[notices.length - 1]}`);
+    } else if (sante.statut !== 200) {
+      result.premisse = true;
+      notices.push(
+        `${MARQUE_PREMISSE} : ${HEALTH_BASE}${CHEMIN_HEALTH} répond HTTP ${sante.statut} — le bloc ` +
+          `« langues » n'a pas été confronté (c'est la sonde de santé du backend qui juge la santé ` +
+          `elle-même, pas celle-ci : ici, l'état illisible est une prémisse, jamais un vert).`
+      );
+      log(`⚠️ ${notices[notices.length - 1]}`);
+    } else {
+      let charge = null;
+      try {
+        charge = JSON.parse(sante.corps);
+      } catch {
+        charge = null;
+      }
+      if (!charge || typeof charge !== 'object') {
+        result.premisse = true;
+        notices.push(
+          `${MARQUE_PREMISSE} : le corps de ${HEALTH_BASE}${CHEMIN_HEALTH} n'est pas du JSON — le ` +
+            `bloc « langues » n'a pas été confronté à ce qui est servi.`
+        );
+        log(`⚠️ ${notices[notices.length - 1]}`);
+      } else {
+        const problemes = jugerBlocLangues({ bloc: charge.langues, mesures });
+        errors.push(...problemes);
+        if (!problemes.length) {
+          checked.push(
+            `  ✓ bloc langues de /health (${mesures.entrees} entrée(s) de sitemap, ` +
+              `${mesures.multilingues} page(s) multilingue(s), ` +
+              `${LANGUES_INDEXEES.length} langue(s) annoncée(s))`
+          );
+        }
       }
     }
   }
@@ -520,7 +825,9 @@ export async function runHreflangProbe({
     dureeMs: Date.now() - debut,
   };
 
-  result.ok = errors.length === 0;
+  // Une prémisse n'est pas un vert : elle rougit le run (code 2) tout en disant
+  // qu'aucun verdict n'a été rendu sur la partie concernée.
+  result.ok = errors.length === 0 && !result.premisse;
   if (result.ok) {
     log(
       `\n${libelle} : conforme (${pages.length} document(s) sur ${aJuger.length} route(s) et ` +
