@@ -48,6 +48,9 @@ import { SITE_ORIGIN, shellFileFor } from '../site-meta.js';
 // pourrait diverger de ce qu'il exige, et le cas conforme rougirait pour la
 // mauvaise raison (la leçon du 25/09/2026).
 import { PAGE_META } from '../../src/config/page-meta.js';
+// La CLASSE du lien d'évitement : la fixture la lit au domicile du chrome pour
+// substituer le libellé de chaque langue, comme le garde la lit pour le juger.
+import { LIEN_EVITEMENT_CLASS } from '../../src/config/classes-chrome.js';
 // Les LANGUES INDEXÉES : la fixture dérive un document par langue de la MÊME
 // déclaration que le garde lit (préfixes d'URL, `lang`, `og:locale`, forme des
 // alternatives). Une langue ajoutée là-bas apparaît donc ici sans qu'on touche
@@ -430,9 +433,17 @@ const copieModules = (dir) => {
   // garde tourne donc ICI avec le dictionnaire du dépôt, sans quoi il tomberait
   // sur un ENOENT au chargement du module — un échec d'outillage qui ne dit rien
   // de la règle jugée.
-  const dictionnaire = path.join(dir, 'src', 'i18n', 'fr.json');
-  fs.mkdirSync(path.dirname(dictionnaire), { recursive: true });
-  fs.copyFileSync(path.join(FRONTEND_DIR, 'src', 'i18n', 'fr.json'), dictionnaire);
+  // Le garde lit AUSSI le dictionnaire de CHAQUE langue indexée, pour juger le
+  // lien d'évitement et le message « sans JavaScript » du document (section 10) :
+  // les cinq sont donc copiés, pas seulement le français.
+  const dictionnaires = path.join(dir, 'src', 'i18n');
+  fs.mkdirSync(dictionnaires, { recursive: true });
+  for (const langue of LANGUES_INDEXEES) {
+    fs.copyFileSync(
+      path.join(FRONTEND_DIR, 'src', 'i18n', `${langue.code}.json`),
+      path.join(dictionnaires, `${langue.code}.json`)
+    );
+  }
 };
 
 /**
@@ -461,12 +472,30 @@ const langueDocument = (contenu, routePath, code) => {
     alternatives +
     `<meta property="og:url" content="${url}" />` +
     `<meta property="og:locale" content="${langue.ogLocale}" />`;
+  // Les deux chaînes d'ACCESSIBILITÉ sont dans la langue du document, comme au
+  // build (`chromeDePage(…, T)` et `appliquerLeNoscript`) : sans cette
+  // substitution, la fixture publierait 61 documents dont le lien d'évitement
+  // dit « Aller au contenu principal », et le refus correspondant accuserait la
+  // fixture au lieu de la règle.
+  const dictionnaire = JSON.parse(
+    fs.readFileSync(path.join(FRONTEND_DIR, 'src', 'i18n', `${code}.json`), 'utf8')
+  );
+  const echappe = (texte) =>
+    String(texte).replace(
+      /[&<>"']/g,
+      (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
+    );
   return contenu
     .replace('<html>', `<html lang="${langue.htmlLang}">`)
     .replace(/<link rel="canonical"[^>]*>/g, '')
     .replace(/<link rel="alternate" hreflang="[^"]*"[^>]*>/g, '')
     .replace(/<meta property="og:url"[^>]*>/g, '')
     .replace(/<meta property="og:locale"[^>]*>/g, '')
+    .replace(
+      new RegExp(`(<a[^>]*class="[^"]*${LIEN_EVITEMENT_CLASS}[^"]*"[^>]*>)[^<]*(</a>)`),
+      `$1${echappe(dictionnaire.skipToContent)}$2`
+    )
+    .replace(/(<noscript>)[\s\S]*?(<\/noscript>)/, `$1${echappe(dictionnaire.jsDisabled)}$2`)
     .replace('</head>', `${entete}</head>`);
 };
 
@@ -509,6 +538,13 @@ const fixture = (mutate) => {
   // chemin (`/jobs`, `lang="fr"`, son canonical et ses alternatives) : sans
   // cela, la fixture conformerait les pages anglaises et pas les françaises,
   // et le premier cas négatif accuserait la fixture.
+  // Le message « sans JavaScript » : chaque page du build en porte un (il vient
+  // de `index.html`), et le garde juge sa LANGUE document par document. La
+  // fixture le pose depuis le dictionnaire, jamais recopié.
+  for (const [nom, contenu] of Object.entries(html)) {
+    if (!/<body>/.test(contenu) || contenu.includes('<noscript>')) continue;
+    html[nom] = contenu.replace('<body>', `<body><noscript>${fr.jsDisabled}</noscript>`);
+  }
   for (const routePath of Object.keys(PAGE_META)) {
     const base = shellFileFor(routePath);
     // La source est lue AVANT la boucle : la langue par défaut normalise la page
@@ -1041,6 +1077,38 @@ describe('check-prerender-shells — chaque refus sait mordre', () => {
         );
       },
       attendu: 'alternatives hreflang',
+    },
+    {
+      // ── LES DEUX CHAÎNES D'ACCESSIBILITÉ (02/11/2026) ──────────────────
+      // Le défaut mesuré ce soir-là : le lien d'évitement et le message
+      // « sans JavaScript » restaient en FRANÇAIS dans les 61 documents. Le
+      // premier a été réparé côté build (`chromeDePage(…, T)`), le second par
+      // réécriture du `<noscript>` : ce cas prouve que le garde voit encore un
+      // document anglais dont le nom accessible est resté français.
+      nom: 'lien d’évitement resté en français dans un document anglais',
+      mutate: ({ html }) => {
+        const anglais = JSON.parse(
+          fs.readFileSync(path.join(FRONTEND_DIR, 'src', 'i18n', 'en.json'), 'utf8')
+        );
+        html['en/jobs.html'] = html['en/jobs.html'].replace(
+          anglais.skipToContent,
+          fr.skipToContent
+        );
+      },
+      attendu: "le lien d'évitement dit",
+    },
+    {
+      nom: 'message sans JavaScript resté en français dans un document anglais',
+      mutate: ({ html }) => {
+        const anglais = JSON.parse(
+          fs.readFileSync(path.join(FRONTEND_DIR, 'src', 'i18n', 'en.json'), 'utf8')
+        );
+        html['en/jobs.html'] = html['en/jobs.html'].replace(
+          anglais.jsDisabled,
+          fr.jsDisabled
+        );
+      },
+      attendu: 'message <noscript> dit',
     },
   ];
 

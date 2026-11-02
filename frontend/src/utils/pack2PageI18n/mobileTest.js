@@ -61,31 +61,94 @@ en: {
   help4: '• Check the Expo Go connection'
 }
 };
+// 02/11/2026 : les listes (fonctionnalités, écrans, étapes, dépannage) étaient
+// restées en français dans les trois langues — elles tombent sur `dict.fr`.
 dict.wo = withBase(dict.fr, {
-backToDashboard: 'Dellu ci dashboard',
+  backToDashboard: 'Dellu ci dashboard',
+  title: 'Mobile test Kojo',
   appInfo: 'Xibaar ci app mobile bi',
   featuresImplemented: 'Fonkisiyon yu sampu',
   screensIntegrated: 'Ekran yi dugal nañu leen',
   testOnMobile: 'Ngir test ci mobile',
-  troubleshooting: 'Defar njuumte'
+  troubleshooting: 'Defar njuumte',
+  feat1: '• Servis bu mat ngir saytu nataal yi (ImageService)',
+  feat2: '• Kompozaŋ ProfilePhoto bu man a jëfandikoo',
+  feat3: '• Jokkoo expo-image-picker ngir kamera/galeri',
+  feat4: '• Saytu ak wàññi nataal yi',
+  feat5: '• Denc ci biir telefon ak AsyncStorage',
+  feat6: '• Yónnee nataal yi ci serwer (test)',
+  feat7: '• Saytu permissions yu telefon',
+  screen1: '• ProfileScreen - Soppi nataal ak bouton kamera',
+  screen2: '• EditProfileScreen - Formulaire ak nataal bi ci biir',
+  screen3: '• DashboardScreen - Nataal ci kanamu xët bi',
+  screen4: '• WorkerProfileScreen - Wone nataal yu liggéeykat yi',
+  screen5: '• CameraScreen - Interfas kamera bu telefon',
+  step1: '1. Bay Expo Go ci sa telefon (Android/iOS)',
+  step2: '2. Tàmbali app mobile bi',
+  step3: '3. Scanne QR code bi ak Expo Go',
+  step4: '4. Test nataal yi ci Profil > Soppi nataal',
+  help1: '• Seet ne app mobile React Native bi dox na',
+  help2: '• Seet ne am nga permissions kamera/galeri',
+  help3: '• Test ci telefon bu dëgg (du navigateur)',
+  help4: '• Seet jokkoo Expo Go bi'
 });
 dict.bm = withBase(dict.fr, {
-backToDashboard: 'Segin ka taa dashboard la',
+  backToDashboard: 'Segin ka taa dashboard la',
   title: 'Kojo mobile test',
   appInfo: 'Mobile app kibaru',
   featuresImplemented: 'Fɛɛrɛw minnu dafalen',
   screensIntegrated: 'Écran minnu don',
   testOnMobile: 'Ka test kɛ mobile kan',
-  troubleshooting: 'Dɛpannage'
+  troubleshooting: 'Dɛpannage',
+  feat1: '• Nataali baara fɛɛrɛ dafalen (ImageService)',
+  feat2: '• ProfilePhoto komponent min bɛ se ka baara kɛ kokura',
+  feat3: '• expo-image-picker jɔn ni kamera/galeri',
+  feat4: '• Nataaliw lakɔlɔsili ni a dɔgɔya',
+  feat5: '• Marali i ka telefɔni kɔnɔ ni AsyncStorage',
+  feat6: '• Nataaliw ci sɛrvɛri la (test)',
+  feat7: '• Telefɔni permissions lakɔlɔsili',
+  screen1: '• ProfileScreen - Foto chanjman ni kamera butɔnw',
+  screen2: '• EditProfileScreen - Formulaire ni foto kɔnɔ',
+  screen3: '• DashboardScreen - Foto kunnafoni-bɔlɔdalen kɔnɔ',
+  screen4: '• WorkerProfileScreen - Baarakɛlaw ka fotow jira',
+  screen5: '• CameraScreen - Kamera interfas',
+  step1: '1. Expo Go dɔn i ka telefɔni kan (Android/iOS)',
+  step2: '2. Mobile app daminɛ',
+  step3: '3. QR code scan ni Expo Go',
+  step4: '4. Fotow test Profil > Foto chanjman kɔnɔ',
+  help1: '• React Native mobile app bɛ baara la wa lajɛ',
+  help2: '• I ka kamera/galeri permissions sɔrɔ',
+  help3: '• Test kɛ telefɔni yɛrɛ kan (browser tɛ)',
+  help4: '• Expo Go jɔnni lajɛ'
 });
 dict.mos = withBase(dict.fr, {
-backToDashboard: 'Lebg n kẽ dashboard',
+  backToDashboard: 'Lebg n kẽ dashboard',
   title: 'Kojo mobile test',
   appInfo: 'Mobile app kibare',
   featuresImplemented: 'Noy sẽn ninge',
   screensIntegrated: 'Écran sẽn paase',
   testOnMobile: 'N ges mobile pʋgẽ',
-  troubleshooting: 'Songre'
+  troubleshooting: 'Songre',
+  feat1: '• Pɩture tʋʋm sõngre sẽn gilli (ImageService)',
+  feat2: '• ProfilePhoto tʋʋm sẽn tõe n lebs n tʋm',
+  feat3: '• expo-image-picker ne kamera/galeri',
+  feat4: '• Pɩture-rãmbã gesgo la b bilfgo',
+  feat5: '• F telefɔn pʋgẽ gũudgo ne AsyncStorage',
+  feat6: '• Pɩture-rãmbã tʋʋm sɛrvɛɛr zugu (test)',
+  feat7: '• Telefɔn permissions gesgo',
+  screen1: '• ProfileScreen - Pɩture tekr ne kamera buton-rãmbã',
+  screen2: '• EditProfileScreen - Formulɛɛr ne pɩture sẽn be a pʋgẽ',
+  screen3: '• DashboardScreen - Pɩture zutã zugu',
+  screen4: '• WorkerProfileScreen - Tʋʋm-nedba pɩture-rãmbã gesgo',
+  screen5: '• CameraScreen - Kamera interfas',
+  step1: '1. Ning-y Expo Go f telefɔn zugu (Android/iOS)',
+  step2: '2. Sɩng-y mobile app wã',
+  step3: '3. Scan-y QR code wã ne Expo Go',
+  step4: '4. Ges-y pɩture-rãmbã Profil > Tek pɩture pʋgẽ',
+  help1: '• Ges-y tɩ React Native mobile app wã tʋʋmda',
+  help2: '• Ges-y tɩ kamera/galeri permissions wã beeme',
+  help3: '• Ges-y telefɔn sẽn yaa sɩd zugu (browser ka la)',
+  help4: '• Ges-y Expo Go connection wã'
 });
 
 export const makeScopedTranslator = (currentLanguage, fallbackT) =>

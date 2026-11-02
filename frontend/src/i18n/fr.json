@@ -916,6 +916,7 @@
   "footerTrades": "Métiers",
   "footerGuides": "Guides",
   "skipToContent": "Aller au contenu principal",
+  "jsDisabled": "Vous devez activer JavaScript pour utiliser cette application.",
   "cookiesConsentTitle": "Mesure d’audience",
   "cookiesConsentBody": "Kojo peut mesurer l’audience du site pour l’améliorer. Ce script n’est chargé qu’avec votre accord ; les cookies de session, indispensables à la connexion, restent actifs dans tous les cas.",
   "cookiesConsentAccept": "Accepter",

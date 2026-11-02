@@ -110,6 +110,10 @@ import { makeScopedTranslator as makeJobsTranslator } from '../src/utils/pack2Pa
 // plus court.
 import { desequilibresDesBalises, decrireDesequilibre } from '../vite-plugins/prerender/balises.js';
 import { PAGE_META } from '../src/config/page-meta.js';
+// La CLASSE du lien d'évitement : le garde lit l'artefact, donc il doit
+// reconnaître le lien que la coquille publie sans recopier sa classe (le
+// domicile est `src/config/classes-chrome.js`, lu par React et par le build).
+import { LIEN_EVITEMENT_CLASS } from '../src/config/classes-chrome.js';
 // Les deux artefacts bâtis hors des routes : leurs noms viennent des modules
 // qui les écrivent, jamais d'une liste tenue ici.
 import { NOM_DU_GABARIT_APP } from '../vite-plugins/prerender/app-template.js';
@@ -148,6 +152,23 @@ const ZERO_PUBLIE = /^0([.,]\s?0+)?\s*(\+|%|\/7)?$/;
 const CSS_CENTRE_PAR_HERITAGE = /\.App\s*\{[^}]*text-align\s*:\s*center/;
 
 const fr = JSON.parse(readFileSync(new URL('../src/i18n/fr.json', import.meta.url), 'utf8'));
+// Le dictionnaire de la langue d'un document, pour juger ses deux chaînes
+// d'accessibilité (lien d'évitement, message « sans JavaScript »). Lu à la
+// demande et une seule fois par langue : section 10 parcourt 61 documents.
+const dictionnaires = new Map();
+const dictionnaireDe = (code) => {
+  if (!dictionnaires.has(code)) {
+    try {
+      dictionnaires.set(
+        code,
+        JSON.parse(readFileSync(new URL(`../src/i18n/${code}.json`, import.meta.url), 'utf8'))
+      );
+    } catch {
+      dictionnaires.set(code, null);
+    }
+  }
+  return dictionnaires.get(code);
+};
 const registerT = makeRegisterTranslator('fr', (cle) => fr[cle]);
 const jobsT = makeJobsTranslator('fr', (cle) => fr[cle]);
 
@@ -1099,6 +1120,46 @@ for (const violation of apostrophesHorsConvention(surfacesApostrophe)) {
         `build/${fichier} : x-default « ${secours || ''} » au lieu de « ${urlParDefaut} » — c'est la page ` +
           `de la langue par défaut (${LANGUE_PAR_DEFAUT}) qui doit être servie à un visiteur sans préférence`
       );
+    }
+    // ── LES DEUX CHAÎNES D'ACCESSIBILITÉ SONT DANS LA LANGUE DU DOCUMENT ──
+    // Mesuré le 02/11/2026 : les 61 documents servis publiaient le lien
+    // d'évitement ET le message « sans JavaScript » en FRANÇAIS — le premier
+    // parce que la coquille lisait `fr.json` une fois pour toutes, le second
+    // parce qu'il vient de `index.html` et n'était jamais réécrit. Un lecteur
+    // d'écran anglophone entendait « Aller au contenu principal » sur
+    // /en/jobs. Ces deux textes sont désormais LUS dans le dictionnaire de la
+    // langue du document ; ce contrôle le vérifie sur l'ARTEFACT, parce qu'un
+    // build qui repasserait par `index.html` sans les réécrire ne se verrait
+    // nulle part ailleurs.
+    const dictionnaire = dictionnaireDe(langue.code);
+    if (dictionnaire) {
+      const desechappe = (texte) =>
+        texte
+          .replace(/&#39;/g, "'")
+          .replace(/&quot;/g, '"')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&amp;/g, '&');
+      const lien = contenu.match(
+        new RegExp(`<a[^>]*class="[^"]*${LIEN_EVITEMENT_CLASS}[^"]*"[^>]*>([^<]*)</a>`)
+      );
+      const libelleLien = lien ? desechappe(lien[1]) : '';
+      if (libelleLien !== dictionnaire.skipToContent) {
+        errors.push(
+          `build/${fichier} : le lien d'évitement dit « ${libelleLien || '(aucun)'} » au lieu de ` +
+            `« ${dictionnaire.skipToContent} » (src/i18n/${langue.code}.json) — un nom accessible dans une ` +
+            "autre langue que le document est un défaut d'accessibilité ET d'internationalisation"
+        );
+      }
+      const noscript = contenu.match(/<noscript>([\s\S]*?)<\/noscript>/);
+      const messageNoscript = noscript ? desechappe(noscript[1]) : '';
+      if (messageNoscript !== dictionnaire.jsDisabled) {
+        errors.push(
+          `build/${fichier} : le message <noscript> dit « ${messageNoscript || '(aucun)'} » au lieu de ` +
+            `« ${dictionnaire.jsDisabled} » (src/i18n/${langue.code}.json) — il vient d'index.html et doit ` +
+            'être réécrit dans la langue du document, sinon la page se dit française à qui refuse son JavaScript'
+        );
+      }
     }
     // La page d'une autre langue n'est pas la COPIE de celle par défaut.
     if (langue.code !== LANGUE_PAR_DEFAUT) {

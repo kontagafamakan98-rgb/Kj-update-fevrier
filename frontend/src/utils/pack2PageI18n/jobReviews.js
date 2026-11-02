@@ -32,31 +32,46 @@ en: {
 }
 };
 dict.wo = withBase(dict.fr, {
-title: 'Avis ak nos',
+  title: 'Avis ak nos',
+  loading: 'Avis yi ngi ñu leen di yeb…',
   noReviews: 'Amul avis tey. Nga nag di ci ñeel jëmm!',
   yourRating: 'Sa nos ci liggéey bii',
-  commentPlaceholder: 'Wax sa xibaar (doo ko def)...',
+  commentPlaceholder: 'Wax sa xibaar (doo ko def)…',
   submit: 'Yégle sama avis',
+  submitting: 'Yégle…',
   success: 'Avis bi yégle na baax!',
-  ratingRequired: 'Tannal nos bu ci dig 1 ba 5 étoiles'
+  error: 'Manuñu yégle avis bi',
+  ratingRequired: 'Tannal nos bu ci dig 1 ba 5 étoiles',
+  delete: 'Moom',
+  anonymous: 'Auteur bu ñu xamul'
 });
 dict.bm = withBase(dict.fr, {
-title: 'Hakɛ ni jatew',
+  title: 'Hakɛ ni jatew',
+  loading: 'Hakɛw bɛ don…',
   noReviews: 'Hakɛ si tɛ yen fɔlɔ. I ka kɛ fɔlɔ ye ka jate!',
   yourRating: 'I ka jate baara nin na',
-  commentPlaceholder: 'I ka kuma fɔ (dɔɔnin)...',
+  commentPlaceholder: 'I ka kuma fɔ (dɔɔnin)…',
   submit: 'N ka hakɛ bila',
+  submitting: 'A bɛ bila…',
   success: 'Hakɛ bilalen don!',
-  ratingRequired: 'Jate sugandi (1 ka tɛmɛ 5 étoiles)'
+  error: 'Hakɛ man se ka bila',
+  ratingRequired: 'Jate sugandi (1 ka tɛmɛ 5 étoiles)',
+  delete: 'Bɔ',
+  anonymous: 'Tɔgɔ dogolen'
 });
 dict.mos = withBase(dict.fr, {
-title: 'Gomde la ningre',
+  title: 'Gomde la ningre',
+  loading: 'Gomde n dogdi…',
   noReviews: 'Gomde ka be ye. F n yɩ sẽn na n ning f gomde!',
   yourRating: 'F ningre tʋʋmã yĩnga',
-  commentPlaceholder: 'Togs f naba (bɩ f maan-a ye)...',
+  commentPlaceholder: 'Togs f naba (bɩ f maan-a ye)…',
   submit: 'Ning m gomde',
+  submitting: 'B ningr n maanda…',
   success: 'Gomde ningeme neere!',
-  ratingRequired: 'Ningre sugri (1 n tɩ tã 5)'
+  error: 'Gomde ka tõe n ning ye',
+  ratingRequired: 'Ningre sugri (1 n tɩ tã 5)',
+  delete: 'Yiis',
+  anonymous: 'Yʋʋr sẽn yɩ solge'
 });
 
 export const makeScopedTranslator = (currentLanguage, fallbackT) =>
