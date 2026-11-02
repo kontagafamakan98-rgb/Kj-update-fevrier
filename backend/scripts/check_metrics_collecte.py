@@ -38,16 +38,34 @@ lit la réponse et juge quatre choses :
   3. toutes les lignes de l'exposition se lisent : un format cassé ne se voit
      pas sur les trois chiffres qu'on regarde à la main ;
   4. l'ÂGE de l'acquisition (`time() - plus_recente`) est sous le seuil que
-     `METRIQUES.md` déclare (30 jours). `0` veut dire JAMAIS, et il est publié
-     comme tel : la règle écrite pour cette jauge — `time() - valeur >
-     30 * 86400` — n'alerte nulle part ailleurs, et une règle que personne ne
-     lit ne déclenche rien.
+     `METRIQUES.md` déclare (30 jours).
+
+LA RÈGLE TRIPLE DE LA FRAÎCHEUR (02/11/2026). Trois états, trois verdicts,
+parce que trois situations différentes se lisent dans la même valeur :
+
+  * `0` — AUCUNE veille datée — est un AVIS (sortie 0), plus un refus. Mesuré le
+    02/11/2026 : `kojo_missions_ouvertes` = 0, `completed_jobs` = 0, et la jauge
+    vaut 0 depuis toujours. Ce n'est pas une panne de COLLECTE (le jeton ouvre,
+    les six familles se lisent), c'est un FAIT DE PRODUIT : aucune alerte emploi
+    n'a encore été créée, donc il n'y a rien à dater. Un refus permanent sur un
+    corpus vide apprend à ignorer les rouges — et c'est précisément le défaut
+    que ce dépôt combat partout ailleurs (un vert qu'on ne lit pas vaut une
+    alerte qu'on ignore). L'avis est PUBLIÉ, avec la phrase qui dit que la règle
+    s'armera d'elle-même : la première veille réelle rend le seuil jugeable.
+  * une date dans le FUTUR, ou un âge au-delà du seuil — un REFUS nommé (1),
+    inchangé : là, quelque chose a été écrit ou a cessé de l'être.
+  * la CONTRADICTION : des veilles COMPTÉES (`kojo_alertes_emploi{…}` > 0) avec
+    une jauge à 0 — un refus (1), parce que le compteur dit qu'une acquisition
+    existe et que la jauge dit qu'aucune n'est datée : l'un des deux est faux,
+    et c'est exactement le cas qu'un simple « 0 = avis » laisserait passer.
 
 Trois sorties, jamais deux :
 
-  0  conforme : la chaîne de collecte fonctionne et l'acquisition est fraîche ;
+  0  conforme : la chaîne de collecte fonctionne, et l'acquisition est fraîche —
+     ou n'a pas encore commencé, ce qui est dit ;
   1  refus nommé : aucun jeton, route fermée ou perdue, famille absente,
-     exposition illisible, acquisition tarie — avec la cause ET le remède ;
+     exposition illisible, acquisition tarie, datée dans le futur, ou comptée
+     sans date — avec la cause ET le remède ;
   2  prémisse : URL inutilisable ou transport injoignable — aucun verdict, et
      ce n'est PAS un vert.
 
@@ -308,11 +326,29 @@ def verifier(
         else:
             plus_recente = valeurs[0]
             if plus_recente <= 0:
-                erreurs.append(
-                    "acquisition JAMAIS DEMARREE : %s vaut 0 (aucune veille datee), donc "
-                    "aucune page ville ou metier n'a produit d'alerte lisible"
-                    % FAMILLE_FRAICHEUR
+                # AVIS, plus un refus (02/11/2026) : le corpus de veilles est
+                # VIDE (0 mission ouverte, 0 alerte creee), donc la collecte
+                # n'a rien a dater. Un rouge permanent sur ce cas apprend a
+                # ignorer les rouges ; la CONTRADICTION ci-dessous, elle, reste
+                # un refus, parce qu'elle dit qu'un chiffre ment.
+                comptees = sum(
+                    int(valeur or 0) for _, valeur in series.get(FAMILLE_PROVENANCE) or []
                 )
+                if comptees > 0:
+                    erreurs.append(
+                        "CONTRADICTION : %d veille(s) comptee(s) dans %s{...} mais "
+                        "%s vaut 0 — un compteur dit qu'une acquisition existe, la "
+                        "jauge dit qu'aucune n'est datee"
+                        % (comptees, FAMILLE_PROVENANCE, FAMILLE_FRAICHEUR)
+                    )
+                else:
+                    constats.append(
+                        "[AVIS] acquisition NON DEMARREE : %s vaut 0 et aucune veille "
+                        "n'est comptee — fait de produit (aucune alerte emploi creee), "
+                        "pas une panne de collecte ; la premiere veille reelle armera "
+                        "le seuil de %d jour(s)"
+                        % (FAMILLE_FRAICHEUR, age_max_jours)
+                    )
             elif plus_recente > maintenant + TOLERANCE_HORLOGE:
                 erreurs.append(
                     "date d'acquisition DANS LE FUTUR (%s) : la jauge est ecrite de travers"

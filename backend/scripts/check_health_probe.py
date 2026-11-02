@@ -76,6 +76,18 @@ CHAMPS_LANGUES = (
     "portee",
 )
 
+# Les champs que le sous-bloc `pages` doit porter (02/11/2026). `total` a ete
+# RENOMME en `declarees` + `vivantes` le 01/11 : un champ nomme « total »
+# affirmait une egalite avec le sitemap que le sitemap servait fausse — il
+# AJOUTE une entree par fiche de mission ouverte et par profil public, lues en
+# base, donc 85 URL servies pour 80 declarees. La sonde lisait encore `total`
+# et a accuse la production d'une contradiction qui n'existait que chez elle,
+# du 01/11 au 02/11 : un jour de rouge, nomme par l'alerte des sondes sans que
+# la cause se lise. `backend/tests/test_health_probe.py` compare cette liste aux
+# cles REELLEMENT publiees par `kojo_sitemap_declaration.bloc_langues`, donc un
+# prochain renommage rougit au lieu de refaire la meme panne muette.
+CHAMPS_PAGES = ("multilingues", "monolingues", "declarees", "vivantes")
+
 
 def _origine(url: str) -> str:
     """Origine (scheme://host[:port]) d'une URL, sans chemin ni requête."""
@@ -274,13 +286,30 @@ def _verifier_langues(data: dict) -> list:
             "une langue sans document n'a pas d'URL a servir"
         )
 
-    pages = bloc.get("pages") or {}
-    if pages.get("total") != sum(int(nombre or 0) for nombre in urls.values()):
+    total_urls = sum(int(nombre or 0) for nombre in urls.values())
+    pages = bloc.get("pages")
+    if not isinstance(pages, dict):
         erreurs.append(
-            "/health se contredit : pages.total="
-            f"{pages.get('total')!r} mais urls_par_langue totalise "
-            f"{sum(int(nombre or 0) for nombre in urls.values())}"
+            "bloc 'langues' : 'pages' n'est pas un objet — le volume par famille "
+            f"n'est pas lisible (lu : {pages!r})"
         )
+    else:
+        manquants_pages = [champ for champ in CHAMPS_PAGES if champ not in pages]
+        if manquants_pages:
+            erreurs.append(
+                "bloc 'langues' : 'pages' ne porte pas "
+                + ", ".join(manquants_pages)
+                + " — un volume ampute ne se juge pas (champs attendus : "
+                + ", ".join(CHAMPS_PAGES)
+                + ")"
+            )
+        elif pages.get("declarees") != total_urls:
+            erreurs.append(
+                "/health se contredit : pages.declarees="
+                f"{pages.get('declarees')!r} mais urls_par_langue totalise "
+                f"{total_urls} — les deux decrivent le MEME ensemble de pages "
+                "declarees (les fiches et profils vivants sont hors de ce compte)"
+            )
 
     if not str(bloc.get("portee") or "").strip():
         erreurs.append(

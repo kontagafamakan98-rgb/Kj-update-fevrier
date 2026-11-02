@@ -1,0 +1,4 @@
+.venv/
+sortie/
+__pycache__/
+valeurs.json

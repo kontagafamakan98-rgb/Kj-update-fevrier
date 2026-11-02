@@ -1,0 +1,10 @@
+# Dépendances de l'outil de relecture — JAMAIS installées dans l'image de l'API.
+#
+# crewai tire chromadb, lancedb, opentelemetry, instructor et le SDK openai :
+# plusieurs centaines de Mo sur une machine Fly, pour une tâche qui tourne hors
+# ligne. `backend/requirements.txt` est audité par le job « Dépendances (avis de
+# sécurité) » et ne doit pas changer pour ça.
+#
+# Python : >= 3.10, < 3.14. Le Python système de ce poste est 3.14 et REFUSE le
+# paquet — d'où le venv en 3.11.
+crewai==1.15.33
