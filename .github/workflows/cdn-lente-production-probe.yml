@@ -71,10 +71,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node 20
+      # MESURÉ le 01/11/2026 : ce job était le SEUL du dépôt pinné en Node 20,
+      # alors que `frontend/package.json` déclare `engines.node >= 22.19.0`. Avec
+      # npm 10 (livré par Node 20), le pair OPTIONNEL `proxy-agent: >=8.0.1` de
+      # `@puppeteer/browsers` se résout vers 8.0.2 — et ses dépendances ne sont
+      # pas dans `frontend/package-lock.json`, qui porte la résolution de npm 11
+      # (`proxy-agent` 6.5.0). `npm ci` refusait donc le verrou
+      # (« Missing: pac-resolver@9.0.1 from lock file », etc.), le step de mesure
+      # n'a jamais tourné, et le rouge accusait un CDN qui n'avait pas été lu.
+      # La version suit désormais le moteur DÉCLARÉ par le paquet ; c'est aussi
+      # celle de tous les autres workflows, et Node 20 est déprécié sur les runners.
+      - name: Set up Node 24
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
