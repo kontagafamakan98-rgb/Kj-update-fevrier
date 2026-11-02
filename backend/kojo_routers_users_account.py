@@ -10,16 +10,27 @@ l'export est la contrepartie exacte de la cascade d'effacement.
 L'ordre des opérations de la suppression est critique et documenté sur
 l'endpoint (rembourser les fonds séquestrés AVANT d'anonymiser, refuser quand un
 remboursement a échoué) : il n'a pas bougé.
+
+DEUX PORTES, UNE SEULE CASCADE (02/11/2026). `DELETE /users/account` sert le
+titulaire (session en cours) ; `POST /owner/accounts/{id}/purge` sert le
+propriétaire, qui n'a pas la session d'un tiers et ne pouvait donc pas retirer
+un profil de test resté PUBLIC au sitemap. Les deux appellent
+`supprimer_compte_utilisateur` : une seule définition de ce qu'une suppression
+efface, donc un seul endroit à couvrir le jour où une collection s'ajoute.
 """
 import asyncio
 
 import uuid
+
+from typing import Optional
 
 from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from fastapi.responses import JSONResponse
+
+from pydantic import BaseModel, Field
 
 from kojo_core import db
 
@@ -32,7 +43,11 @@ from kojo_settings import logger
 # celle de l'index TTL et celle que publie PRIVACY.md.
 from kojo_retention import echeance_de_purge
 
-from kojo_core import get_current_user, sanitize_email
+from kojo_core import get_current_user, sanitize_email, verify_owner_access
+
+# La modération porte les bornes de motif et la définition de « propriétaire » :
+# la purge les LIT au lieu de recopier dix caractères et un test d'email.
+import kojo_comptes_admin as comptes
 
 from kojo_shared import nom_affiche, notify_user_localized, retirer_nom_des_notifications_tiers
 
@@ -178,9 +193,31 @@ CHAMPS_HORS_MODELE = frozenset({
     "wallet_verification",
 })
 
-@router.delete("/users/account")
-async def delete_my_account(current_user: User = Depends(get_current_user)):
-    """Supprime définitivement le compte de l'utilisateur connecté.
+def _identifiant_du_compte(compte) -> str:
+    """L'identifiant d'un compte, qu'il soit le modèle `User` ou un document.
+
+    La cascade ci-dessous est appelée par DEUX portes : la suppression
+    self-service (le modèle de la session) et la purge du propriétaire (le
+    document relu en base). Elle ne doit pas dépendre de la forme reçue, sinon
+    l'une des deux portes effacerait autre chose que ce qu'elle croit.
+    """
+    identifiant = compte.get("id") if isinstance(compte, dict) else getattr(compte, "id", None)
+    if not identifiant:
+        raise HTTPException(status_code=404, detail="Compte introuvable")
+    return identifiant
+
+
+async def supprimer_compte_utilisateur(current_user) -> dict:
+    """Supprime définitivement UN compte, quelle que soit la porte d'entrée.
+
+    Appelée par `DELETE /users/account` (le titulaire lui-même, via le modèle
+    de sa session) et par `POST /owner/accounts/{id}/purge` (le propriétaire,
+    sur le document relu). Une seule cascade, donc une seule définition de « ce
+    que la suppression efface » : deux copies auraient divergé au premier
+    ajout de collection, et l'une des deux aurait laissé des données derrière
+    elle sans que rien ne rougisse. La forme du compte (modèle `User` ou dict)
+    est acceptée par `_identifiant_du_compte` et `nom_affiche`, qui gèrent les
+    deux — c'est ce qui permet de partager le corps sans le réécrire.
 
     Ordre critique (audit RGPD) :
     1. Les fonds SÉQUESTRÉS (paiement `held` / `release_failed` /
@@ -219,7 +256,7 @@ async def delete_my_account(current_user: User = Depends(get_current_user)):
     Returns:
         dict: {message, deleted: true}.
     """
-    user_id = current_user.id
+    user_id = _identifiant_du_compte(current_user)
     now = datetime.now(timezone.utc)
 
     # ------------------------------------------------------------------
@@ -413,6 +450,106 @@ async def delete_my_account(current_user: User = Depends(get_current_user)):
 
     logger.info(f"✅ Compte supprimé (soft delete): {user_id}")
     return {"message": "Votre compte Kojo a été supprimé. Au revoir !", "deleted": True}
+
+
+@router.delete("/users/account")
+async def delete_my_account(current_user: User = Depends(get_current_user)):
+    """Supprime définitivement le compte de l'utilisateur connecté.
+
+    La cascade vit dans `supprimer_compte_utilisateur` : elle est PARTAGÉE avec
+    la purge du propriétaire, et c'est ce partage qui garantit qu'une même
+    suppression efface la même chose, quelle que soit la porte.
+
+    Returns:
+        dict: {message, deleted: true}.
+    """
+    return await supprimer_compte_utilisateur(current_user)
+
+
+class PurgeCompte(BaseModel):
+    """Corps de `POST /owner/accounts/{id}/purge`.
+
+    Le motif est EXIGÉ par la route (10 caractères au moins) : une suppression
+    définitive sans motif écrit laisse, six mois plus tard, un compte anonymisé
+    dont plus personne ne sait pourquoi il l'a été. La borne haute est celle des
+    autres décisions (`kojo_comptes_admin.MOTIF_MAXIMUM`).
+    """
+    motif: Optional[str] = Field(default=None, max_length=500)
+
+
+@router.post("/owner/accounts/{user_id}/purge")
+async def purge_owner_account(
+    user_id: str,
+    payload: PurgeCompte,
+    owner_user = Depends(verify_owner_access),
+):
+    """Supprimer DÉFINITIVEMENT un compte — PROPRIÉTAIRE UNIQUEMENT.
+
+    Ce que l'écran d'administration ne savait pas faire, et qui restait à faire
+    en base à la main : retirer un profil de test du site public. Les deux
+    sanctions (`restreint`, `banni`) laissent la page EN LIGNE ; seule celle-ci
+    efface.
+
+    La route vit ICI, à côté de la cascade qu'elle appelle, plutôt que dans le
+    routeur du propriétaire : elle n'ajoute rien à la modération, elle ouvre la
+    MÊME suppression à une seconde porte. Deux copies de la cascade auraient
+    divergé au premier ajout de collection — et c'est la copie oubliée qui
+    laisse des données personnelles en base après une suppression annoncée
+    comme totale.
+
+    Effets, dans l'ordre de la cascade : les fonds séquestrés sont remboursés
+    (ou la suppression est refusée en 409 si un remboursement/versement est en
+    vol), les données personnelles sont anonymisées, le profil travailleur et
+    les propositions sont supprimés, les missions du client sont annulées. Le
+    document garde `deleted: True`, ce qui le retire de la liste publique, du
+    sitemap et des compteurs de l'accueil.
+
+    Refus NOMMÉS, jamais réparés en silence :
+      * 400 — motif absent ou plus court que `MOTIF_MINIMUM` ;
+      * 404 — identifiant inconnu ;
+      * 409 — compte propriétaire (on ne se purge pas soi-même) ou compte déjà
+              supprimé (une seconde purge écraserait la date de la première).
+
+    Returns:
+        dict: {message, deleted, id} — `deleted` est RELU sur le retour de la
+        cascade, donc une cascade qui n'efface rien ne peut pas répondre
+        « supprimé ».
+    """
+    motif = (payload.motif or "").strip()
+    if len(motif) < comptes.MOTIF_MINIMUM:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Un motif d'au moins %d caractères est exigé pour supprimer "
+                "définitivement un compte." % comptes.MOTIF_MINIMUM
+            ),
+        )
+
+    compte = await db.users.find_one(
+        {**identifiant_query(user_id)}, {"password_hash": 0}
+    )
+    if not compte:
+        raise HTTPException(status_code=404, detail="Compte introuvable")
+    if comptes.est_le_proprietaire(compte):
+        raise HTTPException(
+            status_code=409,
+            detail="Le compte propriétaire ne se supprime pas lui-même.",
+        )
+    if compte.get("deleted") is True:
+        raise HTTPException(
+            status_code=409, detail="Ce compte est déjà supprimé.",
+        )
+
+    resultat = await supprimer_compte_utilisateur(compte)
+    logger.info(
+        "🧹 Compte %s purgé par le propriétaire (motif : %s)",
+        user_id, motif,
+    )
+    return {
+        "message": "Compte supprimé et anonymisé.",
+        "deleted": bool(resultat.get("deleted")),
+        "id": user_id,
+    }
 
 
 # ---------------------------------------------------------------------------
