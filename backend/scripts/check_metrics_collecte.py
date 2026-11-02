@@ -3,7 +3,7 @@
 """Sonde de COLLECTE des métriques Prometheus, en production.
 
 CE QU'ELLE FERME, ET LA MESURE QUI L'A OUVERTE (30/10/2026). `GET /metrics`
-publie six familles pour les veilles emploi : les quatre provenances
+publie sept familles pour les veilles emploi : les quatre provenances
 (`kojo_alertes_emploi{origine=…}`), le hors-vocabulaire, et la FRAÎCHEUR de
 l'acquisition (`kojo_alertes_emploi_plus_recente_timestamp_seconds`). Mesuré ce
 jour :
@@ -32,9 +32,10 @@ lit la réponse et juge quatre choses :
   1. la route est SERVIE et le jeton l'OUVRE (200 + exposition lisible). Un 401,
      un 503 et un 404 sont trois pannes DIFFÉRENTES : le remède n'est pas le
      même (poser le secret côté CI, le poser côté machine, corriger l'hôte) ;
-  2. les SIX familles de veilles sont présentes — une série absente se lit comme
-     une provenance qui n'existe pas, alors que c'est justement la question
-     posée par ces pages ;
+  2. les SEPT familles de veilles sont présentes — quatre provenances, le
+     hors-vocabulaire, la fraîcheur et sa mémoire — ; une série absente se lit
+     comme une provenance qui n'existe pas, alors que c'est justement la
+     question posée par ces pages ;
   3. toutes les lignes de l'exposition se lisent : un format cassé ne se voit
      pas sur les trois chiffres qu'on regarde à la main ;
   4. l'ÂGE de l'acquisition (`time() - plus_recente`) est sous le seuil que
@@ -43,15 +44,22 @@ lit la réponse et juge quatre choses :
 LA RÈGLE TRIPLE DE LA FRAÎCHEUR (02/11/2026). Trois états, trois verdicts,
 parce que trois situations différentes se lisent dans la même valeur :
 
-  * `0` — AUCUNE veille datée — est un AVIS (sortie 0), plus un refus. Mesuré le
-    02/11/2026 : `kojo_missions_ouvertes` = 0, `completed_jobs` = 0, et la jauge
-    vaut 0 depuis toujours. Ce n'est pas une panne de COLLECTE (le jeton ouvre,
-    les six familles se lisent), c'est un FAIT DE PRODUIT : aucune alerte emploi
+  * `0` sur la fraîcheur **et** `0` sur la mémoire — AUCUNE veille n'a jamais
+    été créée — est un AVIS (sortie 0), plus un refus. Mesuré le 02/11/2026 :
+    `kojo_missions_ouvertes` = 0, `completed_jobs` = 0, et la jauge vaut 0
+    depuis toujours. Ce n'est pas une panne de COLLECTE (le jeton ouvre, les
+    sept familles se lisent), c'est un FAIT DE PRODUIT : aucune alerte emploi
     n'a encore été créée, donc il n'y a rien à dater. Un refus permanent sur un
     corpus vide apprend à ignorer les rouges — et c'est précisément le défaut
     que ce dépôt combat partout ailleurs (un vert qu'on ne lit pas vaut une
     alerte qu'on ignore). L'avis est PUBLIÉ, avec la phrase qui dit que la règle
     s'armera d'elle-même : la première veille réelle rend le seuil jugeable.
+  * « PLUS JAMAIS » — `0` sur la fraîcheur, mais une MÉMOIRE non nulle
+    (`kojo_alertes_emploi_premiere_timestamp_seconds`, la date de la première
+    veille jamais créée, gardée hors du corpus) — est un REFUS (1) : une veille
+    a existé, le corpus est vide aujourd'hui. C'est la différence entre un
+    produit qui n'a pas commencé et une acquisition qui s'est ARRÊTÉE, et elle
+    n'était pas mesurable tant que l'unique jauge lisait le corpus vivant.
   * une date dans le FUTUR, ou un âge au-delà du seuil — un REFUS nommé (1),
     inchangé : là, quelque chose a été écrit ou a cessé de l'être.
   * la CONTRADICTION : des veilles COMPTÉES (`kojo_alertes_emploi{…}` > 0) avec
@@ -100,6 +108,13 @@ NOM_DU_SECRET = "METRICS_TOKEN"
 FAMILLE_PROVENANCE = "kojo_alertes_emploi"
 FAMILLE_HORS_VOCABULAIRE = "kojo_alertes_emploi_hors_vocabulaire"
 FAMILLE_FRAICHEUR = "kojo_alertes_emploi_plus_recente_timestamp_seconds"
+# La MEMOIRE de l'acquisition (02/11/2026) : la date de la PREMIERE veille
+# jamais creee, gardee hors du corpus par `kojo_job_alerts` (document
+# `metrics_etat`). Sans elle, `FAMILLE_FRAICHEUR = 0` se lisait « aucune veille
+# n'a jamais existe » dans les deux cas qui n'ont rien a voir : un produit qui
+# n'a pas commence (fait) et un corpus VIDE par suppression
+# (incident). La sonde exige donc les DEUX series et les confronte.
+FAMILLE_PREMIERE = "kojo_alertes_emploi_premiere_timestamp_seconds"
 
 # Les quatre étiquettes DÉCLARÉES par le module propriétaire
 # (`kojo_job_alerts.ORIGINES_COMPTEES`, dérivées de `ORIGINES_ALERTE` +
@@ -315,25 +330,33 @@ def verifier(
         else:
             constats.append("[OK] hors vocabulaire : %g" % hors[0][1])
 
-    # ── La FRAICHEUR de l'acquisition ──────────────────────────────────────
+    # ── La FRAICHEUR de l'acquisition, et sa MEMOIRE ───────────────────────
     if statut == 200 and series:
         valeurs = [valeur for _, valeur in series.get(FAMILLE_FRAICHEUR) or []]
+        memoires = [valeur for _, valeur in series.get(FAMILLE_PREMIERE) or []]
         if not valeurs:
             erreurs.append(
                 "famille ABSENTE : %s — l'acquisition ne se mesure plus dans le temps"
                 % FAMILLE_FRAICHEUR
             )
+        elif not memoires:
+            # Sans la memoire, un corpus vide se lirait « jamais » dans les deux
+            # cas. Son absence n'est donc pas un detail : c'est une revision
+            # anterieure, et le remede est un redeploiement.
+            erreurs.append(
+                "famille ABSENTE : %s — sans elle, un corpus vide se lit « jamais » "
+                "meme quand des veilles ont existe puis disparu ; la revision "
+                "deployee est anterieure a cette jauge, redeployer"
+                % FAMILLE_PREMIERE
+            )
         else:
             plus_recente = valeurs[0]
+            premiere = memoires[0]
+            comptees = sum(
+                int(valeur or 0) for _, valeur in series.get(FAMILLE_PROVENANCE) or []
+            )
             if plus_recente <= 0:
-                # AVIS, plus un refus (02/11/2026) : le corpus de veilles est
-                # VIDE (0 mission ouverte, 0 alerte creee), donc la collecte
-                # n'a rien a dater. Un rouge permanent sur ce cas apprend a
-                # ignorer les rouges ; la CONTRADICTION ci-dessous, elle, reste
-                # un refus, parce qu'elle dit qu'un chiffre ment.
-                comptees = sum(
-                    int(valeur or 0) for _, valeur in series.get(FAMILLE_PROVENANCE) or []
-                )
+                # TROIS zeros differents, trois verdicts (02 et 02/11/2026).
                 if comptees > 0:
                     erreurs.append(
                         "CONTRADICTION : %d veille(s) comptee(s) dans %s{...} mais "
@@ -341,14 +364,33 @@ def verifier(
                         "jauge dit qu'aucune n'est datee"
                         % (comptees, FAMILLE_PROVENANCE, FAMILLE_FRAICHEUR)
                     )
+                elif premiere > 0:
+                    # PLUS JAMAIS : la memoire prouve qu'une veille a existe.
+                    erreurs.append(
+                        "acquisition PLUS JAMAIS : aucune veille datee, alors qu'une "
+                        "veille a deja existe (premiere creation le %s) — le corpus a "
+                        "ete VIDE, ce n'est pas un produit qui n'a jamais commence"
+                        % datetime.fromtimestamp(premiere, timezone.utc).isoformat()
+                    )
                 else:
                     constats.append(
-                        "[AVIS] acquisition NON DEMARREE : %s vaut 0 et aucune veille "
-                        "n'est comptee — fait de produit (aucune alerte emploi creee), "
-                        "pas une panne de collecte ; la premiere veille reelle armera "
-                        "le seuil de %d jour(s)"
-                        % (FAMILLE_FRAICHEUR, age_max_jours)
+                        "[AVIS] acquisition NON DEMARREE : %s vaut 0, aucune veille "
+                        "n'est comptee et %s vaut 0 (aucune veille n'a JAMAIS ete "
+                        "creee) — fait de produit, pas une panne de collecte ; la "
+                        "premiere veille reelle armera le seuil de %d jour(s)"
+                        % (FAMILLE_FRAICHEUR, FAMILLE_PREMIERE, age_max_jours)
                     )
+            elif premiere > plus_recente + TOLERANCE_HORLOGE:
+                erreurs.append(
+                    "CONTRADICTION : %s (%s) est POSTERIEURE a %s (%s) — la premiere "
+                    "veille ne peut pas etre plus recente que la derniere"
+                    % (
+                        FAMILLE_PREMIERE,
+                        datetime.fromtimestamp(premiere, timezone.utc).isoformat(),
+                        FAMILLE_FRAICHEUR,
+                        datetime.fromtimestamp(plus_recente, timezone.utc).isoformat(),
+                    )
+                )
             elif plus_recente > maintenant + TOLERANCE_HORLOGE:
                 erreurs.append(
                     "date d'acquisition DANS LE FUTUR (%s) : la jauge est ecrite de travers"

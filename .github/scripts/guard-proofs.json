@@ -1278,6 +1278,14 @@
       "invoque_par": "ci",
       "preuve": "frontend/scripts/__tests__/check-taille-sources.test.js",
       "runner": "vitest"
+    },
+    {
+      "chemin": "backend/kojo_job_alerts.py",
+      "role": "garde",
+      "invoque_par": "test",
+      "preuve": "backend/tests/test_metrics_prometheus.py",
+      "runner": "pytest",
+      "motif": "la MEMOIRE de l'acquisition des veilles emploi : un document unique (`metrics_etat`, `_id: alertes_emploi`) garde la date de la PREMIERE veille jamais creee, posee par `$setOnInsert` a la creation et jamais deplacee ensuite. Sans elle, la jauge de fraicheur valait 0 dans deux situations que rien ne rapproche : aucune veille n'a jamais existe (le produit n'a pas commence, et un rouge permanent y apprend a ignorer les rouges) et des veilles ont existe puis ont disparu (corpus vide par suppression de compte, donc une acquisition qui s'est ARRETEE). Elle est lue au meme scrape que les compteurs, HORS du corpus — donc elle survit a sa disparition —, et une lecture en panne remonte au lieu de valoir 0 : un zero invente dirait « jamais » sur une base en panne."
     }
   ],
   "rejeux": [
@@ -7301,6 +7309,69 @@
       "cwd": "frontend",
       "attend": [
         "refuse un fichier AU-DESSUS du plafond par défaut"
+      ]
+    },
+    {
+      "id": "sante: le sitemap servi n'est plus confronte a son propre volume",
+      "garde": "backend/scripts/check_health_probe.py",
+      "cible": "backend/scripts/check_health_probe.py",
+      "trouve": "    if locs != total:",
+      "remplace": "    if locs != total and False:  # mutation declaree",
+      "runner": "python",
+      "preuve": "backend/tests/test_health_probe.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_health_probe.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_health_probe.py::TestLeVolumeServiConfronteLaDeclaration::test_un_corps_qui_ne_porte_pas_le_volume_annonce_est_refuse"
+      ]
+    },
+    {
+      "id": "collecte: une acquisition arretee se lit comme un produit jamais demarre",
+      "garde": "backend/scripts/check_metrics_collecte.py",
+      "cible": "backend/scripts/check_metrics_collecte.py",
+      "trouve": "                elif premiere > 0:",
+      "remplace": "                elif premiere > 0 and False:  # mutation declaree",
+      "runner": "python",
+      "preuve": "backend/tests/test_metrics_collecte.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_metrics_collecte.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_metrics_collecte.py::TestLaFraicheurDeLAcquisition::test_un_corpus_vide_apres_une_vraie_veille_est_un_refus"
+      ]
+    },
+    {
+      "id": "veille: la memoire d'acquisition se reecrit a chaque reglage",
+      "garde": "backend/kojo_job_alerts.py",
+      "cible": "backend/kojo_job_alerts.py",
+      "trouve": "            {\"$setOnInsert\": {\"premiere_creation_at\": instant}},",
+      "remplace": "            {\"$set\": {\"premiere_creation_at\": instant}},  # mutation declaree",
+      "runner": "python",
+      "preuve": "backend/tests/test_metrics_prometheus.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_metrics_prometheus.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_metrics_prometheus.py::TestProvenanceDesAlertesEmploi::test_une_veille_creee_pose_la_memoire_de_l_acquisition"
       ]
     }
   ]

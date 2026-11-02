@@ -117,7 +117,7 @@ s'authentifie avec le jeton, lit l'exposition et juge la chaîne entière.
 
 | Situation | Verdict |
 |---|---|
-| 200, six familles présentes, acquisition de moins de 30 jours | **0** conforme |
+| 200, sept familles présentes, acquisition de moins de 30 jours | **0** conforme |
 | aucun secret `METRICS_TOKEN` côté CI | **1** — « AUCUN COLLECTEUR », avec le remède |
 | 401 / 503 / 404 | **1**, nommé : jeton refusé / route fermée / mauvais hôte |
 | une provenance, le hors-vocabulaire ou la fraîcheur absents | **1**, la famille est NOMMÉE |
@@ -127,7 +127,7 @@ s'authentifie avec le jeton, lit l'exposition et juge la chaîne entière.
 | date future, ou âge au-delà du seuil | **1**, nommé avec l'âge |
 | transport injoignable ou URL inutilisable | **2** prémisse — jamais un vert |
 
-**La règle triple de la fraîcheur (02/11/2026).** Mesuré ce jour :
+**Les quatre verdicts de la fraîcheur (02/11/2026).** Mesuré ce jour :
 `kojo_missions_ouvertes = "0"`, `completed_jobs = "0"`, `reviews = "0"` et
 `kojo_alertes_emploi_plus_recente_timestamp_seconds = 0` — aucun deliver, aucune
 veille, donc rien à dater. La sonde rendait **1** (« acquisition JAMAIS
@@ -136,7 +136,7 @@ c'est-à-dire un rouge qu'on apprend à ignorer. Trois verdicts désormais, parc
 que trois situations se cachent derrière la même valeur :
 
 - **`0`, aucune veille comptée ⇒ avis (0)**. La collecte fonctionne (le jeton
-  ouvre, les six familles se lisent) et le produit n'a rien daté. L'avis est
+  ouvre, les sept familles se lisent) et le produit n'a rien daté. L'avis est
   publié, avec le motif, et il annonce que le seuil s'armera de lui-même : la
   première veille réelle le rend jugeable sans changer une ligne ;
 - **date future, ou âge au-delà de 30 jours ⇒ refus (1)**. Là, quelque chose a
@@ -144,7 +144,20 @@ que trois situations se cachent derrière la même valeur :
 - **veilles comptées, aucune datée ⇒ refus (1)**. Les quatre compteurs de
   provenance ne peuvent pas totaliser sans qu'une date existe : l'un des deux
   chiffres est faux, et c'est le cas qu'un simple « 0 = avis » laisserait
-  passer.
+  passer ;
+- **`0` mais une mémoire non nulle ⇒ refus (1), « PLUS JAMAIS »**. La mémoire
+  (`kojo_alertes_emploi_premiere_timestamp_seconds`) prouve qu'une veille a
+  existé : le corpus est vide aujourd'hui, donc l'acquisition s'est ARRÊTÉE —
+  ce n'est pas un produit qui n'a pas commencé. La sonde nomme la date de la
+  première création ;
+- **mémoire postérieure à la dernière veille ⇒ refus (1)**. La première veille
+  ne peut pas être plus récente que la dernière : la mémoire a été écrite de
+  travers.
+
+La mémoire est un DOCUMENT À PART (`metrics_etat`, `_id: alertes_emploi`),
+relu au même scrape que les compteurs, avec la même règle : une lecture en
+panne OMET la famille au lieu d'inventer un zéro, et la sonde refuse alors en
+nommant la famille absente plutôt que de conclure « jamais ».
 
 Deux secrets, et les DEUX sont nécessaires :
 
@@ -264,6 +277,7 @@ redémarrage.
 | `kojo_alertes_emploi{origine="ville\|metier\|directe\|inconnue"}` | gauge | Veilles emploi actives par provenance. Les quatre séries sont **toujours** publiées, zéro compris : une série qui disparaîtrait à zéro se lirait comme une provenance qui n'existe pas |
 | `kojo_alertes_emploi_hors_vocabulaire` | gauge | Veilles dont `origin` n'appartient pas au vocabulaire déclaré (`ORIGINES_ALERTE` + `inconnue`). Comptées **à part**, jamais repliées dans `inconnue` : ce serait faire passer une donnée écrite de travers pour une absence |
 | `kojo_alertes_emploi_plus_recente_timestamp_seconds` | gauge | Date de création de la veille la plus récente, en secondes epoch. **0 = aucune veille datée** (jamais « maintenant »). L'âge se lit `time() - valeur` : c'est lui qui distingue une acquisition qui **tarit** d'un total stable |
+| `kojo_alertes_emploi_premiere_timestamp_seconds` | gauge | Date de la **première veille jamais créée**, gardée hors du corpus (document `metrics_etat`, posé par `$setOnInsert`, il ne bouge plus). **0 = aucune veille n'a jamais existé**. C'est elle qui distingue « jamais » (produit qui n'a pas commencé) de « plus jamais » (corpus vidé, acquisition arrêtée) : sans elle, les deux situations rendent le même `0` sur la jauge de fraîcheur |
 
 Les trois familles de veilles viennent aussi de la BASE, lues par la route dans la
 même passe que le corpus : `kojo_job_alerts.compter_par_origine()` lit `origin` et

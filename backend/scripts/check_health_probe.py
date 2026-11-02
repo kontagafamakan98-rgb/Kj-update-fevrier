@@ -28,8 +28,18 @@ Vérifie :
    langues indexées et, pour chacune, le nombre de documents que le sitemap
    publie — la question que la sonde `hreflang` met 61 requêtes et 11 s à
    trancher. Un bloc absent est un refus nommé (révision antérieure), un volume
-   qui ne tombe pas juste aussi. Ce qu'elle ne dit pas : le `lang`, le
-   `canonical` et la réciprocité des documents SERVIES restent à la sonde.
+   qui ne tombe pas juste aussi.
+9. LE VOLUME SERVI (02/11/2026) : le bloc `langues` est une DÉCLARATION, et
+   rien ne disait qu'un artefact SERVI la portait. La sonde demande donc
+   `GET /api/sitemap.xml` — une requête — et confronte ses trois en-têtes
+   (`X-Kojo-Urls`, `-Declarees`, `-Vivantes`) ET le nombre de `<loc>` réellement
+   écrits à `pages.declarees` de `/health`. Un sitemap illisible, un en-tête
+   absent (révision antérieure) ou un corps qui ne porte pas le volume annoncé
+   sont trois refus nommés. Ce qu'elle ne dit toujours pas, et qui garde son
+   propriétaire : le `lang`, le `canonical` et la réciprocité des 60 documents
+   HTML se lisent dans `frontend/scripts/check-hreflang-production.js`, un cron
+   que la MÊME alerte des sondes relève — ici on juge le VOLUME, là où il est
+   écrit.
 
 Les deux moniteurs sont dérivés de l'origine de `--url`, donc un seul drapeau
 suffit ; ils vivent hors `/api` comme `/health`.
@@ -48,6 +58,10 @@ import urllib.error
 DEFAULT_HEALTH_URL = "https://api.kojoforafrica.cc.cd/health"
 CHEMIN_MONITEUR_EMAIL = "/monitor/email"
 CHEMIN_MONITEUR_COMPOSITE = "/monitor"
+# Le sitemap est le SEUL artefact SERVI qui publie le volume des pages ; les
+# trois en-tetes viennent de `kojo_routers_public` (GET /api/sitemap.xml).
+CHEMIN_SITEMAP = "/api/sitemap.xml"
+ENTETES_SITEMAP = ("X-Kojo-Urls", "X-Kojo-Urls-Declarees", "X-Kojo-Urls-Vivantes")
 AGENT = "KojoHealthMonitor/1.0"
 
 # Les champs que le bloc `paiement` doit porter pour qu'un diagnostic soit
@@ -326,6 +340,114 @@ def _verifier_langues(data: dict) -> list:
     return erreurs
 
 
+def _entete(headers, nom: str):
+    """Une en-tete HTTP, quelle que soit la casse rendue par le client."""
+    try:
+        valeur = headers.get(nom)
+        if valeur is None:
+            valeur = headers.get(nom.lower())
+        return valeur
+    except Exception:  # noqa: BLE001 - un objet d'en-tetes inattendu ne juge pas
+        return None
+
+
+def _lire_sitemap(origine: str, timeout: int):
+    """Lit le sitemap servi : `(entetes, nombre de <loc>, statut, erreur)`."""
+    url = _url_de(origine, CHEMIN_SITEMAP)
+    req = urllib.request.Request(
+        url, headers={"User-Agent": AGENT, "Accept": "application/xml"}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            statut = response.status
+            corps = response.read()
+            entetes = {nom: _entete(response.headers, nom) for nom in ENTETES_SITEMAP}
+    except urllib.error.HTTPError as e:
+        return {}, 0, e.code, "HTTP %d sur %s" % (e.code, CHEMIN_SITEMAP)
+    except urllib.error.URLError as e:
+        return {}, 0, None, "injoignable : %s" % (e.reason,)
+    except Exception as e:  # noqa: BLE001 - une lecture qui casse reste une lecture
+        return {}, 0, None, str(e)
+    if statut != 200:
+        return {}, 0, statut, "HTTP %d inattendu sur %s" % (statut, CHEMIN_SITEMAP)
+    return entetes, corps.count(b"<loc>"), statut, ""
+
+
+def _verifier_sitemap(origine: str, data: dict, timeout: int) -> list:
+    """Le sitemap SERVI confronte le volume DECLARE par `/health`.
+
+    CE QU'IL FERME (02/11/2026). Le bloc `langues` est une DÉCLARATION : la sonde
+    verifiait son arithmetique interne, jamais qu'un artefact servi la portait.
+    Un backend en retard sur le frontend, ou un sitemap qui annonce un volume
+    que son corps ne contient pas, restait donc invisible ici. Une requete suffit
+    a confronter les TROIS chiffres servis (`X-Kojo-Urls*`) et le nombre de
+    `<loc>` reellement ecrits a `pages.declarees`.
+
+    Ce que cette confrontation ne fait PAS, et qui garde son proprietaire : le
+    `lang`, le `canonical` et la reciprocite des `hreflang` des 60 documents
+    servis se lisent dans `frontend/scripts/check-hreflang-production.js`, un
+    cron que la MEME alerte des sondes releve. Ici on juge le VOLUME servi, la
+    ou ce volume est ecrit.
+    """
+    bloc = data.get("langues")
+    pages = (bloc.get("pages") or {}) if isinstance(bloc, dict) else {}
+    declarees = pages.get("declarees") if isinstance(pages, dict) else None
+
+    entetes, locs, _statut, erreur = _lire_sitemap(origine, timeout)
+    if erreur:
+        return [
+            "sitemap %s illisible (%s) : le volume declare par /health n'a pas ete "
+            "confronte a l'artefact servi" % (CHEMIN_SITEMAP, erreur)
+        ]
+
+    manquantes = [
+        nom for nom in ENTETES_SITEMAP if not str(entetes.get(nom) or "").strip()
+    ]
+    if manquantes:
+        return [
+            "sitemap : en-tete(s) %s absent(s) — la revision servie est anterieure "
+            "au volume publie par GET %s, redeployer"
+            % (", ".join(manquantes), CHEMIN_SITEMAP)
+        ]
+
+    try:
+        total = int(entetes["X-Kojo-Urls"])
+        declarees_servies = int(entetes["X-Kojo-Urls-Declarees"])
+        vivantes = int(entetes["X-Kojo-Urls-Vivantes"])
+    except (TypeError, ValueError):
+        return [
+            "sitemap : en-tetes X-Kojo-Urls* non numeriques (%r) — le volume servi "
+            "n'est pas lisible"
+            % (entetes,)
+        ]
+
+    erreurs = []
+    if declarees is not None and declarees_servies != declarees:
+        erreurs.append(
+            "sitemap : X-Kojo-Urls-Declarees=%d mais /health declare %s page(s) — "
+            "la declaration et l'artefact servi ne decrivent pas le meme ensemble"
+            % (declarees_servies, declarees)
+        )
+    if total != declarees_servies + vivantes:
+        erreurs.append(
+            "sitemap : X-Kojo-Urls=%d alors que declarees (%d) + vivantes (%d) = %d "
+            "— le volume servi est incoherent"
+            % (total, declarees_servies, vivantes, declarees_servies + vivantes)
+        )
+    if locs != total:
+        erreurs.append(
+            "sitemap : %d <loc> servis pour X-Kojo-Urls=%d — l'en-tete annonce un "
+            "volume que le corps ne porte pas" % (locs, total)
+        )
+
+    if not erreurs:
+        print(
+            "[OK] Sitemap servi : %d URL dont %d vivante(s) — concorde avec les %s "
+            "page(s) declarees par /health" % (locs, vivantes, declarees)
+        )
+    return erreurs
+
+
 def _verifier_paiement(data: dict, paydunya_composite=None) -> list:
     """Le bloc `paiement` de /health : TROIS états, pas deux.
 
@@ -509,6 +631,10 @@ def check_health(url: str, timeout: int = 15) -> int:
     #    documents chacune — la question que la sonde hreflang met 11 s et 61
     #    requêtes à trancher sur les documents servis.
     errors.extend(_verifier_langues(data))
+    # 6. LE VOLUME SERVI (02/11/2026) : le bloc `langues` est une declaration, et
+    #    rien ne disait qu'un artefact SERVI la portait. Une requete au sitemap
+    #    confronte ses en-tetes et ses <loc> a `pages.declarees`.
+    errors.extend(_verifier_sitemap(origine, data, timeout))
 
     if errors:
         print("\n[ERREUR] ANOMALIES DETECTEES SUR LA PRODUCTION :")

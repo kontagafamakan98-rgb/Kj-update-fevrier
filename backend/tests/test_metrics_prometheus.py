@@ -572,6 +572,70 @@ class TestProvenanceDesAlertesEmploi:
         assert series["inconnue"] == "0"
         assert _valeur(texte, "kojo_alertes_emploi_hors_vocabulaire") == "1"
 
+    async def test_une_veille_creee_pose_la_memoire_de_l_acquisition(
+        self, client: AsyncClient, monkeypatch
+    ):
+        """La mémoire naît AVEC la première veille, et ne bouge plus ensuite.
+
+        C'est elle qui distingue « jamais » de « plus jamais » : sans une écriture
+        au moment de la création, un corpus vidé plus tard ne laisserait aucune
+        trace qu'une acquisition a existé.
+        """
+        monkeypatch.setattr(kojo_metrics, "METRICS_TOKEN", JETON)
+        from kojo_core import db
+        from kojo_job_alerts import enregistrer
+
+        await enregistrer("u-memoire", "a@kojo.test", {"category": "plumbing"})
+        premiere = await db["metrics_etat"].find_one({"_id": "alertes_emploi"})
+        assert premiere is not None, "la création d'une veille doit poser la mémoire"
+        posee = premiere.get("premiere_creation_at")
+        assert posee is not None
+
+        # Un SECOND réglage (autre critère, plus tard) ne déplace pas la date :
+        # c'est la première acquisition qui compte, pas la dernière visite.
+        await enregistrer("u-memoire", "a@kojo.test", {"city": "Bamako"})
+        inchangee = await db["metrics_etat"].find_one({"_id": "alertes_emploi"})
+        assert inchangee.get("premiere_creation_at") == posee
+
+        texte = await _lire(client, ENTETE)
+        assert _valeur(texte, "kojo_alertes_emploi_premiere_timestamp_seconds") not in (
+            None,
+            "0",
+        )
+
+    async def test_un_corpus_vide_garde_la_date_de_la_premiere_veille(
+        self, client: AsyncClient, monkeypatch
+    ):
+        """Le corpus est vide, la mémoire survit : deux zéros ne se confondent plus."""
+        monkeypatch.setattr(kojo_metrics, "METRICS_TOKEN", JETON)
+        from tests.conftest import db_insert
+
+        await db_insert("metrics_etat", {
+            "_id": "alertes_emploi",
+            "premiere_creation_at": "2026-10-01T07:00:00+00:00",
+        })
+
+        texte = await _lire(client, ENTETE)
+
+        assert _valeur(texte, "kojo_alertes_emploi_plus_recente_timestamp_seconds") == "0"
+        attendu = int(
+            datetime(2026, 10, 1, 7, 0, tzinfo=timezone.utc).timestamp()
+        )
+        assert _valeur(texte, "kojo_alertes_emploi_premiere_timestamp_seconds") == str(
+            attendu
+        )
+
+    async def test_sans_memoire_ni_veille_les_deux_jauges_valent_jamais(
+        self, client: AsyncClient, monkeypatch
+    ):
+        """Produit qui n'a pas commencé : les DEUX restent à 0, et c'est dit."""
+        monkeypatch.setattr(kojo_metrics, "METRICS_TOKEN", JETON)
+
+        texte = await _lire(client, ENTETE)
+
+        assert _valeur(texte, "kojo_alertes_emploi_plus_recente_timestamp_seconds") == "0"
+        assert _valeur(texte, "kojo_alertes_emploi_premiere_timestamp_seconds") == "0"
+
     async def test_la_date_publiee_est_celle_de_l_acquisition_la_plus_recente(
         self, client: AsyncClient, monkeypatch
     ):
