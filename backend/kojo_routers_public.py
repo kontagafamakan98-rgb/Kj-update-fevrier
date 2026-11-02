@@ -940,12 +940,28 @@ async def get_sitemap_xml():
 
     lines.append("</urlset>")
     body = "\n".join(lines)
+    # Le VOLUME SERVI, decompose en ce que la DECLARATION compte et ce que la
+    # BASE ajoute. Mesure du 02/11/2026 : `/health` declarait 80 pages et ce
+    # sitemap en servait 85 (quatre profils travailleur, une fiche de mission),
+    # sans qu'aucun champ ne dise d'ou venait l'ecart — un lecteur ne pouvait
+    # pas distinguer une famille non declaree d'une dette. Ces trois en-tetes
+    # rendent l'ecart LISIBLE et BORNE ; `tests/test_langues_health.py` les
+    # confronte au bloc `langues` de /health ET aux `<loc>` reellement servis.
+    # Une fiche est `/jobs/<id>`, un profil `/workers/<id>` ; `/jobs` (la liste)
+    # n'a pas de barre oblique finale et n'entre donc pas dans `vivantes`.
+    total_servi = sum(1 for ligne in lines if "<loc>" in ligne)
+    vivantes = sum(1 for ligne in lines if "/jobs/" in ligne or "/workers/" in ligne)
     # Cache court : les missions changent peu souvent, mais une fiche peut
     # être clôturée — on ne sert jamais une photo de plus de 1h.
     return Response(
         content=body,
         media_type="application/xml",
-        headers={"Cache-Control": "public, max-age=3600, s-maxage=3600"},
+        headers={
+            "Cache-Control": "public, max-age=3600, s-maxage=3600",
+            "X-Kojo-Urls": str(total_servi),
+            "X-Kojo-Urls-Declarees": str(total_servi - vivantes),
+            "X-Kojo-Urls-Vivantes": str(vivantes),
+        },
     )
 
 
