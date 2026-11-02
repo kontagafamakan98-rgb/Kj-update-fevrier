@@ -320,6 +320,53 @@ minimal, et la MÊME règle de comptage est lue par
 dit lui-même au propriétaire (`MARCHE_VIDE_ALERTE_HEURES`) une fois par
 épisode — un tableau de bord qui ne se consulte pas ne corrige rien.
 
+### Cache des pages ville/métier/guide (02/11/2026)
+
+| Série | Type | Sens |
+|---|---|---|
+| `kojo_pages_cache_rejeux_total` | counter | Pages servies par le cache mémoire, **sans** lecture Mongo ni rendu Python |
+| `kojo_pages_cache_rendus_total` | counter | Pages RENDUES (cache vide ou expiré) |
+| `kojo_pages_cache_entrees` | gauge | Documents gardés en mémoire maintenant (plafond 96) |
+
+Mesure du 02/11/2026 qui a motivé ce cache : `/emplois/bamako` coûtait 0,5 s de
+rendu côté Fly et 0,67 s à travers Vercel, avec `X-Vercel-Cache: MISS` à CHAQUE
+appel — le CDN ne met pas en cache une réécriture vers une origine externe,
+malgré le `s-maxage=1800` déjà envoyé. Le document est donc gardé 60 s en
+mémoire (`kojo_pages_cache`), un délai plus court que le `max-age=300` que le
+navigateur applique déjà. Chaque réponse porte `X-Kojo-Pages-Cache: frais|rejoue`.
+
+Les deux compteurs existent séparément parce qu'un cache qui ne sert jamais
+rien passerait sinon pour un cache qui marche : `rejeux_total` qui reste à zéro
+alors que `rendus_total` monte dit que le TTL est plus court que le trafic, pas
+que le cache fonctionne.
+
+### Erreurs non rattrapées (02/11/2026)
+
+| Série | Type | Sens |
+|---|---|---|
+| `kojo_erreurs_serveur_total` | counter | Exceptions non rattrapées depuis le démarrage de ce process. **0 = aucune erreur depuis ce démarrage**, jamais « depuis toujours » — `/health` publie `depuis` et `portee` pour que la durée se lise |
+| `kojo_erreurs_serveur_derniere_timestamp_seconds` | gauge | Date de la dernière exception non rattrapée, en secondes epoch. **0 = aucune** |
+
+Ces deux séries viennent de `kojo_erreurs`, qui compte une seule chose : une
+exception qui **traverse** le serveur sans être rattrapée, donc un 500 que
+Starlette fabrique parce que le code a levé. Les 5xx **déclarés** ne sont pas
+comptés — le 503 de `/monitor`, un refus de capacité, une base indisponible
+annoncée disent un ÉTAT, pas un échec, et les compter ferait rougir une alerte
+pour un fait déjà publié ailleurs : « le serveur a échoué » et « le serveur a
+répondu non » ne demandent pas le même remède.
+
+`/health` publie le MÊME état sous `erreurs` (`state`, `total`, `derniere_at`,
+`classe`, `famille`, `classes`, `depuis`, `portee`), et
+`backend/scripts/check_health_probe.py` le juge : une seule exception est un
+refus **nommé** (classe, famille de route, date), parce qu'elle a rendu 500 à un
+visiteur. Le message de l'exception n'est publié nulle part : `/health` est une
+réponse PUBLIQUE, et un message recopie volontiers un e-mail ou un jeton — la
+sonde dit donc quoi chercher dans le journal Fly.
+
+Alerte type : `increase(kojo_erreurs_serveur_total[15m]) > 0` (une exception
+arrivée depuis le dernier quart d'heure), et la sonde de santé couvre le cas
+où Prometheus n'est pas branché.
+
 ## Ce que ces chiffres ne disent pas
 
 - **Ils sont par PROCESS.** Un scrape ne voit que le process qui répond. Le

@@ -102,6 +102,22 @@ CHAMPS_LANGUES = (
 # prochain renommage rougit au lieu de refaire la meme panne muette.
 CHAMPS_PAGES = ("multilingues", "monolingues", "declarees", "vivantes")
 
+# Les champs que le bloc `erreurs` doit porter (02/11/2026). Meme regle que
+# ci-dessus : un bloc ampute se refuse en nommant ce qui manque, il ne se juge
+# pas a moitie. `backend/tests/test_health_probe.py` compare cette liste aux
+# cles REELLEMENT publiees par `kojo_erreurs.diagnostic`, donc un renommage
+# rougit au lieu de refaire la panne muette du 01/11 au 02/11.
+CHAMPS_ERREURS = (
+    "state",
+    "total",
+    "derniere_at",
+    "classe",
+    "famille",
+    "classes",
+    "depuis",
+    "portee",
+)
+
 
 def _origine(url: str) -> str:
     """Origine (scheme://host[:port]) d'une URL, sans chemin ni requête."""
@@ -448,6 +464,92 @@ def _verifier_sitemap(origine: str, data: dict, timeout: int) -> list:
     return erreurs
 
 
+def _verifier_erreurs(data: dict) -> list:
+    """Le bloc `erreurs` de /health : ce qui a cassé, et quand (02/11/2026).
+
+    CE QU'IL FERME. `sentry: inactif` disait qu'une exception non rattrapée ne
+    remontait nulle part — le site pouvait rendre 500 toute une journée sans
+    qu'aucune sonde ne le voie, puisque les sondes demandent les routes qui
+    répondent. Le bloc publie le compte du PROCESS, et cette sonde le juge :
+
+      * bloc absent → refus nommé (révision antérieure au 02/11/2026, à
+        redéployer) ;
+      * `portee` vide → refus : un compte sans durée se lit comme un historique,
+        et ces compteurs repartent à zéro à chaque déploiement ;
+      * une CONTRADICTION entre `state` et `total` (l'un dit ok, l'autre compte
+        des erreurs) → refus : deux lectures du même fait ne peuvent pas
+        diverger ;
+      * `total > 0` → refus qui NOMME la classe, la famille de route et la date,
+        parce qu'une exception non rattrapée est un défaut, pas un état : elle a
+        rendu 500 à quelqu'un. Le message de l'exception n'est pas publié par
+        `/health` — la sonde dit donc quoi chercher dans le journal Fly.
+
+    Ce qu'elle ne dit pas, et qui reste vrai : le compteur est celui du process
+    qui répond ; un worker qui redémarre repart à zéro.
+    """
+    erreurs: list = []
+    bloc = data.get("erreurs")
+    if not isinstance(bloc, dict) or not bloc:
+        return [
+            "le backend deploye ne publie pas de bloc 'erreurs' dans /health : les "
+            "exceptions non rattrapees ne sont pas lisibles — la revision servie est "
+            "anterieure au 02/11/2026, redeployer"
+        ]
+
+    manquants = [champ for champ in CHAMPS_ERREURS if champ not in bloc]
+    if manquants:
+        return [f"bloc 'erreurs' incomplet : champ(s) absent(s) {', '.join(manquants)}"]
+
+    portee = str(bloc.get("portee") or "").strip()
+    if not portee:
+        erreurs.append(
+            "bloc 'erreurs' : 'portee' est vide — un compte sans duree se lit comme un "
+            "historique alors que les compteurs repartent a zero a chaque demarrage"
+        )
+
+    total = bloc.get("total")
+    etat = bloc.get("state")
+    if not isinstance(total, int) or isinstance(total, bool) or total < 0:
+        erreurs.append(f"bloc 'erreurs' : 'total' doit etre un entier >= 0 (lu {total!r})")
+    if etat not in ("ok", "echec"):
+        erreurs.append(f"bloc 'erreurs' : 'state' inconnu {etat!r} (attendu 'ok' ou 'echec')")
+
+    if isinstance(total, int) and not isinstance(total, bool) and total >= 0:
+        if etat == "ok" and total > 0:
+            erreurs.append(
+                f"bloc 'erreurs' : 'state' dit ok alors que 'total' vaut {total} — deux "
+                f"lectures du meme fait se contredisent"
+            )
+        elif etat == "echec" and total == 0:
+            erreurs.append(
+                "bloc 'erreurs' : 'state' dit echec alors que 'total' vaut 0 — deux "
+                "lectures du meme fait se contredisent"
+            )
+        elif total > 0:
+            classe = bloc.get("classe") or "(classe non nommee)"
+            famille = bloc.get("famille") or "(route non nommee)"
+            quand = bloc.get("derniere_at") or "(date absente)"
+            par_classe = ", ".join(
+                f"{entree.get('classe')}={entree.get('total')}"
+                for entree in (bloc.get("classes") or [])
+                if isinstance(entree, dict)
+            )
+            erreurs.append(
+                f"ERREURS NON RATTRAPEES : {total} exception(s) depuis le demarrage, la "
+                f"derniere {classe} sur {famille} a {quand}"
+                + (f" (par classe : {par_classe})" if par_classe else "")
+                + " — une exception a rendu 500 a un visiteur ; son message est dans le "
+                "journal Fly (cf. /metrics, kojo_erreurs_serveur_total)"
+            )
+        else:
+            print(
+                "[OK] Erreurs non rattrapees : aucune depuis le demarrage"
+                + (f" ({bloc.get('depuis')})" if bloc.get("depuis") else "")
+            )
+
+    return erreurs
+
+
 def _verifier_paiement(data: dict, paydunya_composite=None) -> list:
     """Le bloc `paiement` de /health : TROIS états, pas deux.
 
@@ -635,6 +737,11 @@ def check_health(url: str, timeout: int = 15) -> int:
     #    rien ne disait qu'un artefact SERVI la portait. Une requete au sitemap
     #    confronte ses en-tetes et ses <loc> a `pages.declarees`.
     errors.extend(_verifier_sitemap(origine, data, timeout))
+    # 7. LES ERREURS NON RATTRAPEES (02/11/2026) : `sentry: inactif` laissait une
+    #    exception dans le journal Fly, lu par personne. Le bloc `erreurs`
+    #    compte ce qui a casse depuis le demarrage ; une seule exception est un
+    #    refus nomme (classe, famille de route, date).
+    errors.extend(_verifier_erreurs(data))
 
     if errors:
         print("\n[ERREUR] ANOMALIES DETECTEES SUR LA PRODUCTION :")

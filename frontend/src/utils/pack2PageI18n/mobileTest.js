@@ -78,7 +78,7 @@ dict.wo = withBase(dict.fr, {
   feat5: '• Denc ci biir telefon ak AsyncStorage',
   feat6: '• Yónnee nataal yi ci serwer (test)',
   feat7: '• Saytu permissions yu telefon',
-  screen1: '• ProfileScreen - Soppi nataal ak bouton kamera',
+  screen1: '• ProfileScreen - Soppi nataal ak butoŋ kamera',
   screen2: '• EditProfileScreen - Formulaire ak nataal bi ci biir',
   screen3: '• DashboardScreen - Nataal ci kanamu xët bi',
   screen4: '• WorkerProfileScreen - Wone nataal yu liggéeykat yi',
