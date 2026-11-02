@@ -175,13 +175,38 @@ class TestLesFamillesDeVeilles:
 
 
 class TestLaFraicheurDeLAcquisition:
-    """`0` veut dire JAMAIS : il ne passe pas pour une acquisition fraîche."""
+    """Trois états de la jauge, trois verdicts (règle du 02/11/2026).
 
-    def test_une_acquisition_jamais_demarree_est_un_refus(self, capsys):
+    `0` = aucune veille datée n'est un AVIS, pas un refus : le 02/11/2026, la
+    production comptait 0 mission ouverte et 0 veille créée — la collecte
+    n'avait rien à dater. Un rouge permanent sur un corpus vide apprend à
+    ignorer les rouges. Ce qui reste REFUSÉ : une date future, un âge au-delà
+    du seuil, et la CONTRADICTION (des veilles comptées, aucune datée).
+    """
+
+    def test_une_acquisition_jamais_demarree_est_un_avis_publie(self, capsys):
+        """Corpus vide : la collecte va bien, le produit n'a rien daté — c'est DIT."""
+        code = _lancer(
+            corps=_exposition(
+                0, origines={"directe": 0, "inconnue": 0, "metier": 0, "ville": 0}
+            )
+        )
+        sortie = capsys.readouterr().out
+        assert code == 0, "un corpus vide n'est pas une panne de collecte"
+        assert "[AVIS] acquisition NON DEMARREE" in sortie
+        # Le motif : un fait de produit, pas un levier de collecte.
+        assert "aucune alerte emploi creee" in sortie
+        # L'avis ANNONCE l'armement : rien à coder le jour de la première veille.
+        assert "seuil de 30 jour(s)" in sortie
+        assert "[VERDICT] conforme" in sortie
+
+    def test_des_veilles_comptees_sans_date_sont_une_contradiction(self, capsys):
+        """Un compteur dit qu'une acquisition existe, la jauge dit qu'aucune n'est datée."""
         code = _lancer(corps=_exposition(0))
         sortie = capsys.readouterr().out
-        assert code == 1
-        assert "JAMAIS" in sortie
+        assert code == 1, "l'un des deux chiffres ment : on ne le laisse pas passer"
+        assert "CONTRADICTION" in sortie
+        assert "6 veille(s) comptee(s)" in sortie
 
     def test_une_acquisition_tarie_est_nommee_avec_son_age(self, capsys):
         maintenant = time.time()

@@ -73,7 +73,11 @@ def langues(codes=("fr", "en", "wo", "bm", "mos"), documents=7, monolingues=45):
         "pages": {
             "multilingues": documents,
             "monolingues": monolingues,
-            "total": documents * len(codes) + monolingues,
+            # `declarees` (et non `total`, renomme le 01/11/2026) : le sitemap
+            # ajoute une entree par fiche de mission et par profil public, lues
+            # en base ; `vivantes` vaut None parce que /health ne lit pas la base.
+            "declarees": documents * len(codes) + monolingues,
+            "vivantes": None,
         },
         "alternatives_par_page": len(codes) + 1,
         "portee": (
@@ -570,16 +574,71 @@ def test_un_backend_sans_bloc_langues_echoue_en_disant_de_redeployer(probe, caps
 
 
 def test_un_volume_de_langues_qui_ne_tombe_pas_juste_echoue(probe, capsys):
-    """`pages.total` et la somme des URL par langue décrivent le MÊME ensemble."""
+    """`pages.declarees` et la somme des URL par langue décrivent le MÊME ensemble."""
     bloc = langues()
-    bloc["pages"] = {**bloc["pages"], "total": 999}
+    bloc["pages"] = {**bloc["pages"], "declarees": 999}
     with patch("urllib.request.urlopen",
                side_effect=[sante_ok(langues=bloc), email_ok(), composite_ok()]):
         code = probe.check_health(HEALTH_URL)
 
     sortie = capsys.readouterr().out
     assert code == 1
-    assert "se contredit" in sortie and "pages.total" in sortie
+    assert "se contredit" in sortie and "pages.declarees" in sortie
+
+
+def test_un_sous_bloc_pages_reste_sur_total_est_refuse_en_nommant_declarees(probe, capsys):
+    """La panne du 01/11 au 02/11/2026, rejouee : le champ renomme est NOMME.
+
+    `/health` publiait `pages: {multilingues, monolingues, declarees, vivantes}`
+    et la sonde jugeait `pages.total`, disparu. Le refus doit dire le champ
+    ATTENDU, sinon le lecteur du run ne sait pas si la production est en retard
+    ou si la sonde est en retard — c'est exactement ce qui a dormi un jour.
+    """
+    bloc = langues()
+    bloc["pages"] = {
+        "multilingues": 7,
+        "monolingues": 45,
+        "total": 80,
+    }
+    with patch("urllib.request.urlopen",
+               side_effect=[sante_ok(langues=bloc), email_ok(), composite_ok()]):
+        code = probe.check_health(HEALTH_URL)
+
+    sortie = capsys.readouterr().out
+    assert code == 1
+    assert "declarees" in sortie and "vivantes" in sortie
+    # Aucune accusation de contradiction : le volume n'a pas ete juge, il a ete
+    # declare illisible — deux constats differents, deux remedes differents.
+    assert "se contredit" not in sortie
+
+
+def test_les_champs_lus_par_la_sonde_sont_ceux_que_health_publie(probe):
+    """LE GARDE QUI MANQUAIT : renommer un champ de /health rougit ICI.
+
+    La sonde lit `/health` par des constantes (`CHAMPS_LANGUES`, `CHAMPS_PAGES`) ;
+    la declaration les publie (`kojo_sitemap_declaration.bloc_langues`). Rien ne
+    les reliait : le 01/11/2026 `pages.total` est devenu `declarees` + `vivantes`,
+    la sonde a continue de lire `total` et a publie un rouge qui accusait la
+    production d'un champ que personne ne publiait plus. L'alerte des sondes a
+    nomme le job, jamais la cause — un jour de rouge pour un renommage.
+
+    Ce cas confronte les deux listes dans les DEUX sens : une cle publiee que la
+    sonde ignore, comme une cle jugee que plus personne ne publie, rougissent.
+    """
+    import kojo_sitemap_declaration as declaration
+
+    publie = declaration.bloc_langues()
+    ecart_racine = sorted(set(probe.CHAMPS_LANGUES) ^ set(publie))
+    assert not ecart_racine, (
+        "champs juges par la sonde /health != champs publies par "
+        f"kojo_sitemap_declaration.bloc_langues : {ecart_racine}"
+    )
+
+    ecart_pages = sorted(set(probe.CHAMPS_PAGES) ^ set(publie["pages"]))
+    assert not ecart_pages, (
+        "champs de `pages` juges par la sonde /health != champs publies : "
+        f"{ecart_pages}"
+    )
 
 
 def test_une_langue_sans_document_est_refusee(probe, capsys):

@@ -122,8 +122,29 @@ s'authentifie avec le jeton, lit l'exposition et juge la chaîne entière.
 | 401 / 503 / 404 | **1**, nommé : jeton refusé / route fermée / mauvais hôte |
 | une provenance, le hors-vocabulaire ou la fraîcheur absents | **1**, la famille est NOMMÉE |
 | exposition illisible (ligne ou valeur) | **1** |
-| `plus_recente = 0`, date future, ou âge au-delà du seuil | **1**, nommé avec l'âge |
+| `plus_recente = 0` **et** aucune veille comptée | **0**, `[AVIS] acquisition NON DEMARREE` — fait de produit, pas panne de collecte |
+| veilles comptées mais `plus_recente = 0` | **1**, CONTRADICTION nommée (un des deux chiffres ment) |
+| date future, ou âge au-delà du seuil | **1**, nommé avec l'âge |
 | transport injoignable ou URL inutilisable | **2** prémisse — jamais un vert |
+
+**La règle triple de la fraîcheur (02/11/2026).** Mesuré ce jour :
+`kojo_missions_ouvertes = "0"`, `completed_jobs = "0"`, `reviews = "0"` et
+`kojo_alertes_emploi_plus_recente_timestamp_seconds = 0` — aucun deliver, aucune
+veille, donc rien à dater. La sonde rendait **1** (« acquisition JAMAIS
+DEMARREE ») depuis sa mise en service : un rouge permanent sur un corpus vide,
+c'est-à-dire un rouge qu'on apprend à ignorer. Trois verdicts désormais, parce
+que trois situations se cachent derrière la même valeur :
+
+- **`0`, aucune veille comptée ⇒ avis (0)**. La collecte fonctionne (le jeton
+  ouvre, les six familles se lisent) et le produit n'a rien daté. L'avis est
+  publié, avec le motif, et il annonce que le seuil s'armera de lui-même : la
+  première veille réelle le rend jugeable sans changer une ligne ;
+- **date future, ou âge au-delà de 30 jours ⇒ refus (1)**. Là, quelque chose a
+  été écrit de travers ou a cessé d'être écrit ;
+- **veilles comptées, aucune datée ⇒ refus (1)**. Les quatre compteurs de
+  provenance ne peuvent pas totaliser sans qu'une date existe : l'un des deux
+  chiffres est faux, et c'est le cas qu'un simple « 0 = avis » laisserait
+  passer.
 
 Deux secrets, et les DEUX sont nécessaires :
 
