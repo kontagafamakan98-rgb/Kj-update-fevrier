@@ -120,12 +120,29 @@ def bloc_langues() -> dict:
         "pages": {
             "multilingues": multilingues,
             "monolingues": monolingues,
-            "total": multilingues * len(codes) + monolingues,
+            # `declarees` et non `total` (02/11/2026) : le sitemap AJOUTE une
+            # entree par fiche de mission ouverte et par profil travailleur
+            # public, lues dans la base. Mesure du jour : 80 declarees, 85
+            # servies. Un champ nomme « total » affirmait une egalite que le
+            # sitemap servait faux, sans qu'aucun garde ne la compare.
+            "declarees": multilingues * len(codes) + monolingues,
+            # `None` et non 0 : /health ne lit pas la base (il est interroge
+            # toutes les 20 s pendant une fenetre de deploiement), donc il ne
+            # peut pas compter ce qu'il n'a pas lu. Le nombre servi est publie
+            # par les en-tetes `X-Kojo-Urls*` de GET /api/sitemap.xml.
+            "vivantes": None,
         },
         "alternatives_par_page": len(langues.alternatives(PAGES_STATIQUES[0][0])),
         "portee": (
-            "declaration du sitemap (URL par langue) ; les documents servis — "
-            "lang, canonical, reciprocite des hreflang — se lisent sur l'origine "
-            "du site, avec frontend/scripts/check-hreflang-production.js"
+            "declaration du sitemap (URL par langue) ; `pages.declarees` ne "
+            "compte que les pages STATIQUES multilingues et les pages ville, "
+            "metier et guides monolingues. Le sitemap AJOUTE depuis la base une "
+            "entree par fiche de mission ouverte et par profil travailleur "
+            "public : `pages.vivantes` vaut null parce que /health ne lit pas la "
+            "base, et le total REELLEMENT servi se lit dans les en-tetes "
+            "`X-Kojo-Urls` (total), `X-Kojo-Urls-Declarees` et "
+            "`X-Kojo-Urls-Vivantes` de GET /api/sitemap.xml ; les documents "
+            "servis — lang, canonical, reciprocite des hreflang — se lisent sur "
+            "l'origine du site, avec frontend/scripts/check-hreflang-production.js"
         ),
     }

@@ -60,19 +60,36 @@ MOTIF_MENTION = re.compile(r"\bkojo_core\.([A-Za-z_][A-Za-z0-9_]*)")
 MINIMUM_DE_NOMS = 15
 
 
-def _fichiers_du_depot() -> list[Path]:
+# Un DOSSIER D'INSTALLATION n'est pas un importeur de `kojo_core`.
+#
+# MESURÉ le 02/11/2026 : un environnement virtuel vit DANS `backend/` sur un
+# poste de développement (`backend/.venv`, 3 147 fichiers `.py` contre 247 dans
+# le dépôt). Ce balayage les parsait tous, à CHAQUE cas de ce fichier, et la
+# suite backend devenait injouable hors CI — bloquée à 12 %, sans message. La
+# borne est donc ici, sur la dérivation elle-même, et pas dans un réglage local
+# qui laisserait le même piège au contributeur suivant.
+DOSSIERS_INSTALLES = frozenset(
+    {"__pycache__", ".venv", "venv", "node_modules", ".git", "site-packages"}
+)
+
+
+def _fichiers_du_depot(racines=None) -> list[Path]:
     """Tous les fichiers Python qui peuvent citer `kojo_core`, dérivés du DOSSIER.
 
     Un fichier ajouté demain (routeur, script, test, garde) entre tout seul dans
-    le périmètre : rien à tenir à jour.
+    le périmètre : rien à tenir à jour. Un dossier INSTALLÉ n'entre jamais :
+    c'est du code tiers, il ne cite pas `kojo_core` et il n'appartient pas au
+    dépôt. `racines` sert aux cas de preuve (arbre jetable) ; l'appel réel n'en
+    passe pas.
     """
-    racines = [BACKEND, RACINE / ".github" / "scripts", RACINE / "frontend" / "scripts"]
+    if racines is None:
+        racines = [BACKEND, RACINE / ".github" / "scripts", RACINE / "frontend" / "scripts"]
     trouves: list[Path] = []
     for racine in racines:
         if not racine.exists():
             continue
         for chemin in sorted(racine.rglob("*.py")):
-            if "__pycache__" in chemin.parts or chemin.name == "kojo_core.py":
+            if DOSSIERS_INSTALLES & set(chemin.parts) or chemin.name == "kojo_core.py":
                 continue
             trouves.append(chemin)
     return trouves
@@ -452,3 +469,34 @@ class TestLeRenduDesUnions:
             "« %s » : observé %r, référence %r — le rendu des unions ne les "
             "ramène plus à la même forme" % (nom, observee, attendu)
         )
+
+
+class TestLeBalayageIgnoreLesDossiersInstalles:
+    """Un environnement virtuel posé dans `backend/` n'est pas un importeur.
+
+    Ces deux cas sont la preuve de la borne ajoutée le 02/11/2026 : sans elle,
+    le premier trouve un faux importeur dans `.venv`, et le second fait parcourir
+    3 147 fichiers tiers à chaque cas du fichier (mesuré : suite bloquée à 12 %).
+    """
+
+    def test_un_dossier_installe_n_entre_pas_dans_le_balayage(self, tmp_path):
+        (tmp_path / "backend").mkdir()
+        repere = tmp_path / "backend" / "mon_module.py"
+        repere.write_text("from kojo_core import db\n", encoding="utf-8")
+        for dossier in (".venv", "venv", "node_modules", "__pycache__"):
+            intrus = tmp_path / "backend" / dossier / "lib" / "paquet" / "gros.py"
+            intrus.parent.mkdir(parents=True)
+            intrus.write_text("from kojo_core import pas_vrai\n", encoding="utf-8")
+
+        trouves = _fichiers_du_depot([tmp_path / "backend"])
+
+        assert trouves == [repere], (
+            "le balayage a retenu un fichier d'installation : %s"
+            % [str(c.relative_to(tmp_path)) for c in trouves]
+        )
+
+    def test_le_depot_reel_ne_balaye_aucun_dossier_installe(self):
+        for chemin in _fichiers_du_depot():
+            assert not (DOSSIERS_INSTALLES & set(chemin.parts)), (
+                "le périmètre réel contient un dossier installé : %s" % chemin
+            )

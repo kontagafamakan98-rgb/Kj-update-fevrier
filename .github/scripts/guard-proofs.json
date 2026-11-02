@@ -3434,8 +3434,8 @@
       "id": "environment: branche perimee non nommee",
       "garde": "frontend/scripts/check-git-branches.js",
       "cible": "frontend/scripts/check-git-branches.js",
-      "trouve": "    .map((branche) => rapportBranche(branche, base, cwd, lire))\n",
-      "remplace": "    .map(() => null)\n",
+      "trouve": "    .map((branche) => ({ nom: branche.nom, message: rapportBranche(branche, base, cwd, lire) }))\n",
+      "remplace": "    .map((branche) => ({ nom: branche.nom, message: null }))\n",
       "runner": "node",
       "preuve": "frontend/scripts/__tests__/check-test-environment.test.js",
       "commande": [

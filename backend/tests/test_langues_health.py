@@ -104,7 +104,10 @@ class TestLeBlocPublieLaDeclaration:
         assert bloc["pages"] == {
             "multilingues": multilingues,
             "monolingues": monolingues,
-            "total": multilingues * len(langues.codes()) + monolingues,
+            "declarees": multilingues * len(langues.codes()) + monolingues,
+            # `None` et non 0 : /health ne lit pas la base, donc il ne compte
+            # pas les fiches et profils que le sitemap ajoute depuis elle.
+            "vivantes": None,
         }
         assert bloc["urls_par_langue"][langues.LANGUE_PAR_DEFAUT] == multilingues + monolingues
         for code in langues.codes():
@@ -135,6 +138,11 @@ class TestLeBlocPublieLaDeclaration:
             "lecteur peut croire que `/health` a vérifié les balises"
         )
         assert "canonical" in portee
+        assert "X-Kojo-Urls" in portee, (
+            "le bloc déclare un volume qui n'est PAS celui du sitemap : s'il ne "
+            "nomme pas l'en-tête qui publie le volume servi, l'écart se lit "
+            "comme une dette au lieu d'une famille ajoutée depuis la base"
+        )
 
     def test_aucune_url_ni_hote_dans_un_bloc_public(self):
         """`/health` est PUBLIQUE : le bloc ne publie que des compteurs et des codes."""
@@ -158,7 +166,7 @@ class TestLaDerivationNeRecopieRien:
         assert bloc["documents_par_langue"]["ff"] == len(PAGES_STATIQUES)
         assert bloc["urls_par_langue"]["ff"] == len(PAGES_STATIQUES)
         assert bloc["alternatives_par_page"] == len(six) + 1
-        assert bloc["pages"]["total"] == len(PAGES_STATIQUES) * len(six) + bloc["pages"]["monolingues"]
+        assert bloc["pages"]["declarees"] == len(PAGES_STATIQUES) * len(six) + bloc["pages"]["monolingues"]
 
 
 class TestLeBlocEtLeSitemapComptentLaMemeChose:
@@ -249,4 +257,39 @@ class TestLaReponseDeHealth:
 
         assert len(bloc["indexees"]) == len(langues.codes()) >= 2
         assert all(nombre >= 1 for nombre in bloc["documents_par_langue"].values())
-        assert bloc["pages"]["total"] == sum(bloc["urls_par_langue"].values())
+        assert bloc["pages"]["declarees"] == sum(bloc["urls_par_langue"].values())
+
+
+class TestLeVolumeServiNEstPasLeVolumeDeclare:
+    """L'écart entre /health et le sitemap est MESURÉ, borné et gardé.
+
+    Mesuré le 02/11/2026 : `/health` déclarait 80 pages, le sitemap en servait
+    85 — quatre profils travailleur et une fiche de mission, ajoutés depuis la
+    base. Rien ne le mesurait : un lecteur ne pouvait pas savoir si l'écart
+    était une famille non déclarée ou une dette, et le champ s'appelait
+    `total`, donc il affirmait ce qu'il ne comptait pas. Le sitemap publie
+    désormais son volume servi et sa décomposition ; ce cas exige que les
+    trois nombres tombent juste contre les `<loc>` RÉELLEMENT servis.
+    """
+
+    @pytest.mark.asyncio
+    async def test_le_sitemap_publie_le_volume_servi_et_sa_decomposition(self, client: AsyncClient):
+        resp = await client.get("/api/sitemap.xml")
+        assert resp.status_code == 200
+
+        servies = [_chemin(loc) for loc in LOC.findall(resp.text)]
+        declarees = int(resp.headers["X-Kojo-Urls-Declarees"])
+        vivantes = int(resp.headers["X-Kojo-Urls-Vivantes"])
+
+        assert int(resp.headers["X-Kojo-Urls"]) == len(servies) == declarees + vivantes, (
+            "le volume annoncé par les en-têtes n'est pas le nombre de <loc> servis"
+        )
+        assert vivantes == sum(1 for chemin in servies if DYNAMIQUE.match(chemin)), (
+            "`X-Kojo-Urls-Vivantes` doit compter EXACTEMENT les fiches et profils "
+            "servis : une page déclarée comptée comme vivante masquerait une "
+            "famille que le sitemap a cessé de publier"
+        )
+        assert declarees == bloc_langues()["pages"]["declarees"], (
+            "le sitemap et /health ne comptent pas la même déclaration : "
+            f"sitemap {declarees} / bloc {bloc_langues()['pages']['declarees']}"
+        )
