@@ -1098,3 +1098,49 @@ describe('check-test-environment — nettoyage d’une réf distante orpheline',
     }
   }, 60_000);
 });
+
+// ── Le pré-vol ne bloque que ce qu'il publie ─────────────────────────────────
+// MESURÉ le 02/11/2026 : un push de `main` était refusé au nom d'une branche
+// locale dont la PR avait été fusionnée par squash et dont la réf distante avait
+// été supprimée (`[gone]`). Rien de ce résidu n'était publié par ce push, et la
+// seule issue laissée était `git branch -D` ou `--no-verify` — c'est-à-dire
+// l'habitude d'ignorer le garde. Le résidu reste NOMMÉ, mais il ne bloque plus
+// le pré-vol ; l'hygiène autonome, elle, continue de le refuser.
+describe('check-test-environment — le pré-vol ne bloque que ce qu’il publie', () => {
+  const residuLivre = () => mesurer(
+    ['main\torigin/main\t\t*', 'refonte\torigin/refonte\t[gone]\t '],
+    FUSION_PAR_SQUASH,
+  );
+
+  it('nomme le résidu livré, et ne le compte pas parmi les bloquants', async () => {
+    const { verdictDeLaPasse } = await import('../check-test-environment.js');
+    const verdict = residuLivre();
+
+    expect(verdict.issues).toEqual(REFONTE_EST_LA);
+    expect(verdict.nettoyables).toEqual(REFONTE_EST_LA);
+    const { bloquants, rappels } = verdictDeLaPasse({ avantPush: true, branches: verdict, environnement: [] });
+    expect(bloquants).toEqual([]);
+    // Ni bloquant ni rappelé : un rappel qui nommerait à CHAQUE push une branche
+    // que personne ne supprime serait du bruit. Elle reste nommée par l'hygiène
+    // autonome, avec sa commande.
+    expect(rappels).not.toContain(REFONTE_EST_LA[0]);
+  });
+
+  it('bloque toujours en fin de passe : c’est le moment de tout remettre à zéro', async () => {
+    const { verdictDeLaPasse } = await import('../check-test-environment.js');
+    const { bloquants } = verdictDeLaPasse({ avantPush: false, branches: residuLivre(), environnement: [] });
+
+    expect(bloquants).toEqual(REFONTE_EST_LA);
+  });
+
+  it('ne retire QUE les résidus livrés : une lecture impossible bloque toujours', async () => {
+    // Sans cette borne, un filtre trop large rendrait le pré-vol muet sur tout.
+    const { verdictDeLaPasse } = await import('../check-test-environment.js');
+    const verdict = mesurer(['b1\torigin/b1\t[gone]\t ']);
+
+    expect(verdict.nettoyables).toEqual([]);
+    expect(verdict.issues.length).toBe(1);
+    expect(verdictDeLaPasse({ avantPush: true, branches: verdict, environnement: [] }).bloquants)
+      .toEqual(verdict.issues);
+  });
+});

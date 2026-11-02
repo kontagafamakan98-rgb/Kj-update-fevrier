@@ -270,7 +270,13 @@ export function actionsDesArguments(args) {
  * le code de sortie.
  */
 export const verdictDeLaPasse = ({ avantPush, branches, environnement }) => ({
-  bloquants: avantPush ? branches.issues : [...branches.issues, ...environnement],
+  // `nettoyables` : les résidus LIVRÉS (contenu déjà dans la base, réf distante
+  // disparue). Ils restent nommés par `check-git-branches`, mais le pré-vol de
+  // push ne bloque plus dessus : ce push ne les publie pas, et refuser là-dessus
+  // n'apprend qu'à passer outre. L'hygiène autonome continue de les refuser.
+  bloquants: avantPush
+    ? branches.issues.filter((issue) => !(branches.nettoyables ?? []).includes(issue))
+    : [...branches.issues, ...environnement],
   // Le travail non publié est toujours RAPPELÉ et jamais bloquant : à l'instant
   // où le pré-vol tourne, la branche qu'on pousse EST du travail non publié —
   // refuser là-dessus reviendrait à refuser le geste qui le publie, et il ne
@@ -278,6 +284,11 @@ export const verdictDeLaPasse = ({ avantPush, branches, environnement }) => ({
   // pré-vol retire même de cette liste les branches que CE push publie (voir
   // KOJO_BRANCHES_POUSEES) : un rappel qui nomme à chaque push ce que le push
   // publie ne serait plus lu.
+  // Les résidus LIVRÉS (`nettoyables`) ne sont ni bloquants ni rappelés ici : le
+  // push ne les publie pas, et un rappel qui nommerait à CHAQUE push une branche
+  // que personne ne supprime serait du bruit dans le seul message que ce garde
+  // existe pour faire lire. Ils restent nommés par l'hygiène autonome
+  // (`check-git-branches`), avec leur commande.
   rappels: [...(branches.publication?.lignes ?? []), ...(avantPush ? environnement : [])],
 });
 

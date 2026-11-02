@@ -89,7 +89,30 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Installer les dépendances (Playwright compris)
-        run: npm ci
+        # MESURÉ le 01/11/2026 : `npm ci` a échoué sous Node 20 (verrou résolu
+        # par npm 11) et le job est devenu ROUGE sans qu'une seule requête soit
+        # partie — l'alerte accusait donc un CDN qui n'avait pas été lu. Node
+        # est passé à 24 ; l'échec d'installation, lui, reste un échec (une
+        # installation cassée se corrige), mais il est NOMMÉ comme PRÉMISSE :
+        # le résumé du job dit « rien n'a été mesuré », et l'erreur porte le
+        # même titre, donc la lecture de l'alerte ne confond plus une prémisse
+        # avec un verdict produit.
+        run: |
+          set -euo pipefail
+          if npm ci; then
+            echo "dépendances installées — $(node --version), npm $(npm --version)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "## PRÉMISSE — installation"
+              echo ""
+              echo "La sonde n'a **rien mesuré** : \`npm ci\` a échoué avant la première requête."
+              echo ""
+              echo "Ce rouge n'est **pas** un verdict sur le CDN. Le cas réel du 01/11/2026 :"
+              echo "Node 20 refusait le verrou résolu par npm 11 (corrigé en Node 24)."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error title=Prémisse (installation)::npm ci a échoué : la sonde n'a rien mesuré, ce rouge n'accuse pas le CDN."
+            exit 1
+          fi
 
       # Chromium et ses bibliothèques système : la sonde lit un VRAI LCP, elle a
       # donc besoin d'un moteur de rendu, pas d'un fetch.

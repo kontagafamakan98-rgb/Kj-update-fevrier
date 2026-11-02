@@ -281,6 +281,7 @@ export function mesurerBranches({
       // Aucune base : rien n'a pu être jugé livré, donc aucun résidu n'a pu être
       // établi — et un plan de nettoyage vide est la seule réponse honnête.
       residusDistants: [],
+      nettoyables: [],
     };
   }
   const candidates = branches.filter((branche) => branche.suivi && branche.nom !== base);
@@ -298,11 +299,6 @@ export function mesurerBranches({
   const residusDistants = orphelines
     .map((ref) => ({ ...ref, raison: raisonDuContenu(ref.ref, baseDistante.ref, cwd, lire) }))
     .filter((residu) => Boolean(residu.raison));
-  const issues = candidates
-    .filter((branche) => branche.disparue)
-    .map((branche) => rapportBranche(branche, base, cwd, lire))
-    .filter(Boolean)
-    .concat(residusDistants.map((residu) => messageRefDistante(residu)));
   // La partition est stricte, comme pour les réfs distantes ci-dessus : une
   // branche DÉJÀ nommée comme résidu est livrée (son contenu est dans la base),
   // donc elle ne porte pas de travail propre à ce disque — un résidu ne produit
@@ -314,6 +310,25 @@ export function mesurerBranches({
       .filter((branche) => Boolean(raisonDuContenu(branche.nom, base, cwd, lire)))
       .map((branche) => branche.nom),
   );
+  const messagesBranches = candidates
+    .filter((branche) => branche.disparue)
+    .map((branche) => ({ nom: branche.nom, message: rapportBranche(branche, base, cwd, lire) }))
+    .filter((entree) => Boolean(entree.message));
+  const issues = messagesBranches
+    .map((entree) => entree.message)
+    .concat(residusDistants.map((residu) => messageRefDistante(residu)));
+  // Un résidu LIVRÉ (contenu déjà dans la base) reste nommé dans `issues`, et
+  // sa phrase est AUSSI publiée dans `nettoyables` : c'est le PRÉ-VOL DE PUSH
+  // qui ne bloque plus dessus, parce que ce push ne le publie pas (voir
+  // `verdictDeLaPasse` dans check-test-environment.js). Le contrôle d'hygiène
+  // autonome, lui, continue de le refuser — c'est son objet. Mesuré le
+  // 02/11/2026 : le pré-vol refusait un push de `main` au nom d'une branche
+  // fusionnée par squash dont la réf distante avait été supprimée, et la seule
+  // issue laissée était `--no-verify`, c'est-à-dire l'habitude d'ignorer le
+  // garde.
+  const nettoyables = messagesBranches
+    .filter((entree) => livrees.has(entree.nom))
+    .map((entree) => entree.message);
   const publication = mesurerPublication(
     branches.filter((branche) => !livrees.has(branche.nom)), refsDistantes, distant, cwd, lire, publiees,
   );
@@ -322,10 +337,13 @@ export function mesurerBranches({
   // sans branche locale, branches locales jugées du point de vue de la
   // publication). Ces compteurs alimentent la ligne de résumé informatif affichée
   // en console lors du succès, attestant du périmètre effectivement contrôlé.
-  return { issues, examinees: candidates.length, distantes: orphelines.length, publication, residusDistants };
+  return {
+    issues, examinees: candidates.length, distantes: orphelines.length,
+    publication, residusDistants, nettoyables,
+  };
 }
 
-export function ecrireStepSummary({ issues, examinees, distantes, publication }, cheminFichier = process.env.GITHUB_STEP_SUMMARY) {
+export function ecrireStepSummary({ issues, examinees, distantes, publication, nettoyables }, cheminFichier = process.env.GITHUB_STEP_SUMMARY) {
   if (!cheminFichier) return;
   const lignes = [
     '### Hygiène des branches et réfs distantes',
@@ -364,7 +382,7 @@ export async function main(
 ) {
   try {
     const resultat = mesurer({ cwd });
-    const { issues, examinees, distantes, publication } = resultat;
+    const { issues, examinees, distantes, publication, nettoyables } = resultat;
     ecrireStepSummary(resultat, stepSummaryPath);
     // Nommés AVANT le verdict, et dans les deux cas : c'est la demande de cette
     // classe — un travail qui n'existe que sur ce disque doit être lu à la fin de
