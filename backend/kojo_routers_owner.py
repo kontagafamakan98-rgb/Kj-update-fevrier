@@ -33,11 +33,6 @@ from kojo_payments import (
     refresh_paydunya_circuit_from_db,
 )
 from kojo_routers_jobs import execute_paydunya_refund
-# La cascade de suppression (RGPD) vit dans le routeur de compte : la purge du
-# propriétaire l'APPELLE au lieu d'en écrire une seconde. Deux copies auraient
-# divergé au premier ajout de collection — et c'est la copie oubliée qui laisse
-# des données personnelles en base après une suppression annoncée comme totale.
-from kojo_routers_users_account import supprimer_compte_utilisateur
 # Helpers du sweeper (kojo_scheduler) : source unique de vérité pour les
 # statuts incertains et le calcul de la durée de blocage.
 from kojo_scheduler import _STUCK_PAYOUT_STATUSES, _stuck_for, mesure_relances
@@ -511,17 +506,6 @@ class ChangementEtatCompte(BaseModel):
     motif: Optional[str] = Field(default=None, max_length=500)
 
 
-class PurgeCompte(BaseModel):
-    """Corps de `POST /owner/accounts/{id}/purge`.
-
-    Le motif est EXIGÉ par la route (10 caractères au moins) : une suppression
-    définitive sans motif écrit laisse, six mois plus tard, un compte anonymisé
-    dont plus personne ne sait pourquoi il l'a été. La borne haute est celle des
-    autres décisions (`kojo_comptes_admin.MOTIF_MAXIMUM`).
-    """
-    motif: Optional[str] = Field(default=None, max_length=500)
-
-
 class OwnerDisputeDecision(BaseModel):
     """Corps de `POST /owner/missions/{job_id}/litige/decision`.
 
@@ -927,79 +911,6 @@ async def set_owner_account_state(
             "banni": "Compte banni : l'accès est fermé.",
         }[decision["etat"]],
         "compte": await comptes.detail_compte(relu or compte),
-    }
-
-
-@router.post("/owner/accounts/{user_id}/purge")
-async def purge_owner_account(
-    user_id: str,
-    payload: PurgeCompte,
-    owner_user = Depends(verify_owner_access),
-):
-    """Supprimer DÉFINITIVEMENT un compte — PROPRIÉTAIRE UNIQUEMENT.
-
-    Ce que l'écran d'administration ne savait pas faire, et qui restait à faire
-    en base à la main : retirer un profil de test du site public. Les deux
-    autres décisions (`restreint`, `banni`) laissent la page en ligne ; seule
-    celle-ci efface.
-
-    Elle APPELLE la cascade du self-service
-    (`kojo_routers_users_account.supprimer_compte_utilisateur`) au lieu d'en
-    écrire une variante : la même suppression efface donc exactement la même
-    chose, et un ajout de collection demain n'a qu'un endroit à couvrir.
-
-    Effets, dans l'ordre de la cascade : les fonds séquestrés sont remboursés
-    (ou la suppression est refusée en 409 si un remboursement/versement est en
-    vol), les données personnelles sont anonymisées, le profil travailleur et
-    les propositions sont supprimés, les missions du client sont annulées. Le
-    document garde `deleted: True`, ce qui le retire de la liste publique, du
-    sitemap et des compteurs de l'accueil.
-
-    Refus NOMMÉS, jamais réparés en silence :
-      * 400 — motif absent ou plus court que `MOTIF_MINIMUM` ;
-      * 404 — identifiant inconnu ;
-      * 409 — compte propriétaire (on ne se purge pas soi-même) ou compte déjà
-              supprimé (une seconde purge écraserait la date de la première).
-
-    Returns:
-        dict: {message, deleted, id} — `deleted` vient de la cascade, jamais
-        recopié ici, donc une cascade qui n'efface rien ne peut pas répondre
-        « supprimé ».
-    """
-    motif = (payload.motif or "").strip()
-    if len(motif) < comptes.MOTIF_MINIMUM:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Un motif d'au moins %d caractères est exigé pour supprimer "
-                "définitivement un compte." % comptes.MOTIF_MINIMUM
-            ),
-        )
-
-    compte = await db.users.find_one(
-        {**identifiant_query(user_id)}, {"password_hash": 0}
-    )
-    if not compte:
-        raise HTTPException(status_code=404, detail="Compte introuvable")
-    if comptes.est_le_proprietaire(compte):
-        raise HTTPException(
-            status_code=409,
-            detail="Le compte propriétaire ne se supprime pas lui-même.",
-        )
-    if compte.get("deleted") is True:
-        raise HTTPException(
-            status_code=409, detail="Ce compte est déjà supprimé.",
-        )
-
-    resultat = await supprimer_compte_utilisateur(compte)
-    logger.info(
-        "🧹 Compte %s purgé par le propriétaire (motif : %s)",
-        user_id, motif,
-    )
-    return {
-        **resultat,
-        "id": user_id,
-        "message": "Compte supprimé et anonymisé.",
     }
 
 
