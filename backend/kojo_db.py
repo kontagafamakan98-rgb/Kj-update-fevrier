@@ -32,6 +32,14 @@ try:
     )
     db = client[db_name]
 
+    # Le NOM réellement retenu, publié sur le module. `db` est remplacé par une
+    # doublure dans les tests locaux (sans Mongo), le nom ne l'est pas : c'est
+    # donc le seul fait qui dise sur quelle base la suite tourne, et
+    # `tests/test_isolation_base_de_test.py` le confronte au nom de test exigé.
+    # En production, il dit à côté de quoi on a démarré — sans le déduire d'un
+    # `MONGO_URL` qui peut changer sous les pieds.
+    nom_base = db_name
+
     # Test connection on startup
     logger.info(f"✅ MongoDB connected to: {db_name}")
 except Exception as e:

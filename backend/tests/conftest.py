@@ -84,6 +84,41 @@ from kojo_recherche_missions import (
 )
 
 # ---------------------------------------------------------------------------
+# ISOLATION : la suite n'écrit QUE dans une base dont le nom dit « test »
+# ---------------------------------------------------------------------------
+# Mesuré le 02/11/2026 : trois profils de test (« CI Worker », deux doublons
+# « Famakan Kontaga ») étaient publiés sur le site de production — visibles au
+# sitemap et comptés dans la preuve sociale de l'accueil. Aucun d'eux ne venait
+# de la CI (elle était déjà isolée), mais la protection était INCIDENTE : elle
+# reposait sur une ligne d'affectation qu'un nettoyage pouvait retirer, et le
+# défaut du serveur est `kojo_db` — la base de PRODUCTION (`kojo_db.py`).
+#
+# Elle est désormais REFUSÉE : le nom doit finir par `_test`, sinon la suite ne
+# démarre pas. Un refus au démarrage coûte une seconde ; une suite qui écrit
+# dans la vraie base crée des comptes publics qu'il faut ensuite purger à la
+# main (`POST /owner/accounts/{id}/purge`).
+NOM_BASE_TEST = "kojo_test"
+
+
+def nom_base_de_test(nom: str) -> str:
+    """Le nom de base, ou un refus NET avant la première écriture.
+
+    Rendue pure pour être prouvée (`tests/test_isolation_base_de_test.py`) : un
+    garde qui ne se rejoue pas est un garde qu'on croit tenir.
+    """
+    propre = (nom or "").strip()
+    if not propre.endswith("_test"):
+        raise RuntimeError(
+            "La suite de tests refuse d'écrire dans la base %r : son nom ne "
+            "finit pas par « _test ». La base par défaut du serveur est la "
+            "base de PRODUCTION — les comptes créés par un test y seraient "
+            "publics (sitemap, compteurs de l'accueil)."
+            % (propre or "‹ aucune ›")
+        )
+    return propre
+
+
+# ---------------------------------------------------------------------------
 # Variables d'env AVANT tout import de server.py
 # ---------------------------------------------------------------------------
 TEST_MONGO_URL = os.environ.get("TEST_MONGO_URL", "").strip()
@@ -95,7 +130,7 @@ if USE_REAL_MONGO:
     os.environ["MONGO_URL"] = TEST_MONGO_URL
 else:
     os.environ["MONGO_URL"] = "mongodb://localhost:27017"
-os.environ["DB_NAME"] = "kojo_test"
+os.environ["DB_NAME"] = nom_base_de_test(NOM_BASE_TEST)
 os.environ["APP_ENV"] = "test"
 os.environ["REDIS_URL"] = ""
 os.environ["DISABLE_TRUSTED_HOST_MIDDLEWARE"] = "true"

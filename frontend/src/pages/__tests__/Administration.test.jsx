@@ -33,6 +33,7 @@ const serviceMock = vi.hoisted(() => ({
   getAccounts: vi.fn(),
   getAccount: vi.fn(),
   setAccountState: vi.fn(),
+  purgeAccount: vi.fn(),
   getConversations: vi.fn(),
   getConversation: vi.fn(),
 }));
@@ -95,6 +96,12 @@ beforeEach(() => {
   serviceMock.getAccounts.mockReset();
   serviceMock.getAccount.mockReset();
   serviceMock.setAccountState.mockReset();
+  serviceMock.purgeAccount.mockReset();
+  serviceMock.purgeAccount.mockResolvedValue({
+    message: 'Compte supprimé et anonymisé.',
+    deleted: true,
+    id: 'client-1',
+  });
   serviceMock.getConversations.mockReset();
   serviceMock.getConversation.mockReset();
 
@@ -267,6 +274,50 @@ describe('/administration — les décisions', () => {
     expect(await screen.findByText('Missions publiées')).toBeTruthy();
     expect(screen.getByText(/Publications hors sujet/)).toBeTruthy();
     expect(screen.getByText(/owner-1/)).toBeTruthy();
+  });
+});
+
+describe('/administration — la purge, définitive', () => {
+  it('n’envoie rien sans motif NI confirmation, puis retire le compte de la liste', async () => {
+    rendre();
+    await screen.findByText(/awa@kojo.sn/);
+
+    // « Supprimer » (la ligne), à ne pas confondre avec le bouton du formulaire.
+    fireEvent.click(screen.getAllByText('Supprimer')[0]);
+
+    // L'écran DIT ce qui va se passer : un profil purgé disparaît du site public.
+    expect(screen.getByText('Suppression définitive')).toBeTruthy();
+    expect(screen.getByText(/disparaît du site public/)).toBeTruthy();
+
+    const envoyer = screen.getByText('Supprimer définitivement');
+    const confirmation = screen.getByLabelText(/Je comprends que cette suppression/);
+    const motif = screen.getByLabelText(/Motif de la suppression/);
+
+    // Deux verrous, deux raisons : un motif écrit (il se relit) et une case
+    // cochée (la suppression ne se défait pas). Aucun des deux ne suffit seul.
+    expect(envoyer.disabled).toBe(true);
+    fireEvent.change(motif, { target: { value: 'Profil de test créé par erreur' } });
+    expect(envoyer.disabled).toBe(true);
+    fireEvent.click(confirmation);
+    await waitFor(() => expect(envoyer.disabled).toBe(false));
+
+    // La relecture ne rend plus le compte purgé : c'est ce que le serveur dit.
+    serviceMock.getAccounts.mockResolvedValue({
+      ...REPERTOIRE,
+      count: 1,
+      total: 1,
+      comptes: [TRAVAILLEUR_RESTREINT],
+      mesures: { ...REPERTOIRE.mesures, total: 127, clients: 89 },
+    });
+
+    fireEvent.click(envoyer);
+
+    await waitFor(() =>
+      expect(serviceMock.purgeAccount).toHaveBeenCalledWith('client-1', 'Profil de test créé par erreur')
+    );
+    // La sanction réversible n'a pas été empruntée pour une suppression.
+    expect(serviceMock.setAccountState).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByText(/awa@kojo\.sn/)).toBeNull());
   });
 });
 

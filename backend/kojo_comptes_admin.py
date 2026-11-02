@@ -139,13 +139,26 @@ def _horodatage() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _est_proprietaire(compte: dict) -> bool:
+def est_le_proprietaire(compte: dict) -> bool:
+    """Vrai si le compte EST le propriétaire (email du secret `OWNER_EMAIL`).
+
+    Public depuis la purge (`POST /owner/accounts/{id}/purge`) : la route doit
+    refuser de supprimer le compte du propriétaire avec le MÊME critère que
+    celui qui refuse de le bannir. Un second calcul écrit sur place (rôle, id,
+    drapeau) aurait pu désigner un autre compte le jour où l'un des deux
+    critères bouge.
+    """
     # Le module, pas le nom : `OWNER_EMAIL` est lu à l'APPEL, comme partout où
     # il décide d'un droit. Une copie figée à l'import ignorerait un changement
     # de configuration (et, en test, la même valeur que `verify_owner_access`).
     email_proprietaire = (getattr(kojo_settings, "OWNER_EMAIL", "") or "").strip().lower()
     email = str((compte or {}).get("email") or "").strip().lower()
     return bool(email_proprietaire) and email == email_proprietaire
+
+
+# Nom d'avant la publication : trois appelants internes le lisent encore plutôt
+# que de réécrire leur ligne. Il désigne la MÊME fonction, pas une copie.
+_est_proprietaire = est_le_proprietaire
 
 
 def _compte_public(compte: dict) -> dict:

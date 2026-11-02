@@ -11,6 +11,7 @@ import {
   Search,
   ShieldAlert,
   ShieldCheck,
+  Trash2,
   Users,
   X,
 } from 'lucide-react';
@@ -24,8 +25,15 @@ import { safeLog } from '../utils/env';
 // Il avait des chiffres (gains, commissions, litiges) et aucun COMPTE : pas un
 // nom, pas un état, aucun moyen d'arrêter quelqu'un. Cet écran ouvre les trois
 // choses qui manquaient — le répertoire, les deux sanctions, la lecture des
-// fils — et rien de plus : il ne supprime rien, ne change aucun mot de passe et
-// ne modifie aucun rôle.
+// fils — et la PURGE, sans laquelle un profil de test restait PUBLIC pour
+// toujours : restreindre et bannir laissent la page en ligne, et la seule
+// suppression existante exigeait la session du titulaire. Il ne change aucun
+// mot de passe et ne modifie aucun rôle.
+//
+// La purge n'a donc pas le même poids que les deux sanctions, et l'écran le
+// dit : case de confirmation obligatoire, avertissement écrit, et libellé
+// « Supprimer définitivement ». Pour écarter quelqu'un sans l'effacer, la
+// restriction et le bannissement restent les bons gestes.
 //
 // Les trois états ont TROIS effets distincts, et l'écran les écrit à côté du
 // bouton plutôt que de laisser deviner :
@@ -136,6 +144,10 @@ const Administration = () => {
   const [motif, setMotif] = useState('');
   const [decisionErreur, setDecisionErreur] = useState('');
   const [decisionEnCours, setDecisionEnCours] = useState(false);
+  // Une purge ne s'applique qu'après une confirmation EXPLICITE : la même
+  // modale sert les deux sanctions réversibles et la suppression définitive,
+  // donc c'est cette case — pas le bouton — qui dit qu'on a lu l'avertissement.
+  const [confirmationPurge, setConfirmationPurge] = useState(false);
 
   // ── Conversations ─────────────────────────────────────────────────────
   const [conversations, setConversations] = useState([]);
@@ -244,12 +256,18 @@ const Administration = () => {
     setDecision({ compte, etat: nouvelEtat });
     setMotif('');
     setDecisionErreur('');
+    setConfirmationPurge(false);
   };
 
   const appliquerDecision = async (evenement) => {
     evenement.preventDefault();
     if (!decision || decisionEnCours) return;
     const motifPropre = motif.trim();
+    const estPurge = decision.etat === 'purge';
+    if (estPurge && !confirmationPurge) {
+      setDecisionErreur(pageT('purgeConfirmRequired'));
+      return;
+    }
     if (decision.etat !== 'actif' && motifPropre.length < MOTIF_MINIMUM) {
       setDecisionErreur(pageT('sanctionRequired'));
       return;
@@ -257,11 +275,30 @@ const Administration = () => {
     setDecisionEnCours(true);
     setDecisionErreur('');
     try {
-      const reponse = await OwnerService.setAccountState(decision.compte.id, {
-        etat: decision.etat,
-        motif: motifPropre,
-      });
+      const reponse = estPurge
+        ? await OwnerService.purgeAccount(decision.compte.id, motifPropre)
+        : await OwnerService.setAccountState(decision.compte.id, {
+          etat: decision.etat,
+          motif: motifPropre,
+        });
       if (!vivant.current) return;
+      if (estPurge) {
+        // Le compte n'existe plus : il QUITTE la liste au lieu d'y rester avec
+        // une pastille. La fiche ouverte est fermée, et la relecture confirme
+        // que le serveur ne le rend plus.
+        const identifiant = decision.compte.id;
+        setComptes((precedents) => precedents.filter((compte) => compte.id !== identifiant));
+        if (selectionId === identifiant) {
+          setSelectionId(null);
+          setDetail(null);
+        }
+        toast.success(reponse?.message || pageT('purgeSuccess'));
+        setDecision(null);
+        setMotif('');
+        setConfirmationPurge(false);
+        await chargerComptes();
+        return;
+      }
       const compteRelu = reponse?.compte;
       if (compteRelu) {
         setDetail((precedent) => (precedent ? compteRelu : precedent));
@@ -277,9 +314,11 @@ const Administration = () => {
       if (!vivant.current) return;
       safeLog.error('Décision de modération refusée:', err);
       // Le refus du serveur dit QUOI corriger (motif trop court, compte
-      // propriétaire…) : il est rendu tel quel, jamais remplacé par un
-      // message générique qui effacerait le remède.
-      setDecisionErreur(err?.message || pageT('sanctionError'));
+      // propriétaire, remboursement en vol…) : il est rendu tel quel, jamais
+      // remplacé par un message générique qui effacerait le remède.
+      setDecisionErreur(
+        err?.message || (estPurge ? pageT('purgeError') : pageT('sanctionError'))
+      );
     } finally {
       if (vivant.current) setDecisionEnCours(false);
     }
@@ -495,6 +534,16 @@ const Administration = () => {
                               </button>
                             </>
                           )}
+                          {compte.user_type !== 'owner' && (
+                            <button
+                              type="button"
+                              onClick={() => demanderDecision(compte, 'purge')}
+                              className="bouton bouton-clair"
+                            >
+                              <Trash2 className="h-4 w-4" aria-hidden="true" />
+                              {pageT('purge')}
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => ouvrirCompte(compte.id)}
@@ -607,6 +656,12 @@ const Administration = () => {
                         <button type="button" onClick={() => demanderDecision(detail, 'actif')} className="bouton bouton-encre">
                           <ShieldCheck className="h-4 w-4" aria-hidden="true" />
                           {pageT('reactivate')}
+                        </button>
+                      )}
+                      {detail.user_type !== 'owner' && !detail.is_owner && (
+                        <button type="button" onClick={() => demanderDecision(detail, 'purge')} className="bouton bouton-clair">
+                          <Trash2 className="h-4 w-4" aria-hidden="true" />
+                          {pageT('purge')}
                         </button>
                       )}
                     </div>
@@ -731,7 +786,9 @@ const Administration = () => {
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <span className="sur-titre">{pageT('sanctionTitle')}</span>
+                <span className="sur-titre">
+                  {decision.etat === 'purge' ? pageT('purgeTitle') : pageT('sanctionTitle')}
+                </span>
                 <h2 id="titre-decision" className="titre-carte-app mt-2">{nomAffiche(decision.compte)}</h2>
                 <p className="mt-1 text-xs text-stone-500">{decision.compte.email}</p>
               </div>
@@ -745,23 +802,31 @@ const Administration = () => {
               </button>
             </div>
 
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <EtatPastille etat={decision.etat} pageT={pageT} />
-              <span className="text-xs text-stone-600">
-                {decision.etat === 'restreint' && pageT('hintRestrict')}
-                {decision.etat === 'banni' && pageT('hintBan')}
-                {decision.etat === 'actif' && pageT('reactivate')}
-              </span>
-            </div>
+            {decision.etat === 'purge' ? (
+              <p className="mt-4 rounded-[3px] border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+                {pageT('purgeHint')}
+              </p>
+            ) : (
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <EtatPastille etat={decision.etat} pageT={pageT} />
+                <span className="text-xs text-stone-600">
+                  {decision.etat === 'restreint' && pageT('hintRestrict')}
+                  {decision.etat === 'banni' && pageT('hintBan')}
+                  {decision.etat === 'actif' && pageT('reactivate')}
+                </span>
+              </div>
+            )}
 
             {decision.etat !== 'actif' && (
               <label htmlFor="motif-decision" className="mt-4 block">
-                <span className="sur-titre">{pageT('sanctionReason')}</span>
+                <span className="sur-titre">
+                  {decision.etat === 'purge' ? pageT('purgeReason') : pageT('sanctionReason')}
+                </span>
                 <textarea
                   id="motif-decision"
                   value={motif}
                   onChange={(evenement) => setMotif(evenement.target.value)}
-                  placeholder={pageT('sanctionReasonPlaceholder')}
+                  placeholder={decision.etat === 'purge' ? pageT('purgeReasonPlaceholder') : pageT('sanctionReasonPlaceholder')}
                   rows={3}
                   maxLength={500}
                   className="mt-1 w-full rounded-[3px] border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:outline-hidden focus:ring-2 focus:ring-orange-500"
@@ -769,6 +834,19 @@ const Administration = () => {
                 <span className="mt-1 block text-xs text-stone-500">
                   {motif.trim().length}/{MOTIF_MINIMUM}
                 </span>
+              </label>
+            )}
+
+            {decision.etat === 'purge' && (
+              <label htmlFor="confirmation-purge" className="mt-4 flex items-start gap-2 text-sm text-stone-800">
+                <input
+                  id="confirmation-purge"
+                  type="checkbox"
+                  checked={confirmationPurge}
+                  onChange={(evenement) => setConfirmationPurge(evenement.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded-[3px] border-stone-300 text-orange-700 focus:ring-2 focus:ring-orange-500"
+                />
+                <span>{pageT('purgeConfirm')}</span>
               </label>
             )}
 
@@ -784,10 +862,16 @@ const Administration = () => {
               </button>
               <button
                 type="submit"
-                disabled={decisionEnCours || (decision.etat !== 'actif' && motif.trim().length < MOTIF_MINIMUM)}
+                disabled={
+                  decisionEnCours
+                  || (decision.etat === 'purge' && !confirmationPurge)
+                  || (decision.etat !== 'actif' && motif.trim().length < MOTIF_MINIMUM)
+                }
                 className="bouton bouton-encre disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {decisionEnCours ? pageT('loading') : pageT('sanctionSubmit')}
+                {decisionEnCours
+                  ? pageT('loading')
+                  : (decision.etat === 'purge' ? pageT('purgeSubmit') : pageT('sanctionSubmit'))}
               </button>
             </div>
           </form>

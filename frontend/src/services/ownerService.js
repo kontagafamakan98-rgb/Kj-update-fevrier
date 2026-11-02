@@ -263,6 +263,23 @@ class OwnerService {
     }
   }
 
+  /** Supprime DÉFINITIVEMENT un compte, avec son motif (purge propriétaire).
+   *
+   *  Distinct de `setAccountState` : restreindre ou bannir laisse la page
+   *  PUBLIQUE en ligne, alors qu'un profil de test doit disparaître du site.
+   *  Le serveur applique la même cascade que la suppression self-service et
+   *  rend 400 sans motif, 409 sur le compte propriétaire ou un compte déjà
+   *  supprimé, 404 sur un identifiant inconnu — refus rendus tels quels.
+   *  @returns {Promise<object>} {message, deleted, id}. */
+  async purgeAccount(userId, motif) {
+    try {
+      return await api.post(`/owner/accounts/${encodeURIComponent(userId)}/purge`, { motif });
+    } catch (error) {
+      safeLog.error('❌ Erreur suppression définitive du compte:', error);
+      throw this._erreurNommee(error, `Erreur serveur: ${error?.response?.status || 'inconnu'}`);
+    }
+  }
+
   /** Conversations de la plateforme, en LECTURE SEULE (propriétaire).
    *  @returns {Promise<object>} {total, count, tronque, conversations}. */
   async getConversations(recherche = '') {

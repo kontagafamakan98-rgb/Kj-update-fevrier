@@ -178,9 +178,31 @@ CHAMPS_HORS_MODELE = frozenset({
     "wallet_verification",
 })
 
-@router.delete("/users/account")
-async def delete_my_account(current_user: User = Depends(get_current_user)):
-    """Supprime définitivement le compte de l'utilisateur connecté.
+def _identifiant_du_compte(compte) -> str:
+    """L'identifiant d'un compte, qu'il soit le modèle `User` ou un document.
+
+    La cascade ci-dessous est appelée par DEUX portes : la suppression
+    self-service (le modèle de la session) et la purge du propriétaire (le
+    document relu en base). Elle ne doit pas dépendre de la forme reçue, sinon
+    l'une des deux portes effacerait autre chose que ce qu'elle croit.
+    """
+    identifiant = compte.get("id") if isinstance(compte, dict) else getattr(compte, "id", None)
+    if not identifiant:
+        raise HTTPException(status_code=404, detail="Compte introuvable")
+    return identifiant
+
+
+async def supprimer_compte_utilisateur(current_user) -> dict:
+    """Supprime définitivement UN compte, quelle que soit la porte d'entrée.
+
+    Appelée par `DELETE /users/account` (le titulaire lui-même, via le modèle
+    de sa session) et par `POST /owner/accounts/{id}/purge` (le propriétaire,
+    sur le document relu). Une seule cascade, donc une seule définition de « ce
+    que la suppression efface » : deux copies auraient divergé au premier
+    ajout de collection, et l'une des deux aurait laissé des données derrière
+    elle sans que rien ne rougisse. La forme du compte (modèle `User` ou dict)
+    est acceptée par `_identifiant_du_compte` et `nom_affiche`, qui gèrent les
+    deux — c'est ce qui permet de partager le corps sans le réécrire.
 
     Ordre critique (audit RGPD) :
     1. Les fonds SÉQUESTRÉS (paiement `held` / `release_failed` /
@@ -219,7 +241,7 @@ async def delete_my_account(current_user: User = Depends(get_current_user)):
     Returns:
         dict: {message, deleted: true}.
     """
-    user_id = current_user.id
+    user_id = _identifiant_du_compte(current_user)
     now = datetime.now(timezone.utc)
 
     # ------------------------------------------------------------------
@@ -413,6 +435,20 @@ async def delete_my_account(current_user: User = Depends(get_current_user)):
 
     logger.info(f"✅ Compte supprimé (soft delete): {user_id}")
     return {"message": "Votre compte Kojo a été supprimé. Au revoir !", "deleted": True}
+
+
+@router.delete("/users/account")
+async def delete_my_account(current_user: User = Depends(get_current_user)):
+    """Supprime définitivement le compte de l'utilisateur connecté.
+
+    La cascade vit dans `supprimer_compte_utilisateur` : elle est PARTAGÉE avec
+    la purge du propriétaire, et c'est ce partage qui garantit qu'une même
+    suppression efface la même chose, quelle que soit la porte.
+
+    Returns:
+        dict: {message, deleted: true}.
+    """
+    return await supprimer_compte_utilisateur(current_user)
 
 
 # ---------------------------------------------------------------------------
