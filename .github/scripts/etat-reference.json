@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-11-02",
-    "motif": "02/11/2026 : la sonde de sante lit pages.declarees (total renomme en declarees+vivantes le 01/11, d'ou un rouge d'un jour qui accusait la production) et la sonde de collecte separe l'acquisition jamais demarree (avis, sortie 0) de la contradiction veilles comptees sans date (refus) ; deux regles nouvelles, donc une mutation laissee sur l'une de ces sondes doit se voir ici",
+    "motif": "02/11/2026 : la sonde de sante demande le sitemap SERVI (ses trois en-tetes et ses <loc>) et le confronte a pages.declarees, et la sonde de collecte exige la MEMOIRE de l'acquisition (kojo_job_alerts, kojo_metrics) pour distinguer « jamais » de « plus jamais » ; trois regles nouvelles, donc une mutation laissee sur l'une de ces sondes se voit ici",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/alerte_sondes.py": "35c6b645b431b932c6af1ed53704acc4f096da428a49e2f7461259358f137687",
@@ -59,6 +59,7 @@
       "backend/kojo_balises.py": "3596f3a55094902f31f1327c93d744551e30c959262c97f64c9b6beb4e437f67",
       "backend/kojo_core.py": "bf699385546b29fd504a7ded798c5ee0f95c53b2395a03d3bed3d3604abda69f",
       "backend/kojo_identifiants.py": "83911ed4c8f53d1b1e74133045bcf6db9647fe0888299180ad7781147b3b7cf6",
+      "backend/kojo_job_alerts.py": "8caaca0e902fdb5f684a1abebcdd240df4ebc0224a71d9cfb7e347240aada031",
       "backend/kojo_payments.py": "bf568820c46d4ec42d314de48c2aeeebe06e82e577ac4c1b318f662357a84c9e",
       "backend/kojo_routers_jobs.py": "12d708991877f307f60af638cdce0ec7d2d3a3b7cf529611b662cb65cc5088ad",
       "backend/kojo_routers_jobs_proposals.py": "513fa961889e9318173d989836c290c3c08556ff3289f62ba2ebb750563f43a4",
@@ -71,7 +72,9 @@
       "backend/scripts/check_ai_assistant_probe.py": "2ce9e4a4acca1a3cdd2a651ee976e14cfda9db09fee76b0f5f61ecf9fd42d94d",
       "backend/scripts/check_atlas_backups.py": "e41a5b799d7128cfa98e6e34424ad30988a88274a302c484c48c9e8aa0b44c83",
       "backend/scripts/check_deployed_revision.py": "bcd6ef28eab30e1365db3cf3c41b3eb203f6578177e93102cc9830bad82113ae",
+      "backend/scripts/check_health_probe.py": "3a42da06dc6a646d974c79618f150e88508e331cc2f994aa1fa272656b6a415b",
       "backend/scripts/check_index_db.py": "ab9545fdb8e09f2cdabeed9865b2537f9216c4954c36ca7ea5fae656ac1212dd",
+      "backend/scripts/check_metrics_collecte.py": "3cba8281ce84c8141ef1cb36b75b9820ffa74872cb2ee0cf58dc41d6a500c97a",
       "backend/scripts/verifier_depot_sauvegarde.py": "165d97d983076e2f03a0ed09950c703935963aef53a917db7b7d70e404f63866",
       "backend/server.py": "c6e9713b31635965e00272bb2b1f52177a64f82ffd3797e35fcaf52c107e6cbd",
       "frontend/scripts/audit_api_returns.cjs": "2e54a6a80a65df023c7d75695a0ea00657d3ee7d40bcaa5d42ca12fa9308afa7",
@@ -117,6 +120,7 @@
       "frontend/scripts/check-pack2-chunks.js": "953f86f71a0f61e8f446727a41e83097ccbb0ecb7f118dc7571bc6b413c6caef",
       "frontend/scripts/check-pack2-i18n-hygiene.js": "692a809c06b036b51536bf1810317ced7e77d7ee10d777188b00bf78b4389d58",
       "frontend/scripts/check-page-meta.js": "abbdc46403a4e2ce8b06fc9b76c652a98958bc23c8155f973029c600d3ce281b",
+      "frontend/scripts/check-prerender-shells.js": "748b20e4d7ed7afa14dabaf10f52c015ca4e63c78e9df222bc6887c4fe7ddac4",
       "frontend/scripts/check-pwa-manifest.js": "7840560638e9bb25d11c87e729640fc7208a1e60e0ed521dcfa4e3dc2652ad95",
       "frontend/scripts/check-reliquats-css.js": "afc399893d24bf9831bc9c0094b695746bb0a7ddbe5c06e7f65f9adde936a219",
       "frontend/scripts/check-retard-main.js": "b9c98e4c23382b24d1ce361acc7ea5d0cc6dc166d83ab288402f76436d205e61",
@@ -148,10 +152,7 @@
       "frontend/scripts/retard-main.js": "eef5724dae66bc8e17fbb50e0be1c426b9eba4ceb24c04808c8fdb0f8dacad37",
       "frontend/scripts/style-layout-budgets.cjs": "db93353a147d9be6e84999ea065d3b3df5d08871a62fe943f3346bc80d68ede9",
       "frontend/scripts/validate-vercel-json.mjs": "16a56835e1fb299821c3a1dd7fa4d0957982a970a493e98ed8855d06fc563518",
-      "frontend/scripts/verre-contraste.js": "0304f01ae4ccd2fea6db62cff8badcb4085d3a34622f49416ed8944c377c688c",
-      "frontend/scripts/check-prerender-shells.js": "748b20e4d7ed7afa14dabaf10f52c015ca4e63c78e9df222bc6887c4fe7ddac4",
-      "backend/scripts/check_health_probe.py": "ce7471064e23e3973d3dc9892aefa7bebc72b9a1b00e9486d7bcd94671864ef1",
-      "backend/scripts/check_metrics_collecte.py": "116b2fd6e11a92ff5ed625f087e6984d32e4db42399b88a9e35a262c0f2501d2"
+      "frontend/scripts/verre-contraste.js": "0304f01ae4ccd2fea6db62cff8badcb4085d3a34622f49416ed8944c377c688c"
     }
   },
   "hors_perimetre": [

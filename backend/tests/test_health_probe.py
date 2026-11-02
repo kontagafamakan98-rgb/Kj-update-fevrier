@@ -124,6 +124,27 @@ def email_down(provider="resend", detail="expéditeur inutilisable : domaine « 
     })
 
 
+def sitemap_ok(urls=80, vivantes=0):
+    """Le sitemap SERVI : les trois en-tetes de volume et les `<loc>` qui vont avec.
+
+    Les valeurs par defaut sont celles du bloc `langues()` de reference (7 pages
+    multilingues × 5 langues + 45 pages monolingues = 80 declarees), pour que la
+    confrontation soit VRAIE dans les cas ordinaires au lieu d'etre neutralisee.
+    """
+    total = urls + vivantes
+    corps = "<urlset>" + "".join(
+        "<url><loc>https://kojoforafrica.cc.cd/p%d</loc></url>" % n for n in range(total)
+    ) + "</urlset>"
+    reponse = make_fake_response(200, {})
+    reponse.read.return_value = corps.encode("utf-8")
+    reponse.headers = {
+        "X-Kojo-Urls": str(total),
+        "X-Kojo-Urls-Declarees": str(urls),
+        "X-Kojo-Urls-Vivantes": str(vivantes),
+    }
+    return reponse
+
+
 def composite_ok(total=4, seuil=2):
     return make_fake_response(200, {
         "service": "composite",
@@ -171,7 +192,7 @@ def test_check_health_success(probe):
         "revision": "abcdef1234"
     }
     with patch("urllib.request.urlopen",
-               side_effect=[make_fake_response(200, payload), email_ok(), composite_ok()]):
+               side_effect=[make_fake_response(200, payload), email_ok(), composite_ok(), sitemap_ok()]):
         assert probe.check_health(HEALTH_URL) == 0
 
 
@@ -199,7 +220,7 @@ def test_check_health_fails_on_paydunya_open(probe, capsys):
         ),
     }
     with patch("urllib.request.urlopen",
-               side_effect=[make_fake_response(200, payload), email_ok(), composite_ok()]):
+               side_effect=[make_fake_response(200, payload), email_ok(), composite_ok(), sitemap_ok()]):
         assert probe.check_health(HEALTH_URL) == 1
     assert "CIRCUIT BREAKER PAYDUNYA OUVERT" in capsys.readouterr().out
 
@@ -215,7 +236,7 @@ def test_check_health_fails_on_database_disconnected(probe):
         "paiement": paiement(),
     }
     with patch("urllib.request.urlopen",
-               side_effect=[make_fake_response(200, payload), email_ok(), composite_ok()]):
+               side_effect=[make_fake_response(200, payload), email_ok(), composite_ok(), sitemap_ok()]):
         assert probe.check_health(HEALTH_URL) == 1
 
 
@@ -250,7 +271,8 @@ def test_email_provider_none_fait_echouer(probe, capsys):
         "configured": False,
         "detail": "EMAIL_PROVIDER=none : aucun fournisseur actif, aucun email ne part",
     })
-    with patch("urllib.request.urlopen", side_effect=[sante_ok(), muet, composite_ok()]):
+    with patch("urllib.request.urlopen",
+               side_effect=[sante_ok(), muet, composite_ok(), sitemap_ok()]):
         code = probe.check_health(HEALTH_URL)
 
     sortie = capsys.readouterr().out
@@ -300,7 +322,8 @@ def test_sonde_email_absente_fait_echouer_en_le_disant(probe, capsys):
     with patch("urllib.request.urlopen",
                side_effect=[sante_ok(),
                             urllib.error.HTTPError("u", 404, "Not Found", {}, None),
-                            composite_ok()]):
+                            composite_ok(),
+                            sitemap_ok()]):
         code = probe.check_health(HEALTH_URL)
 
     sortie = capsys.readouterr().out
@@ -314,7 +337,8 @@ def test_sonde_email_absente_fait_echouer_en_le_disant(probe, capsys):
 
 def test_composite_au_dela_du_seuil_echoue_et_nomme_les_pannes(probe, capsys):
     with patch("urllib.request.urlopen",
-               side_effect=[sante_ok(), email_ok(), composite_503(("email", "cloudinary"))]):
+               side_effect=[sante_ok(), email_ok(), composite_503(("email", "cloudinary")),
+                            sitemap_ok()]):
         code = probe.check_health(HEALTH_URL)
 
     sortie = capsys.readouterr().out
@@ -338,7 +362,8 @@ def test_composite_degrade_sous_le_seuil_avertit_sans_echouer(probe, capsys):
             "cloudinary": {"circuit": "ok"},
         },
     })
-    with patch("urllib.request.urlopen", side_effect=[sante_ok(), email_ok(), degrade]):
+    with patch("urllib.request.urlopen",
+               side_effect=[sante_ok(), email_ok(), degrade, sitemap_ok()]):
         code = probe.check_health(HEALTH_URL)
 
     sortie = capsys.readouterr().out
@@ -355,7 +380,8 @@ def test_composite_503_sans_fournisseur_down_ne_conclut_pas(probe, capsys):
         "threshold": 2,
         "providers": {},
     })
-    with patch("urllib.request.urlopen", side_effect=[sante_ok(), email_ok(), muet]):
+    with patch("urllib.request.urlopen",
+               side_effect=[sante_ok(), email_ok(), muet, sitemap_ok()]):
         code = probe.check_health(HEALTH_URL)
 
     sortie = capsys.readouterr().out
@@ -372,15 +398,20 @@ def test_les_moniteurs_sont_derives_de_l_url_de_sante(probe):
 
     def urlopen_espion(req, timeout=None):
         demandees.append(req.full_url)
-        return [sante_ok(), email_ok(), composite_ok()][len(demandees) - 1]
+        return [sante_ok(), email_ok(), composite_ok(), sitemap_ok()][
+            len(demandees) - 1
+        ]
 
     with patch("urllib.request.urlopen", side_effect=urlopen_espion):
         assert probe.check_health("https://api.kojoforafrica.cc.cd/health") == 0
 
+    # Le sitemap est demande au MEME hote derive, une fois : la declaration de
+    # /health se confronte a un artefact SERVI, pas a elle-meme.
     assert demandees == [
         "https://api.kojoforafrica.cc.cd/health",
         "https://api.kojoforafrica.cc.cd/monitor/email",
         "https://api.kojoforafrica.cc.cd/monitor",
+        "https://api.kojoforafrica.cc.cd/api/sitemap.xml",
     ]
 
 
@@ -411,6 +442,7 @@ def test_paiement_non_configure_fait_echouer_et_nomme_le_remede(probe, capsys):
         )),
         email_ok(),
         composite_ok(),
+        sitemap_ok(),
     ]):
         code = probe.check_health(HEALTH_URL)
 
@@ -429,6 +461,7 @@ def test_paiement_en_echec_publie_son_motif(probe, capsys):
         )),
         email_ok(),
         composite_ok(),
+        sitemap_ok(),
     ]):
         code = probe.check_health(HEALTH_URL)
 
@@ -445,7 +478,7 @@ def test_paiement_jamais_exerce_n_est_pas_une_panne(probe, capsys):
     rougirait là-dessus dirait « panne » à la place de « zéro vente ». Le fait
     est publié, et la distinction avec `ok` reste lisible.
     """
-    with patch("urllib.request.urlopen", side_effect=[sante_ok(), email_ok(), composite_ok()]):
+    with patch("urllib.request.urlopen", side_effect=[sante_ok(), email_ok(), composite_ok(), sitemap_ok()]):
         code = probe.check_health(HEALTH_URL)
 
     sortie = capsys.readouterr().out
@@ -463,6 +496,7 @@ def test_paiement_ok_publie_le_dernier_appel(probe, capsys):
         )),
         email_ok(),
         composite_ok(),
+        sitemap_ok(),
     ]):
         code = probe.check_health(HEALTH_URL)
 
@@ -480,7 +514,7 @@ def test_un_backend_sans_diagnostic_de_paiement_echoue_en_disant_de_redeployer(p
                              "remaining_cooldown_seconds": 0},
     }
     with patch("urllib.request.urlopen",
-               side_effect=[make_fake_response(200, payload), email_ok(), composite_ok()]):
+               side_effect=[make_fake_response(200, payload), email_ok(), composite_ok(), sitemap_ok()]):
         code = probe.check_health(HEALTH_URL)
 
     sortie = capsys.readouterr().out
@@ -492,7 +526,7 @@ def test_un_bloc_paiement_incomplet_nomme_le_champ_absent(probe, capsys):
     bloc = paiement()
     del bloc["motif"]
     with patch("urllib.request.urlopen",
-               side_effect=[sante_ok(paiement=bloc), email_ok(), composite_ok()]):
+               side_effect=[sante_ok(paiement=bloc), email_ok(), composite_ok(), sitemap_ok()]):
         code = probe.check_health(HEALTH_URL)
 
     sortie = capsys.readouterr().out
@@ -506,6 +540,7 @@ def test_un_health_qui_se_contredit_echoue(probe, capsys):
         sante_ok(paiement=paiement(consecutive_failures=3)),
         email_ok(),
         composite_ok(),
+        sitemap_ok(),
     ]):
         code = probe.check_health(HEALTH_URL)
 
@@ -529,7 +564,8 @@ def test_un_composite_qui_contredit_le_diagnostic_echoue(probe, capsys):
             "cloudinary": {"circuit": "ok"},
         },
     })
-    with patch("urllib.request.urlopen", side_effect=[sante_ok(), email_ok(), composite]):
+    with patch("urllib.request.urlopen",
+               side_effect=[sante_ok(), email_ok(), composite, sitemap_ok()]):
         code = probe.check_health(HEALTH_URL)
 
     sortie = capsys.readouterr().out
@@ -544,7 +580,7 @@ def test_un_composite_qui_contredit_le_diagnostic_echoue(probe, capsys):
 def test_les_langues_servies_sont_publiees_et_comptees(probe, capsys):
     """Le bloc doit pouvoir se lire sans lancer la sonde hreflang."""
     with patch("urllib.request.urlopen",
-               side_effect=[sante_ok(), email_ok(), composite_ok()]):
+               side_effect=[sante_ok(), email_ok(), composite_ok(), sitemap_ok()]):
         code = probe.check_health(HEALTH_URL)
 
     sortie = capsys.readouterr().out
@@ -564,7 +600,7 @@ def test_un_backend_sans_bloc_langues_echoue_en_disant_de_redeployer(probe, caps
         "paiement": paiement(),
     }
     with patch("urllib.request.urlopen",
-               side_effect=[make_fake_response(200, payload), email_ok(), composite_ok()]):
+               side_effect=[make_fake_response(200, payload), email_ok(), composite_ok(), sitemap_ok()]):
         code = probe.check_health(HEALTH_URL)
 
     sortie = capsys.readouterr().out
@@ -578,7 +614,7 @@ def test_un_volume_de_langues_qui_ne_tombe_pas_juste_echoue(probe, capsys):
     bloc = langues()
     bloc["pages"] = {**bloc["pages"], "declarees": 999}
     with patch("urllib.request.urlopen",
-               side_effect=[sante_ok(langues=bloc), email_ok(), composite_ok()]):
+               side_effect=[sante_ok(langues=bloc), email_ok(), composite_ok(), sitemap_ok()]):
         code = probe.check_health(HEALTH_URL)
 
     sortie = capsys.readouterr().out
@@ -601,7 +637,7 @@ def test_un_sous_bloc_pages_reste_sur_total_est_refuse_en_nommant_declarees(prob
         "total": 80,
     }
     with patch("urllib.request.urlopen",
-               side_effect=[sante_ok(langues=bloc), email_ok(), composite_ok()]):
+               side_effect=[sante_ok(langues=bloc), email_ok(), composite_ok(), sitemap_ok()]):
         code = probe.check_health(HEALTH_URL)
 
     sortie = capsys.readouterr().out
@@ -646,7 +682,7 @@ def test_une_langue_sans_document_est_refusee(probe, capsys):
     bloc = langues()
     bloc["documents_par_langue"] = {**bloc["documents_par_langue"], "mos": 0}
     with patch("urllib.request.urlopen",
-               side_effect=[sante_ok(langues=bloc), email_ok(), composite_ok()]):
+               side_effect=[sante_ok(langues=bloc), email_ok(), composite_ok(), sitemap_ok()]):
         code = probe.check_health(HEALTH_URL)
 
     sortie = capsys.readouterr().out
@@ -659,9 +695,69 @@ def test_un_volume_sans_portee_est_refuse(probe, capsys):
     bloc = langues()
     bloc["portee"] = "   "
     with patch("urllib.request.urlopen",
-               side_effect=[sante_ok(langues=bloc), email_ok(), composite_ok()]):
+               side_effect=[sante_ok(langues=bloc), email_ok(), composite_ok(), sitemap_ok()]):
         code = probe.check_health(HEALTH_URL)
 
     sortie = capsys.readouterr().out
     assert code == 1
     assert "portee" in sortie
+
+
+class TestLeVolumeServiConfronteLaDeclaration:
+    """Le bloc `langues` est une DECLARATION ; le sitemap est un artefact SERVI.
+
+    Ce que ces cas ferment (02/11/2026) : la sonde verifiait l'arithmetique
+    INTERNE du bloc, jamais qu'un artefact servi la portait. Un backend en
+    retard sur le frontend, ou un sitemap qui annonce un volume que son corps
+    ne contient pas, restait donc invisible ici — et c'est exactement l'ecart
+    qu'un deploiement partiel produit.
+    """
+
+    def _lancer(self, probe, sitemap):
+        with patch("urllib.request.urlopen",
+                  side_effect=[sante_ok(), email_ok(), composite_ok(), sitemap]):
+            return probe.check_health(HEALTH_URL)
+
+    def test_un_sitemap_concordant_est_publie_comme_un_fait(self, probe, capsys):
+        assert self._lancer(probe, sitemap_ok(vivantes=5)) == 0
+        sortie = capsys.readouterr().out
+        assert "[OK] Sitemap servi : 85 URL dont 5 vivante(s)" in sortie
+        assert "80 page(s) declarees" in sortie
+
+    def test_un_volume_servi_different_du_volume_declare_est_refuse(self, probe, capsys):
+        """La declaration dit 80, l'artefact en sert 79 : les deux ne parlent pas du meme site."""
+        code = self._lancer(probe, sitemap_ok(urls=79))
+        sortie = capsys.readouterr().out
+        assert code == 1
+        assert "X-Kojo-Urls-Declarees=79" in sortie and "80 page(s)" in sortie
+
+    def test_un_entete_absent_nomme_la_revision_a_redeployer(self, probe, capsys):
+        reponse = sitemap_ok()
+        del reponse.headers["X-Kojo-Urls-Vivantes"]
+        code = self._lancer(probe, reponse)
+        sortie = capsys.readouterr().out
+        assert code == 1
+        assert "X-Kojo-Urls-Vivantes" in sortie and "redeployer" in sortie
+
+    def test_un_corps_qui_ne_porte_pas_le_volume_annonce_est_refuse(self, probe, capsys):
+        """L'en-tete annonce 80 et le corps n'en contient que 3 : le compte ment."""
+        reponse = sitemap_ok()
+        corps = "<urlset>" + "<url><loc>https://x/y</loc></url>" * 3 + "</urlset>"
+        reponse.read.return_value = corps.encode("utf-8")
+        code = self._lancer(probe, reponse)
+        sortie = capsys.readouterr().out
+        assert code == 1
+        assert "3 <loc> servis" in sortie and "X-Kojo-Urls=80" in sortie
+
+    def test_un_sitemap_illisible_n_est_pas_un_vert(self, probe, capsys):
+        """Une route qui ne repond pas n'a rien confronte : elle est nommee."""
+        sitemap = MagicMock()
+        sitemap.status = 500
+        sitemap.read.return_value = b"boom"
+        sitemap.headers = {}
+        sitemap.__enter__.return_value = sitemap
+        sitemap.__exit__.return_value = False
+        code = self._lancer(probe, sitemap)
+        sortie = capsys.readouterr().out
+        assert code == 1
+        assert "sitemap" in sortie.lower() and "HTTP 500" in sortie

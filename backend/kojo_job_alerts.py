@@ -87,6 +87,21 @@ from kojo_shared import notify_user_localized
 # veille, et un journal par email serait une donnée de plus à purger.
 COLLECTION = "job_alerts"
 
+# ── LA MEMOIRE DE L'ACQUISITION (02/11/2026) ───────────────────────────────
+# La jauge `plus_recente` lit le corpus VIVANT : elle vaut 0 quand aucune veille
+# n'est datee. Mesure du 02/11/2026 : 0 veille, 0 mission ouverte — donc 0. Ce
+# zero ne distingue pas deux situations que rien ne rapproche : « aucune veille
+# n'a jamais ete creee » (le produit n'a pas commence, et un rouge permanent y
+# apprend a ignorer les rouges) et « des veilles ont existe puis ont disparu »
+# (un corpus VIDE par une suppression de compte ou un nettoyage, c'est-a-dire
+# une acquisition qui a cesse — un incident). Un document unique garde donc la
+# date de la PREMIERE veille jamais creee, hors du corpus : il ne bouge plus,
+# il survit a la disparition des veilles, et c'est lui qui permet a la sonde de
+# collecte de nommer le second cas. Ecrit par `$setOnInsert` (la premiere date
+# gagne), lu au meme moment que les compteurs.
+COLLECTION_ETAT = "metrics_etat"
+DOC_ETAT = "alertes_emploi"
+
 # Bornes, toutes choisies pour que le passage reste une lecture courte même si
 # la base grandit : cinq missions par email (au-delà, le message devient une
 # liste que personne ne lit), deux cents veilles par passage, deux cents
@@ -162,6 +177,12 @@ async def compter_par_origine() -> dict:
             quand aucune veille ne porte de date lisible (corpus vide, ou
             documents importés sans le champ) : l'appelant publie alors 0, qui
             veut dire « jamais », jamais « maintenant ».
+            ``premiere`` est la date de la PREMIÈRE veille jamais créée, lue
+            dans `metrics_etat` (hors corpus, donc elle survit à la
+            disparition des veilles) : ``None`` veut dire « aucune veille n'a
+            jamais été créée ». C'est ce couple qui distingue « jamais » de
+            « plus jamais » — un corpus vidé laisse ``plus_recente`` à
+            ``None`` alors que ``premiere`` porte encore sa date.
     """
     comptes = {origine: 0 for origine in ORIGINES_COMPTEES}
     hors = 0
@@ -184,11 +205,40 @@ async def compter_par_origine() -> dict:
                 creee = creee.replace(tzinfo=timezone.utc)
             if plus_recente is None or creee > plus_recente:
                 plus_recente = creee
+    # La MEMOIRE (02/11/2026) : hors du corpus, donc elle survit a sa
+    # disparition. Une erreur de lecture REMONTE au lieu de valoir 0 — un zero
+    # invente dirait « jamais » sur une base en panne, ce que la regle de
+    # `server.py` interdit deja pour les compteurs (la famille est omise).
+    etat = await db[COLLECTION_ETAT].find_one({"_id": DOC_ETAT}, {"premiere_creation_at": 1})
+    premiere: Optional[datetime] = _instant((etat or {}).get("premiere_creation_at"))
+    if premiere is not None and premiere.tzinfo is None:
+        premiere = premiere.replace(tzinfo=timezone.utc)
     return {
         "par_origine": comptes,
         "hors_vocabulaire": hors,
         "plus_recente": plus_recente,
+        "premiere": premiere,
     }
+
+
+async def _retenir_premiere_creation(instant: datetime) -> None:
+    """Pose la date de la PREMIERE veille jamais creee (elle ne bouge plus).
+
+    `$setOnInsert` : la premiere ecriture gagne, les suivantes ne changent rien.
+    Un echec est JOURNALISE et n'interrompt pas le reglage de l'utilisateur —
+    une mesure ne fait pas echouer une action client —, et la sonde de collecte
+    le verra comme un corpus vide plutot que de lire un chiffre invente.
+    """
+    try:
+        await db[COLLECTION_ETAT].update_one(
+            {"_id": DOC_ETAT},
+            {"$setOnInsert": {"premiere_creation_at": instant}},
+            upsert=True,
+        )
+    except Exception as exc:  # noqa: BLE001 - une mesure ne casse pas le reglage
+        logger.warning(
+            "⚠️ Veille emploi : memoire d'acquisition non ecrite (%s)", exc
+        )
 
 
 def _base_publique() -> str:
@@ -458,6 +508,12 @@ async def enregistrer(user_id: str, email: str, donnees: dict) -> dict:
         await db[COLLECTION].update_one(
             {"user_id": user_id}, {"$set": {**changement, **pose_jeton}}
         )
+
+    # La MEMOIRE de l'acquisition (02/11/2026) : un document unique, hors du
+    # corpus, garde la date de la premiere veille jamais creee. Sans lui, un
+    # corpus vide se lisait « aucune veille n'a jamais existe », y compris
+    # quand des veilles avaient existe et avaient disparu.
+    await _retenir_premiere_creation(maintenant)
 
     document = await db[COLLECTION].find_one({"user_id": user_id})
     return vue(document)

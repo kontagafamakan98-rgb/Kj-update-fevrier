@@ -382,6 +382,20 @@ def rendre(corpus: Optional[dict] = None) -> str:
             "Creation de la veille emploi la plus recente (0 = aucune). Age = time() - valeur.",
             _epoch(alertes.get("plus_recente")),
         )
+        # LA MEMOIRE DE L'ACQUISITION (02/11/2026). La jauge ci-dessus lit le
+        # corpus VIVANT : elle vaut 0 dans deux situations que rien ne
+        # rapproche — aucune veille n'a JAMAIS ete creee (le produit n'a pas
+        # commence, ce qui est un fait, pas une panne), et des veilles ont
+        # existe PUIS ont disparu (un corpus vide par suppression de compte ou
+        # nettoyage, donc une acquisition qui s'est ARRETEE). Cette seconde
+        # jauge porte la date de la premiere veille jamais creee, gardee hors
+        # du corpus (`kojo_job_alerts._retenir_premiere_creation`) : elle ne
+        # bouge plus, donc les deux zeros cessent de se ressembler.
+        jauge(
+            "kojo_alertes_emploi_premiere_timestamp_seconds",
+            "Creation de la PREMIERE veille emploi jamais creee (0 = aucune, jamais).",
+            _epoch(alertes.get("premiere")),
+        )
 
     # Le format texte se termine par un saut de ligne : un corps sans lui est
     # encore lisible, mais un client strict peut refuser la derniere ligne.

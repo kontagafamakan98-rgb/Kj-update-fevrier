@@ -59,6 +59,7 @@ def _exposition(
     origines=None,
     hors_vocabulaire: int = 0,
     familles_supprimees=(),
+    premiere: float = 0,
 ):
     """Une exposition de référence : le format texte 0.0.4 que sert le backend."""
     origines = (
@@ -80,6 +81,13 @@ def _exposition(
         lignes.append("# TYPE kojo_alertes_emploi_plus_recente_timestamp_seconds gauge")
         lignes.append(
             "kojo_alertes_emploi_plus_recente_timestamp_seconds %s" % plus_recente
+        )
+    # La MEMOIRE de l'acquisition (02/11/2026) : date de la PREMIERE veille
+    # jamais creee, gardee hors du corpus. `0` = aucune veille n'a jamais existe.
+    if "memoire" not in familles_supprimees:
+        lignes.append("# TYPE kojo_alertes_emploi_premiere_timestamp_seconds gauge")
+        lignes.append(
+            "kojo_alertes_emploi_premiere_timestamp_seconds %s" % premiere
         )
     return "\n".join(lignes) + "\n"
 
@@ -194,8 +202,11 @@ class TestLaFraicheurDeLAcquisition:
         sortie = capsys.readouterr().out
         assert code == 0, "un corpus vide n'est pas une panne de collecte"
         assert "[AVIS] acquisition NON DEMARREE" in sortie
-        # Le motif : un fait de produit, pas un levier de collecte.
-        assert "aucune alerte emploi creee" in sortie
+        # Le motif : un fait de produit, pas un levier de collecte — et la
+        # MEMOIRE est nommee, sinon l'avis ne dit pas ce qui le distingue d'un
+        # corpus vide apres coup.
+        assert "aucune veille n'a JAMAIS ete creee" in sortie
+        assert "kojo_alertes_emploi_premiere_timestamp_seconds vaut 0" in sortie
         # L'avis ANNONCE l'armement : rien à coder le jour de la première veille.
         assert "seuil de 30 jour(s)" in sortie
         assert "[VERDICT] conforme" in sortie
@@ -207,6 +218,44 @@ class TestLaFraicheurDeLAcquisition:
         assert code == 1, "l'un des deux chiffres ment : on ne le laisse pas passer"
         assert "CONTRADICTION" in sortie
         assert "6 veille(s) comptee(s)" in sortie
+
+    def test_un_corpus_vide_apres_une_vraie_veille_est_un_refus(self, capsys):
+        """« Plus jamais » n'est pas « jamais » : la memoire le prouve, et c'est un rouge."""
+        premiere = time.time() - 20 * 86400
+        code = _lancer(
+            corps=_exposition(
+                0,
+                origines={"directe": 0, "inconnue": 0, "metier": 0, "ville": 0},
+                premiere=premiere,
+            )
+        )
+        sortie = capsys.readouterr().out
+        assert code == 1, "un corpus vide alors qu'une veille a existe est un incident"
+        assert "PLUS JAMAIS" in sortie, "le cas doit etre nomme, pas confondu avec « jamais »"
+        assert "premiere creation le" in sortie and "corpus a ete VIDE" in sortie
+
+    def test_la_memoire_absente_est_refusee_en_nommant_la_famille(self, capsys):
+        """Sans la memoire, les deux zeros se ressemblent : la sonde le refus\n        plutot que de conclure.
+        """
+        code = _lancer(
+            corps=_exposition(
+                time.time() - 3600, familles_supprimees=("memoire",)
+            )
+        )
+        sortie = capsys.readouterr().out
+        assert code == 1
+        assert "kojo_alertes_emploi_premiere_timestamp_seconds" in sortie
+        assert "redeployer" in sortie
+
+    def test_une_memoire_posterieure_a_la_derniere_veille_est_refusee(self, capsys):
+        """La premiere veille ne peut pas etre plus recente que la derniere."""
+        maintenant = time.time()
+        code = _lancer(
+            corps=_exposition(maintenant - 3600, premiere=maintenant), maintenant=maintenant
+        )
+        sortie = capsys.readouterr().out
+        assert code == 1
+        assert "POSTERIEURE" in sortie
 
     def test_une_acquisition_tarie_est_nommee_avec_son_age(self, capsys):
         maintenant = time.time()
