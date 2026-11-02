@@ -436,6 +436,26 @@ class TestPorteeDesEtapes:
         )
         assert "cite.py" not in impliques, sorted(impliques)
 
+    def test_un_paragraphe_qui_finit_par_un_fichier_n_est_pas_un_chemin(self, harnais, tmp_path):
+        # MESURÉ le 02/11/2026 : le champ `portee` du bloc `langues` de /health —
+        # un paragraphe de 900 caractères qui FINIT par
+        # `check-hreflang-production.js` — était retenu comme un chemin cité, et
+        # le harnais mourait sur `OSError: [Errno 36] File name too long` AVANT
+        # de rejouer la moindre mutation. Un chemin est COURT et SANS BLANC ;
+        # la prose qui cite un fichier reste de la prose.
+        (tmp_path / "frontend" / "scripts").mkdir(parents=True)
+        (tmp_path / "frontend" / "scripts" / "sonde.js").write_text("// sonde\n", encoding="utf-8")
+        paragraphe = "les documents servis se lisent avec frontend/scripts/sonde.js"
+        racine = self._arbre(tmp_path, 'PORTEE = "%s"\n' % paragraphe)
+
+        impliques = harnais.fichiers_impliques(
+            {"chemin": "garde.py", "preuve": None, "runner": None}, racine
+        )
+
+        assert harnais.chemin_cite_plausible("frontend/scripts/sonde.js")
+        assert not harnais.chemin_cite_plausible(paragraphe)
+        assert "frontend/scripts/sonde.js" not in impliques, sorted(impliques)
+
     def test_le_verdict_d_une_etape_est_publie_dans_la_sortie(self, harnais, monkeypatch, tmp_path, capsys):
         # Le workflow ne choisit pas son filtre : il RELAIE ce verdict. S'il
         # n'était pas publié, la seule façon de décider serait de recopier la

@@ -311,6 +311,23 @@ def _resolution(chemin, racine):
     return None
 
 
+# Un chemin CITÉ est COURT et SANS BLANC. Ce n'est pas une précaution de style :
+# MESURÉ le 02/11/2026, le champ `portee` du bloc `langues` de /health — un
+# paragraphe de 900 caractères qui FINIT par `check-hreflang-production.js` —
+# était retenu comme un chemin cité, et le harnais mourait sur
+# `OSError: [Errno 36] File name too long` AVANT de rejouer la moindre mutation.
+# Un rouge qui n'accuse pas le produit coûte exactement ce que ce harnais existe
+# pour éviter : la prose qui cite un fichier reste de la prose.
+LONGUEUR_MAX_CHEMIN_CITE = 200
+
+
+def chemin_cite_plausible(valeur):
+    """Une constante de chaîne qui a la FORME d'un chemin, pas d'un paragraphe."""
+    return 0 < len(valeur) <= LONGUEUR_MAX_CHEMIN_CITE and not any(
+        caractere.isspace() for caractere in valeur
+    )
+
+
 def _imports_du_depot(chemin, racine):
     """Tout ce dont un fichier du dépôt DÉPEND, tel que sa source le dit.
 
@@ -389,6 +406,8 @@ def _imports_du_depot(chemin, racine):
             if not (isinstance(noeud, ast.Constant) and isinstance(noeud.value, str)):
                 continue
             if id(noeud) in prose or not noeud.value.endswith(EXTENSIONS_CITEES):
+                continue
+            if not chemin_cite_plausible(noeud.value):
                 continue
             for candidat in (noeud.value, "backend/" + noeud.value, "frontend/" + noeud.value):
                 resolu = _resolution(candidat, racine)

@@ -136,3 +136,6 @@ uploads/
 *_extract/
 kojo-emergency-backup*/
 
+# Pièces jointes de la fenêtre de travail (images collées, exports de
+# conversation) — artefacts du poste, jamais du produit.
+.cloud-attachments/

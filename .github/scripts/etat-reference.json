@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-11-02",
-    "motif": "le pre-vol de push ne bloque que ce qu'il publie : un residu livre est nomme et non bloquant (02/11/2026)",
+    "motif": "02/11/2026 : un chemin cite est court et sans blanc — le champ portee de /health (paragraphe finissant par check-hreflang-production.js) etait pris pour un chemin et le harnais mourait sur File name too long avant de rejouer la moindre mutation",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/alerte_sondes.py": "35c6b645b431b932c6af1ed53704acc4f096da428a49e2f7461259358f137687",
@@ -44,7 +44,6 @@
       ".github/scripts/check-exercice-restauration.py": "5b630d1aa76144c52795e6c2fad82295736b696457166cfb5b746fe38390e68e",
       ".github/scripts/check-fly-env-drift.py": "66a47a17d99bcec1f02793e006aa4f3d6165ce0e9814a06801195991b694a712",
       ".github/scripts/check-gate-perimetre.py": "875db0af3fad7e867eff7115e42d104c30c8f505e6c4c2bc63ac255d8e411e82",
-      ".github/scripts/check-guard-mutations.py": "4fb457ff74d13487058b4853a95d28861d1f128ecf68b9d194400b1e9466b20a",
       ".github/scripts/check-informative-steps.py": "3ef82281cd546809dd739fd2241a24e2d1f68a3cf17d3cb96fefbe8ac77c9219",
       ".github/scripts/check-og-test-mutations.py": "2dc4d4b0a602492740848080cbaee1880b17e4cdb9f3261f4005cc4882456c6d",
       ".github/scripts/check-privacy-policy.py": "e31c8617b44057df96902688096cd586d11a73de8863ab364ca361eaf01f502b",
@@ -151,7 +150,8 @@
       "frontend/scripts/check-hero-images.js": "21a17fbcbf1e2d6bf2f36a735b11e0b5b3f4a3c9dce5a851015a3af832f34038",
       "frontend/scripts/check-hreflang-production.js": "58e0ab84a23cb65cc01cdcce9d9ea9baee07bcd81867a6cbbd7feb0d60bb86c3",
       "frontend/scripts/check-git-branches.js": "f4e52feb16fe69a214b7afcb928c6f1bdedca7c680d5551a019177959a237ed8",
-      "frontend/scripts/check-test-environment.js": "ce3814b071811252b209e84bd22454585d5429e909dbe512359abdbe3224572d"
+      "frontend/scripts/check-test-environment.js": "ce3814b071811252b209e84bd22454585d5429e909dbe512359abdbe3224572d",
+      ".github/scripts/check-guard-mutations.py": "3d88bad7725162eed651ad5582a292b8acc02109d0a9099d4df6e22fd9317fef"
     }
   },
   "hors_perimetre": [
