@@ -25,9 +25,11 @@ import {
   PHOTO_HEROS_FORMATS,
   PHOTO_HEROS_LARGEUR,
   PHOTO_HEROS_HAUTEUR,
+  PHOTO_HEROS_REPLI,
   PHOTO_HEROS_SIZES,
   sourceImageHeros,
   srcsetHeros,
+  srcsetRepliHeros,
 } from '../../src/config/photos-heros.js'
 import { svgDeLIcone, svgDuDrapeau } from './icons-serveur.js'
 // Le conteneur de page du corps : une SEULE déclaration, partagée avec le
@@ -255,7 +257,14 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `<picture>${PHOTO_HEROS_FORMATS.map(
       (format) =>
         `<source type="image/${format}" srcset="${esc(srcsetHeros(0, format))}" sizes="${esc(PHOTO_HEROS_SIZES)}">`
-    ).join('')}<img src="${esc(sourceImageHeros(0))}" alt="${esc(T('heroPhotoAlt'))}" width="${PHOTO_HEROS_LARGEUR}" height="${PHOTO_HEROS_HAUTEUR}" fetchpriority="high" decoding="sync" class="${heroIllustrationImageClass}"></picture>`,
+    // LE REPLI JPEG, EN DERNIER `<source>` (02/11/2026), exactement comme
+    // src/components/PhotoDuHeros.js : un `<picture>` retient le PREMIER
+    // `<source>` dont le `type` est supporté, donc ce candidat ne sert qu'aux
+    // navigateurs qui ne lisent ni l'AVIF ni le WebP (Safari ≤ 13) — ceux pour
+    // qui l'`<img>` (qui publie le WebP) n'affiche plus rien. Le publier APRÈS
+    // les deux formats modernes est la condition pour ne pas les priver de leur
+    // sélection, et la coquille et React doivent publier la MÊME liste.
+    ).join('')}<source type="image/${PHOTO_HEROS_REPLI}" srcset="${esc(srcsetRepliHeros(0))}" sizes="${esc(PHOTO_HEROS_SIZES)}"><img src="${esc(sourceImageHeros(0))}" alt="${esc(T('heroPhotoAlt'))}" width="${PHOTO_HEROS_LARGEUR}" height="${PHOTO_HEROS_HAUTEUR}" fetchpriority="high" decoding="sync" class="${heroIllustrationImageClass}"></picture>`,
     `</div>`,
     `</div>`,
     `</section>`,

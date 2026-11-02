@@ -11,10 +11,12 @@ import {
   PHOTO_HEROS_HAUTEUR,
   PHOTO_HEROS_LARGEUR,
   PHOTO_HEROS_LARGEURS,
+  PHOTO_HEROS_REPLI,
   PHOTO_HEROS_SIZES,
   VARIANTES_HEROS,
   sourceImageHeros,
   srcsetHeros,
+  srcsetRepliHeros,
 } from '../../config/photos-heros';
 // Le libellé attendu n'est PAS recopié ici : il est lu dans le dictionnaire que
 // le composant consomme (le français est le repli universel hors provider, cf.
@@ -228,25 +230,59 @@ describe('la photo du héros (et son alternance)', () => {
     // L'ORDRE est celui de `PHOTO_HEROS_FORMATS` : l'AVIF d'abord. L'inverser
     // ferait télécharger le WebP (le plus lourd des deux) à tous les navigateurs
     // qui savent lire l'AVIF.
-    expect(sources.map((source) => source.getAttribute('type'))).toEqual(
-      PHOTO_HEROS_FORMATS.map((format) => `image/${format}`)
-    );
+    expect(sources.map((source) => source.getAttribute('type'))).toEqual([
+      ...PHOTO_HEROS_FORMATS.map((format) => `image/${format}`),
+      // …puis le REPLI JPEG, en DERNIER : un `<picture>` retient le premier
+      // `<source>` supporté, donc le placer avant priverait l'AVIF et le WebP
+      // de leur sélection. C'est lui qui rend une image aux navigateurs d'avant
+      // le WebP (Safari ≤ 13), auxquels l'`<img>` ne répond plus.
+      `image/${PHOTO_HEROS_REPLI}`,
+    ]);
     expect(sources[0].getAttribute('srcset')).toBe(srcsetHeros(0, 'avif'));
     expect(sources[1].getAttribute('srcset')).toBe(srcsetHeros(0, 'webp'));
     // Chaque `srcset` porte les DEUX largeurs, avec leur descripteur : c'est ce
     // qui autorise le navigateur à choisir autre chose que la source entière
     // (un écran à densité 1 n'a pas besoin de 720 px).
-    for (const source of sources) {
+    for (const source of sources.slice(0, PHOTO_HEROS_FORMATS.length)) {
       expect(source.getAttribute('sizes')).toBe(PHOTO_HEROS_SIZES);
       expect(
         (source.getAttribute('srcset') || '').split(',').map((candidat) => candidat.trim().split(' ')[1])
       ).toEqual(['480w', '720w']);
     }
+    // Le repli ne porte qu'UNE largeur (720) : il n'existe pas de JPEG 480 sur
+    // disque, les variantes 480 sont des WebP et des AVIF. Annoncer un `480w`
+    // promettrait un fichier absent — et c'est ce candidat-là que le navigateur
+    // d'avant le WebP demanderait.
+    const repli = sources[PHOTO_HEROS_FORMATS.length];
+    expect(repli.getAttribute('sizes')).toBe(PHOTO_HEROS_SIZES);
+    expect(repli.getAttribute('srcset')).toBe(srcsetRepliHeros(0));
+    expect(repli.getAttribute('srcset')).toMatch(/\.jpg 720w$/);
     // L'`<img>` est le DERNIER enfant du `<picture>` : c'est le repli, et le
     // SEUL nœud image de la page — l'élément LCP reste unique.
     expect(picture.lastElementChild.tagName).toBe('IMG');
     expect(picture.lastElementChild.getAttribute('src')).toBe(sourceImageHeros(0));
     expect(document.querySelectorAll('img')).toHaveLength(1);
+  });
+
+  it('donne un repli JPEG à un navigateur sans WebP, et ce repli SUIT l’alternance', () => {
+    // Mesuré le 02/11/2026 : depuis que l'`<img>` publie le WebP 720, un
+    // navigateur qui ne sait lire ni l'AVIF ni le WebP n'avait plus AUCUNE
+    // image de héros. Le repli est un `<source type="image/jpeg">` publié en
+    // dernier, et il décrit la photo AFFICHÉE, pas la première : figé sur la
+    // photo 0, il ferait voir la mauvaise image au tour suivant.
+    render(<PhotoDuHeros />);
+    const repli = () => [...document.querySelectorAll('picture source')].at(-1);
+    expect(repli().getAttribute('type')).toBe('image/jpeg');
+    expect(repli().getAttribute('srcset')).toBe(`${PHOTOS_HEROS[0]} 720w`);
+    expect(existsSync(cheminPublic(PHOTOS_HEROS[0]))).toBe(true);
+    act(() => {
+      vi.advanceTimersByTime(PHOTO_HEROS_DELAI_MS);
+    });
+    expect(repli().getAttribute('srcset')).toBe(srcsetRepliHeros(1));
+    expect(repli().getAttribute('srcset')).toBe(`${PHOTOS_HEROS[1]} 720w`);
+    // Et l'`<img>` n'est PAS redescendu au JPEG pour autant : l'attribut `src`
+    // reste un format moderne, c'est ce que lit un vérificateur d'accessibilité.
+    expect(image().getAttribute('src')).toMatch(/\.webp$/);
   });
 
   it('sert des fichiers au MÊME rapport que les dimensions déclarées — sinon l’alternance déplacerait la page', () => {
