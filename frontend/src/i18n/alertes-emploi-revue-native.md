@@ -243,6 +243,79 @@ une valeur propre par langue, donc trois nouvelles chaînes à relire :
     `mos`. Est-ce redondant à l'oral, ou faut-il une formule de constat plus
     courte ?
 
+## Les dictionnaires de PAGE (02/11/2026) — 469 clés par langue
+
+Ce fichier sert de support à la relecture de **tout** ce qui est traduit, pas
+seulement des alertes emploi : les 14 dictionnaires de page
+(`src/utils/pack2PageI18n/*.js`) viennent de passer de 166 à **469 clés
+traduites sur 473** en `wo`, `bm` et `mos`, parce que `dict.wo = withBase(dict.fr,
+{…})` **étale le français** : une clé absente des surcharges n'était pas en
+anglais, elle était en français. `/jobs`, la page que l'audit du 02/11 a nommée,
+ne montre plus une seule phrase française à un lecteur wolof, bambara ou mooré.
+
+**Statut : NON SIGNÉ, comme le reste de ce fichier.** Les 469 valeurs sont des
+propositions construites sur le vocabulaire déjà présent dans `wo.json`,
+`bm.json` et `mos.json` (977 clés traduites) et sur celui du fichier voisin.
+
+Ce qui a été vérifié MÉCANIQUEMENT, et ne demande donc pas de relecture :
+**0 placeholder perdu** (`{count}`, `{n}`, `{min}`, `{max}`, `{name}` conservés à
+l'identique), **0 valeur vide**, **0 apostrophe droite** (la convention du dépôt
+typographique est tenue), et **0 valeur identique au français** hors les quatre
+exceptions déclarées : `phonePlaceholder` (un format de numéro), `recentBudget`
+(`{min} - {max} XOF`), `userAgent` et `wallet` (termes techniques).
+
+### Les onze valeurs corrigées après balayage
+
+Le balayage cherche les mots qui n'existent pas dans ces trois langues. Il a
+trouvé onze valeurs qui portaient encore du français, toutes corrigées :
+
+| Fichier · clé | Avant | Après | Motif |
+|---|---|---|---|
+| `commissionDashboard` `wo.title` | Dashboard - komision propriétaire | **Tablo - komision boroom bi** | « Dashboard » et « propriétaire » dans une phrase wolof ; `boroom` (= possesseur) est déjà employé dans `portefeuilles` (« boroom baara bi ») |
+| `commissionDashboard` `bm.title` | Tableau de bord - commissionw | **Tablo - commissionw tigi** | « Tableau de bord » recopié du français ; `tigi` est le composé possessif du bambara |
+| `commissionDashboard` `bm.subtitle` | I ka commission automatique 14% filɛ sara bɛɛ kan | **I ka commissionw 14% bɛ filɛ sara bɛɛ kan** | « automatique » retiré, `commission` au pluriel comme dans le titre |
+| `commissionDashboard` `mos.title` | Tableau de bord - komision | **Tablo - komision soabã** | idem ; `soabã` (= son propriétaire) est déjà dans `mos.json` |
+| `commissionDashboard` `mos.subtitle` | Gese f komision automatique 14% yaoolã bãmb | **Gese f komision 14% yaoolã bãmb** | « automatique » retiré |
+| `emailVerification` `bm.subtitle` | An bɛ inscription laban ka dashboard da yɔrɔ la ka dafa. | **An bɛ i ka email lajɛ, i ka kont bɛ da o yɔrɔ la.** | « inscription » ET « dashboard » français dans une phrase bambara ; reconstruite avec `lajɛ` (vérifier) et `kont` (compte), tous deux déjà employés dans le fichier |
+| `emailVerification`, `register`, `paymentVerification` `wo.duplicateEmailError` | Adresse email bii jëfandikoo nañu ko ba noppi | **Email bii jëfandikoo nañu ko ba noppi** | « adresse » est français ; le wolof du dépôt ne l'emprunte pas (contrairement au bambara `adɛrɛsi`) |
+| `register` `wo.duplicateEmailSignIn` | bindu ak adresse bii | **bindu ak email bii** | idem |
+| `register` `wo.emailAvailable` | Adresse email bii japp na | **Email bii japp na** | idem |
+| `register` `wo.checkingEmail` | Mi ngi saytu adresse email bii... | **Mi ngi saytu email bii...** | idem |
+
+### Ce que la relecture doit trancher sur ces 469 valeurs
+
+28. **`Tablo` (les trois langues)** pour « tableau de bord » : le mot est-il
+    compris tel quel, ou faut-il une forme fléchie (`tablo bi`, `tabloo`) ?
+    C'est le seul mot inventé pour l'occasion qui apparaît dans un TITRE.
+29. **`boroom bi` (wolof)** pour « propriétaire » : `portefeuilles` dit déjà
+    « boroom baara bi » (« le propriétaire du travail »). Faut-il la même forme
+    courte, ou `boroom kont bi` (« le propriétaire du compte ») ?
+30. **`commissionw tigi` (bambara)** : `-tigi` est un composé possessif
+    (`dugutigi`, chef de village). L'ordre `commissionw tigi` est-il celui du
+    bambara, ou faut-il `tigi` devant ?
+31. **`komision soabã` (mooré)** : `soabã` est-il accordé comme il faut avec
+    `komision` (classe nominale) ?
+32. **Orthographe de « commission »** : `komision` en `wo` et `mos`,
+    `commission` en `bm` — faut-il unifier, et laquelle des deux formes un
+    locuteur écrirait-il ?
+33. **Emprunts assumés, à confirmer** : `profil`, `fichier`, `bouton`,
+    `client`, `email`, `PIN`, `mobile money`, `wallet`, `WhatsApp`. Les douze
+    valeurs concernées sont dans `profile`, `photoTest`, `mobileTest` et
+    `portefeuilles`. Sont-ils les mots qu'un locuteur emploierait, ou faut-il
+    un terme propre par langue ?
+34. **Le mot wolof `du`** (= « n'est pas ») a été signalé par le balayage
+    automatique comme du français dans six valeurs (`purgeHint`, `purgeConfirm`,
+    `purgeConfirmRequired`, `readOnlyNotice`, `mobileTest.help3`,
+    `paymentVerification.security2`). Le balayage a TORT — `du` est la négation
+    du wolof — mais la relecture doit confirmer que ces six phrases sont
+    complètes et bien niées.
+35. **`14%` sans espace** : la typographie française écrit « 14 % ». Les trois
+    langues gardent la forme collée du fichier ; est-ce celle qu'on écrit ?
+36. **Les trois `title` des pages de diagnostic** (`photoTest`, `mobileTest` :
+    « Test nataalu profil », « Profil foto test », « Profil pɩture test ») sont
+    des mots-clés empilés, par construction. Ces pages ne sont pas dans le
+    parcours visiteur : à réécrire proprement, ou à laisser ?
+
 ## Comment contresigner
 
 Corriger directement les trois dictionnaires, puis remplacer le statut ci-dessus
