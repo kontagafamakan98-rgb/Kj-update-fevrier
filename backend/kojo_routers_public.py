@@ -30,6 +30,7 @@ from kojo_routers_jobs_listing import _job_view
 from kojo_routers_workers_public import profil_public
 from kojo_settings import FRONTEND_APP_URL, logger
 from kojo_identifiants import identifiant_job_query, identifiant_public
+import kojo_pages_cache as pages_cache
 import kojo_pages_metier as pages_metier
 import kojo_pages_guides as pages_guides
 # Les langues qui ont une URL propre, et la forme des alternatives `hreflang` :
@@ -612,14 +613,23 @@ async def _missions_de_page(filtre: dict, limite: int | None = None) -> list:
     return await curseur.to_list(borne)
 
 
-def _reponse_page(contenu: str, statut: int) -> Response:
-    """Le document servi, après la MÊME règle d'équilibre que les fiches."""
+def _reponse_page(contenu: str, statut: int, rejoue: bool | None = None) -> Response:
+    """Le document servi, après la MÊME règle d'équilibre que les fiches.
+
+    `rejoue` dit d'où vient le document (cache mémoire ou rendu neuf) : sans ce
+    témoin, un cache qui ne sert jamais rien passerait pour un cache qui marche.
+    Les 404 ne passent pas par le cache et n'en portent donc pas l'en-tête.
+    """
+    temoin = {}
+    if statut == 200 and rejoue is not None:
+        temoin["X-Kojo-Pages-Cache"] = "rejoue" if rejoue else "frais"
     return Response(
         content=contenu,
         media_type="text/html; charset=utf-8",
         status_code=statut,
         headers={
             "Cache-Control": PAGES_METIER_CACHE if statut == 200 else "no-store",
+            **temoin,
             **({"X-Robots-Tag": "noindex"} if statut != 200 else {}),
         },
     )
@@ -644,15 +654,16 @@ async def get_page_ville(slug: str):
             ),
             404,
         )
-    missions = await _missions_de_page(pages_metier.requete_ville(page))
-    return _reponse_page(
-        exiger_balises_equilibrees(
+    async def _rendre() -> str:
+        missions = await _missions_de_page(pages_metier.requete_ville(page))
+        return exiger_balises_equilibrees(
             f"la page ville {page['slug']}",
             pages_metier.document(page, "ville", base, missions),
             origine="kojo_pages_metier",
-        ),
-        200,
-    )
+        )
+
+    contenu, rejoue = await pages_cache.obtenir(("ville", page["slug"], base), _rendre)
+    return _reponse_page(contenu, 200, rejoue)
 
 
 # ── Guides ÉDITORIAUX (/guides/{slug}) — 27/10/2026 ───────────────────────
@@ -682,31 +693,32 @@ async def get_page_guide(slug: str):
             ),
             404,
         )
-    missions = []
-    if page["type"] == "prix":
-        # Les budgets mesurés et les exemples viennent de la MÊME lecture : une
-        # page qui afficherait une fourchette calculée sur une requête et une
-        # liste tirée d'une autre publierait deux marchés différents.
-        missions = await _missions_de_page(
-            pages_metier.requete_metier(page["metier"]),
-            limite=pages_guides.MAX_MISSIONS_LUES,
-        )
-    elif page["type"] == "prix_ville":
-        # Le guide de ville lit les missions DE LA VILLE, toutes catégories :
-        # c'est ce qui lui permet de publier une ligne par métier du catalogue.
-        # Le filtre est celui de la page ville, pas une regex de circonstance.
-        missions = await _missions_de_page(
-            pages_metier.requete_ville(page["ville"]),
-            limite=pages_guides.MAX_MISSIONS_LUES,
-        )
-    return _reponse_page(
-        exiger_balises_equilibrees(
+    async def _rendre() -> str:
+        missions = []
+        if page["type"] == "prix":
+            # Les budgets mesurés et les exemples viennent de la MÊME lecture : une
+            # page qui afficherait une fourchette calculée sur une requête et une
+            # liste tirée d'une autre publierait deux marchés différents.
+            missions = await _missions_de_page(
+                pages_metier.requete_metier(page["metier"]),
+                limite=pages_guides.MAX_MISSIONS_LUES,
+            )
+        elif page["type"] == "prix_ville":
+            # Le guide de ville lit les missions DE LA VILLE, toutes catégories :
+            # c'est ce qui lui permet de publier une ligne par métier du catalogue.
+            # Le filtre est celui de la page ville, pas une regex de circonstance.
+            missions = await _missions_de_page(
+                pages_metier.requete_ville(page["ville"]),
+                limite=pages_guides.MAX_MISSIONS_LUES,
+            )
+        return exiger_balises_equilibrees(
             f"le guide {page['slug']}",
             pages_guides.document(page, base, missions),
             origine="kojo_pages_guides",
-        ),
-        200,
-    )
+        )
+
+    contenu, rejoue = await pages_cache.obtenir(("guide", page["slug"], base), _rendre)
+    return _reponse_page(contenu, 200, rejoue)
 
 
 @router.get("/pages/metiers/{slug}", include_in_schema=False)
@@ -728,15 +740,16 @@ async def get_page_metier(slug: str):
             ),
             404,
         )
-    missions = await _missions_de_page(pages_metier.requete_metier(page))
-    return _reponse_page(
-        exiger_balises_equilibrees(
+    async def _rendre() -> str:
+        missions = await _missions_de_page(pages_metier.requete_metier(page))
+        return exiger_balises_equilibrees(
             f"la page métier {page['slug']}",
             pages_metier.document(page, "metier", base, missions),
             origine="kojo_pages_metier",
-        ),
-        200,
-    )
+        )
+
+    contenu, rejoue = await pages_cache.obtenir(("metier", page["slug"], base), _rendre)
+    return _reponse_page(contenu, 200, rejoue)
 
 
 # Base du site pour le SITEMAP (seul reste à être servi par le backend ; le

@@ -94,6 +94,11 @@ from kojo_settings import APP_ENV, APP_REVISION, APP_VERSION, FRONTEND_APP_URL, 
 # plus : `sentry_sdk` y recopie le DSN.
 from kojo_sentry import diagnostic as sentry_diagnostic
 from kojo_sentry import initialiser as initialiser_sentry
+# LES ERREURS NON RATTRAPÉES, comptées et publiées (cf. kojo_erreurs) : sans
+# `SENTRY_DSN`, une exception ne laissait qu'une ligne dans les journaux Fly, et
+# aucune sonde ne la lisait.
+from kojo_erreurs import ErreursServeurMiddleware
+from kojo_erreurs import diagnostic as erreurs_diagnostic
 
 _etat_sentry = initialiser_sentry(environnement=APP_ENV)
 if _etat_sentry["state"] == "ok":
@@ -223,6 +228,13 @@ async def _health_payload() -> dict:
         # sa clé, ni son hôte d'ingestion ne sont publiés : `/health` est une
         # réponse publique (cf. kojo_sentry).
         "sentry": sentry_diagnostic(),
+        # CE QUI A CASSÉ, ET QUAND (02/11/2026). `sentry: inactif` disait qu'une
+        # exception ne remonte nulle part ; ce bloc publie le compte de celles
+        # qui ont traversé le serveur, leur classe et leur famille de route. Il
+        # ne publie ni message, ni URL avec identifiant, ni trace : `/health`
+        # est PUBLIC. `state: ok` ne veut dire qu'une chose — aucune exception
+        # depuis le démarrage, dont la date est dans `depuis` (cf. kojo_erreurs).
+        "erreurs": erreurs_diagnostic(),
         # LES LANGUES SERVIES (01/11/2026) : cinq langues ont une URL propre, et
         # ce bloc dit combien de documents chacune publie — la question que la
         # sonde `hreflang` met 61 requêtes et 11 s à trancher, répondue ici en
@@ -740,6 +752,10 @@ if ENABLE_TRUSTED_HOST_MIDDLEWARE:
 
 # Middlewares de sécurité + rate-limiting (ordre d'empilement : le dernier
 # add_middleware est le plus externe).
+# Compte les exceptions non rattrapées puis les RELANCE (il observe, il ne
+# répare pas) : posé ici, il voit sortir les 500 de toutes les routes, y compris
+# celles qui sont ajoutées après lui dans la pile.
+app.add_middleware(ErreursServeurMiddleware)
 app.add_middleware(WestAfricaSecurityMiddleware)
 app.add_middleware(RateLimitMiddleware)
 # Monté en DERNIER, donc le plus EXTERNE : un 429 du rate-limiter, un refus de

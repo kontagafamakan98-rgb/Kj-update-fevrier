@@ -39,6 +39,8 @@ from datetime import datetime
 from typing import List, Optional
 
 from kojo_auth_core import revocation_stats
+from kojo_erreurs import diagnostic as erreurs_diagnostic
+from kojo_pages_cache import stats as pages_cache_stats
 from kojo_job_alerts import ORIGINES_COMPTEES
 from kojo_live import (
     MAX_STREAMS_PER_USER,
@@ -396,6 +398,50 @@ def rendre(corpus: Optional[dict] = None) -> str:
             "Creation de la PREMIERE veille emploi jamais creee (0 = aucune, jamais).",
             _epoch(alertes.get("premiere")),
         )
+
+    # ── Pages ville/métier/guide : cache mémoire (02/11/2026) ──────────────
+    # Mesure du 02/11 : /emplois/bamako rendait en 0,5 s côté Fly ET en 0,67 s
+    # a travers Vercel (`X-Vercel-Cache: MISS` a chaque appel, le CDN ne cache
+    # pas une reecriture externe). Le document est donc garde 60 s en memoire
+    # (cf. kojo_pages_cache). Sans ces deux series, un cache qui ne servirait
+    # jamais rien passerait pour un cache qui marche : un rendu neuf et un
+    # rejeu ne sont pas le meme fait.
+    cache_pages = pages_cache_stats()
+    compteur(
+        "kojo_pages_cache_rejeux_total",
+        "Pages ville/metier/guide servies par le cache memoire (aucun rendu).",
+        cache_pages.get("rejoue"),
+    )
+    compteur(
+        "kojo_pages_cache_rendus_total",
+        "Pages ville/metier/guide RENDUES (cache vide ou expire).",
+        cache_pages.get("frais"),
+    )
+    jauge(
+        "kojo_pages_cache_entrees",
+        "Documents gardes en memoire maintenant (plafond %d)." % cache_pages.get("plafond", 0),
+        cache_pages.get("entrees"),
+    )
+
+    # ── Erreurs non rattrapées (02/11/2026) ─────────────────────────────────
+    # `sentry: inactif` dans /health disait qu'une exception ne remontait nulle
+    # part : elle ne laissait qu'une ligne dans les journaux Fly, que personne
+    # ne lit. Ces deux series sont le compteur du PROCESS (cf. kojo_erreurs) :
+    # 0 ne veut dire que « aucune erreur depuis le demarrage ». Les 5xx
+    # DECLARES (503 de /monitor, refus de capacite) ne sont pas comptes — ils
+    # disent un etat, pas un echec, et les confondre ferait rougir une alerte
+    # pour un fait deja publie ailleurs.
+    erreurs = erreurs_diagnostic()
+    compteur(
+        "kojo_erreurs_serveur_total",
+        "Exceptions non rattrapees depuis le demarrage de ce process (0 = aucune).",
+        erreurs.get("total"),
+    )
+    jauge(
+        "kojo_erreurs_serveur_derniere_timestamp_seconds",
+        "Date de la derniere exception non rattrapee (0 = aucune). Age = time() - valeur.",
+        erreurs.get("derniere_epoch") or 0,
+    )
 
     # Le format texte se termine par un saut de ligne : un corps sans lui est
     # encore lisible, mais un client strict peut refuser la derniere ligne.

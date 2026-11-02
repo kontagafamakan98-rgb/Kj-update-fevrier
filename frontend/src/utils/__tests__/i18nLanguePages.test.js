@@ -51,12 +51,17 @@ import { makeScopedTranslator as registerT } from '../pack2PageI18n/register';
  * publiée en français (`i18nCoverage`), et la QUALITÉ grammaticale — c'est le
  * travail d'un locuteur natif, préparé par `outils/relecture-i18n/`.
  *
- * La dette est DÉCLARÉE, comme `EN_ATTENTE` dans `i18nLangue.test.js` : les
- * quatre cas restants vivent tous dans les deux pages de DIAGNOSTIC
- * (`photoTest`, `mobileTest`), hors navigation, et le terme à employer n'est
- * pas connu — l'inventer serait pire que le constater. Le plafond ne peut que
- * baisser, et une entrée devenue inutile fait ROUGIR : la liste ne peut pas
- * devenir le fourre-tout où l'on glisserait une phrase non traduite.
+ * La dette est DÉCLARÉE, comme `EN_ATTENTE` dans `i18nLangue.test.js`, et elle
+ * est VIDE depuis le 02/11/2026 : les quatre clés des pages de diagnostic ont
+ * été traduites avec le vocabulaire DÉJÀ attesté dans le dépôt, sans inventer
+ * de terme. « fichier » désignait en réalité une IMAGE (l'entrée de cette page
+ * est un `<input type="file">` de photo) : `nataal` (wo), `ja` (bm) et `foto`
+ * (mos) sont déjà employés par les dictionnaires global et de page pour cet
+ * objet, donc aucun second vocabulaire n'est né. « bouton » devient `butoŋ`,
+ * la forme que le dictionnaire global wolof emploie déjà (`actionButton` =
+ * « Butoŋ jëf »). Le plafond est donc à ZÉRO, et une entrée devenue inutile
+ * fait ROUGIR : la liste ne peut pas devenir le fourre-tout où l'on glisserait
+ * une phrase non traduite.
  */
 
 const SCOPES = {
@@ -92,44 +97,15 @@ const MARQUEURS_FRANCAIS = [
   'tableau',
 ];
 
-// La dette mesurée le 02/11/2026 : 10 valeurs (4 clés × langues), toutes dans
-// les pages de diagnostic. Motif ≥ 40 caractères, sinon la déclaration ne dit
-// rien et le test la refuse.
-const DETTE = [
-  {
-    fichier: 'mobileTest.js',
-    cle: 'screen1',
-    motif:
-      'Page de diagnostic (liste des écrans de test), hors navigation : « bouton kamera » ' +
-      'reste en français tant qu’aucun locuteur n’a donné le terme, et la relecture assistée ' +
-      'le compte parmi ses doutes',
-  },
-  {
-    fichier: 'photoTest.js',
-    cle: 'directFileTest',
-    motif:
-      'Page de diagnostic de téléversement : « fichier » est français mais le mot wolof, ' +
-      'bambara ou mooré n’est attesté nulle part dans le dépôt — l’inventer créerait un ' +
-      'second vocabulaire pour un seul objet',
-  },
-  {
-    fichier: 'photoTest.js',
-    cle: 'noFileSelected',
-    motif:
-      'Même page de diagnostic, même mot : l’entrée existe pour que le plafond de dette ' +
-      'compte la clé réelle et qu’un correctif futur la retire nommément',
-  },
-  {
-    fichier: 'photoTest.js',
-    cle: 'fileInputTesting',
-    motif:
-      'Même page de diagnostic, même mot, dans une phrase de journal de test : hors parcours ' +
-      'visiteur, et la traduction attend un terme validé par un locuteur',
-  },
-];
+// La dette mesurée le 02/11/2026 au matin : 10 valeurs (4 clés × langues), toutes
+// dans les pages de diagnostic. ELLES SONT SOLDÉES depuis le 02/11/2026 au soir
+// (voir l’en-tête), et le plafond tombe à ZÉRO : une valeur française dans une
+// page n’a plus de case où se ranger. Motif ≥ 40 caractères, sinon la
+// déclaration ne dit rien et le test la refuse.
+const DETTE = [];
 
-// Plafond MESURÉ : 4 entrées, 10 valeurs. Il ne monte jamais.
-const PLAFOND_DETTE = 4;
+// Plafond MESURÉ : 0 entrée, 0 valeur. Il ne monte jamais.
+const PLAFOND_DETTE = 0;
 
 // Planchers de lecture : un balayage cassé ne doit pas rendre un vert muet.
 const PLANCHER_SCOPES = 14;

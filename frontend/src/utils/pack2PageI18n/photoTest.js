@@ -68,7 +68,7 @@ dict.wo = withBase(dict.fr, {
   readOnly: 'Jàng rekk',
   smallFormat: 'Format bu ndaw',
   manualTests: 'Test yu loxo',
-  directFileTest: 'Test tann fichier bu jub',
+  directFileTest: 'Test tànn nataal bu jub',
   addLog: 'Yokk log',
   clearLogs: 'Far logs yi',
   testLogs: 'Logs yu test',
@@ -79,8 +79,8 @@ dict.wo = withBase(dict.fr, {
   localStorage: 'LocalStorage am na',
   supported: 'Am na',
   unsupported: 'Amul',
-  noFileSelected: 'Amul fichier bu ñu tànn',
-  fileInputTesting: 'Mi ngi test tànn fichier bu loxo...',
+  noFileSelected: 'Amul nataal bu ñu tànn',
+  fileInputTesting: 'Mi ngi test tànn nataal bu loxo...',
   manualLogEntry: 'Log bu loxo'
 });
 dict.bm = withBase(dict.fr, {
@@ -94,7 +94,7 @@ dict.bm = withBase(dict.fr, {
   readOnly: 'Kalan dɔrɔn',
   smallFormat: 'Format dɔgɔman',
   manualTests: 'Bololabolo testw',
-  directFileTest: 'Fichier sugandi test',
+  directFileTest: 'Ja sugandi test',
   addLog: 'Log fara',
   clearLogs: 'Logw bɔ',
   testLogs: 'Test logw',
@@ -105,8 +105,8 @@ dict.bm = withBase(dict.fr, {
   localStorage: 'LocalStorage bɛ yen',
   supported: 'A bɛ yen',
   unsupported: 'A tɛ yen',
-  noFileSelected: 'Fichier ma sugandi',
-  fileInputTesting: 'Bɛ fichier sugandi bololabolo la...',
+  noFileSelected: 'Ja ma sugandi',
+  fileInputTesting: 'Bɛ ja sugandi bololabolo la...',
   manualLogEntry: 'Log bololabolo'
 });
 dict.mos = withBase(dict.fr, {
@@ -120,7 +120,7 @@ dict.mos = withBase(dict.fr, {
   readOnly: 'Kare bala',
   smallFormat: 'Format sẽn bilf',
   manualTests: 'Lɔɔm test',
-  directFileTest: 'Fichier sugri test',
+  directFileTest: 'Foto sugri test',
   addLog: 'Paas log',
   clearLogs: 'Moa logs',
   testLogs: 'Test logs',
@@ -131,8 +131,8 @@ dict.mos = withBase(dict.fr, {
   localStorage: 'LocalStorage bee',
   supported: 'A bee',
   unsupported: 'A ka be ye',
-  noFileSelected: 'Fichier ka yãk ye',
-  fileInputTesting: 'A gese fichier yãkgo ne nug kaoore...',
+  noFileSelected: 'Foto ka yãk ye',
+  fileInputTesting: 'A gese foto yãkgo ne nug kaoore...',
   manualLogEntry: 'Log sẽn yi nugẽ'
 });
 

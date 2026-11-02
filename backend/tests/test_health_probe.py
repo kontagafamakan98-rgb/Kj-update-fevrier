@@ -88,6 +88,31 @@ def langues(codes=("fr", "en", "wo", "bm", "mos"), documents=7, monolingues=45):
     }
 
 
+def erreurs(total=0, **extra):
+    """Bloc `erreurs` de /health (02/11/2026), cohérent par défaut.
+
+    `total=0` est le défaut parce que c'est l'état d'une production qui n'a pas
+    rendu 500 depuis son démarrage. Les compteurs sont ceux du PROCESS : `depuis`
+    et `portee` disent sur quelle durée le zéro porte.
+    """
+    bloc = {
+        "state": "ok" if total == 0 else "echec",
+        "total": total,
+        "derniere_at": None if total == 0 else "2026-11-02T20:14:05+00:00",
+        "derniere_epoch": 0 if total == 0 else 1762114445,
+        "classe": None if total == 0 else "TypeError",
+        "famille": None if total == 0 else "/api/jobs",
+        "classes": [] if total == 0 else [{"classe": "TypeError", "total": total}],
+        "depuis": "2026-11-02T19:00:00+00:00",
+        "portee": (
+            "depuis le demarrage de ce processus : les compteurs repartent a zero a "
+            "chaque deploiement ou redemarrage"
+        ),
+    }
+    bloc.update(extra)
+    return bloc
+
+
 def sante_ok(**extra):
     payload = {
         "status": "healthy",
@@ -99,6 +124,7 @@ def sante_ok(**extra):
         },
         "paiement": paiement(),
         "langues": langues(),
+        "erreurs": erreurs(),
     }
     payload.update(extra)
     return make_fake_response(200, payload)
@@ -189,6 +215,7 @@ def test_check_health_success(probe):
         },
         "paiement": paiement(),
         "langues": langues(),
+        "erreurs": erreurs(),
         "revision": "abcdef1234"
     }
     with patch("urllib.request.urlopen",
@@ -761,3 +788,106 @@ class TestLeVolumeServiConfronteLaDeclaration:
         sortie = capsys.readouterr().out
         assert code == 1
         assert "sitemap" in sortie.lower() and "HTTP 500" in sortie
+
+class TestLesErreursNonRattrapees:
+    """Le bloc `erreurs` de /health jugé par la sonde (02/11/2026).
+
+    `sentry: inactif` disait qu'une exception ne remontait nulle part. Ces cas
+    tiennent la chaîne complète : exception → compteur → /health → sonde →
+    alerte. Le maillon muet d'aujourd'hui est exactement celui que ces cas
+    interdisent de recréer.
+    """
+
+    @staticmethod
+    def _lancer(probe, sante):
+        with patch("urllib.request.urlopen",
+                   side_effect=[sante, email_ok(), composite_ok(), sitemap_ok()]):
+            return probe.check_health(HEALTH_URL)
+
+    def test_le_contrat_du_bloc_erreurs_est_lu_dans_le_module_proprietaire(self, probe):
+        """Le garde qui manquait le 01/11 : les champs lus sont les champs publiés.
+
+        CHAMPS_ERREURS est recopié dans la sonde et kojo_erreurs.diagnostic() est
+        la déclaration : un renommage d'un côté rougit AVANT que la production
+        n'accuse un champ qui existe. C'est la panne muette de `pages.total`
+        renommé en `declarees`, refaite une fois de trop si ce cas n'existait pas.
+        """
+        import kojo_erreurs
+
+        # `derniere_epoch` est publié pour la série Prometheus
+        # (`kojo_erreurs_serveur_derniere_timestamp_seconds`), qui a besoin d'un
+        # nombre : la sonde juge la date ISO, pas le doublon. Le champ est donc
+        # DÉCLARÉ ici comme publié-pour-un-autre-lecteur — l'écrire plutôt que
+        # tolérer un écart rend le prochain ajout de champ visible.
+        CHAMPS_POUR_METRIQUES = {"derniere_epoch"}
+
+        assert set(probe.CHAMPS_ERREURS) | CHAMPS_POUR_METRIQUES == set(
+            kojo_erreurs.diagnostic()
+        )
+
+    def test_chaque_champ_declare_est_reellement_lu(self, probe):
+        """Un champ déclaré mais jamais lu ne juge rien — il décore le contrat."""
+        import inspect
+
+        source = inspect.getsource(probe._verifier_erreurs)
+        # On saute la boucle qui TESTE la présence : elle nomme les champs sans
+        # les lire, et la compter ici rendrait ce cas vert sur un bloc ignoré.
+        tete, reste = source.split("manquants = ", 1)
+        _, corps = reste.split("if manquants:", 1)
+        absents = [champ for champ in probe.CHAMPS_ERREURS if champ not in corps]
+        assert absents == [], f"champ(s) déclaré(s) mais jamais lu(s) : {absents}"
+
+    def test_un_bloc_absent_est_un_refus_nomme(self, probe, capsys):
+        """Révision antérieure au 02/11/2026 : elle ne publie pas le bloc."""
+        payload = {
+            "status": "healthy",
+            "database": "connected",
+            "paydunya_circuit": {
+                "state": "closed",
+                "consecutive_failures": 0,
+                "remaining_cooldown_seconds": 0,
+            },
+            "paiement": paiement(),
+            "langues": langues(),
+        }
+        code = self._lancer(probe, make_fake_response(200, payload))
+
+        sortie = capsys.readouterr().out
+        assert code == 1
+        assert "erreurs" in sortie and "redeployer" in sortie
+
+    def test_une_exception_est_refusee_en_la_nommant(self, probe, capsys):
+        """Une 500 a atteint un visiteur : classe, famille et date se lisent."""
+        code = self._lancer(probe, sante_ok(erreurs=erreurs(total=1)))
+
+        sortie = capsys.readouterr().out
+        assert code == 1
+        assert "ERREURS NON RATTRAPEES" in sortie
+        assert "TypeError" in sortie and "/api/jobs" in sortie
+        assert "2026-11-02T20:14:05" in sortie
+        # Le remède est nommé : le journal Fly porte le message, pas /health.
+        assert "journal Fly" in sortie
+
+    def test_un_compte_sans_portee_est_refuse(self, probe, capsys):
+        """Un zéro sans durée se lit comme « jamais », alors qu'il dit « depuis là »."""
+        code = self._lancer(probe, sante_ok(erreurs=erreurs(portee="   ")))
+
+        sortie = capsys.readouterr().out
+        assert code == 1
+        assert "portee" in sortie
+
+    def test_des_lectures_contradictoires_sont_refusees(self, probe, capsys):
+        """`state: ok` avec un total non nul : deux lectures du même fait divergent."""
+        code = self._lancer(probe, sante_ok(erreurs=erreurs(total=2, state="ok")))
+
+        sortie = capsys.readouterr().out
+        assert code == 1
+        assert "se contredisent" in sortie
+
+    def test_aucune_erreur_se_lit_en_vert(self, probe, capsys):
+        """Le zéro est publié, pas tu : une sonde qui ne dit rien ne rassure pas."""
+        code = self._lancer(probe, sante_ok())
+
+        sortie = capsys.readouterr().out
+        assert code == 0
+        assert "[OK] Erreurs non rattrapees : aucune depuis le demarrage" in sortie
