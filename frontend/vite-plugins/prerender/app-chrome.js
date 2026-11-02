@@ -140,13 +140,39 @@ if (!LIBELLE_EVITEMENT) {
   )
 }
 
+// ── LE LIEN D'ÉVITEMENT SE LIT DANS LA LANGUE DU DOCUMENT (02/11/2026) ─────
+// Mesuré ce soir : les 61 documents servis publiaient le lien d'évitement en
+// FRANÇAIS, y compris `build/en/index.html` — la coquille lisait le
+// dictionnaire français une fois pour toutes, alors que React, lui, publie
+// `t('skipToContent')` dans la langue du contexte. Un lecteur d'écran anglophone
+// entendait donc « Aller au contenu principal » sur /en/jobs, et l'audit du
+// 02/11 le compte à la fois en accessibilité (nom accessible) et en
+// internationalisation (deux chaînes de coquille restées françaises).
+//
+// Le libellé est LECTURE d'une clé (`skipToContent`), pas une copie : une clé
+// retouchée se propage au document servi, et un dictionnaire amputé casse le
+// build au lieu de publier un lien sans nom.
 /**
  * Le lien d'évitement du document pré-rendu — même classe, même cible que
  * src/App.js (`LIEN_EVITEMENT_CLASS`, `MAIN_ID`), pour que la bascule
  * coquille → React ne change ni sa place, ni son texte, ni sa cible.
+ *
+ * @param {(cle: string) => string} [T] Traducteur GLOBAL de la langue du
+ *   document. Absent = français (les deux constantes exportées plus bas).
  */
-export const LIEN_EVITEMENT_HTML =
-  `<a class="${LIEN_EVITEMENT_CLASS}" href="#${MAIN_ID}">${escapeHtml(LIBELLE_EVITEMENT)}</a>`
+export function lienEvitementHtml(T) {
+  const libelle = T ? T('skipToContent') : LIBELLE_EVITEMENT
+  if (!libelle) {
+    throw new Error(
+      'prerender-app-chrome : la clé « skipToContent » est introuvable dans le dictionnaire de la ' +
+        'langue du document — la coquille publierait un lien d’évitement sans nom accessible'
+    )
+  }
+  return `<a class="${LIEN_EVITEMENT_CLASS}" href="#${MAIN_ID}">${escapeHtml(libelle)}</a>`
+}
+
+/** La version FRANÇAISE du lien (langue par défaut), lue par les gardes. */
+export const LIEN_EVITEMENT_HTML = lienEvitementHtml()
 
 export const CHROME_OUVERTURE =
   `<div class="${APP_CLASS}">` +
@@ -283,9 +309,14 @@ export function piedDePage({ esc, T, socialLinks = [] }) {
  * @param {string} corps Corps de page publié par la coquille.
  * @param {string} piedDePageHtml Sortie de `piedDePage(...)`.
  */
-export function chromeDePage(corps, piedDePageHtml) {
+export function chromeDePage(corps, piedDePageHtml, T) {
+  // Le lien d'évitement du document est celui de SA langue : sans `T`, on
+  // retombe sur le français (les deux constantes exportées ci-dessus).
+  const ouverture = T
+    ? CHROME_OUVERTURE.replace(LIEN_EVITEMENT_HTML, lienEvitementHtml(T))
+    : CHROME_OUVERTURE
   return (
-    CHROME_OUVERTURE +
+    ouverture +
     corps +
     CHROME_FERMETURE +
     (piedDePageHtml || '') +

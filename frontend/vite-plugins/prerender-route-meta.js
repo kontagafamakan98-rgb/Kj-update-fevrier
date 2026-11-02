@@ -115,6 +115,33 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
         }
         return value
       }
+      // ── LE MESSAGE « SANS JAVASCRIPT » EST DANS LA LANGUE DU DOCUMENT ────
+      // Mesuré le 02/11/2026 : `index.html` porte un `<noscript>` français, et
+      // les 61 documents servis l'héritaient tel quel — `build/en/index.html`
+      // disait « Vous devez activer JavaScript » sur une page anglaise. Le texte
+      // appartient au dictionnaire (`jsDisabled`, cinq langues) et chaque
+      // document reçoit le sien au moment de l'écriture : un dictionnaire
+      // amputé lève ici plutôt que de publier un document muet sur sa langue.
+      const appliquerLeNoscript = (documentHtml, T, langueCode) => {
+        const message = T('jsDisabled')
+        if (!message) {
+          throw new Error(
+            `prerender-route-meta : la clé « jsDisabled » est absente du dictionnaire de ${langueCode} — ` +
+              'le document servi publierait un message « sans JavaScript » dans une autre langue'
+          )
+        }
+        const remplace = documentHtml.replace(
+          /<noscript>[\s\S]*?<\/noscript>/,
+          `<noscript>${esc(message)}</noscript>`
+        )
+        if (remplace === documentHtml && !documentHtml.includes('<noscript>')) {
+          throw new Error(
+            `prerender-route-meta : <noscript> introuvable dans le document de ${langueCode} — ` +
+              'le message sans JavaScript ne serait publié dans aucune langue'
+          )
+        }
+        return remplace
+      }
       const esc = (value) =>
         String(value)
           .replace(/&/g, '&amp;')
@@ -248,7 +275,7 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
       // src/config/og-cards.js) : celle de sa route, sinon celle de la
       // racine — et une route du projet sans carte fait échouer le build
       // plutôt que de publier une coquille sans og:image.
-      for (const { langue, exigerCorpsDeclare, pied, SHELLS, writeRouteText } of PAR_LANGUE) {
+      for (const { langue, T, exigerCorpsDeclare, pied, SHELLS, writeRouteText } of PAR_LANGUE) {
         for (const routePath of Object.keys(pageMeta)) {
           if (routePath === '/') continue // index.html : la MÊME fonction, écrite plus bas
           const route = routePath.slice(1)
@@ -286,7 +313,7 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
             // donc l'héritage des styles du document divergeait de React (cf.
             // app-chrome.js — le `text-align` hérité déplaçait les bornes d'encre
             // du texte LCP et faisait ré-élire la peinture de React).
-            out = out.replace('<div id="root"></div>', `<div id="root">${chromeDePage(shell, pied)}</div>`)
+            out = out.replace('<div id="root"></div>', `<div id="root">${chromeDePage(shell, pied, T)}</div>`)
           }
           // Preload du chunk lazy de la route, en parallèle de l'entrée →
           // boot React accéléré (modulepreload fetch aussi ses imports).
@@ -302,6 +329,7 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
           // alternatives `hreflang` de SA famille (les mêmes dans les deux
           // langues, par construction).
           out = appliquerLaLangue(out, { chemin: routePath, code: langue.code, origine: origin })
+          out = appliquerLeNoscript(out, T, langue.code)
           const fichier = fichierDuDocument(langue.code, routePath)
           exigerBalisesEquilibrees(`la coquille pré-rendue ${chemin} → ${fichier}`, out)
           fs.mkdirSync(path.dirname(path.join(outDir, fichier)), { recursive: true })
@@ -370,24 +398,28 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
       // l'artefact APRÈS le build — ici, la coquille déséquilibrée n'est pas
       // écrite du tout. Le préchargement de la photo est le même pour les deux
       // langues (même héros, même image).
-      for (const { langue, exigerCorpsDeclare, pied, homeShell, writeRouteText } of PAR_LANGUE) {
+      for (const { langue, T, exigerCorpsDeclare, pied, homeShell, writeRouteText } of PAR_LANGUE) {
         const chemin = cheminDansLaLangue('/', langue.code)
         exigerCorpsDeclare('/', 'home', homeShell)
         exigerBalisesEquilibrees("le corps de l'accueil (shells-home.js)", homeShell)
         const withHomeShell = withPreload.replace(
           '<div id="root"></div>',
-          `<div id="root">${chromeDePage(homeShell, pied)}</div>`
+          `<div id="root">${chromeDePage(homeShell, pied, T)}</div>`
         )
         if (withHomeShell === withPreload) {
           throw new Error(
             `prerender-route-meta : <div id="root"></div> introuvable dans index.html — shell accueil NON injecté (${langue.code})`
           )
         }
-        const indexFinal = appliquerLaLangue(writeRouteText(withHomeShell, '/'), {
-          chemin: '/',
-          code: langue.code,
-          origine: origin,
-        })
+        const indexFinal = appliquerLeNoscript(
+          appliquerLaLangue(writeRouteText(withHomeShell, '/'), {
+            chemin: '/',
+            code: langue.code,
+            origine: origin,
+          }),
+          T,
+          langue.code
+        )
         exigerBalisesEquilibrees(`la page pré-rendue ${chemin}`, indexFinal)
         // index.html porte le texte de « / » : même fonction que les sept
         // coquilles, donc les deux canaux ne peuvent pas diverger. La langue par

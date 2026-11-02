@@ -99,6 +99,99 @@ function findScope(source) {
   return scope === 'core' ? null : scope;
 }
 
+// ── LES DICTIONNAIRES DE PAGE NE RETOMBENT PLUS SUR LE FRANÇAIS ────────────
+// Mesuré le 02/11/2026 : 166 des 463 clés de page étaient traduites, donc
+// `/jobs` s'affichait à 67–78 % en français pour un lecteur wolof, bambara ou
+// mooré. La cause est structurelle : `dict.wo = withBase(dict.fr, {...})`
+// ÉTALE le français, donc une clé absente des surcharges n'est pas « en
+// anglais », elle est EN FRANÇAIS.
+//
+// Ce cas juge la PRÉSENCE, pas la valeur : une clé déclarée dans `dict.<langue>`
+// est traduite ; une clé absente est publiée en français. Il porte un plancher
+// de lecture (fichiers et clés) pour qu'un balayage cassé ne rende pas un vert
+// muet, et une liste d'EXCEPTIONS DÉCLARÉES avec leur motif.
+const PACK_DIR = path.join(SRC_ROOT, 'utils', 'pack2PageI18n');
+const LANGUES_DE_PAGE = ['wo', 'bm', 'mos'];
+const SANS_TRADUCTION = [
+  {
+    fichier: 'register.js',
+    cle: 'phonePlaceholder',
+    motif:
+      'un exemple de FORMAT de numéro (« 77 123 45 67 »), pas une phrase : il ne se traduit pas, ' +
+      'et une valeur inventée par langue donnerait un numéro qui n’existe dans aucun pays',
+  },
+  {
+    fichier: 'dashboard.js',
+    cle: 'recentBudget',
+    motif:
+      '« {min} - {max} XOF » : un FORMAT de montant, identique dans les cinq langues par ' +
+      'construction. Une surcharge recopiée à l’identique est du poids mort, et ' +
+      '`check-pack2-i18n-hygiene.js` la refuse',
+  },
+  {
+    fichier: 'photoTest.js',
+    cle: 'userAgent',
+    motif:
+      '« User Agent » : le NOM d’un en-tête HTTP, pas un mot d’interface — il ne se traduit pas ' +
+      '(page de diagnostic, hors parcours visiteur)',
+  },
+  {
+    fichier: 'portefeuilles.js',
+    cle: 'wallet',
+    motif:
+      '« Wallet » : le terme du métier mobile money, celui qu’emploient les opérateurs ; le ' +
+      'traduire inventerait un mot que personne n’emploie (page d’administration)',
+  },
+];
+
+describe('les dictionnaires de PAGE sont traduits en entier', () => {
+  const fichiers = fs
+    .readdirSync(PACK_DIR)
+    .filter((nom) => nom.endsWith('.js') && nom !== 'core.js')
+    .sort();
+
+  it('aucune clé de page ne retombe sur le français en wo/bm/mos', () => {
+    // Les clés d'un bloc de dictionnaire : `cle:` en début de ligne, le seul
+    // format que ces fichiers emploient (deux espaces dans `fr`, aucun dans les
+    // surcharges — les deux formes sont lues).
+    const cles = (bloc) => [...bloc.matchAll(/^\s*([A-Za-z0-9_]+):/gm)].map((m) => m[1]);
+    const manquantes = [];
+    let clesLues = 0;
+
+    for (const fichier of fichiers) {
+      const source = fs.readFileSync(path.join(PACK_DIR, fichier), 'utf8');
+      // Après l'accolade : sans cela le `fr:` de la déclaration serait lu
+      // comme une clé (« fr » manquerait alors à toutes les langues).
+      const clesFr = cles(
+        source.slice(source.indexOf('fr: {') + 'fr: {'.length, source.indexOf('en: {'))
+      );
+      clesLues += clesFr.length;
+      for (const langue of LANGUES_DE_PAGE) {
+        const debut = source.indexOf(`dict.${langue}`);
+        const bornes = LANGUES_DE_PAGE.map((l) => source.indexOf(`dict.${l}`)).filter(
+          (position) => position > debut
+        );
+        const fin = bornes.length ? Math.min(...bornes) : source.indexOf('export const makeScopedTranslator');
+        const presentes = new Set(cles(source.slice(debut, fin)));
+        for (const cle of clesFr) {
+          if (presentes.has(cle)) continue;
+          const excuse = SANS_TRADUCTION.some((e) => e.fichier === fichier && e.cle === cle);
+          if (!excuse) manquantes.push(`${fichier} : « ${cle} » manque à dict.${langue}`);
+        }
+      }
+    }
+
+    // Planchers : 14 scopes, 470 clés au moins. Un balayage qui ne lit rien
+    // rendrait toutes ses absences muettes et passerait pour un vert.
+    expect(fichiers.length, 'les dictionnaires de page ne sont plus lus').toBe(14);
+    expect(clesLues, 'les clés de page ne sont plus lues').toBeGreaterThan(460);
+    expect(
+      manquantes,
+      `clés de page affichées en FRANÇAIS à un lecteur wo/bm/mos (dict.<langue> ne les porte pas) :\n${manquantes.join('\n')}`
+    ).toEqual([]);
+  });
+});
+
 describe('i18n coverage des appels t() / pageT()', () => {
   it("chaque clé t('...') existe dans le dictionnaire global des 5 langues", () => {
     const missing = new Set();

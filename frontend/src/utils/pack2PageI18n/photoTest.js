@@ -57,44 +57,83 @@ en: {
   manualLogEntry: 'Manual log entry'
 }
 };
-dict.wo = withBase(dict.fr, {  title: 'Test nataalu profil',
+dict.wo = withBase(dict.fr, {
+  title: 'Test nataalu profil',
   subtitle: 'Xët bu debug ngir seet sistem nataal bi',
   userInfo: 'Xibaaru jëfandikookat',
   photoComponent: 'Test bu kompozaŋ nataal',
   editableMode: 'Mode soppi',
   clickToEdit: 'Bësal ngir soppi',
   readMode: 'Mode jàng',
+  readOnly: 'Jàng rekk',
+  smallFormat: 'Format bu ndaw',
   manualTests: 'Test yu loxo',
   directFileTest: 'Test tann fichier bu jub',
   addLog: 'Yokk log',
   clearLogs: 'Far logs yi',
-  testLogs: 'Logs yu test'
+  testLogs: 'Logs yu test',
+  entriesCount: '{count} yepp',
+  browserInfo: 'Xibaar ci navigateur bi',
+  fileApi: 'File API am na',
+  canvas: 'Canvas am na',
+  localStorage: 'LocalStorage am na',
+  supported: 'Am na',
+  unsupported: 'Amul',
+  noFileSelected: 'Amul fichier bu ñu tànn',
+  fileInputTesting: 'Mi ngi test tànn fichier bu loxo...',
+  manualLogEntry: 'Log bu loxo'
 });
-dict.bm = withBase(dict.fr, {  title: 'Profil foto test',
+dict.bm = withBase(dict.fr, {
+  title: 'Profil foto test',
   subtitle: 'Debug duw ka foto system filɛ',
   userInfo: 'Baarakɛla kibaru',
   photoComponent: 'Foto composant test',
   editableMode: 'Sopili mode',
   clickToEdit: 'A digi ka soppi',
   readMode: 'Kalan mode',
+  readOnly: 'Kalan dɔrɔn',
+  smallFormat: 'Format dɔgɔman',
   manualTests: 'Bololabolo testw',
   directFileTest: 'Fichier sugandi test',
   addLog: 'Log fara',
   clearLogs: 'Logw bɔ',
-  testLogs: 'Test logw'
+  testLogs: 'Test logw',
+  entriesCount: '{count} don',
+  browserInfo: 'Navigatɛri kibaru',
+  fileApi: 'File API bɛ yen',
+  canvas: 'Canvas bɛ yen',
+  localStorage: 'LocalStorage bɛ yen',
+  supported: 'A bɛ yen',
+  unsupported: 'A tɛ yen',
+  noFileSelected: 'Fichier ma sugandi',
+  fileInputTesting: 'Bɛ fichier sugandi bololabolo la...',
+  manualLogEntry: 'Log bololabolo'
 });
-dict.mos = withBase(dict.fr, {  title: 'Profil pɩture test',
+dict.mos = withBase(dict.fr, {
+  title: 'Profil pɩture test',
   subtitle: 'Debug page n ges pɩture system',
   userInfo: 'Ned kibare',
   photoComponent: 'Pɩture composant test',
   editableMode: 'Tek mode',
   clickToEdit: 'Pɩlg n tek',
   readMode: 'Kare mode',
+  readOnly: 'Kare bala',
+  smallFormat: 'Format sẽn bilf',
   manualTests: 'Lɔɔm test',
   directFileTest: 'Fichier sugri test',
   addLog: 'Paas log',
   clearLogs: 'Moa logs',
-  testLogs: 'Test logs'
+  testLogs: 'Test logs',
+  entriesCount: '{count} tẽnre',
+  browserInfo: 'Navigatɛɛr kibare',
+  fileApi: 'File API bee',
+  canvas: 'Canvas bee',
+  localStorage: 'LocalStorage bee',
+  supported: 'A bee',
+  unsupported: 'A ka be ye',
+  noFileSelected: 'Fichier ka yãk ye',
+  fileInputTesting: 'A gese fichier yãkgo ne nug kaoore...',
+  manualLogEntry: 'Log sẽn yi nugẽ'
 });
 
 export const makeScopedTranslator = (currentLanguage, fallbackT) =>

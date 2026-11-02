@@ -112,23 +112,112 @@ en: {
   jobAlertReservedAction: 'Post a mission'
 }
 };
-dict.wo = withBase(dict.fr, {  searchPlaceholder: 'Tur walla melokaan...',
+// 02/11/2026 : le scope est traduit EN ENTIER en wo/bm/mos (26 clés manquaient
+// ici, et la page /jobs restait à 67-78 % de français dans ces trois langues).
+dict.wo = withBase(dict.fr, {
+  searchPlaceholder: 'Tur walla melokaan...',
+  tabDiscover: 'Seetal',
+  tabApplications: 'Sa kandidaat yi',
+  tabMissions: 'Sa liggéey yi',
+  myMissions: 'Sa liggéey yi',
+  availableJobs: 'Liggéey yu am',
+  intro:
+    'Fii nga di gis liggéey yépp yu ñu feeñal ci Kojo : seetal liggéey yi ubbeeku ci sa wet, laaj ci saa bu gaaw, te topp sa kandidaat yi fii.',
+  allCategories: 'Xeetu liggéey yépp',
+  allStatuses: 'Statut yépp',
+  loadingMore: 'Mi ngi ñëw…',
+  loadMore: 'Wone liggéey yu bari',
+  noApplicationsYet: 'Amuloo kandidaat ci liggéey ba léegi.',
+  retry: 'Jéemaat',
+  loadErrorNetwork: 'Amul jokkoo. Seet sa reso, te jéemaat.',
+  loadErrorServer: 'Serwer bi tontuwul. Jéemaat ci saa bu gaawe.',
+  emptyFiltered: 'Amul liggéey bu zems ak filtre yii.',
+  clearFilters: 'Far filtre yi',
+  emptyHint: 'Yaatal sa seet walla dellu ci ginnaaw.',
+  resultsOne: '1 liggéey zems na ak sa seet',
+  resultsMany: '{count} liggéey zems nañu ak sa seet',
+  sortLabel: 'Tëral ci',
+  sortRecent: 'Yu bees',
+  sortBudget: 'Bajat bu gëna mag',
+  sortDistance: 'Yu gëna jege',
   premierArrivantsTitle: 'Jot liggéey yi njëkk',
   premierArrivantsLead: 'Amul liggéey bu ubbeeku tey. Feesal sa liggéey, jot yu bees ci email, walla bind nu ci WhatsApp.',
   premierArrivantsWatch: 'Jot liggéey yi ci email',
-  premierArrivantsWhatsApp: 'Bind ci WhatsApp'
+  premierArrivantsWhatsApp: 'Bind ci WhatsApp',
+  jobAlertReservedTitle: 'Alerta yu liggéey, liggéeykat yi lañu',
+  jobAlertReservedLead:
+    'Alerta dafay yónnee ci email liggéey yi zems ak sa tànn yi. Ci konto kliyan, dina la delloo katalog bi nga boole ci sa bopp — moo tax ñu di ko doxal ci konto liggéeykat. Su nga boole liggéey, liggéeykat yi am alerta ñoo lañu di yéegle.',
+  jobAlertReservedAction: 'Boole liggéey'
 });
-dict.bm = withBase(dict.fr, {  searchPlaceholder: 'Tɔgɔ walima fɔli...',
+dict.bm = withBase(dict.fr, {
+  searchPlaceholder: 'Tɔgɔ walima fɔli...',
+  tabDiscover: 'A flɛ',
+  tabApplications: 'N ka kandidatiw',
+  tabMissions: 'N ka baaraw',
+  myMissions: 'N ka baaraw',
+  availableJobs: 'Baaraw minnu bɛ yen',
+  intro:
+    'Yan i bɛ baaraw bɛɛ ye minnu bɛ Kojo kan : baaraw minnu bɛ yen i ka yɔrɔ la flɛ, i ka i ɲini joona, ka i ka kandidatiw ɲɛnabɔ yan.',
+  allCategories: 'Baara suguw bɛɛ',
+  allStatuses: 'Statut bɛɛ',
+  loadingMore: 'A bɛ na…',
+  loadMore: 'Baaraw wɛrɛw jira',
+  noApplicationsYet: 'I ma kandidati kɛ fɔlɔ.',
+  retry: 'Ɲinɛ kokura',
+  loadErrorNetwork: 'Jɔnni tɛ. I ka reso lajɛ, ka ɲinɛ kokura.',
+  loadErrorServer: 'Sɛrvɛri ma jaabi. Ɲinɛ kokura joona.',
+  emptyFiltered: 'Baara si ma zɛn ni filtiri ninw ye.',
+  clearFilters: 'Filtiriw bɔ',
+  emptyHint: 'I ka ɲinini yaala, walima i ka segin kɔfɛ.',
+  resultsOne: 'Baara kelen bɛ i ka ɲinini kan',
+  resultsMany: 'Baaraw {count} bɛ i ka ɲinini kan',
+  sortLabel: 'Ka ɲɛnabɔ ni',
+  sortRecent: 'Kuraw',
+  sortBudget: 'Wari caya',
+  sortDistance: 'Ka kɛ surun',
   premierArrivantsTitle: 'Baara sɔrɔ fɔlɔ',
   premierArrivantsLead: 'Baara si tɛ yen sisan. Baara bila, baara kuraw sɔrɔ email la, walima sɛbɛn an ma WhatsApp kan.',
   premierArrivantsWatch: 'Baara sɔrɔ email la',
-  premierArrivantsWhatsApp: 'Sɛbɛn WhatsApp kan'
+  premierArrivantsWhatsApp: 'Sɛbɛn WhatsApp kan',
+  jobAlertReservedTitle: 'Kumaseliw yɛ baarakɛlaw kama',
+  jobAlertReservedLead:
+    'Kumaseli bɛ email ci baaraw minnu bɛ zɛn ni i ka laɲiniw. Kiliyan konto kan, a bɛna i segin i yɛrɛ ka katalɔgi la — o de kɔsɔn a bɛ daminɛ baarakɛla konto kan. Ni i bɛ baara bila, baarakɛlaw minnu bɛ kumaseli, olu de bɛ kibarɔ.',
+  jobAlertReservedAction: 'Baara bila'
 });
-dict.mos = withBase(dict.fr, {  searchPlaceholder: 'Yʋʋr bɩ goama...',
+dict.mos = withBase(dict.fr, {
+  searchPlaceholder: 'Yʋʋr bɩ goama...',
+  tabDiscover: 'Gese',
+  tabApplications: 'M kandidat-rãmbã',
+  tabMissions: 'M tʋʋm-rãmbã',
+  myMissions: 'M tʋʋm-rãmbã',
+  availableJobs: 'Tʋʋm sẽn be',
+  intro:
+    'Kẽnga pʋgẽ y na n yã tʋʋm fãa sẽn yi Kojo zugu : ges-y tʋʋm sẽn be f zĩigẽ, tʋm-y f sokrã taoore, la pʋg-y f kandidat-rãmbã zĩig a yembr.',
+  allCategories: 'Tʋʋm buud fãa',
+  allStatuses: 'Statut fãa',
+  loadingMore: 'A wa n waa…',
+  loadMore: 'Leb n ges tʋʋm a taab',
+  noApplicationsYet: 'F kandidat ka be ye.',
+  retry: 'Leb n lʋɩ',
+  loadErrorNetwork: 'Internet ka be ye. Ges-y f reso wã la lebs n lʋɩ.',
+  loadErrorServer: 'Sɛrvɛɛr wã ka leok ye. Leb n lʋɩ bilf.',
+  emptyFiltered: 'Tʋʋm ka zems ne filtre-rãmbã ye.',
+  clearFilters: 'Yiis-y filtre-rãmbã',
+  emptyHint: 'Yals-y f baoobã walla lebs-y n wa sʋka.',
+  resultsOne: 'Tʋʋm a yembr zemsa ne f baoobã',
+  resultsMany: 'Tʋʋm {count} zemsa ne f baoobã',
+  sortLabel: 'Pɩk-y ne',
+  sortRecent: 'Paal-rãmbã',
+  sortBudget: 'Ligdi sẽn yɩɩdga',
+  sortDistance: 'Sẽn surga',
   premierArrivantsTitle: 'Paam tʋʋm pipi',
   premierArrivantsLead: 'Tʋʋm ka be nɑɑ. Ning-y yãmb tʋʋmã, paam-y tʋʋm paal email la, walla gʋls-y tõnd WhatsApp zugu.',
   premierArrivantsWatch: 'Paam tʋʋm email la',
-  premierArrivantsWhatsApp: 'Gʋls WhatsApp zugu'
+  premierArrivantsWhatsApp: 'Gʋls WhatsApp zugu',
+  jobAlertReservedTitle: 'Kibare-rãmbã yaa tʋʋm-nedba yĩnga',
+  jobAlertReservedLead:
+    'Kibarã tʋʋmda email la ne tʋʋm sẽn zems ne f sẽkã. Kiliyan konto zugu, a na n lebsa foom katalɔg ning f yɛrã sẽn ninge — rẽ n so tɩ b tʋʋmd a ne tʋʋm-neda konto. F sã n ning tʋʋm, yaa tʋʋm-nedba sẽn tar kibar la b na n toge.',
+  jobAlertReservedAction: 'Ning-y tʋʋm'
 });
 
 export const makeScopedTranslator = (currentLanguage, fallbackT) =>

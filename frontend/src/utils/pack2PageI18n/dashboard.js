@@ -24,25 +24,31 @@ en: {
 }
 };
 dict.wo = withBase(dict.fr, {
-loading: 'Mi ngi yebbi dashboard bi...',
+  loading: 'Mi ngi yebbi tablo bi…',
   status_open: 'Ubbeeku',
   status_in_progress: 'Mi ngi dox',
   status_completed: 'Jeexna',
-  status_cancelled: 'Neenal'
+  status_cancelled: 'Neenal',
+  addPaymentAccountHint: 'Amoo kont bu man a fey. Yomb na: boole ko bépp bu bëggee ñu fey la (walla fey ab liggéey).',
+  addPaymentAccountAction: 'Boole ab kont bu man a fey'
 });
 dict.bm = withBase(dict.fr, {
-loading: 'Bɛ tableau de bord kalan...',
+  loading: 'Tablo bi bɛ don…',
   status_open: 'Dayɛlɛn',
   status_in_progress: 'Bɛ sen',
   status_completed: 'Banbali',
-  status_cancelled: 'Dabila'
+  status_cancelled: 'Dabila',
+  addPaymentAccountHint: 'I ma sara kontu sɔrɔ fɔlɔ. A ma gɛlɛn: i bɛ se ka a fara a kan waati min i bɛ sɔn ka sara sɔrɔ (walla ka baara sara).',
+  addPaymentAccountAction: 'Sara kontu fara a kan'
 });
 dict.mos = withBase(dict.fr, {
-loading: 'A kareng tableau de bord...',
+  loading: 'Tablo wã n dogdi…',
   status_open: 'Yɔɔgda',
   status_in_progress: 'A tʋmda',
   status_completed: 'A séose',
-  status_cancelled: 'A yãage'
+  status_cancelled: 'A yãage',
+  addPaymentAccountHint: 'F ka sara kont pa tar ye. Woto ka yalem: paas-a wakat ning f sẽn dat n paam sara (walla n yo sara tʋʋm).',
+  addPaymentAccountAction: 'Paas sara kont'
 });
 
 export const makeScopedTranslator = (currentLanguage, fallbackT) =>

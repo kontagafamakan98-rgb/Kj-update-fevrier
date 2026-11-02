@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-11-02",
-    "motif": "État de référence du 02/11/2026 : les DEUX gardes du pré-vol de push (check-git-branches.js et check-test-environment.js) sont nommés dans cette référence, alors que le motif qu'elle portait ne parlait que du harnais de mutation (dernière adoption). Le périmètre est réenregistré d'un bloc, sans changement de fichier, pour que la trace dise ce que le pré-vol tient : les deux gardes du pré-vol sont lus à chaque push et une mutation laissée sur l'un d'eux ne doit pas passer pour un dépôt propre.",
+    "motif": "02/11/2026 : la section 10 du garde confronte desormais les DEUX chaines d'accessibilite de chaque document servi (lien d'evitement, message noscript) au dictionnaire de SA langue, parce que les 61 documents les publiaient en francais ; l'empreinte bouge de ce seul controle, et une mutation laissee sur ce garde doit se voir ici",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/alerte_sondes.py": "35c6b645b431b932c6af1ed53704acc4f096da428a49e2f7461259358f137687",
@@ -119,7 +119,6 @@
       "frontend/scripts/check-pack2-chunks.js": "953f86f71a0f61e8f446727a41e83097ccbb0ecb7f118dc7571bc6b413c6caef",
       "frontend/scripts/check-pack2-i18n-hygiene.js": "692a809c06b036b51536bf1810317ced7e77d7ee10d777188b00bf78b4389d58",
       "frontend/scripts/check-page-meta.js": "abbdc46403a4e2ce8b06fc9b76c652a98958bc23c8155f973029c600d3ce281b",
-      "frontend/scripts/check-prerender-shells.js": "efbb287fe83a4708f0262796ac7b3d21b5a3f77ca568785fac9c80da27d458e5",
       "frontend/scripts/check-pwa-manifest.js": "7840560638e9bb25d11c87e729640fc7208a1e60e0ed521dcfa4e3dc2652ad95",
       "frontend/scripts/check-reliquats-css.js": "afc399893d24bf9831bc9c0094b695746bb0a7ddbe5c06e7f65f9adde936a219",
       "frontend/scripts/check-retard-main.js": "b9c98e4c23382b24d1ce361acc7ea5d0cc6dc166d83ab288402f76436d205e61",
@@ -151,7 +150,8 @@
       "frontend/scripts/retard-main.js": "eef5724dae66bc8e17fbb50e0be1c426b9eba4ceb24c04808c8fdb0f8dacad37",
       "frontend/scripts/style-layout-budgets.cjs": "db93353a147d9be6e84999ea065d3b3df5d08871a62fe943f3346bc80d68ede9",
       "frontend/scripts/validate-vercel-json.mjs": "16a56835e1fb299821c3a1dd7fa4d0957982a970a493e98ed8855d06fc563518",
-      "frontend/scripts/verre-contraste.js": "0304f01ae4ccd2fea6db62cff8badcb4085d3a34622f49416ed8944c377c688c"
+      "frontend/scripts/verre-contraste.js": "0304f01ae4ccd2fea6db62cff8badcb4085d3a34622f49416ed8944c377c688c",
+      "frontend/scripts/check-prerender-shells.js": "748b20e4d7ed7afa14dabaf10f52c015ca4e63c78e9df222bc6887c4fe7ddac4"
     }
   },
   "hors_perimetre": [

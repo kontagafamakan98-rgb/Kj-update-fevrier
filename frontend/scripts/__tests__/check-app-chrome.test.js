@@ -38,6 +38,7 @@ import {
   piedDePage,
 } from '../../vite-plugins/prerender/app-chrome.js';
 import fr from '../../src/i18n/fr.json';
+import en from '../../src/i18n/en.json';
 import {
   APP_CLASS,
   COLONNE_CLASS,
@@ -121,6 +122,22 @@ describe('app-chrome — le chrome est la copie de celui de l’app', () => {
     expect(LIEN_EVITEMENT_HTML).toContain(fr.skipToContent);
   });
 
+  it('le lien d’évitement est dans la LANGUE du document, pas en français partout', () => {
+    // Mesuré le 02/11/2026 : `chromeDePage` publiait `LIEN_EVITEMENT_HTML`, lu
+    // une fois dans `fr.json` — donc « Aller au contenu principal » sur
+    // /en/jobs, /wo/jobs et les autres, alors que React publie
+    // `t('skipToContent')` dans la langue du contexte.
+    const anglais = en;
+    const TAnglais = (cle) => anglais[cle];
+    const html = chromeDePage('<p>corps</p>', '', TAnglais);
+    expect(html).toContain(anglais.skipToContent);
+    expect(html, 'le libellé français survit dans un document anglais').not.toContain(
+      LIBELLE_EVITEMENT
+    );
+    // Sans `T`, la langue par défaut : les constantes exportées ne bougent pas.
+    expect(chromeDePage('<p>corps</p>', '')).toContain(LIBELLE_EVITEMENT);
+  });
+
   it('le PIED DE PAGE est lu au même domicile que celui de src/App.js', () => {
     // Mêmes classes de part et d'autre, et surtout : plus une seule recopie.
     const pied = piedDePage({ esc, T, socialLinks: [] });
@@ -198,8 +215,14 @@ describe('app-chrome — publié à UN seul endroit', () => {
     // Une seule des deux qui l'oublierait suffirait à remettre une page
     // pré-rendue dans l'ancienne géométrie — l'accueil et /jobs sont les deux
     // routes dont l'élément LCP est un texte du corps.
-    expect(ROUTE_META).toMatch(/chromeDePage\(shell, pied\)/);
-    expect(ROUTE_META).toMatch(/chromeDePage\(homeShell, pied\)/);
+    // `T` est passé au chrome depuis le 02/11/2026 : c'est lui qui met le lien
+    // d'évitement du document dans SA langue (les 61 documents le publiaient en
+    // français). Un appel qui perdrait ce troisième argument repasserait en
+    // français sans qu'aucun autre cas ne le voie.
+    expect(ROUTE_META).toMatch(/chromeDePage\(shell, pied, T\)/);
+    expect(ROUTE_META).toMatch(/chromeDePage\(homeShell, pied, T\)/);
+    // Et le message « sans JavaScript » est réécrit dans la langue du document.
+    expect(ROUTE_META).toMatch(/appliquerLeNoscript\(/);
     expect(ROUTE_META).not.toMatch(/'<div id="root">\$\{shell\}<\/div>'/);
     expect(ROUTE_META).not.toMatch(/'<div id="root">\$\{homeShell\}<\/div>'/);
     // UN SEUL pied de page construit, pour les DEUX injections.

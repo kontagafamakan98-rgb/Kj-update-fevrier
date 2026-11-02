@@ -115,7 +115,12 @@ title: 'Sos konto',
   googleLogin: 'Yokk ci Google',
   googleSuccess: 'Konto sos nañu ko ak Google',
   onboardingNotice: 'Jëm bala ci étape 3 ngir yëngal sa konto ci yàgg.',
-  googleEmailExists: 'Konto am na ba noppi ci email bii. Bindu ngir yokk sa konto Google.'
+  googleEmailExists: 'Konto am na ba noppi ci email bii. Bindu ngir yokk sa konto Google.',
+  emailPlaceholder: 'misal@email.com',
+  stepEmail: 'Saytu email',
+  stepPayments: 'Fey',
+  legalContactLine: 'Jokk ci KOJO : +18193003507 · Email : Kojoapp98@gmail.com · Adres : Hamdallaye Aci 2000 Bamako Mali',
+  referralCodeLabel: 'Code parrainage (soo bëggee)'
 });
 dict.bm = withBase(dict.fr, {
 title: 'Konto da',
@@ -149,7 +154,12 @@ title: 'Konto da',
   googleLogin: 'Tɛmɛ ni Google ye',
   googleSuccess: 'Konto dilannen ni Google ye',
   onboardingNotice: 'Ka tɛmɛ étape 3 fɔlɔ walasa i ka konto labɛn cogo bɛɛ la.',
-  googleEmailExists: 'Konto bɛ yen ni email nin ye. I ka jɛɲɔgɔn don walasa i ka Google konto fara a kan.'
+  googleEmailExists: 'Konto bɛ yen ni email nin ye. I ka jɛɲɔgɔn don walasa i ka Google konto fara a kan.',
+  emailPlaceholder: 'misali@email.com',
+  stepEmail: 'Email lakɔlɔsili',
+  stepPayments: 'Sara',
+  legalContactLine: 'Jɛɲɔgɔn KOJO ye : +18193003507 · Email : Kojoapp98@gmail.com · Adɛrɛsi : Hamdallaye Aci 2000 Bamako Mali',
+  referralCodeLabel: 'Parrainage code (ni i b’a fɛ)'
 });
 dict.mos = withBase(dict.fr, {
 title: 'Ning konto',
@@ -183,7 +193,12 @@ title: 'Ning konto',
   googleLogin: 'Tʋm n tʋm Google',
   googleSuccess: 'Konto maanegame ne Google',
   onboardingNotice: 'Dɑɑg étape 3 yɑɑngɑ n dɩ f konto wã sɩd yĩngɑ.',
-  googleEmailExists: 'Konto beeme ne email-kãngã. Bindu n nɑɑg f Google konto.'
+  googleEmailExists: 'Konto beeme ne email-kãngã. Bindu n nɑɑg f Google konto.',
+  emailPlaceholder: 'misaal@email.com',
+  stepEmail: 'Email gesgo',
+  stepPayments: 'Ligdi',
+  legalContactLine: 'Jokr ne KOJO : +18193003507 · Email : Kojoapp98@gmail.com · Adres : Hamdallaye Aci 2000 Bamako Mali',
+  referralCodeLabel: 'Parrainage code (f sã n kʋdga)'
 });
 
 export const makeScopedTranslator = (currentLanguage, fallbackT) =>
