@@ -97,7 +97,7 @@ dict.wo = withBase(dict.fr, {
   dashboardMessage: 'Dalal ak jàmm {firstName} ! Konto bi ñu seet na ko ak {count} misaal fey.',
   referralAppliedToast: 'Code parrainage bi dox na ci wàll bu baax !',
   referralAppliedWithBonusToast: 'Code parrainage bi dox na ! +{amount} FCFA ci bonus.',
-  duplicateEmailError: 'Adresse email bii jëfandikoo nañu ko ba noppi',
+  duplicateEmailError: 'Email bii jëfandikoo nañu ko ba noppi',
   step3DoneToast: 'Etaap 3 bi jeex na ci wàll bu baax.',
   dashboardReadyMessage: 'Méngale fey yi jeex na. Sa konto bi pare na léegi.'
 });
