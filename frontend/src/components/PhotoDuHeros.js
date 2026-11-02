@@ -120,10 +120,12 @@ import {
   PHOTO_HEROS_FORMATS,
   PHOTO_HEROS_HAUTEUR,
   PHOTO_HEROS_LARGEUR,
+  PHOTO_HEROS_REPLI,
   PHOTO_HEROS_SIZES,
   memeVarianteQue,
   sourceImageHeros,
   srcsetHeros,
+  srcsetRepliHeros,
 } from '../config/photos-heros';
 
 /** Le repli quand `requestIdleCallback` n'existe pas (Safari) : même règle que
@@ -237,6 +239,19 @@ export default function PhotoDuHeros({ className }) {
             sizes={PHOTO_HEROS_SIZES}
           />
         ))}
+        {/* LE REPLI JPEG, EN DERNIER `<source>` (02/11/2026). Un `<picture>`
+            retient le PREMIER `<source>` dont le `type` est supporté : un
+            navigateur antérieur au WebP (Safari ≤ 13) ignore l'AVIF et le WebP,
+            retient celui-ci, et affiche donc une photo — ce qui n'était plus le
+            cas depuis que l'`<img>` publie le WebP. Il vient APRÈS les formats
+            modernes, sinon il les priverait de leur sélection ; et l'`<img>`
+            reste le WebP 720 pour les lecteurs d'attribut (voir
+            src/config/photos-heros.js, `PHOTO_HEROS_REPLI`). */}
+        <source
+          type={`image/${PHOTO_HEROS_REPLI}`}
+          srcSet={srcsetRepliHeros(index)}
+          sizes={PHOTO_HEROS_SIZES}
+        />
         <img
           ref={refImage}
           src={sourceImageHeros(index)}

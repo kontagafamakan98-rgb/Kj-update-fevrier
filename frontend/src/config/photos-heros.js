@@ -244,6 +244,46 @@ export const sourceImageHeros = (index) => {
 };
 
 /**
+ * ── LE REPLI JPEG, PUBLIÉ COMME UN `<source>` (02/11/2026) ──────────────────
+ *
+ * Le 01/11/2026, l'`<img>` du `<picture>` a cessé de publier le JPEG pour
+ * publier le WebP 720 : un vérificateur qui ne lit que l'attribut `src` ne
+ * devait plus voir un JPEG là où le navigateur reçoit de l'AVIF. C'était juste,
+ * mais incomplet — et c'est écrit ici depuis : « plus de JPEG publié, donc un
+ * navigateur antérieur au WebP n'affiche pas d'image ».
+ *
+ * La correction ne revient PAS sur ce choix : l'`<img>` garde le WebP 720
+ * (l'attribut `src` reste un format moderne), et le JPEG redevient un candidat
+ * en devenant un `<source type="image/jpeg">` publié EN DERNIER.
+ *
+ * Pourquoi ça marche, et pourquoi l'ORDRE est la règle : un `<picture>` retient
+ * le PREMIER `<source>` dont le `type` est supporté. Un navigateur moderne
+ * s'arrête sur l'AVIF ; celui qui connaît le WebP sans l'AVIF s'arrête sur le
+ * WebP ; celui qui ne connaît NI l'un NI l'autre (Safari ≤ 13) ignore les deux
+ * premiers et retient ce troisième. L'`<img>` n'est consulté que par un
+ * navigateur sans `<picture>` du tout — il publie alors le WebP, ce qui ne sert
+ * plus à rien, mais ce sont des navigateurs qui ne font pas tourner
+ * l'application.
+ *
+ * COÛT MESURÉ : zéro octet pour un navigateur moderne, qui ne demande jamais ce
+ * candidat (`e2e/heros-format.spec.js` l'exige : « aucun .jpg du héros sur
+ * toute la navigation »). Le prix est d'environ 90 octets de HTML par
+ * `<source>`, dans la coquille comme dans le composant.
+ *
+ * Le `srcset` ne porte qu'UNE largeur (720), parce qu'il n'existe pas de JPEG
+ * 480 sur disque : les variantes 480 sont des WebP et des AVIF. Annoncer un
+ * `480w` promettrait un fichier absent — et c'est exactement ce candidat-là que
+ * le navigateur d'avant le WebP demanderait.
+ */
+export const PHOTO_HEROS_REPLI = 'jpeg';
+
+export const srcsetRepliHeros = (index) => {
+  const variantes = VARIANTES_HEROS[index];
+  if (!variantes) throw new Error(`photo de héros inconnue : ${index}`);
+  return `${variantes.jpeg} ${PHOTO_HEROS_LARGEUR}w`;
+};
+
+/**
  * De la variante CHOISIE par le navigateur à celle de la photo suivante.
  *
  * Sert au préchargement du cran suivant (PhotoDuHeros) : le navigateur a déjà
