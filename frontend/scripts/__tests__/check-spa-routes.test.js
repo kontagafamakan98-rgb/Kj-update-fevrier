@@ -85,8 +85,10 @@ const CONFORMING_REWRITES = [
   // Le profil public est pré-rendu par le MÊME backend (20/10/2026) : il n'est
   // donc plus servi par app.html, et il n'est plus privé non plus.
   { source: WORKER_REWRITE_SOURCE, destination: `https://api.kojoforafrica.cc.cd${WORKER_REWRITE_SUFFIX}` },
+  // Le sitemap passe par la FONCTION d'arête (03/11/2026), et AVANT le
+  // catch-all /api : une destination absolue n'est pas cachée par Vercel.
+  { source: '/sitemap.xml', destination: '/api/sitemap' },
   { source: '/api/:path*', destination: 'https://api.kojoforafrica.cc.cd/api/:path*' },
-  { source: '/sitemap.xml', destination: 'https://api.kojoforafrica.cc.cd/api/sitemap.xml' },
   { source: '/login', destination: '/login.html' },
   { source: '/login/', destination: '/login.html' },
   { source: '/register', destination: '/register.html' },
@@ -180,6 +182,10 @@ function makeProject({
     raw !== undefined ? raw : JSON.stringify({ framework: 'vite', rewrites, headers }, null, 2)
   );
   fs.writeFileSync(path.join(frontendDir, 'src', 'App.js'), appSource);
+  // La fonction d'arête que la réécriture du sitemap doit atteindre : sans ce
+  // fichier, le contrôle refuse (le sitemap répondrait 404).
+  fs.mkdirSync(path.join(frontendDir, 'api'), { recursive: true });
+  fs.writeFileSync(path.join(frontendDir, 'api', 'sitemap.js'), 'export default async function handler() {}\n');
   if (index) fs.writeFileSync(path.join(buildDir, 'index.html'), '<div id="root"></div>');
   if (notFound !== null) fs.writeFileSync(path.join(buildDir, '404.html'), notFound);
   if (appHtml !== null) fs.writeFileSync(path.join(buildDir, 'app.html'), appHtml);
@@ -578,6 +584,34 @@ describe('check-spa-routes — découverte et cas dégradés', () => {
       ),
     });
     expect(run(project).errors.join('\n')).toContain('/sitemap.xml');
+  });
+
+  // Mesuré le 02/11/2026 : une réécriture ABSOLUE vers Fly rend
+  // `X-Vercel-Cache: MISS` à chaque crawl — le CDN ne cache pas une origine
+  // externe. Le sitemap doit donc passer par la fonction d'arête.
+  it('refuse une destination absolue pour le sitemap (le CDN ne la cache pas)', () => {
+    const project = makeProject({
+      rewrites: withRewrites((rewrites) => {
+        const regle = rewrites.find((rule) => rule.source === '/sitemap.xml');
+        regle.destination = 'https://api.kojoforafrica.cc.cd/api/sitemap.xml';
+      }),
+    });
+
+    const errors = run(project).errors.join('\n');
+    expect(errors).toContain('/api/sitemap');
+    expect(errors).toContain('ABSOLUE');
+  });
+
+  it('refuse la fonction placée APRÈS le catch-all /api (elle ne serait jamais atteinte)', () => {
+    const projet = makeProject({
+      rewrites: withRewrites((rewrites) => {
+        const regle = rewrites.find((rule) => rule.source === '/sitemap.xml');
+        rewrites.splice(rewrites.indexOf(regle), 1);
+        rewrites.splice(rewrites.findIndex((r) => r.source === '/api/:path*') + 1, 0, regle);
+      }),
+    });
+
+    expect(run(projet).errors.join('\n')).toContain('APRÈS');
   });
 
   // Le rewrite /robots.txt → /api/robots.txt a été RETIRÉ : la liste `Disallow`

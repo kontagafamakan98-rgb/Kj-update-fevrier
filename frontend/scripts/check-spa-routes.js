@@ -152,6 +152,13 @@ export function privateRoutesOf(routes, rewrites = []) {
 // privé doit contenir.
 export const ROBOTS_TXT = 'robots.txt';
 
+// La fonction d'arête qui sert le sitemap depuis le CDN (03/11/2026). Elle
+// TRANSPORTE le document du backend et le rend avec `s-maxage=60` ; une
+// réécriture directe vers l'origine Fly n'est pas cachée par Vercel, donc chaque
+// crawler payait l'aller-retour.
+export const SITEMAP_FONCTION = '/api/sitemap';
+export const SITEMAP_FONCTION_FICHIER = 'api/sitemap.js';
+
 // `/api/` n'est pas une route de l'application : c'est le proxy du backend, et
 // il n'a jamais eu vocation à être crawlé. Il vit donc ici, avec le rendu, et
 // pas dans la liste des pages.
@@ -482,11 +489,43 @@ export function runSpaRoutesCheck(options = {}) {
   // la liste des routes privées — un rewrite le masquerait (la réécriture passe
   // avant le fichier statique), donc l'ancien rewrite n'est plus une exigence
   // mais un DÉFAUT : il servirait une liste figée dans le backend.
+  // Le sitemap est DYNAMIQUE (il énumère les fiches /jobs/:id vivantes) : sa
+  // source reste le backend. Mais depuis le 03/11/2026 le chemin passe par la
+  // FONCTION D'ARÊTE `api/sitemap.js`, qui transporte le document et le rend
+  // avec `s-maxage=60`. Une destination ABSOLUE est refusée : mesuré à chaque
+  // crawl, Vercel rend `X-Vercel-Cache: MISS` sur une réécriture vers une
+  // origine externe — le CDN ne servait donc jamais le sitemap, et chaque
+  // crawler payait l'aller-retour jusqu'à Fly.
   const sitemapRewrite = find('/sitemap.xml');
   if (!sitemapRewrite) {
-    errors.push("aucun rewrite « /sitemap.xml » → /api/sitemap.xml : le sitemap dynamique du backend n'est plus servi");
-  } else if (!String(sitemapRewrite.destination || '').endsWith('/api/sitemap.xml')) {
-    errors.push(`le rewrite « /sitemap.xml » devrait mener à « /api/sitemap.xml », pas « ${sitemapRewrite.destination} »`);
+    errors.push(
+      `aucun rewrite « /sitemap.xml » → « ${SITEMAP_FONCTION} » : le sitemap dynamique n'est plus servi`
+    );
+  } else {
+    const destination = String(sitemapRewrite.destination || '');
+    if (destination !== SITEMAP_FONCTION) {
+      errors.push(
+        `le rewrite « /sitemap.xml » devrait mener à « ${SITEMAP_FONCTION} » (la fonction d'arête qui cache 60 s), ` +
+          `pas « ${destination} »` +
+          (destination.startsWith('http')
+            ? ' — une destination ABSOLUE n\'est jamais mise en cache par le CDN'
+            : '')
+      );
+    }
+    if (!existsSync(path.join(frontendDir, SITEMAP_FONCTION_FICHIER))) {
+      errors.push(
+        `« /sitemap.xml » est réécrit vers « ${SITEMAP_FONCTION} » mais ${SITEMAP_FONCTION_FICHIER} est absent : ` +
+          'le sitemap répondrait 404, et les crawlers le retireraient'
+      );
+    }
+    const rangFonction = indexOfSource('/sitemap.xml');
+    const rangCatchAll = indexOfSource('/api/:path*');
+    if (rangCatchAll !== -1 && rangFonction > rangCatchAll) {
+      errors.push(
+        'le rewrite « /sitemap.xml » passe APRÈS « /api/:path* » : cette règle capterait la redirection ' +
+          'et la fonction ne serait jamais atteinte'
+      );
+    }
   }
   const robotsRewrite = find('/robots.txt');
   if (robotsRewrite) {

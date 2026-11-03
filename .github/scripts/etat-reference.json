@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-11-03",
-    "motif": "03/11/2026 (nuit) : le sitemap passe par le memo cache des pages (valeur {corps, volumes} rendue et cachee ensemble), et une ecriture reussie sous /api vide la famille sitemap par la pile ASGI — deux mutations nouvelles, donc une surface laissee aveugle se voit ici",
+    "motif": "03/11/2026 : le sitemap passe par la fonction d'arete frontend/api/sitemap.js — /sitemap.xml vise desormais /api/sitemap, AVANT le catch-all /api/:path*, pour que le CDN de Vercel le cache 60 s ; les commentaires des deux modules backend et le garde de routage suivent ce chemin, et le controle refuse une destination absolue comme une fonction absente",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/alerte_sondes.py": "35c6b645b431b932c6af1ed53704acc4f096da428a49e2f7461259358f137687",
@@ -101,7 +101,6 @@
       "frontend/scripts/check-git-branches.js": "f4e52feb16fe69a214b7afcb928c6f1bdedca7c680d5551a019177959a237ed8",
       "frontend/scripts/check-hero-images.js": "21a17fbcbf1e2d6bf2f36a735b11e0b5b3f4a3c9dce5a851015a3af832f34038",
       "frontend/scripts/check-home-shell.js": "d146088dc555deda0993924a4b4f5d7697d3c05a4107a7d9575cee6fd37ce080",
-      "frontend/scripts/check-hreflang-production.js": "58e0ab84a23cb65cc01cdcce9d9ea9baee07bcd81867a6cbbd7feb0d60bb86c3",
       "frontend/scripts/check-job-form-canari.js": "806fdaed94c92d1e1f2fc8040a4db9dba5f49b78006a1b5f81a0358cee25c797",
       "frontend/scripts/check-job-interactive-production.js": "5993af00403cb45bfaca0bc6ccd6c7f0263d459d0e87a4c369896c26e1b695c4",
       "frontend/scripts/check-job-og-contract.js": "bc54348347ebef1363feb71a89f4c23eba3d88852fd6fa1f41cb754656a24571",
@@ -127,7 +126,6 @@
       "frontend/scripts/check-session-reload-production.js": "80247fa35e7b1467b3c0a9f4c66f1ff994dbcfd857795c2b6f74f2d78fd484ca",
       "frontend/scripts/check-shell-remote-resources.js": "892f772d7c2ab1a41b03b0dc05d29b470d7c0c9bc6ce0355599b5a8c020d2822",
       "frontend/scripts/check-shell-text-provenance.js": "eedaecfb08a9586588fa1bbf94285b807898ca49e2f98c3090dcaed921747fc6",
-      "frontend/scripts/check-spa-routes.js": "c7f9e1020e818509f95927809195d1f996c5dac45518574ba97009d8b932804f",
       "frontend/scripts/check-sse-proxy-production.js": "132d0b00aaf5726b81261da5a449021e4e1a007469077535e20021a8af84ba9b",
       "frontend/scripts/check-taille-sources.js": "751511298b6dc3f1e8a9c3b914ccfc9de864bcaab95967e89c2aa22581642674",
       "frontend/scripts/check-test-environment.js": "ce3814b071811252b209e84bd22454585d5429e909dbe512359abdbe3224572d",
@@ -153,7 +151,9 @@
       "frontend/scripts/verre-contraste.js": "0304f01ae4ccd2fea6db62cff8badcb4085d3a34622f49416ed8944c377c688c",
       "backend/scripts/check_health_probe.py": "18a5862747e15b6ac07c2a244730a77a62ad3472ecb7c52421d6b4ac3dbe960b",
       "backend/server.py": "28e8e2e306507dba07efd3260b01b5645a65f15224272727c0b4df45aa737951",
-      "backend/kojo_pages_cache.py": "d4b7db9eb198fc8a4a038e4360907e4a8bea29657adde3850303b3f19da1ac47"
+      "backend/kojo_pages_cache.py": "c346142dc39a35ed075219d9ada01d420af3a2d7a69c5ea36cf1d2c2c6a57e96",
+      "frontend/scripts/check-hreflang-production.js": "6d23db8572230b15ad21849a29bfb99fe41c5fe6b797c7b516b0b6231a11d7a1",
+      "frontend/scripts/check-spa-routes.js": "1c7146269ed3b350865736d72db42efbb5d6ca25c183852b84a64251f047ed92"
     }
   },
   "hors_perimetre": [
