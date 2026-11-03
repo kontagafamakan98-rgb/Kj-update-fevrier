@@ -825,8 +825,7 @@ async def get_public_stats(response: Response):
     }
 
 
-@router.get("/sitemap.xml", include_in_schema=False)
-async def get_sitemap_xml():
+async def _construire_sitemap(base: str) -> Response:
     """Sitemap dynamique : liste statique du site + toutes les fiches de
     mission PUBLIQUES (/jobs/:id) encore ouvertes ou en cours — les seules
     pages métier indexables (les autres statuts sont privés/terminés).
@@ -839,8 +838,6 @@ async def get_sitemap_xml():
     Returns:
         Response: XML (text/xml) — le sitemap complet, pas un objet JSON.
     """
-    base = _site_base()
-
     # `/login` et `/register` en sont SORTIS le 27/10/2026. Ce sont deux
     # FORMULAIRES : aucun moteur ne les classe sur une intention de recherche, et
     # les annoncer en `weekly` + 0,8 les présentait comme les pages les plus
@@ -974,6 +971,55 @@ async def get_sitemap_xml():
             "X-Kojo-Urls": str(total_servi),
             "X-Kojo-Urls-Declarees": str(total_servi - vivantes),
             "X-Kojo-Urls-Vivantes": str(vivantes),
+        },
+    )
+
+
+@router.get("/sitemap.xml", include_in_schema=False)
+async def get_sitemap_xml():
+    """Le sitemap, rendu une fois par minute (02/11/2026).
+
+    MESURE DU SOIR : `/sitemap.xml` rendait **0,72 s** à chaque crawl, pour une
+    déclaration qui ne change qu'aux publications. Les 45 pages ville/métier/
+    guide ont reçu leur cache mémoire le même soir ; le sitemap, non. Et Vercel
+    ne met pas en cache la réécriture `/sitemap.xml → /api/sitemap.xml` (origine
+    externe, même constat que les pages), donc le `s-maxage=3600` déjà envoyé ne
+    protège que le navigateur, pas le crawler.
+
+    Le corps ET ses trois en-têtes de volume sont rendus ENSEMBLE puis cachés
+    ensemble (cf. `kojo_pages_cache`) : un en-tête qui décrirait un autre corps
+    après un rejeu serait pire que pas de cache du tout.
+    `X-Kojo-Sitemap-Cache` dit lequel des deux on lit, et les compteurs `/metrics`
+    du cache comptent aussi ce document — un cache qui ne sert jamais rien s'y
+    verrait.
+    """
+    base = _site_base()
+
+    async def _rendre() -> dict:
+        construit = await _construire_sitemap(base)
+        return {
+            "corps": construit.body,
+            "volumes": {
+                nom: construit.headers[nom]
+                for nom in (
+                    "X-Kojo-Urls",
+                    "X-Kojo-Urls-Declarees",
+                    "X-Kojo-Urls-Vivantes",
+                )
+            },
+        }
+
+    document, rejoue = await pages_cache.obtenir(("sitemap", "xml", base), _rendre)
+    return Response(
+        content=document["corps"],
+        media_type="application/xml",
+        headers={
+            # Le crawler garde 1 h, le cache serveur 60 s : jamais plus vieux chez
+            # nous que chez lui, et une fiche clôturée disparaît de la version
+            # servie à la minute suivante.
+            "Cache-Control": "public, max-age=3600, s-maxage=3600",
+            **document["volumes"],
+            "X-Kojo-Sitemap-Cache": "rejoue" if rejoue else "frais",
         },
     )
 

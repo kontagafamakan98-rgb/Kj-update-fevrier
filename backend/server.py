@@ -99,6 +99,10 @@ from kojo_sentry import initialiser as initialiser_sentry
 # aucune sonde ne la lisait.
 from kojo_erreurs import ErreursServeurMiddleware
 from kojo_erreurs import diagnostic as erreurs_diagnostic
+# Une écriture réussie sous /api rend le sitemap faux, et une purge de compte
+# doit retirer son profil IMMÉDIATEMENT (cf. kojo_pages_cache) : le cache est
+# donc invalidé par la pile ASGI, pas par chaque route qui écrit.
+from kojo_pages_cache import InvalidationSitemapMiddleware
 
 _etat_sentry = initialiser_sentry(environnement=APP_ENV)
 if _etat_sentry["state"] == "ok":
@@ -756,6 +760,9 @@ if ENABLE_TRUSTED_HOST_MIDDLEWARE:
 # répare pas) : posé ici, il voit sortir les 500 de toutes les routes, y compris
 # celles qui sont ajoutées après lui dans la pile.
 app.add_middleware(ErreursServeurMiddleware)
+# Juste à l'intérieur : il lit le statut de la réponse produite pour ne pas
+# vider le cache sur un refus.
+app.add_middleware(InvalidationSitemapMiddleware)
 app.add_middleware(WestAfricaSecurityMiddleware)
 app.add_middleware(RateLimitMiddleware)
 # Monté en DERNIER, donc le plus EXTERNE : un 429 du rate-limiter, un refus de

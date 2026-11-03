@@ -23,6 +23,14 @@ CE QUE CE MODULE FAIT, ET RIEN DE PLUS : il garde en mémoire le document RENDU
 parce que les URL absolues du document (canonical, JSON-LD) en dépendent : une
 page rendue pour un domaine ne doit pas être servie sous un autre.
 
+LE SITEMAP PASSE PAR LE MÊME MODULE, LE MÊME SOIR. Mesuré à **0,72 s par
+crawl** (`/sitemap.xml`) pour une déclaration qui ne change qu'aux publications,
+et Vercel ne cache pas davantage la réécriture `/sitemap.xml → /api/sitemap.xml`
+que les pages. La valeur mise en cache y est un dictionnaire
+`{corps, volumes}` : le corps et ses trois en-têtes `X-Kojo-Urls*` sont rendus
+puis cachés ENSEMBLE, donc un en-tête ne peut pas décrire un autre corps après
+un rejeu. C'est la raison pour laquelle `obtenir` rend `Any` et non `str`.
+
 TROIS RÈGLES, CHACUNE MESURÉE.
 
   * TTL de 60 s, plus court que le `max-age=300` que le navigateur applique
@@ -43,7 +51,7 @@ missions, et il est plus court que ce que le navigateur garde déjà.
 """
 import time
 from collections import OrderedDict
-from typing import Awaitable, Callable, Optional, Tuple
+from typing import Any, Awaitable, Callable, Optional, Tuple
 
 # Le délai, en secondes. Plus court que le `max-age=300` du navigateur, par
 # construction : on ne garde jamais un document plus longtemps que le client.
@@ -54,7 +62,7 @@ TTL_SECONDES = 60
 # base (préproduction, domaine Fly) sans jamais rendre le cache illimité.
 MAX_ENTREES = 96
 
-# (famille, slug, base) -> (instant monotone du rendu, document)
+# (famille, slug, base) -> (instant monotone du rendu, valeur rendue)
 _entrees: "OrderedDict[tuple, Tuple[float, str]]" = OrderedDict()
 
 # Ce que le cache a fait depuis le démarrage. `expire` compte les rendus
@@ -69,6 +77,51 @@ def reinitialiser() -> None:
         _stats[cle] = 0
 
 
+def invalider(famille: str) -> int:
+    """Retire les entrées d'une famille (`sitemap`, `ville`, `metier`, `guide`).
+
+    Rend le nombre d'entrées retirées — un `0` est une information : il dit
+    qu'aucun document de cette famille n'était caché, donc que l'invalidation
+    n'a rien évité.
+    """
+    cles = [cle for cle in _entrees if cle and cle[0] == famille]
+    for cle in cles:
+        del _entrees[cle]
+    return len(cles)
+
+
+# Les écritures qui rendent le SITEMAP faux. Mesuré le 02/11/2026 (soir) : la
+# purge d'un compte et la suppression d'une mission doivent retirer leur URL du
+# sitemap IMMÉDIATEMENT — `tests/test_purge_compte_proprietaire.py` et
+# `tests/test_job_og_cycle.py` l'exigent, et c'est la promesse tenue à un
+# visiteur dont le profil est purgé. Un TTL de 60 s aurait laissé son nom
+# public une minute de trop.
+#
+# La règle est large à dessein : TOUTE écriture réussie sous /api vide le
+# sitemap, pas seulement celles de `jobs` et `users`. Une liste de chemins
+# écrite ici serait une seconde déclaration, libre de rater une route ajoutée
+# plus tard ; invalider pour un message envoyé ne coûte qu'un rendu au crawl
+# suivant, tandis qu'une invalidation manquée publie une URL morte.
+METHODES_SANS_ECRITURE = ("GET", "HEAD", "OPTIONS")
+PREFIXE_API = "/api"
+FAMILLE_INVALIDEE = "sitemap"
+
+
+def invalider_sur_ecriture(methode: str, chemin: str, statut: int) -> int:
+    """Vide le sitemap si la requête était une écriture RÉUSSIE sous /api.
+
+    Un 4xx/5xx n'a rien changé en base : rien à invalider, et vider le cache
+    sur un refus ne ferait que payer un rendu pour une tentative rejetée.
+    """
+    if str(methode or "").upper() in METHODES_SANS_ECRITURE:
+        return 0
+    if not str(chemin or "").startswith(PREFIXE_API):
+        return 0
+    if statut >= 400:
+        return 0
+    return invalider(FAMILLE_INVALIDEE)
+
+
 def stats() -> dict:
     """`{frais, rejoue, expire, entrees, ttl_secondes, plafond}` — pour /metrics."""
     return {
@@ -81,12 +134,18 @@ def stats() -> dict:
 
 async def obtenir(
     cle: tuple,
-    rendre: Callable[[], Awaitable[str]],
+    rendre: Callable[[], Awaitable[Any]],
     *,
     ttl: Optional[float] = None,
     maintenant: Optional[Callable[[], float]] = None,
-) -> Tuple[str, bool]:
+) -> Tuple[Any, bool]:
     """Le document de `cle`, rendu si absent ou expiré.
+
+    `rendre` peut rendre n'importe quoi (`Any`) : une page est une chaîne, le
+    sitemap est un dictionnaire `{body, servi, declarees, vivantes}`. Ce qui est
+    mis en cache est la VALEUR RENDUE, jamais une reconstruction partielle —
+    c'est ce qui garantit que l'en-tête de volume et le corps du sitemap ne
+    peuvent pas se contredire après un rejeu.
 
     Args:
         cle: `(famille, slug, base)` — la base du site en fait partie parce que
@@ -125,3 +184,33 @@ async def obtenir(
     while len(_entrees) > MAX_ENTREES:
         _entrees.popitem(last=False)
     return document, False
+
+
+class InvalidationSitemapMiddleware:
+    """Vide le cache du sitemap après une écriture réussie (cf. plus haut).
+
+    Posé dans la pile ASGI plutôt que dans chaque route : une invalidation
+    rappelée à chaque endroit qui écrit est exactement le genre de règle qu'un
+    chemin ajouté plus tard oublie. Le statut est lu sur la réponse déjà
+    produite — un refus n'a rien changé en base, donc rien à invalider.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") != "http":
+            return await self.app(scope, receive, send)
+
+        statut = {"code": 500}
+
+        async def _send(message):
+            if message.get("type") == "http.response.start":
+                statut["code"] = int(message.get("status") or 500)
+            await send(message)
+
+        await self.app(scope, receive, _send)
+        try:
+            invalider_sur_ecriture(scope.get("method"), scope.get("path"), statut["code"])
+        except Exception:  # noqa: BLE001 — invalider ne doit jamais casser une réponse
+            pass

@@ -901,6 +901,16 @@ async def reset_state():
     # fantômes (buckets auth-otp 12/5min, auth-login 300/5min et auth-session
     # 20/5min) en mode réel comme en mode FakeDB.
     _srv.request_counts.clear()
+    # Le cache des pages ville/métier/guide ET du sitemap vit en mémoire, au
+    # niveau du module (TTL 60 s) : sans ce vidage, un test qui publie une
+    # mission lirait le sitemap rendu par le test PRÉCÉDENT — un ordre
+    # d'exécution deviendrait une dépendance, et le cas passerait ou rougirait
+    # selon le voisin.
+    try:
+        import kojo_pages_cache
+        kojo_pages_cache.reinitialiser()
+    except Exception:
+        pass
     # Même raison pour le plafond par RÉSEAU (kojo_login_reseau) : ses échecs et
     # ses sondes vivent en mémoire quand REDIS_URL est vide, donc un test qui
     # sature un /24 laisserait 429 le suivant — et le client de test partage

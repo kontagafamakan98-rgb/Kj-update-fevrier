@@ -320,12 +320,12 @@ minimal, et la MÊME règle de comptage est lue par
 dit lui-même au propriétaire (`MARCHE_VIDE_ALERTE_HEURES`) une fois par
 épisode — un tableau de bord qui ne se consulte pas ne corrige rien.
 
-### Cache des pages ville/métier/guide (02/11/2026)
+### Cache des pages et du sitemap (02/11/2026)
 
 | Série | Type | Sens |
 |---|---|---|
-| `kojo_pages_cache_rejeux_total` | counter | Pages servies par le cache mémoire, **sans** lecture Mongo ni rendu Python |
-| `kojo_pages_cache_rendus_total` | counter | Pages RENDUES (cache vide ou expiré) |
+| `kojo_pages_cache_rejeux_total` | counter | Documents servis par le cache mémoire, **sans** lecture Mongo ni rendu Python |
+| `kojo_pages_cache_rendus_total` | counter | Documents RENDUS (cache vide ou expiré) |
 | `kojo_pages_cache_entrees` | gauge | Documents gardés en mémoire maintenant (plafond 96) |
 
 Mesure du 02/11/2026 qui a motivé ce cache : `/emplois/bamako` coûtait 0,5 s de
@@ -339,6 +339,14 @@ Les deux compteurs existent séparément parce qu'un cache qui ne sert jamais
 rien passerait sinon pour un cache qui marche : `rejeux_total` qui reste à zéro
 alors que `rendus_total` monte dit que le TTL est plus court que le trafic, pas
 que le cache fonctionne.
+
+Le SITEMAP passe par le même module depuis le même soir : mesuré à **0,72 s par
+crawl** alors que sa déclaration ne change qu'aux publications, et Vercel ne
+cache pas davantage la réécriture `/sitemap.xml` que les pages. Le corps et ses
+trois en-têtes de volume (`X-Kojo-Urls*`) sont rendus puis cachés ENSEMBLE, donc
+un en-tête ne peut pas décrire un autre corps après un rejeu ;
+`X-Kojo-Sitemap-Cache: frais|rejoue` le dit, et ces trois séries comptent le
+sitemap avec les pages.
 
 ### Erreurs non rattrapées (02/11/2026)
 
