@@ -26,9 +26,17 @@
 //      reste sous 60 s quand le lien est sain (13–15 s relevés), et
 //      `stale-while-revalidate` sert la copie PENDANT le rafraîchissement —
 //      `Age` est monté à 191 s au moment où l'aller-retour vers Fly prenait
-//      plusieurs secondes. Le plafond réel est donc `s-maxage` + la fenêtre
-//      stale (6 min au pire), pas la minute du backend : c'est le prix de
-//      l'indisponibilité évitée, et il est écrit ici plutôt que supposé.
+//      plusieurs secondes.
+//
+//      LA FENÊTRE STALE EST PASSÉE DE 300 À 60 s LE 03/11/2026 : 300 s
+//      donnaient un plafond de 6 min pour un document qui ne change qu'aux
+//      publications, et c'était une copie de cinq minutes servie à un crawler
+//      pour éviter une revalidation qui coûte 0,41 s chez le backend. Une
+//      revalidation BLOQUANTE au pire des cas est bornée par le délai d'amont
+//      ci-dessous ; c'est moins cher que de publier du périmé. Le plafond est
+//      donc 60 s frais + 60 s de stale = 2 min au pire, et il se relit sur
+//      `Age` — jamais sur cet en-tête (Vercel normalise le `Cache-Control`
+//      qu'il rend au client).
 //
 // Garde : `frontend/scripts/__tests__/sitemap-vercel.test.js` (la réécriture
 // INTERNE et son ordre, la recopie du corps et des volumes, le refus d'un
@@ -52,7 +60,11 @@ const DELAI_MS = 5000;
 
 // 60 s de CDN : la déclaration ne change qu'aux publications, et le backend
 // garde son document 60 s — les deux horizons coïncident.
-const CACHE = 'public, s-maxage=60, stale-while-revalidate=300';
+//
+// 60 s de stale, et non 300 : le plafond de fraîcheur est `s-maxage` + cette
+// fenêtre, donc 2 min. Une copie de 6 min n'était pas un besoin, c'était le
+// reste d'un réglage choisi avant de mesurer qu'une revalidation coûte 0,41 s.
+const CACHE = 'public, s-maxage=60, stale-while-revalidate=60';
 
 // Les volumes rendus par le backend, recopiés tels quels : les sondes et le
 // bloc `langues` de /health les confrontent au corps, donc ils doivent
