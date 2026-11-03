@@ -53,6 +53,23 @@ import { pathToFileURL } from 'node:url';
 export const DEFAULT_BACKEND = 'http://127.0.0.1:8000';
 export const DEFAULT_PORT = 4174;
 
+/**
+ * Les FONCTIONS d'arête du projet, émulées ici : une destination RELATIVE d'un
+ * rewrite ne désigne pas toujours un fichier du build.
+ *
+ * Depuis le 03/11/2026, `vercel.json` réécrit `/sitemap.xml` vers `api/sitemap`,
+ * une fonction Edge (`frontend/api/sitemap.js`) qui TRANSPORTE le sitemap du
+ * backend et le rend avec `s-maxage=60` — pour que le CDN de Vercel le serve
+ * sans revenir jusqu'à Fly à chaque crawl. Ce serveur-ci ne peut pas exécuter un
+ * runtime d'arête ; il rejoue donc son unique effet observable, la lecture de la
+ * route backend, query comprise. Sans cette table, la réécriture relative
+ * tombait sur « fichier absent du build » et le cycle `/jobs/:id` rendait 500 au
+ * lieu de juger l'absence de la mission dans le sitemap.
+ */
+export const FONCTIONS_EMULEES = {
+  '/api/sitemap': '/api/sitemap.xml',
+};
+
 const CONTENT_TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -296,17 +313,13 @@ export function createRewriteServer({ root, config, backendUrl = DEFAULT_BACKEND
 
     const rule = matchRewrite(rewrites, pathname);
 
-    // ── Destination ABSOLUE : proxy vers le backend local ──────────────────
-    if (rule && /^https?:\/\//i.test(rule.destination)) {
-      // La query de la REQUÊTE traverse le rewrite (Vercel la conserve) : sans
-      // cela, `/api/jobs?limit=1` atteindrait le backend sans `limit=1`, et le
-      // paramètre anti-cache `?kojo_cb=` de la sonde post-suppression serait
-      // perdu. Les paramètres déjà présents dans la destination gagnent.
-      const target = mergeRequestQuery(
-        retargetToBackend(rule.destination, backendUrl),
-        url.search,
-        backendUrl
-      );
+    // Proxifie vers le backend local : destinations ABSOLUES de la table, et
+    // fonctions émulées (voir FONCTIONS_EMULEES). La query de la REQUÊTE
+    // traverse le rewrite (Vercel la conserve) : sans cela, `/api/jobs?limit=1`
+    // atteindrait le backend sans `limit=1`, et le paramètre anti-cache
+    // `?kojo_cb=` de la sonde post-suppression serait perdu. Les paramètres
+    // déjà présents dans la destination gagnent.
+    const proxy = async (target) => {
       let upstream;
       try {
         upstream = await fetchImpl(target, {
@@ -335,6 +348,22 @@ export function createRewriteServer({ root, config, backendUrl = DEFAULT_BACKEND
       sendHeaders(upstream.status, headers);
       const body = Buffer.from(await upstream.arrayBuffer());
       res.end(req.method === 'HEAD' ? undefined : body);
+    };
+
+    // ── Destination ABSOLUE : proxy vers le backend local ──────────────────
+    if (rule && /^https?:\/\//i.test(rule.destination)) {
+      await proxy(
+        mergeRequestQuery(retargetToBackend(rule.destination, backendUrl), url.search, backendUrl)
+      );
+      return;
+    }
+
+    // ── Destination RELATIVE qui est une FONCTION (émulée) ─────────────────
+    const fonction = rule ? FONCTIONS_EMULEES[rule.destination.split('?')[0]] : undefined;
+    if (fonction) {
+      await proxy(
+        mergeRequestQuery(new URL(fonction, backendUrl).toString(), url.search, backendUrl)
+      );
       return;
     }
 
