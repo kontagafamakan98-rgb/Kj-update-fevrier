@@ -25,8 +25,10 @@ page rendue pour un domaine ne doit pas être servie sous un autre.
 
 LE SITEMAP PASSE PAR LE MÊME MODULE, LE MÊME SOIR. Mesuré à **0,72 s par
 crawl** (`/sitemap.xml`) pour une déclaration qui ne change qu'aux publications,
-et Vercel ne cache pas davantage la réécriture `/sitemap.xml → /api/sitemap.xml`
-que les pages. La valeur mise en cache y est un dictionnaire
+et Vercel ne cache pas davantage la réécriture vers l'origine Fly que les pages
+(depuis le 03/11/2026 le site passe par la fonction d'arête `api/sitemap.js`,
+qui apporte la couche de CDN ; ce module reste la couche d'origine). La valeur
+mise en cache y est un dictionnaire
 `{corps, volumes}` : le corps et ses trois en-têtes `X-Kojo-Urls*` sont rendus
 puis cachés ENSEMBLE, donc un en-tête ne peut pas décrire un autre corps après
 un rejeu. C'est la raison pour laquelle `obtenir` rend `Any` et non `str`.

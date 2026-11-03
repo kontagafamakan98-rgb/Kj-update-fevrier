@@ -136,12 +136,12 @@
       "destination": "https://api.kojoforafrica.cc.cd/api/og/jobs/$1"
     },
     {
-      "source": "/api/:path*",
-      "destination": "https://api.kojoforafrica.cc.cd/api/:path*"
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap"
     },
     {
-      "source": "/sitemap.xml",
-      "destination": "https://api.kojoforafrica.cc.cd/api/sitemap.xml"
+      "source": "/api/:path*",
+      "destination": "https://api.kojoforafrica.cc.cd/api/:path*"
     },
     {
       "source": "/login",

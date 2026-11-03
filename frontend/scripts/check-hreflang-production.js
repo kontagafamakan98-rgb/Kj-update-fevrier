@@ -135,7 +135,7 @@ export const MARQUE_PREMISSE = 'prémisse (aucun verdict rendu ici)';
  */
 export const PAGES_OBLIGATOIRES = ['/', '/jobs'];
 
-/** Le sitemap servi par l'origine du site (rewrite Vercel → `/api/sitemap.xml`). */
+/** Le sitemap servi par l'origine du site (rewrite → fonction d'arête → backend). */
 export const CHEMIN_SITEMAP = '/sitemap.xml';
 
 /**

@@ -32,8 +32,10 @@ const CONFIG = {
     { source: '/jobs', destination: '/jobs.html' },
     { source: '/jobs/', destination: '/jobs.html' },
     { source: '/jobs/(.*)', destination: 'https://api.kojoforafrica.cc.cd/api/og/jobs/$1' },
+    // Le sitemap passe par la FONCTION d'arête (03/11/2026), avant le catch-all :
+    // une destination absolue n'est jamais cachée par le CDN de Vercel.
+    { source: '/sitemap.xml', destination: '/api/sitemap' },
     { source: '/api/:path*', destination: 'https://api.kojoforafrica.cc.cd/api/:path*' },
-    { source: '/sitemap.xml', destination: 'https://api.kojoforafrica.cc.cd/api/sitemap.xml' },
     { source: '/register', destination: '/register.html' },
     { source: '/register/', destination: '/register.html' },
     { source: '/dashboard', destination: '/app.html' },
@@ -285,6 +287,31 @@ describe('vercel-rewrite-server — service réel (HTTP sur boucle locale)', () 
     expect(await fiches.text()).toBe('fiche introuvable');
     expect(liste.status).toBe(404);
     expect(sitemap.status).toBe(404);
+  });
+
+  // Le serveur ne peut pas exécuter un runtime d'arête : il rejoue l'effet
+  // observable de `frontend/api/sitemap.js` (lire la route du backend). Sans
+  // cette émulation, la réécriture relative tombait sur « fichier absent du
+  // build », et le cycle /jobs/:id rendait 500 au lieu de juger le sitemap —
+  // c'est exactement le rouge mesuré du 03/11/2026 sur la PR #294.
+  it('émule la fonction d’arête du sitemap : la réécriture relative lit la route backend', async () => {
+    const seen = [];
+    const { base } = await start({
+      fetchImpl: async (url) => {
+        seen.push(String(url));
+        return new Response('<urlset><url><loc>https://kojoforafrica.cc.cd/</loc></url></urlset>', {
+          status: 200,
+          headers: { 'content-type': 'application/xml' },
+        });
+      },
+    });
+
+    const reponse = await fetch(`${base}/sitemap.xml?kojo_cb=7`);
+
+    expect(seen).toEqual(['http://127.0.0.1:9000/api/sitemap.xml?kojo_cb=7']);
+    expect(reponse.status).toBe(200);
+    expect(reponse.headers.get('content-type')).toContain('xml');
+    expect(await reponse.text()).toContain('<loc>');
   });
 
   it('transmet séparément les cookies session et CSRF à travers le proxy', async () => {

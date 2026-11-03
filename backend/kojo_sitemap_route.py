@@ -15,11 +15,16 @@ une ville ajoutée au référentiel apparaît ici sans qu'on touche à ce fichie
 
 Le CACHE, mesuré le soir du 02/11/2026 : `/sitemap.xml` rendait **0,72 s** à
 chaque crawl pour une déclaration qui ne change qu'aux publications, et Vercel
-ne met pas en cache la réécriture `/sitemap.xml → /api/sitemap.xml` (origine
-externe, même constat que les 45 pages ville/métier/guide) : le `s-maxage=3600`
-déjà envoyé ne protégeait que le navigateur. Le corps ET ses trois en-têtes de
-volume sont donc rendus puis cachés ENSEMBLE — un en-tête qui décrirait un autre
-corps après un rejeu serait pire que pas de cache du tout.
+ne met pas en cache la réécriture vers une origine externe (même constat que
+les 45 pages ville/métier/guide) : le `s-maxage=3600` déjà envoyé ne protégeait
+que le navigateur. Le corps ET ses trois en-têtes de volume sont donc rendus
+puis cachés ENSEMBLE — un en-tête qui décrirait un autre corps après un rejeu
+serait pire que pas de cache du tout.
+
+Deux couches depuis le 03/11/2026 : cette mémoire d'origine (60 s) et la
+fonction d'arête `frontend/api/sitemap.js`, qui transporte ce document et le
+rend avec `s-maxage=60` pour que le CDN de Vercel le serve sans revenir jusqu'à
+Fly à chaque crawl.
 """
 from fastapi import Response
 
@@ -55,8 +60,8 @@ async def _construire_sitemap(base: str) -> Response:
 
     Sert du XML réel (text/xml) pour que Google puisse crawler les fiches
     exactes, au lieu du sitemap statique Vercel qui n'énumérait que la home.
-    Le Vercel rewrite /sitemap.xml → /api/sitemap.xml (vercel.json) achemine
-    le crawler jusqu'ici.
+    Le rewrite /sitemap.xml → /api/sitemap (fonction d'arête, vercel.json) puis
+    la lecture de /api/sitemap.xml acheminent le crawler jusqu'ici.
 
     Args:
         base: l'origine publique du site, sans barre oblique finale — elle est
