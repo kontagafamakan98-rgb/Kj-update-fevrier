@@ -37,6 +37,9 @@ const VOLUMES = {
   'X-Kojo-Urls-Declarees': '80',
   'X-Kojo-Urls-Vivantes': '3',
 };
+// Le témoin de l'amont : `frais` (le backend a rendu) ou `rejoue` (il a resservi
+// sa mémoire 60 s). Il traversait la réécriture externe, pas la fonction.
+const TEMOIN = 'rejoue';
 const URL_SITE = 'https://kojoforafrica.cc.cd/sitemap.xml';
 
 function amont(reponse) {
@@ -86,6 +89,49 @@ describe('Ce que la fonction sert', () => {
     for (const [nom, valeur] of Object.entries(VOLUMES)) {
       expect(reponse.headers.get(nom.toLowerCase())).toBe(valeur);
     }
+  });
+
+  // Le fait qui manquait : le témoin du backend. Sans lui, cette URL ne
+  // distinguait pas « le CDN a rafraîchi depuis Fly » de « le CDN a resservi la
+  // mémoire du backend » — deux choses différentes pour qui mesure la
+  // fraîcheur, et la seule adresse que les crawlers interrogent.
+  it('transporte le témoin de cache du backend (frais/rejoue)', async () => {
+    amont(
+      new Response(XML, {
+        status: 200,
+        headers: { ...VOLUMES, 'X-Kojo-Sitemap-Cache': TEMOIN },
+      }),
+    );
+
+    const reponse = await handler(new Request(URL_SITE));
+
+    expect(reponse.headers.get('x-kojo-sitemap-cache')).toBe(TEMOIN);
+  });
+
+  it('ne fabrique pas de témoin quand l’amont n’en donne pas', async () => {
+    amont(new Response(XML, { status: 200, headers: VOLUMES }));
+
+    const reponse = await handler(new Request(URL_SITE));
+
+    expect(reponse.headers.get('x-kojo-sitemap-cache')).toBeNull();
+  });
+
+  // La politique DEMANDÉE, publiée à part : Vercel normalise le `Cache-Control`
+  // d'une fonction d'arête en `public`, donc la valeur écrite dans le module
+  // n'était lisible par personne. Deux faits distincts : ce qu'on demande (ici)
+  // et ce qui est servi (`Age`, mesuré en production).
+  it('publie la politique demandée dans un en-tête que la plateforme ne réécrit pas', async () => {
+    amont(new Response(XML, { status: 200, headers: VOLUMES }));
+
+    const reponse = await handler(new Request(URL_SITE));
+
+    expect(reponse.headers.get('x-kojo-cache-politique')).toBe(
+      'public, s-maxage=60, stale-while-revalidate=60',
+    );
+    // Le même texte que le `Cache-Control` demandé, jamais deux déclarations.
+    expect(reponse.headers.get('x-kojo-cache-politique')).toBe(
+      reponse.headers.get('cache-control'),
+    );
   });
 
   it('porte le cache de 60 s à l’arête, et le dit dans l’en-tête', async () => {
@@ -147,7 +193,9 @@ describe('Ce que la fonction sert', () => {
 
     expect(reponse.status).toBe(200);
     expect(await reponse.text()).toBe('');
+    // Le témoin et la politique sont des en-têtes : un HEAD les porte aussi.
     expect(reponse.headers.get('x-kojo-sitemap-cache')).toBeNull();
+    expect(reponse.headers.get('x-kojo-cache-politique')).toContain('s-maxage=60');
     expect(reponse.headers.get('cache-control')).toContain('s-maxage=60');
   });
 

@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-11-03",
-    "motif": "03/11/2026 : le sitemap passe par la fonction d'arete frontend/api/sitemap.js — /sitemap.xml vise desormais /api/sitemap, AVANT le catch-all /api/:path*, pour que le CDN de Vercel le cache 60 s ; les commentaires des deux modules backend et le garde de routage suivent ce chemin, et le controle refuse une destination absolue comme une fonction absente",
+    "motif": "03/11/2026 : la fonction d'arete du sitemap entre dans le perimetre des mutations declarees (transport du temoin de cache, politique publiee, plafond de fraicheur borne) ; deux mutations rejouees prouvent que son test sait rougir",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/alerte_sondes.py": "35c6b645b431b932c6af1ed53704acc4f096da428a49e2f7461259358f137687",
@@ -153,7 +153,8 @@
       "backend/server.py": "28e8e2e306507dba07efd3260b01b5645a65f15224272727c0b4df45aa737951",
       "backend/kojo_pages_cache.py": "c346142dc39a35ed075219d9ada01d420af3a2d7a69c5ea36cf1d2c2c6a57e96",
       "frontend/scripts/check-hreflang-production.js": "6d23db8572230b15ad21849a29bfb99fe41c5fe6b797c7b516b0b6231a11d7a1",
-      "frontend/scripts/check-spa-routes.js": "1c7146269ed3b350865736d72db42efbb5d6ca25c183852b84a64251f047ed92"
+      "frontend/scripts/check-spa-routes.js": "1c7146269ed3b350865736d72db42efbb5d6ca25c183852b84a64251f047ed92",
+      "frontend/api/sitemap.js": "cc9ccd3decd9f058153db97b101c6a083db7ad4c2a2215386daa13397d18daf6"
     }
   },
   "hors_perimetre": [
