@@ -99,6 +99,24 @@ describe('Ce que la fonction sert', () => {
     expect(cache).not.toContain('no-store');
   });
 
+  // Le PLAFOND de fraîcheur, et pas seulement la présence de la directive :
+  // `s-maxage` + la fenêtre stale est le temps le plus vieux qu'un crawler
+  // puisse lire. Il a été ramené de 6 min à 2 min le 03/11/2026 — une copie
+  // de cinq minutes pour éviter une revalidation qui coûte 0,41 s n'était pas
+  // un arbitrage, c'était un réglage d'avant la mesure. Un retour à 300 doit
+  // donc rougir ici au lieu de repasser en silence.
+  it('borne le plafond de fraîcheur à 2 min (60 s frais + 60 s de stale)', async () => {
+    amont(new Response(XML, { status: 200, headers: VOLUMES }));
+
+    const cache = (await handler(new Request(URL_SITE))).headers.get('cache-control');
+    const frais = Number(/s-maxage=(\d+)/.exec(cache)?.[1]);
+    const stale = Number(/stale-while-revalidate=(\d+)/.exec(cache)?.[1]);
+
+    expect(frais).toBe(60);
+    expect(stale).toBe(60);
+    expect(frais + stale).toBeLessThanOrEqual(120);
+  });
+
   it('un amont en échec rend un 502 NON caché, en nommant le statut', async () => {
     amont(new Response('boom', { status: 503 }));
 
