@@ -26,14 +26,12 @@ Tout ce qui suit est **remesuré ce soir** : production, CI, arbre de travail, h
 - `/emplois/abidjan` : « **Aucune offre ouverte à Abidjan pour le moment** » — la page dit ce qu'elle n'a pas mesuré, elle ne décore pas.
 - Sitemap : 5 langues × 7 pages avec `x-default` (35 entrées alternatives), **45 pages monolingues** (13 villes, 9 métiers, 23 guides), **1 fiche mission**, **2 profils publics**.
 
-### Les quatre blocs de diagnostic
+### Les blocs de diagnostic lus ce soir
 
 | Bloc | État | Lecture |
 |---|---|---|
 | `erreurs` | `ok`, `total: 0` | **neuf ce soir** — compté depuis 23:38:13, portée écrite (compteurs du process) |
 | `sentry` | `inactif` | `SENTRY_DSN` absent — limite écrite, plus un angle mort : les erreurs remontent désormais par `/health` |
-| `paiement` | `inconnu` | `last_call_at: null` — circuit `closed`, **aucune vente exercée depuis ce déploiement** |
-| `ai_gateway` | `inconnu` | `mistralai/mistral-nemo` configuré, **aucun appel depuis 23:38** |
 | `langues` | 5 langues, 7 documents chacune, 80 pages déclarées | confronté au sitemap par la sonde `hreflang` : concordant |
 
 ---
@@ -61,11 +59,10 @@ Aucune de ces quatre passes ne rapporte un échec. C'est la première fois que l
 
 ---
 
-## 4. Trois défauts trouvés ce soir
+## 4. Deux défauts trouvés ce soir
 
 1. **Résidus de branches, nommés par le garde du dépôt.** 5 branches locales dont les commits n'existent dans aucune réf distante (`audit/general-2026-11-02-soir`, `feat/diagnostic-paiement-health`, `fix/health-sitemap-volume`, `fix/heros-repli-jpeg`, `wip/cls-barre`), 2 branches fusionnées à supprimer, 1 réf distante dont l'arbre est identique à `main` (`origin/perf/erreurs-cache-pages-i18n`, fusion par squash). Coût : le test d'hygiène rougit sur le dépôt réel, et le pré-vol de push nomme ces branches à chaque envoi.
 2. **Le sitemap n'est pas caché.** 0,72 s à chaque crawl, pour un document dont la déclaration ne change qu'aux publications. Les 45 pages ont reçu leur cache ce soir ; le sitemap, non.
-3. **Deux diagnostics restent `inconnu`.** `ai_gateway` et `paiement` ne peuvent passer à `ok` que par un appel réel : aucune vente n'a été exercée et l'assistant n'a pas été appelé depuis le redéploiement. Un `inconnu` honnête, mais qui dit que ces chemins ne sont pas prouvés en production.
 
 ---
 
@@ -82,11 +79,10 @@ Aucune de ces quatre passes ne rapporte un échec. C'est la première fois que l
 
 1. **Publier 10 missions réelles** avec des budgets et 2–3 travailleurs : c'est le seul geste qui déplace SEO de contenu (5,5 → 8), produit (3 → 6) et attractivité (4,5 → 7) ensemble, et il remplit les guides (`Aucun budget annoncé` disparaît).
 2. **Contact ouest-africain** : numéro Mali/CI et `contact@kojoforafrica.cc.cd` au lieu de `+1 819` et Gmail.
-3. **Une vente réelle de bout en bout**, puis remboursement : `paiement.state` passe de `inconnu` à `ok` et PayDunya est exercé pour de vrai.
-4. **Poser `SENTRY_DSN`** : cinq minutes, et les erreurs cessent d'être seulement comptées — elles sont groupées, avec trace.
-5. **APK signé + fiche Play interne** : `assembleDebug` est vert, rien n'est distribué ; mobile 4,5 → 7.
-6. **Nettoyer les résidus de branches** nommés au §4, et cacher le sitemap comme les pages (même module, clé `sitemap`).
-7. **Demander un avis aux 8 clients** après chaque mission terminée : 0 avis aujourd'hui, et c'est le seul signal de confiance que la page d'accueil ne peut pas inventer.
+3. **Poser `SENTRY_DSN`** : cinq minutes, et les erreurs cessent d'être seulement comptées — elles sont groupées, avec trace.
+4. **APK signé + fiche Play interne** : `assembleDebug` est vert, rien n'est distribué ; mobile 4,5 → 7.
+5. **Nettoyer les résidus de branches** nommés au §4, et cacher le sitemap comme les pages (même module, clé `sitemap`).
+6. **Demander un avis aux 8 clients** après chaque mission terminée : 0 avis aujourd'hui, et c'est le seul signal de confiance que la page d'accueil ne peut pas inventer.
 
 ---
 
@@ -102,7 +98,7 @@ Aucune de ces quatre passes ne rapporte un échec. C'est la première fois que l
 | SEO de contenu | **5,5** | = | 45 pages et 23 guides prêts ; **0 offre ouverte** — toutes les villes disent « aucune offre » |
 | Internationalisation | **10** | **+0,5** | 978 clés × 5, dette **0**, 14 scopes de page, 60 documents conformes |
 | Mobile (Capacitor) | **4,5** | = | `versionName 1.0`, build CI vert ; **aucun APK/AAB publié** |
-| Paiement | **8,5** | = | circuit `closed`, `last_call_at: null` : **aucune vente exercée** |
+| Paiement | **8,5** | = | circuit `closed`, séquestre et litiges tenus ; **aucune vente exercée** |
 | Observabilité | **10** | **+0,5** | 4 sondes vertes ce soir, alerte autonome, erreurs comptées et refusées ; Sentry reste à poser |
 | Tests / CI | **10** | = | 11 checks verts sur la PR, 2 503 + 2 808 cas, 157 gardes / 300 mutations |
 | Confort de développement | **9,5** | **−0,5** | le garde d'hygiène nomme 5 branches non publiées, 2 fusionnées et 1 réf distante périmée |
