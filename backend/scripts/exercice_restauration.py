@@ -22,7 +22,11 @@ CE QU'IL FAIT, dans cet ordre, et rien d'autre :
      ne restaure RIEN et juge la cible telle qu'un autre outil l'a remplie ;
   4. recalcule la même empreinte dans la cible et COMPARE — un document
      manquant, un index perdu, un index aux options différentes ou un contenu
-     altéré font échouer l'exercice ;
+     altéré font échouer l'exercice ; pour les collections VOLATILES déclarées
+     (`COLLECTIONS_VOLATILES` : l'état du planificateur, qui change entre la
+     copie et la comparaison), il compare les IDENTIFIANTS et les index, jamais
+     le contenu — et le dit dans son verdict, pour qu'un vert ne cache pas ce
+     qu'il n'a pas regardé ;
   5. détruit la base de travail (`--garder` pour l'inspecter) — jamais avec
      `--deja-restauree`, qui n'a rien créé ;
   6. écrit un rapport daté (`--rapport`) et rend un code de sortie.
@@ -66,6 +70,45 @@ SOURCE_DEFAUT = "kojo_db"
 # un exercice qui ne comparerait que ce qu'il trouve passerait après une perte.
 COLLECTIONS_ATTENDUES = ("users", "jobs", "payments", "notifications", "messages")
 
+# ── LES COLLECTIONS VOLATILES DÉCLARÉES ────────────────────────────────────
+#
+# Mesuré le 03/11/2026 (run 41616073851 de `backup-db.yml`, ROUGE) :
+# `scheduler_alerts` et `scheduler_leases` sortaient en « empreinte
+# différente » avec le MÊME nombre de documents. Ces deux collections sont de
+# l'ÉTAT DE PLANIFICATEUR : `scheduler_leases` porte un document par tâche
+# (`_id` = nom de la tâche, `expires_at` renouvelé à chaque passage) et
+# `scheduler_alerts` un document par alerte (`_id` = clé d'alerte, `signature`
+# et `retabli_at` réécrits — voir `kojo_scheduler.py`). Sur la fenêtre qui
+# sépare le `mongodump` de la comparaison, leur CONTENU change forcément : une
+# archive PARFAITE ne peut donc pas être identique, et le verdict accusait la
+# sauvegarde d'un défaut qui n'existait pas.
+#
+# Le pire était l'intermittence : les 1er et 2 novembre ces deux documents ne
+# bougeaient pas pendant la minute du contrôle et le run était vert — donc un
+# VRAI échec de restauration se serait noyé dans ce bruit.
+#
+# Ce qui reste jugé pour elles, et qui est ce qu'une sauvegarde doit tenir :
+#   * la collection EXISTE ;
+#   * ses INDEX survivent, définitions et options comprises ;
+#   * ses IDENTIFIANTS (`_id`, stables par CONSTRUCTION ici : le nom d'une
+#     tâche, la clé d'une alerte) sont tous là — un identifiant perdu est un
+#     écart nommé, un identifiant inventé aussi.
+#
+# Ce qui n'est plus jugé pour elles : l'empreinte du contenu (et le nombre de
+# documents, qui découle des identifiants). Une collection NON déclarée garde
+# la règle complète : c'est cette déclaration, et elle seule, qui fait
+# échapper à la comparaison de contenu.
+COLLECTIONS_VOLATILES = {
+    "scheduler_alerts": (
+        "état d'alerte : `_id` = clé d'alerte (`marche_vide`, `email_provider`, …), "
+        "`signature` et `retabli_at` réécrits à chaque panne et rétablissement"
+    ),
+    "scheduler_leases": (
+        "bail de tâche : `_id` = nom de la tâche, `expires_at` et propriétaire "
+        "renouvelés à chaque passage"
+    ),
+}
+
 # Champs de `index_information()` qui ne sont PAS des options de création :
 # `key` est passé à part, `name` aussi, et `v`/`ns`/`background` appartiennent au
 # serveur (les recopier ferait refuser l'index).
@@ -99,36 +142,72 @@ def definition_index(information: dict) -> str:
     return json.dumps({"key": cles, **options_index(information)}, sort_keys=True, default=str)
 
 
-def empreinte_collection(collection) -> dict:
-    """Nombre exact, SHA-256 du contenu complet et index d'une collection.
+def empreinte_collection(collection, volatile: bool = False) -> dict:
+    """Nombre exact, SHA-256 du contenu complet, identifiants et index.
 
     Le hachage porte sur les documents ENCODÉS BSON, dans l'ordre de `_id` : deux
     lectures de la même base donnent la même empreinte, et une valeur modifiée
     (même d'un caractère) la change. L'ordre est demandé au SERVEUR (index `_id`),
     donc pas de tri en mémoire sur des millions de documents.
+
+    `volatile` recopie la DÉCLARATION dans l'empreinte : la comparaison lit
+    l'empreinte, pas une liste de noms, donc un dictionnaire construit à la main
+    (test, outil) dit lui-même ce qu'il a jugé. Une collection volatile porte en
+    plus ses `identifiants` — ce qui doit survivre quand le contenu bouge.
     """
     condensat = hashlib.sha256()
     documents = 0
+    identifiants = []
     for document in collection.find({}).sort("_id", 1):
         condensat.update(BSON.encode(document))
         condensat.update(b"\x00")
         documents += 1
+        if volatile:
+            identifiants.append(str(document.get("_id")))
     informations = collection.index_information()
     index = sorted(nom for nom in informations if nom != "_id_")
     definitions = {nom: definition_index(informations[nom]) for nom in index}
-    return {
+    empreinte = {
         "documents": documents,
         "sha256": condensat.hexdigest(),
         "index": index,
         "definitions": definitions,
+        "volatile": bool(volatile),
     }
+    if volatile:
+        empreinte["identifiants"] = sorted(identifiants)
+    return empreinte
 
 
 def empreinte_base(db) -> dict:
-    """Empreinte de chaque collection de la base, noms triés."""
+    """Empreinte de chaque collection de la base, noms triés.
+
+    La déclaration `COLLECTIONS_VOLATILES` est lue ICI, une fois : une
+    collection qu'on ne déclare pas est jugée sur son contenu entier.
+    """
     return {
-        nom: empreinte_collection(db[nom]) for nom in sorted(db.list_collection_names())
+        nom: empreinte_collection(db[nom], volatile=nom in COLLECTIONS_VOLATILES)
+        for nom in sorted(db.list_collection_names())
     }
+
+
+def volatiles_jugees(avant: dict) -> list:
+    """Les collections dont le CONTENU n'a pas été comparé, noms triés."""
+    return sorted(nom for nom, empreinte in avant.items() if empreinte.get("volatile"))
+
+
+def mention_volatiles(volatiles) -> str:
+    """La phrase qui accompagne CHAQUE verdict vert.
+
+    Un vert muet sur ce qu'il n'a pas regardé se lirait comme une couverture
+    complète : la phrase est ajoutée au message, pas cachée dans le rapport.
+    """
+    if not volatiles:
+        return ""
+    return (
+        " — contenu NON comparé pour %d collection(s) volatile(s) déclarée(s) "
+        "(%s) : identifiants ET index jugés" % (len(volatiles), ", ".join(volatiles))
+    )
 
 
 def comparer(avant: dict, apres: dict) -> list:
@@ -140,16 +219,36 @@ def comparer(avant: dict, apres: dict) -> list:
         if cible is None:
             ecarts.append(f"{nom} : collection ABSENTE de la restauration")
             continue
-        if cible["documents"] != reference["documents"]:
-            ecarts.append(
-                "%s : %d document(s) restaurés sur %d"
-                % (nom, cible["documents"], reference["documents"])
-            )
-        if cible["sha256"] != reference["sha256"]:
-            ecarts.append(
-                "%s : empreinte différente (%s… ≠ %s…)"
-                % (nom, reference["sha256"][:12], cible["sha256"][:12])
-            )
+        if reference.get("volatile"):
+            # Collection VOLATILE DÉCLARÉE : le contenu bouge légitimement entre
+            # la copie et la comparaison, donc c'est l'IDENTITÉ qui est jugée —
+            # ce que la sauvegarde doit tenir, c'est que chaque tâche / chaque
+            # alerte soit là, avec ses index.
+            source = set(reference.get("identifiants") or [])
+            restaures = set(cible.get("identifiants") or [])
+            perdus = sorted(source - restaures)
+            if perdus:
+                ecarts.append(
+                    "%s : %d identifiant(s) PERDU(S) dans la restauration : %s"
+                    % (nom, len(perdus), ", ".join(perdus[:5]))
+                )
+            inventes = sorted(restaures - source)
+            if inventes:
+                ecarts.append(
+                    "%s : %d identifiant(s) ABSENT(S) de la source : %s"
+                    % (nom, len(inventes), ", ".join(inventes[:5]))
+                )
+        else:
+            if cible["documents"] != reference["documents"]:
+                ecarts.append(
+                    "%s : %d document(s) restaurés sur %d"
+                    % (nom, cible["documents"], reference["documents"])
+                )
+            if cible["sha256"] != reference["sha256"]:
+                ecarts.append(
+                    "%s : empreinte différente (%s… ≠ %s…)"
+                    % (nom, reference["sha256"][:12], cible["sha256"][:12])
+                )
         perdus = sorted(set(reference["index"]) - set(cible["index"]))
         if perdus:
             ecarts.append("%s : index non restauré(s) : %s" % (nom, ", ".join(perdus)))
@@ -319,8 +418,20 @@ def main(argv=None) -> int:
         duree_verification = time.monotonic() - debut
 
         ecarts = comparer(avant, apres)
+        volatiles = volatiles_jugees(avant)
         rapport.update(
             {
+                # Ce qui n'a PAS été comparé se publie : un vert qui tairait
+                # l'exception la ferait passer pour une couverture complète.
+                "collections_volatiles": {
+                    nom: {
+                        "documents": avant[nom]["documents"],
+                        "identifiants": len(avant[nom].get("identifiants") or []),
+                        "contenu_non_compare": True,
+                    }
+                    for nom in volatiles
+                },
+                "pourquoi_volatiles": {nom: COLLECTIONS_VOLATILES[nom] for nom in volatiles},
                 "collections": {nom: value["documents"] for nom, value in avant.items()},
                 "documents": sum(value["documents"] for value in avant.values()),
                 "duree_empreinte_s": round(duree_empreinte, 1),
@@ -356,14 +467,20 @@ def main(argv=None) -> int:
                 0,
                 "✅ Archive restaurée IDENTIQUE à la source — %d document(s), %d "
                 "collection(s), index ET options d'index compris (base de travail %s, "
-                "jugée telle que mongorestore l'a laissée, contre %s)."
-                % (rapport["documents"], len(avant), cible_nom, args.base),
+                "jugée telle que mongorestore l'a laissée, contre %s)%s."
+                % (
+                    rapport["documents"], len(avant), cible_nom, args.base,
+                    mention_volatiles(volatiles),
+                ),
             )
         return ecrire(
             0,
             "✅ Restauration IDENTIQUE — %d document(s), %d collection(s), index compris, "
-            "en %.1f s (RTO mesuré, cible %s)."
-            % (rapport["documents"], len(avant), rapport["rto_mesure_s"], cible_nom),
+            "en %.1f s (RTO mesuré, cible %s)%s."
+            % (
+                rapport["documents"], len(avant), rapport["rto_mesure_s"], cible_nom,
+                mention_volatiles(volatiles),
+            ),
         )
     finally:
         try:

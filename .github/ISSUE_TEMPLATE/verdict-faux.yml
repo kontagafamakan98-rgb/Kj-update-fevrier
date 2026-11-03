@@ -1,0 +1,60 @@
+name: Verdict faux (rouge qui n'en est pas un)
+description: Un garde, une sonde ou un run refuse du légitime, ou accuse le mauvais objet. C'est la famille la plus coûteuse du dépôt — un rouge faux apprend à ignorer les vrais.
+title: 'verdict faux : '
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Un rouge doit désigner **ce qui a échoué**, et son remède doit être
+        **exécutable**. Si l'un des deux manque, c'est ce formulaire : le
+        verdict était faux, ou son remède impossible, et dans les deux cas le
+        prochain vrai rouge sera lu comme du bruit.
+  - type: input
+    id: garde
+    attributes:
+      label: Le garde, la sonde ou le run concerné
+      description: Le chemin du script, ou le nom du job et son URL de run.
+      placeholder: frontend/scripts/check-exemple.js — run 41616073851
+    validations:
+      required: true
+  - type: textarea
+    id: attendu
+    attributes:
+      label: Ce que le verdict affirme
+      description: Recopie la phrase du refus, telle qu'elle est publiée.
+    validations:
+      required: true
+  - type: textarea
+    id: mesure
+    attributes:
+      label: La mesure qui le contredit
+      description: |
+        La commande ou la requête, l'heure, et le résultat réel. « Ça marche
+        chez moi » n'est pas une mesure : le dépôt juge sur une valeur.
+      placeholder: |
+        $ python3 .github/scripts/… 
+        → vert / valeur réelle …
+    validations:
+      required: true
+  - type: dropdown
+    id: famille
+    attributes:
+      label: La famille du défaut
+      options:
+        - Le refus porte sur un artefact périmé (build, cache, archive d'avant)
+        - Le refus confond deux états (prémisse lue comme absence)
+        - Le refus compare du contenu qui bouge légitimement (collections volatiles)
+        - Le remède nommé est impossible à exécuter
+        - Le refus ne nomme rien (pas de cause, pas de remède)
+        - Autre — décrit ci-dessous
+    validations:
+      required: true
+  - type: textarea
+    id: pourquoi
+    attributes:
+      label: Pourquoi ce n'est pas un vrai échec
+      description: |
+        Ce qui distingue ce cas d'une panne réelle. C'est cette phrase qui
+        empêche de « corriger » un garde qui avait raison.
+    validations:
+      required: false
