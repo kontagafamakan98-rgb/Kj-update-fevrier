@@ -1,4 +1,4 @@
-name: Alerte des sondes de production (quotidienne)
+name: Alerte des sondes de production (toutes les 6 h)
 
 # ─── LE DESTINATAIRE DES SONDES ─────────────────────────────────────────────
 # Mesuré le 27/10/2026 : `POST /api/support/robot/chat` rendait 502 en une
@@ -21,11 +21,35 @@ name: Alerte des sondes de production (quotidienne)
 # 2 = PRÉMISSE (jeton absent, API illisible, moins de huit sondes lues, aucun run
 # lu) — le run est alors ROUGE, parce qu'une surveillance aveugle qui se tait est
 # exactement la panne du 27/10, une couche plus haut.
+# ─── LA CADENCE, MESURÉE PUIS CORRIGÉE (03/11/2026) ──────────────────────────
+# Ce workflow était QUOTIDIEN, donc une panne planifiée pouvait rester muette
+# jusqu'à 24 h : mesuré le 03/11, le job de sauvegarde (`backup-db.yml`) a
+# échoué à 02:40 et l'alerte ne l'aurait dit qu'à 07:50 le lendemain, soit
+# ~29 h après le début du run — pendant que la veille SEO, la typographie et
+# `hreflang` étaient, elles, vertes, donc rien ne pressait personne.
+#
+# Quatre passages par jour (environ toutes les 6 h) bornent ce retard à la
+# cadence elle-même : la dernière exécution manquée est lue au passage
+# suivant, pas au suivant du lendemain.
+#
+# Ce que la cadence NE casse pas, et c'est ce qui autorise à la raccourcir :
+#   * 07:50 est CONSERVÉ et reste le passage de référence — la dernière sonde
+#     planifiée démarre à 07:32 et a 10 min de budget, donc ce passage lit des
+#     runs TERMINÉS, tout le corpus d'un coup.
+#   * aux trois autres heures, une sonde EN COURS n'est pas un rouge : elle est
+#     classée « non jugée » (`statut` non terminé), et l'empreinte d'une issue
+#     ne porte QUE les échecs — un run en cours ne réécrit donc aucune issue et
+#     n'ouvre rien. C'est la règle du 27/10 (un `cancelled` n'est pas un rouge)
+#     appliquée à l'heure : personne n'apprend une panne qui n'existe pas.
+#   * le coût est de ~30 appels d'API par passage, très loin du quota horaire.
+# Sept minutes après la minute des sondes horaires pleines, pour ne pas lire
+# une sonde qui vient de démarrer à la même minute.
 on:
   schedule:
-    # 07:50 UTC : la dernière sonde planifiée démarre à 07:32 et a 10 min de
-    # budget — l'alerte lit donc des runs TERMINÉS, jamais un run en cours.
-    - cron: '50 7 * * *'
+    - cron: '50 7 * * *'   # passage de référence, après la dernière sonde du matin
+    - cron: '20 13 * * *'
+    - cron: '20 19 * * *'
+    - cron: '20 1 * * *'
   workflow_dispatch:
 
 permissions:

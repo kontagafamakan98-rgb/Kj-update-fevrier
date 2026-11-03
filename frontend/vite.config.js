@@ -194,6 +194,25 @@ export default defineConfig(({ mode }) => {
       // et nulle part ailleurs.
       target: 'baseline-widely-available',
       rollupOptions: {
+        // LES PAGES DE DIAGNOSTIC NE SONT PLUS ÉMISES DU TOUT (03/11/2026).
+        //
+        // `src/pages/MobileTest.js` et `src/pages/PhotoTest.js` n'existent
+        // qu'en DÉV (`App.js` : `import.meta.env.DEV ? lazy(() => import(…))`)
+        // et sont exclues du scan Tailwind (`@source not`, `src/index.css`) —
+        // donc leurs classes (`mt-12`, `max-h-96`, `w-fit`) n'ont AUCUNE règle
+        // par construction. Le commentaire d'`App.js` dit pourtant que le chunk
+        // a été retiré du graphe : mesuré faux le 03/11/2026, `build/assets/`
+        // contenait encore `PhotoTest-*.js`, `MobileTest-*.js` et
+        // `vendor-react-dom-*.js`, et `check-classes-sans-regle.js` l'a refusé
+        // dès qu'un `build/` FRAIS a existé pour qu'il tourne (son cas « arbre
+        // RÉEL » est `skipIf(build périmé)`, et en CI `npm test` précède le
+                // build : il ne s'exécutait jamais là où il juge). Une importation
+        // dynamique dans une branche morte reste une ENTRÉE DE CHUNK pour
+        // Rollup : mettre les deux pages en `external` les sort du graphe, donc
+        // aucun chunk, aucune classe posée sans règle — et le remède reste
+        // celui que le garde nomme (retirer du livré), pas une exemption qui
+        // ferait peindre trois utilitaires pour deux pages jamais servies.
+        external: [/\.\/pages\/(MobileTest|PhotoTest)$/],
         output: {
           manualChunks(id) {
             if (!id.includes('node_modules')) return undefined
@@ -227,6 +246,21 @@ export default defineConfig(({ mode }) => {
       globals: true,
       environment: 'jsdom',
       setupFiles: './src/setupTests.js',
+      // LE `build/` JUGÉ EST CELUI DES SOURCES. Mesuré le 03/11/2026 : sans
+      // rebuild, la suite comptait HUIT rouges ; après un `npm run build` de
+      // 8,9 s, SEPT disparaissaient. Ils ne trouvaient rien dans le produit :
+      // ils jugeaient un artefact d'une révision précédente (budget CSS, clés
+      // de coquille, pré-rendu) et l'annonçaient comme un défaut du code. Un
+      // rebuild n'est pas un remède à un rouge : c'est ce qui distingue un
+      // artefact PÉRIMÉ d'un artefact FAUX, et le dépôt ne faisait cette
+      // distinction que pour l'artefact ABSENT (la CI teste avant de
+      // construire, et les gardes se déclarent en prémisse).
+      // `scripts/vitest-build-frais.js` reconstruit donc une fois quand
+      // `build/index.html` date d'avant la plus récente source publiée, ne
+      // construit RIEN quand le dossier est absent (l'ordre de la CI ne bouge
+      // pas), et arrête la suite sur une cause nommée si le build échoue —
+      // plutôt que de laisser sept verdicts accuser le mauvais objet.
+      globalSetup: './scripts/vitest-build-frais.js',
       css: true,
       exclude: ['**/node_modules/**', '**/dist/**', '**/build/**', '**/e2e/**'],
       // Marge sur le délai par défaut (5 s). Plusieurs gardes CI testent des

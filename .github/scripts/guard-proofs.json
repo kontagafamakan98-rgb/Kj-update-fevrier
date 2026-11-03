@@ -1296,11 +1296,20 @@
       "motif": "le cache memoire des 45 pages ville/metier/guide (02/11/2026) : mesure du jour, /emplois/bamako coutait 0,5 s de rendu cote Fly et 0,67 s a travers Vercel avec `X-Vercel-Cache: MISS` a CHAQUE appel — le CDN ne met pas en cache une reecriture vers une origine externe, malgre le `s-maxage=1800` deja envoye. Il garde le document RENDU (lecture Mongo comprise) pendant un TTL plus court que le `max-age=300` que le navigateur applique deja, la BASE DU SITE est dans la cle (les URL absolues du document en dependent), les 404 n'entrent jamais, le cache est BORNE (96 entrees, la plus ancienne sort) et chaque reponse dit son origine (`X-Kojo-Pages-Cache: frais|rejoue`) — sans ce temoin, un cache qui ne sert jamais rien passerait pour un cache qui marche."
     },
     {
+      "chemin": "frontend/scripts/vitest-build-frais.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/vitest-build-frais.test.js",
+      "runner": "vitest",
+      "motif": "outil, pas un garde : il ne prononce aucun verdict sur le dépôt — il reconstruit `build/` quand l'artefact date d'avant la plus récente source publiée, une fois, avant que la suite ne juge. Ce qu'il EMPÊCHE d'être un garde est mesuré : le 03/11/2026, sept cas de la suite rendaient un refus FAUX sur un `build/` d'une révision précédente (budget CSS, clés de coquille, pré-rendu), et un rebuild de 8,9 s les rendait verts — le rouge venait de l'artefact, pas du produit. Il ne construit RIEN quand `build/` est absent (c'est l'état de la CI, où `npm test` précède `npm run build`, et les gardes d'artefact se déclarent alors en prémisse), et il arrête la suite sur une cause NOMMÉE quand la reconstruction échoue, plutôt que de laisser sept verdicts accuser le mauvais objet. Sa propre preuve (5 cas) fixe les trois états et la frontière : inverser la comparaison rendrait un artefact périmé « à jour » et les sept faux rouges reviendraient sans qu'aucun test ne rougisse."
+    },
+    {
       "chemin": "frontend/api/sitemap.js",
       "role": "garde",
       "invoque_par": "test",
       "preuve": "frontend/scripts/__tests__/sitemap-vercel.test.js",
-      "runner": "vitest"
+      "runner": "vitest",
+      "motif": "la fonction d'ARÊTE `/sitemap.xml` servie par Vercel (03/11/2026) : elle recopie la politique de fraîcheur que le backend a DÉJÀ calculée (`X-Kojo-Cache-Politique`, lue par `frontend/scripts/site-meta.js` des deux côtés) au lieu d'écrire une seconde valeur qui dériverait, elle BORNE ce qu'elle relaie (un plafond mesuré, jamais une durée choisie à la main : Vercel normalise l'en-tête de sa fonction en `public`, donc la fraîcheur écrite dans le module n'est pas celle qu'un observateur lit — elle se mesure par `Age`), elle porte le témoin `X-Kojo-Sitemap-Cache` (frais/rejoué) pour que le CDN ne puisse pas servir la mémoire du backend en la présentant comme un rafraîchissement, et une erreur d'amont ne se cache pas derrière un 200 vide. Ce qu'elle ne juge pas, écrit : l'exercice réel de la mémoïre d'arête et le vieillissement du CDN en production — c'est la sonde `check-sitemap-cache-production.js`, et le test du module ne fait que fixer le contrat que cette sonde lit."
     }
   ],
   "rejeux": [
@@ -7490,6 +7499,26 @@
       "cwd": "frontend",
       "attend": [
         "expected 'public, s-maxage=60' to be 'no-store'"
+      ]
+    },
+    {
+      "id": "build-frais: un artefact perime passe pour a jour",
+      "garde": "frontend/scripts/vitest-build-frais.js",
+      "cible": "frontend/scripts/vitest-build-frais.js",
+      "trouve": "etat: retard > 0 ? 'perime' : 'frais',",
+      "remplace": "etat: 'frais',",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/vitest-build-frais.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/vitest-build-frais.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "dit PÉRIMÉ quand une source est plus récente"
       ]
     }
   ]

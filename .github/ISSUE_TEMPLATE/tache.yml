@@ -1,0 +1,40 @@
+name: Tâche
+description: Un travail à faire, avec la mesure qui dit qu'il est fait.
+title: ''
+labels: []
+body:
+  - type: textarea
+    id: but
+    attributes:
+      label: Le but, en une phrase
+      description: Ce qui est vrai aujourd'hui, et ce qui sera vrai après.
+    validations:
+      required: true
+  - type: textarea
+    id: preuve
+    attributes:
+      label: Comment on saura que c'est fait
+      description: |
+        Une commande, un run, une valeur observée. Le dépôt préfère une mesure
+        à une case cochée : c'est elle qui décidera si la tâche se ferme.
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Surface touchée
+      options:
+        - Backend (Fly, API, sitemap, pages servies)
+        - Frontend (build, coquilles, pré-rendu, actifs)
+        - CI et gardes (workflows, harnais de mutation, preuves)
+        - Production (sondes, alertes, sauvegardes)
+        - Contenu et SEO (guides, villes, métiers, langues)
+    validations:
+      required: true
+  - type: textarea
+    id: limite
+    attributes:
+      label: Ce que la tâche ne fera pas
+      description: La limite déclarée d'avance, pour qu'un lecteur ne croie pas la couverture totale.
+    validations:
+      required: false

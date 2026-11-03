@@ -329,3 +329,135 @@ class TestLArchiveRestaureeEstLeSujet:
         )
         assert code == 2, sortie
         assert "est vide" in sortie and "PRÉMISSE" in sortie, sortie
+
+
+def _empreinte_volatile(identifiants, sha="a" * 64, index=(), definitions=None):
+    return {
+        "documents": len(identifiants),
+        "sha256": sha,
+        "index": list(index),
+        "definitions": definitions or {},
+        "volatile": True,
+        "identifiants": sorted(identifiants),
+    }
+
+
+class TestLesCollectionsVolatilesSontJugeesSurLeurIdentite:
+    """Le rouge du 03/11/2026, et la règle qui le ferme.
+
+    Run 41616073851 de `backup-db.yml` : `scheduler_alerts` et
+    `scheduler_leases` en « empreinte différente » avec le MÊME nombre de
+    documents. Ces deux collections portent de l'ÉTAT DE PLANIFICATEUR
+    (`_id` = nom de tâche / clé d'alerte, contenu réécrit à chaque passage) :
+    sur la minute qui sépare le dump de la comparaison, une archive PARFAITE ne
+    peut pas être identique. Le verdict accusait donc la sauvegarde d'un défaut
+    qui n'existait pas — et il le faisait de façon intermittente, donc un vrai
+    échec se serait noyé dans ce bruit.
+
+    Ce qui est jugé pour elles : les IDENTIFIANTS et les INDEX. Ce qui ne l'est
+    plus : le contenu. Et ce qui n'a pas été jugé est DIT dans le verdict.
+    """
+
+    def test_un_contenu_qui_bouge_n_est_pas_un_ecart(self):
+        avant = {"scheduler_leases": _empreinte_volatile(["email", "marche_vide"])}
+        apres = {"scheduler_leases": _empreinte_volatile(["email", "marche_vide"], sha="b" * 64)}
+        assert exercice.comparer(avant, apres) == []
+
+    def test_la_tolerance_n_existe_pas_pour_une_collection_non_declaree(self):
+        """La déclaration est ce qui décide, pas la forme de l'empreinte : une
+        collection non déclarée garde la comparaison de contenu ENTIÈRE — sinon
+        la tolérance serait une porte ouverte sur toutes les collections."""
+        avant = {"jobs": _empreinte(2, "a" * 64)}
+        apres = {"jobs": _empreinte(2, "b" * 64)}
+        ecarts = exercice.comparer(avant, apres)
+        assert ecarts and "empreinte différente" in ecarts[0], ecarts
+
+    def test_un_identifiant_perdu_est_un_ecart_nomme(self):
+        ecarts = exercice.comparer(
+            {"scheduler_leases": _empreinte_volatile(["email", "marche_vide"])},
+            {"scheduler_leases": _empreinte_volatile(["email"])},
+        )
+        assert ecarts and "PERDU" in ecarts[0] and "marche_vide" in ecarts[0], ecarts
+
+    def test_un_identifiant_invente_est_un_ecart(self):
+        ecarts = exercice.comparer(
+            {"scheduler_alerts": _empreinte_volatile(["marche_vide"])},
+            {"scheduler_alerts": _empreinte_volatile(["marche_vide", "fantome"])},
+        )
+        assert ecarts and "ABSENT" in ecarts[0] and "fantome" in ecarts[0], ecarts
+
+    def test_un_index_perdu_reste_un_ecart(self):
+        ecarts = exercice.comparer(
+            {"scheduler_alerts": _empreinte_volatile(["marche_vide"], index=("signature",))},
+            {"scheduler_alerts": _empreinte_volatile(["marche_vide"])},
+        )
+        assert ecarts and "index non restauré" in ecarts[0], ecarts
+
+    def test_la_declaration_ne_nomme_que_le_planificateur_et_dit_pourquoi(self):
+        assert set(exercice.COLLECTIONS_VOLATILES) == {"scheduler_alerts", "scheduler_leases"}
+        for motif in exercice.COLLECTIONS_VOLATILES.values():
+            assert "_id" in motif and len(motif) > 40, motif
+
+    def test_l_empreinte_declare_elle_meme_ce_qu_elle_a_juge(self):
+        base = _FausseBase(
+            {
+                "scheduler_leases": {"documents": _DOCUMENTS, "index": _INDEX},
+                "users": {"documents": _DOCUMENTS, "index": _INDEX},
+            }
+        )
+        empreintes = exercice.empreinte_base(base)
+        assert empreintes["scheduler_leases"]["volatile"] is True
+        assert empreintes["scheduler_leases"]["identifiants"] == ["1", "2"]
+        assert empreintes["users"]["volatile"] is False
+        assert "identifiants" not in empreintes["users"]
+
+
+def _bases(noms_bail_cible):
+    """Une source dont les baux ont un contenu, une cible dont le contenu a
+    changé — mais avec les mêmes identifiants, comme dans la vraie vie."""
+    baux_source = [{"_id": "email", "expires_at": "A"}, {"_id": "marche", "expires_at": "A"}]
+    baux_cible = [
+        {"_id": nom, "expires_at": "B"} for nom in noms_bail_cible
+    ]
+    return {
+        "kojo_db": {
+            "scheduler_leases": {"documents": baux_source, "index": _INDEX},
+            "users": {"documents": _DOCUMENTS, "index": _INDEX},
+        },
+        "kojo_verif": {
+            "scheduler_leases": {"documents": baux_cible, "index": _INDEX},
+            "users": {"documents": _DOCUMENTS, "index": _INDEX},
+        },
+    }
+
+
+class TestLeVerdictDitCeQuIlNaPasCompare:
+    def test_une_archive_avec_un_contenu_volatil_change_est_verte_et_le_dit(self):
+        with tempfile.TemporaryDirectory() as dossier:
+            rapport = Path(dossier) / "rapport.json"
+            code, sortie, _client = _lancer_avec_client(
+                [
+                    "--uri", "mongodb://exemple.invalide/",
+                    "--base", "kojo_db", "--cible", "kojo_verif",
+                    "--deja-restauree", "--rapport", str(rapport),
+                ],
+                _bases(["email", "marche"]),
+            )
+            assert code == 0, sortie
+            # Le vert DIT ce qu'il n'a pas regardé : un vert muet se lirait
+            # comme une couverture complète.
+            assert "contenu NON comparé" in sortie and "scheduler_leases" in sortie, sortie
+            donnees = json.loads(rapport.read_text(encoding="utf-8"))
+            assert donnees["collections_volatiles"]["scheduler_leases"]["contenu_non_compare"] is True
+            assert donnees["pourquoi_volatiles"]["scheduler_leases"].startswith("bail de tâche")
+
+    def test_un_bail_perdu_dans_l_archive_est_toujours_un_rouge(self):
+        code, sortie, _client = _lancer_avec_client(
+            [
+                "--uri", "mongodb://exemple.invalide/",
+                "--base", "kojo_db", "--cible", "kojo_verif", "--deja-restauree",
+            ],
+            _bases(["email"]),
+        )
+        assert code == 1, sortie
+        assert "PERDU" in sortie and "marche" in sortie, sortie

@@ -550,6 +550,25 @@ def fusionner_pr(pr_number: int, sha: str, mode: str, jeton: str) -> str:
     return merge_sha
 
 
+def elaguer_refs_distantes():
+    """Retire les réfs distantes des branches que le merge a fait supprimer.
+
+    Best-effort et SILENCIEUX : l'élagage ne juge rien, il remet le dépôt local
+    en accord avec le distant. Un échec (réseau) laisse simplement la réf en
+    place, ce que le garde d'hygiène signalera — et son remède est écrit.
+    """
+    try:
+        subprocess.run(
+            ["git", "fetch", "--prune", "origin"],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    except Exception as exc:  # réseau, git absent, délai : jamais fatal ici
+        log(f"Élagage des réfs distantes non effectué (sans conséquence) : {exc}")
+
+
 def synchroniser_et_nettoyer_local(branche_travail: str):
     log("Synchronisation de la branche locale 'main' et élagage...")
     # Basculer sur main
@@ -1166,6 +1185,18 @@ def main(argv=None) -> int:
         )
         if not ok
     ]
+    # 8. DERNIER ÉLAGAGE, APRÈS les confirmations.
+    #
+    # `delete_branch_on_merge` supprime la branche sur origin de façon
+    # ASYNCHRONE : le `fetch --prune` de l'étape 6, lancé quelques secondes après
+    # la fusion, peut encore lire la réf distante. Elle survit alors en local,
+    # et le garde d'hygiène du dépôt refuse cet état (« réf distante … et aucune
+    # branche locale ne la porte ») — mesuré le 03/11/2026 sur la PR #298, où il
+    # a fallu un `git fetch --prune` manuel pour repasser au vert. Plusieurs
+    # minutes se sont écoulées ici (Vercel, actifs, SEO, Fly) : le second
+    # passage lit l'état DEFINITIF au lieu de parier sur le délai de l'API.
+    elaguer_refs_distantes()
+
     if not refus:
         log_succes("Trajet de livraison COMPLET terminé avec succès !")
         log(
