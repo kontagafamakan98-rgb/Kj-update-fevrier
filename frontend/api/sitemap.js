@@ -35,7 +35,12 @@
 // L'amont est le sitemap du backend, celui qui porte déjà son propre cache
 // mémoire et ses trois en-têtes de volume. Surchargeable pour une répétition
 // locale, jamais pour changer ce que la production sert.
-const AMONT = process.env.SITEMAP_UPSTREAM || 'https://api.kojoforafrica.cc.cd/api/sitemap.xml';
+// `process` est lu DÉFENSIVEMENT : le runtime d'arête l'expose, mais un module
+// qui lèverait à l'import rendrait 500 sur TOUTES les requêtes — un test local
+// hors Vercel (où il n'existe pas) doit pouvoir importer le handler.
+const AMONT =
+  (typeof process !== 'undefined' && process.env && process.env.SITEMAP_UPSTREAM) ||
+  'https://api.kojoforafrica.cc.cd/api/sitemap.xml';
 
 // Le délai de l'aller-retour. Au-delà, mieux vaut un 502 NOMMÉ et non caché
 // qu'un crawler qui attend le délai de la plateforme.
