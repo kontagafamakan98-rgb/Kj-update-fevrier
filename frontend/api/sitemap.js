@@ -21,10 +21,14 @@
 //      sondes `hreflang` et SEO lisent. Elle ne fait que TRANSPORTER.
 //   2. Une ERREUR NE SE CACHE JAMAIS (`no-store`) : un incident de cinq
 //      secondes ne doit pas figer un 502 pendant une minute chez les crawlers.
-//   3. La fraîcheur est la même qu'au backend : 60 s de CDN pour un backend qui
-//      garde son document 60 s — jamais plus vieux chez l'arête que chez
-//      l'origine, et `stale-while-revalidate` sert un visiteur pendant le
-//      rafraîchissement.
+//   3. La fraîcheur est MESURÉE, pas promise : 60 s de CDN comme le backend
+//      garde son document 60 s. Mesuré en production le 03/11/2026 : `Age`
+//      reste sous 60 s quand le lien est sain (13–15 s relevés), et
+//      `stale-while-revalidate` sert la copie PENDANT le rafraîchissement —
+//      `Age` est monté à 191 s au moment où l'aller-retour vers Fly prenait
+//      plusieurs secondes. Le plafond réel est donc `s-maxage` + la fenêtre
+//      stale (6 min au pire), pas la minute du backend : c'est le prix de
+//      l'indisponibilité évitée, et il est écrit ici plutôt que supposé.
 //
 // Garde : `frontend/scripts/__tests__/sitemap-vercel.test.js` (la réécriture
 // INTERNE et son ordre, la recopie du corps et des volumes, le refus d'un
