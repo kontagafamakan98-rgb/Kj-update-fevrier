@@ -1294,6 +1294,13 @@
       "preuve": "backend/tests/test_pages_cache.py",
       "runner": "pytest",
       "motif": "le cache memoire des 45 pages ville/metier/guide (02/11/2026) : mesure du jour, /emplois/bamako coutait 0,5 s de rendu cote Fly et 0,67 s a travers Vercel avec `X-Vercel-Cache: MISS` a CHAQUE appel — le CDN ne met pas en cache une reecriture vers une origine externe, malgre le `s-maxage=1800` deja envoye. Il garde le document RENDU (lecture Mongo comprise) pendant un TTL plus court que le `max-age=300` que le navigateur applique deja, la BASE DU SITE est dans la cle (les URL absolues du document en dependent), les 404 n'entrent jamais, le cache est BORNE (96 entrees, la plus ancienne sort) et chaque reponse dit son origine (`X-Kojo-Pages-Cache: frais|rejoue`) — sans ce temoin, un cache qui ne sert jamais rien passerait pour un cache qui marche."
+    },
+    {
+      "chemin": "frontend/api/sitemap.js",
+      "role": "garde",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/sitemap-vercel.test.js",
+      "runner": "vitest"
     }
   ],
   "rejeux": [
@@ -7443,6 +7450,46 @@
       "cwd": "backend",
       "attend": [
         "FAILED tests/test_pages_cache.py::test_seule_une_ecriture_reussie_vide_le_sitemap"
+      ]
+    },
+    {
+      "id": "sitemap: le plafond de fraicheur n'est plus borne",
+      "garde": "frontend/api/sitemap.js",
+      "cible": "frontend/api/sitemap.js",
+      "trouve": "const CACHE = 'public, s-maxage=60, stale-while-revalidate=60';",
+      "remplace": "const CACHE = 'public, s-maxage=3600, stale-while-revalidate=300';",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/sitemap-vercel.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/sitemap-vercel.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "expected 3600 to be 60"
+      ]
+    },
+    {
+      "id": "sitemap: une erreur d'amont se cache",
+      "garde": "frontend/api/sitemap.js",
+      "cible": "frontend/api/sitemap.js",
+      "trouve": "'cache-control': 'no-store',",
+      "remplace": "'cache-control': 'public, s-maxage=60',",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/sitemap-vercel.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/sitemap-vercel.test.js",
+        "--reporter=default"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "expected 'public, s-maxage=60' to be 'no-store'"
       ]
     }
   ]

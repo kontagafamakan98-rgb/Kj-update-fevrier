@@ -15,10 +15,13 @@
 //
 // TROIS RÈGLES, CHACUNE TENUE PAR LE CODE CI-DESSOUS.
 //
-//   1. Le corps est recopié À L'IDENTIQUE, en-têtes de volume compris : une
-//      fonction qui recomposerait le XML serait une seconde déclaration du
-//      sitemap, libre de diverger de celle que `/health` confronte et que les
-//      sondes `hreflang` et SEO lisent. Elle ne fait que TRANSPORTER.
+//   1. Le corps est recopié À L'IDENTIQUE, en-têtes de volume et TÉMOIN de
+//      cache compris : une fonction qui recomposerait le XML serait une
+//      seconde déclaration du sitemap, libre de diverger de celle que `/health`
+//      confronte et que les sondes `hreflang` et SEO lisent. Elle ne fait que
+//      TRANSPORTER — y compris ce qu'elle ne comprend pas, comme le
+//      `frais`/`rejoue` du backend, sans lequel cette URL ne dit plus si le CDN
+//      a rafraîchi ou resservi la mémoire de l'origine.
 //   2. Une ERREUR NE SE CACHE JAMAIS (`no-store`) : un incident de cinq
 //      secondes ne doit pas figer un 502 pendant une minute chez les crawlers.
 //   3. La fraîcheur est MESURÉE, pas promise : 60 s de CDN comme le backend
@@ -35,8 +38,11 @@
 //      revalidation BLOQUANTE au pire des cas est bornée par le délai d'amont
 //      ci-dessous ; c'est moins cher que de publier du périmé. Le plafond est
 //      donc 60 s frais + 60 s de stale = 2 min au pire, et il se relit sur
-//      `Age` — jamais sur cet en-tête (Vercel normalise le `Cache-Control`
-//      qu'il rend au client).
+//      `Age` — jamais sur cet en-tête, puisque Vercel normalise le
+//      `Cache-Control` qu'il rend au client (`public`, mesuré). La valeur
+//      DEMANDÉE est donc publiée à part, dans `X-Kojo-Cache-Politique` : sans
+//      cela, la politique de ce module n'était lisible par personne et seul
+//      `Age` parlait — un fait mesuré, jamais la déclaration.
 //
 // Garde : `frontend/scripts/__tests__/sitemap-vercel.test.js` (la réécriture
 // INTERNE et son ordre, la recopie du corps et des volumes, le refus d'un
@@ -70,6 +76,23 @@ const CACHE = 'public, s-maxage=60, stale-while-revalidate=60';
 // bloc `langues` de /health les confrontent au corps, donc ils doivent
 // accompagner CE corps.
 const ENTETES_VOLUME = ['X-Kojo-Urls', 'X-Kojo-Urls-Declarees', 'X-Kojo-Urls-Vivantes'];
+
+// LE TÉMOIN DE L'AMONT (03/11/2026) : il dit si le backend a RENDU son document
+// (`frais`) ou resservi sa mémoire 60 s (`rejoue`). Sans lui, cette URL ne
+// distinguait plus « le CDN a rafraîchi depuis l'origine » de « le CDN a
+// resservi la mémoire du backend » — le fait restait lisible sur
+// `/api/sitemap.xml`, mais l'adresse que tout le monde interroge était muette,
+// et c'est justement celle que les crawlers et les sondes lisent.
+const ENTETES_TEMOIN = ['X-Kojo-Sitemap-Cache'];
+
+// LA POLITIQUE DÉCLARÉE, PUBLIÉE À PART. Vercel normalise le `Cache-Control`
+// d'une fonction d'arête : mesuré le 03/11/2026, un observateur reçoit `public`
+// et rien d'autre, donc le `s-maxage` et la fenêtre stale écrits dans ce module
+// n'étaient lisibles par PERSONNE. Ils sont publiés ici, dans un en-tête que la
+// plateforme ne réécrit pas — et `Age` reste la mesure de ce qui est
+// réellement servi : deux faits, deux en-têtes, aucun des deux ne prétendant
+// remplacer l'autre.
+const ENTETE_POLITIQUE = 'X-Kojo-Cache-Politique';
 
 export const config = { runtime: 'edge' };
 
@@ -126,8 +149,11 @@ export default async function handler(request) {
   const entetes = new Headers({
     'content-type': 'application/xml; charset=utf-8',
     'cache-control': CACHE,
+    // La politique DEMANDÉE, lisible même quand la plateforme réécrit
+    // `Cache-Control` : c'est la déclaration du module, pas une mesure.
+    [ENTETE_POLITIQUE]: CACHE,
   });
-  for (const nom of ENTETES_VOLUME) {
+  for (const nom of [...ENTETES_VOLUME, ...ENTETES_TEMOIN]) {
     const valeur = amont.headers.get(nom);
     if (valeur) entetes.set(nom, valeur);
   }
