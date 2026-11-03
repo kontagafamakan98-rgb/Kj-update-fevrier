@@ -17,7 +17,7 @@ from pydantic import ValidationError
 
 from kojo_core import db
 from kojo_balises import DesequilibreHtml, exiger_balises_equilibrees
-from kojo_job_og import escape_xml, job_og_html, job_og_html_404
+from kojo_job_og import job_og_html, job_og_html_404
 # La vue PUBLIQUE d'une mission (allowlist `JobPublic`) a UN propriétaire :
 # `_job_view` dans son routeur. Le pré-rendu la LIT au lieu d'en construire une
 # seconde — deux constructions divergeraient au premier champ ajouté, et c'est
@@ -29,18 +29,14 @@ from kojo_routers_jobs_listing import _job_view
 # que l'allowlist existe pour empêcher.
 from kojo_routers_workers_public import profil_public
 from kojo_settings import FRONTEND_APP_URL, logger
-from kojo_identifiants import identifiant_job_query, identifiant_public
+from kojo_identifiants import identifiant_job_query
 import kojo_pages_cache as pages_cache
 import kojo_pages_metier as pages_metier
 import kojo_pages_guides as pages_guides
-# Les langues qui ont une URL propre, et la forme des alternatives `hreflang` :
-# une seule déclaration (kojo_langues.py), comparée à celle du frontend par
-# backend/tests/test_hreflang_sitemap.py.
-import kojo_langues as langues
-# La déclaration du sitemap (pages statiques) et le bloc `langues` de /health :
-# un seul proprietaire, pour que l'enumeration et le compte ne puissent pas
-# diverger (cf. kojo_sitemap_declaration.py).
-from kojo_sitemap_declaration import PAGES_STATIQUES
+# Le sitemap (construction, volumes, cache) vit dans son propre module depuis le
+# 02/11/2026 : ce routeur a franchi son plafond de lignes, et le sitemap est un
+# bloc de DÉCLARATION, pas une route de données.
+import kojo_sitemap_route as sitemap_route
 from kojo_worker_og import (
     nom_complet,
     worker_meta_lines,
@@ -825,203 +821,27 @@ async def get_public_stats(response: Response):
     }
 
 
-async def _construire_sitemap(base: str) -> Response:
-    """Sitemap dynamique : liste statique du site + toutes les fiches de
-    mission PUBLIQUES (/jobs/:id) encore ouvertes ou en cours — les seules
-    pages métier indexables (les autres statuts sont privés/terminés).
-
-    Sert du XML réel (text/xml) pour que Google puisse crawler les fiches
-    exactes, au lieu du sitemap statique Vercel qui n'énumérait que la home.
-    Le Vercel rewrite /sitemap.xml → /api/sitemap.xml (vercel.json) achemine
-    le crawler jusqu'ici.
-
-    Returns:
-        Response: XML (text/xml) — le sitemap complet, pas un objet JSON.
-    """
-    # `/login` et `/register` en sont SORTIS le 27/10/2026. Ce sont deux
-    # FORMULAIRES : aucun moteur ne les classe sur une intention de recherche, et
-    # les annoncer en `weekly` + 0,8 les présentait comme les pages les plus
-    # importantes du site après l'accueil et les missions — mesuré le 27/10, deux
-    # des neuf entrées statiques décrivaient une porte, pas un contenu. Ils
-    # restent indexables (une recherche de marque « kojo connexion » doit tomber
-    # dessus, et un `noindex` la ferait disparaître) : c'est leur PRIORITÉ dans le
-    # sitemap qui était fausse, pas leur existence.
-    # ── Une ENTRÉE PAR LANGUE INDEXÉE (30/10/2026) ────────────────────
-    # La liste des pages statiques vit dans `kojo_sitemap_declaration`
-    # (`PAGES_STATIQUES`) : ce sitemap l'énumère, et le bloc `langues` de
-    # `/health` en compte les documents par langue (01/11/2026). Deux copies de
-    # cette liste auraient divergé au premier ajout de page — l'une des deux
-    # aurait publié un compte faux sans que rien ne rougisse.
-    static_paths = PAGES_STATIQUES
-    # `(url, chemin, freq, priorité)` : `chemin` n'est renseigné que pour les
-    # pages qui ONT une alternative par langue. Les pages ville, métier et guides
-    # sont écrites en français (aucune version anglaise n'existe) : elles gardent
-    # `None`, donc aucune alternative — une page monolingue ne déclare pas de
-    # `hreflang`, c'est le fait qui la décrit.
-    static_urls = [
-        (base + langues.chemin_dans_la_langue(chemin, code), chemin, freq, prio)
-        for chemin, freq, prio in static_paths
-        for code in langues.codes()
-    ]
-
-    # ── Les pages VILLE et MÉTIER (27/10/2026) ───────────────────────────────
-    # Elles viennent de `kojo_pages_metier.urls_sitemap()`, c'est-à-dire de la
-    # MÊME déclaration que les routes `/api/pages/villes|metiers/{slug}` : une
-    # URL publiée ici répond forcément, et un slug renommé ne peut pas laisser
-    # derrière lui une entrée morte (un sitemap qui renvoie des 404 fait perdre
-    # la confiance du crawler sur tout le fichier).
-    static_urls += [
-        (base + chemin, None, freq, prio)
-        for chemin, freq, prio in pages_metier.urls_sitemap()
-    ]
-
-    # ── Les GUIDES ÉDITORIAUX (27/10/2026) ──────────────────────────────────
-    # Même règle : la liste sort de `kojo_pages_guides.urls_sitemap()`, la même
-    # déclaration que la route `/api/pages/guides/{slug}`. Sans eux, le site
-    # n'aurait, pour « combien coûte un plombier », que des listes d'offres à
-    # classer ; avec eux, une page répond à la question posée avant l'offre.
-    static_urls += [
-        (base + chemin, None, freq, prio)
-        for chemin, freq, prio in pages_guides.urls_sitemap()
-    ]
-
-    lines = [
-        '<?xml version="1.0" encoding="UTF-8"?>',
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '
-        'xmlns:mobile="http://www.google.com/schemas/sitemap-mobile/1.0" '
-        'xmlns:xhtml="http://www.w3.org/1999/xhtml">',
-    ]
-    for url, chemin, changefreq, priority in static_urls:
-        # Les alternatives d'une page bilingue. Elles sont écrites pour CHAQUE
-        # langue de la famille, `x-default` compris — la réciproque que Google
-        # exige (une page qui pointe l'autre sans être pointée en retour est
-        # ignorée) et la même liste dans les deux entrées, par construction.
-        alternatives = "".join(
-            f'<xhtml:link rel="alternate" hreflang="{escape_xml(code_langue)}" '
-            f'href="{escape_xml(base + chemin_langue)}"/>'
-            for code_langue, chemin_langue in langues.alternatives(chemin)
-        ) if chemin else ""
-        lines.append(
-            f"  <url><loc>{escape_xml(url)}</loc>"
-            f"{alternatives}"
-            f"<changefreq>{changefreq}</changefreq>"
-            f"<priority>{priority}</priority><mobile:mobile/></url>"
-        )
-
-    # Fiches missions publiques (ouvertes/en cours). Limite raisonnable :
-    # sitemap de 10k URLs max — on sert les plus récentes.
-    cursor = db.jobs.find(
-        {"status": {"$in": ["open", "in_progress"]}, "deleted": {"$ne": True}},
-        {"id": 1, "updated_at": 1},
-    ).sort("created_at", -1).limit(9000)
-    async for job in cursor:
-        lines.append(
-            f"  <url><loc>{escape_xml(base)}/jobs/{escape_xml(job['id'])}</loc>"
-            f"<lastmod>{str(job.get('updated_at') or job.get('created_at') or '')[:10]}</lastmod>"
-            f"<changefreq>daily</changefreq><priority>0.8</priority><mobile:mobile/></url>"
-        )
-
-    # Profils TRAVAILLEURS publics. Depuis le 20/10/2026, /workers/:id est une
-    # page pré-rendue par le backend (rewrite Vercel /workers/(.*)) : sans
-    # entrée ici, elle ne serait découverte que par un lien entrant — c'est-à-
-    # dire, en pratique, jamais. Seuls les profils qui publient un NOM sont
-    # listés (une page sans nom n'a rien à indexer), les plus récents d'abord.
-    # Limite : le sitemap reste sous les 50 000 URL du format, missions
-    # comprises.
-    curseur = db.users.find(
-        {
-            "user_type": "worker",
-            "deleted": {"$ne": True},
-            "first_name": {"$nin": [None, ""]},
-        },
-        {"id": 1, "_id": 1, "created_at": 1},
-    ).sort("created_at", -1).limit(4000)
-    async for worker in curseur:
-        # `identifiant_public` : un compte importé peut ne porter que `_id`, et
-        # un identifiant vide ne désignerait aucune page.
-        identifiant = identifiant_public(worker)
-        if not identifiant:
-            continue
-        lines.append(
-            f"  <url><loc>{escape_xml(base)}/workers/{escape_xml(identifiant)}</loc>"
-            f"<lastmod>{str(worker.get('created_at') or '')[:10]}</lastmod>"
-            f"<changefreq>weekly</changefreq><priority>0.6</priority><mobile:mobile/></url>"
-        )
-
-    lines.append("</urlset>")
-    body = "\n".join(lines)
-    # Le VOLUME SERVI, decompose en ce que la DECLARATION compte et ce que la
-    # BASE ajoute. Mesure du 02/11/2026 : `/health` declarait 80 pages et ce
-    # sitemap en servait 85 (quatre profils travailleur, une fiche de mission),
-    # sans qu'aucun champ ne dise d'ou venait l'ecart — un lecteur ne pouvait
-    # pas distinguer une famille non declaree d'une dette. Ces trois en-tetes
-    # rendent l'ecart LISIBLE et BORNE ; `tests/test_langues_health.py` les
-    # confronte au bloc `langues` de /health ET aux `<loc>` reellement servis.
-    # Une fiche est `/jobs/<id>`, un profil `/workers/<id>` ; `/jobs` (la liste)
-    # n'a pas de barre oblique finale et n'entre donc pas dans `vivantes`.
-    total_servi = sum(1 for ligne in lines if "<loc>" in ligne)
-    vivantes = sum(1 for ligne in lines if "/jobs/" in ligne or "/workers/" in ligne)
-    # Cache court : les missions changent peu souvent, mais une fiche peut
-    # être clôturée — on ne sert jamais une photo de plus de 1h.
-    return Response(
-        content=body,
-        media_type="application/xml",
-        headers={
-            "Cache-Control": "public, max-age=3600, s-maxage=3600",
-            "X-Kojo-Urls": str(total_servi),
-            "X-Kojo-Urls-Declarees": str(total_servi - vivantes),
-            "X-Kojo-Urls-Vivantes": str(vivantes),
-        },
-    )
-
-
 @router.get("/sitemap.xml", include_in_schema=False)
 async def get_sitemap_xml():
-    """Le sitemap, rendu une fois par minute (02/11/2026).
+    """Le sitemap, servi par le cache mémoire de la minute (02/11/2026).
 
-    MESURE DU SOIR : `/sitemap.xml` rendait **0,72 s** à chaque crawl, pour une
-    déclaration qui ne change qu'aux publications. Les 45 pages ville/métier/
-    guide ont reçu leur cache mémoire le même soir ; le sitemap, non. Et Vercel
-    ne met pas en cache la réécriture `/sitemap.xml → /api/sitemap.xml` (origine
-    externe, même constat que les pages), donc le `s-maxage=3600` déjà envoyé ne
-    protège que le navigateur, pas le crawler.
+    La CONSTRUCTION vit dans `kojo_sitemap_route` : ce routeur-ci porte les
+    fiches, les cartes OG et les compteurs, et il a franchi son plafond de
+    lignes en recevant ce cache — un fichier de plus de 1 000 lignes n'est plus
+    relu, et le sitemap est un bloc de DÉCLARATION, pas une route de données.
 
-    Le corps ET ses trois en-têtes de volume sont rendus ENSEMBLE puis cachés
-    ensemble (cf. `kojo_pages_cache`) : un en-tête qui décrirait un autre corps
-    après un rejeu serait pire que pas de cache du tout.
-    `X-Kojo-Sitemap-Cache` dit lequel des deux on lit, et les compteurs `/metrics`
-    du cache comptent aussi ce document — un cache qui ne sert jamais rien s'y
-    verrait.
+    Mesure du soir : `/sitemap.xml` rendait **0,72 s** à chaque crawl pour une
+    déclaration qui ne change qu'aux publications, et Vercel ne met pas en cache
+    la réécriture vers l'origine Fly, donc le `s-maxage=3600` déjà envoyé ne
+    protégeait que le navigateur. Le corps ET ses trois en-têtes de volume sont
+    rendus puis cachés ensemble : un en-tête qui décrirait un autre corps après
+    un rejeu serait pire que pas de cache du tout.
+
+    Returns:
+        Response: XML (text/xml) — le sitemap, ses volumes `X-Kojo-Urls*` et le
+        témoin `X-Kojo-Sitemap-Cache: frais|rejoue`.
     """
-    base = _site_base()
-
-    async def _rendre() -> dict:
-        construit = await _construire_sitemap(base)
-        return {
-            "corps": construit.body,
-            "volumes": {
-                nom: construit.headers[nom]
-                for nom in (
-                    "X-Kojo-Urls",
-                    "X-Kojo-Urls-Declarees",
-                    "X-Kojo-Urls-Vivantes",
-                )
-            },
-        }
-
-    document, rejoue = await pages_cache.obtenir(("sitemap", "xml", base), _rendre)
-    return Response(
-        content=document["corps"],
-        media_type="application/xml",
-        headers={
-            # Le crawler garde 1 h, le cache serveur 60 s : jamais plus vieux chez
-            # nous que chez lui, et une fiche clôturée disparaît de la version
-            # servie à la minute suivante.
-            "Cache-Control": "public, max-age=3600, s-maxage=3600",
-            **document["volumes"],
-            "X-Kojo-Sitemap-Cache": "rejoue" if rejoue else "frais",
-        },
-    )
+    return await sitemap_route.servir(_site_base())
 
 
 # robots.txt n'est PLUS servi ici : il est écrit au build par le FRONTEND, depuis
