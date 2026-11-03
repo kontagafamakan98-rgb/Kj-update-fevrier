@@ -140,3 +140,76 @@ async def test_une_404_n_est_jamais_servie_depuis_le_cache(client):
         assert "x-kojo-pages-cache" not in reponse.headers
         assert reponse.headers.get("cache-control") == "no-store"
     assert cache.stats()["entrees"] == 0
+
+
+async def test_le_sitemap_est_servi_par_le_cache_au_second_appel(client):
+    """Le sitemap aussi : 0,72 s par crawl, pour une déclaration stable.
+
+    Mesure du 02/11/2026 au soir : les 45 pages avaient reçu leur cache, le
+    sitemap non — et Vercel ne cache pas la réécriture externe, donc le
+    `s-maxage=3600` ne protégeait que le navigateur. Le second appel doit servir
+    le MÊME corps, avec le témoin qui le dit.
+    """
+    premier = await client.get("/api/sitemap.xml")
+    second = await client.get("/api/sitemap.xml")
+
+    assert premier.status_code == second.status_code == 200
+    assert premier.headers.get("x-kojo-sitemap-cache") == "frais"
+    assert second.headers.get("x-kojo-sitemap-cache") == "rejoue"
+    assert premier.text == second.text
+    # Une seule entrée en cache : le sitemap n'écrase pas la place d'une page.
+    assert cache.stats()["entrees"] == 1
+
+
+async def test_le_volume_rejoue_est_celui_du_corps(client):
+    """Les trois en-têtes de volume sont cachés AVEC le corps, pas recalculés.
+
+    Un en-tête qui décrirait un autre corps après rejeu serait pire que pas de
+    cache : le crawler lirait un compte que le fichier ne porte pas.
+    """
+    await client.get("/api/sitemap.xml")
+    rejoue = await client.get("/api/sitemap.xml")
+
+    servies = rejoue.text.count("<loc>")
+    assert int(rejoue.headers["x-kojo-urls"]) == servies
+    declarees = int(rejoue.headers["x-kojo-urls-declarees"])
+    vivantes = int(rejoue.headers["x-kojo-urls-vivantes"])
+    assert declarees + vivantes == servies
+
+
+async def test_seule_une_ecriture_reussie_vide_le_sitemap():
+    """Le cache du sitemap tombe sur une écriture RÉUSSIE, et seulement là.
+
+    Mesuré le 02/11/2026 au soir : la purge d'un compte doit retirer son profil
+    du sitemap IMMÉDIATEMENT (c'est la promesse faite au visiteur purgé), et la
+    suppression d'une mission doit retirer sa fiche. Un refus, une lecture ou
+    une écriture hors `/api` ne changent rien en base : vider le cache y ferait
+    seulement payer un rendu pour rien.
+    """
+    async def _rendre():
+        return "<urlset/>"
+
+    await cache.obtenir(("sitemap", "xml", "x"), _rendre)
+    assert cache.stats()["entrees"] == 1
+
+    # Une lecture ne touche à rien.
+    assert cache.invalider_sur_ecriture("GET", "/api/sitemap.xml", 200) == 0
+    # Un refus non plus : la base n'a pas bougé.
+    assert cache.invalider_sur_ecriture("DELETE", "/api/jobs/1", 409) == 0
+    # Hors /api, hors sitemap.
+    assert cache.invalider_sur_ecriture("POST", "/monitor", 200) == 0
+    assert cache.stats()["entrees"] == 1
+
+    # L'écriture réussie vide la famille, et le rendu suivant repart.
+    assert cache.invalider_sur_ecriture("DELETE", "/api/jobs/1", 200) == 1
+    assert cache.stats()["entrees"] == 0
+
+
+async def test_une_page_ville_n_est_pas_videe_par_une_ecriture(client):
+    """L'invalidation vise le SITEMAP : les 45 pages gardent leur minute."""
+    await client.get("/api/pages/villes/abidjan")
+    assert cache.stats()["entrees"] == 1
+
+    await client.delete("/api/jobs/inconnue")  # 404 : rien n'a changé
+
+    assert cache.stats()["entrees"] == 1

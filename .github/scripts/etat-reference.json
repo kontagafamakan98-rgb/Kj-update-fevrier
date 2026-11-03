@@ -34,8 +34,8 @@
     "Preuve : backend/tests/test_etat_reference.py"
   ],
   "reference": {
-    "etablie_le": "2026-11-02",
-    "motif": "02/11/2026 (soir) : les erreurs non rattrapees sont comptees et publiees (kojo_erreurs, bloc erreurs de /health, deux series /metrics, sonde de sante qui refuse en nommant classe et date), et les 45 pages ville/metier/guide sont rendues une fois par minute (kojo_pages_cache, TTL 60 s borne, temoin X-Kojo-Pages-Cache) — deux mutations nouvelles, donc une surface laissee aveugle se voit ici",
+    "etablie_le": "2026-11-03",
+    "motif": "03/11/2026 (nuit) : le sitemap passe par le memo cache des pages (valeur {corps, volumes} rendue et cachee ensemble), et une ecriture reussie sous /api vide la famille sitemap par la pile ASGI — deux mutations nouvelles, donc une surface laissee aveugle se voit ici",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/alerte_sondes.py": "35c6b645b431b932c6af1ed53704acc4f096da428a49e2f7461259358f137687",
@@ -152,8 +152,8 @@
       "frontend/scripts/validate-vercel-json.mjs": "16a56835e1fb299821c3a1dd7fa4d0957982a970a493e98ed8855d06fc563518",
       "frontend/scripts/verre-contraste.js": "0304f01ae4ccd2fea6db62cff8badcb4085d3a34622f49416ed8944c377c688c",
       "backend/scripts/check_health_probe.py": "18a5862747e15b6ac07c2a244730a77a62ad3472ecb7c52421d6b4ac3dbe960b",
-      "backend/kojo_pages_cache.py": "5c9d9b1c28dfaa09776096cf8e614a07bf943f7ef1150112b2d79fa3d79d13ef",
-      "backend/server.py": "0bc8e54716b6bf878fe3feb73f274c42293e48619f8a5cfc60d1559e3b6d4a18"
+      "backend/server.py": "28e8e2e306507dba07efd3260b01b5645a65f15224272727c0b4df45aa737951",
+      "backend/kojo_pages_cache.py": "d4b7db9eb198fc8a4a038e4360907e4a8bea29657adde3850303b3f19da1ac47"
     }
   },
   "hors_perimetre": [

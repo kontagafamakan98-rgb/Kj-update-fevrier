@@ -7423,6 +7423,27 @@
       "attend": [
         "FAILED tests/test_pages_cache.py::test_un_second_appel_ne_rend_pas_et_ne_lit_pas_la_base"
       ]
+    },
+    {
+      "id": "pages-cache: une ecriture reussie ne vide plus le sitemap",
+      "garde": "backend/kojo_pages_cache.py",
+      "cible": "backend/kojo_pages_cache.py",
+      "trouve": "    return invalider(FAMILLE_INVALIDEE)",
+      "remplace": "    return 0",
+      "runner": "python",
+      "preuve": "backend/tests/test_pages_cache.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_pages_cache.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_pages_cache.py::test_seule_une_ecriture_reussie_vide_le_sitemap"
+      ]
     }
   ]
 }

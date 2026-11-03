@@ -399,7 +399,7 @@ def rendre(corpus: Optional[dict] = None) -> str:
             _epoch(alertes.get("premiere")),
         )
 
-    # ── Pages ville/métier/guide : cache mémoire (02/11/2026) ──────────────
+    # ── Pages et sitemap : cache mémoire (02/11/2026) ───────────────────────
     # Mesure du 02/11 : /emplois/bamako rendait en 0,5 s côté Fly ET en 0,67 s
     # a travers Vercel (`X-Vercel-Cache: MISS` a chaque appel, le CDN ne cache
     # pas une reecriture externe). Le document est donc garde 60 s en memoire
@@ -409,12 +409,12 @@ def rendre(corpus: Optional[dict] = None) -> str:
     cache_pages = pages_cache_stats()
     compteur(
         "kojo_pages_cache_rejeux_total",
-        "Pages ville/metier/guide servies par le cache memoire (aucun rendu).",
+        "Documents (pages ville/metier/guide, sitemap) servis par le cache memoire, sans rendu.",
         cache_pages.get("rejoue"),
     )
     compteur(
         "kojo_pages_cache_rendus_total",
-        "Pages ville/metier/guide RENDUES (cache vide ou expire).",
+        "Documents RENDUS : cache vide ou expire (pages et sitemap).",
         cache_pages.get("frais"),
     )
     jauge(
