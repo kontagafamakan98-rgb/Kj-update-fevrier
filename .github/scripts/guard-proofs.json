@@ -510,7 +510,15 @@
       "invoque_par": "ci",
       "preuve": "backend/tests/test_sondes_sante_workflow.py",
       "runner": "pytest",
-      "motif": "lit la conclusion du dernier run de CHAQUE job PLANIFIE (la liste est lue des workflows, l'alerte s'excluant elle-meme par son propre script) et n'ECRIT que sur un rouge : une issue au marqueur stable, reecrite seulement si l'EMPREINTE des echecs change, refermee avec un commentaire date quand tout repasse au vert, et AUCUNE ecriture quand tout est vert sans issue ouverte — un canal qui parle tous les jours devient muet. Un run `cancelled` n'est pas un rouge ; une sonde jamais executee est publiee a part ; une PREMISSE (jeton absent, API illisible, moins de 8 sondes lues, aucun run lu) sort en 2 et n'ecrase jamais une alerte reelle deja ouverte"
+      "motif": "lit la conclusion du dernier run de CHAQUE job PLANIFIE (la liste est lue des workflows, l'alerte s'excluant elle-meme par son propre script) et n'ECRIT que sur un rouge : une issue au marqueur stable, reecrite seulement si l'EMPREINTE des echecs change, refermee avec un commentaire date quand tout repasse au vert, et AUCUNE ecriture quand tout est vert sans issue ouverte — un canal qui parle tous les jours devient muet. Un run `cancelled` et un run `startup_failure` ne sont pas des rouges (aucun des deux n'a mesure) ; une sonde jamais executee est publiee a part ; une PREMISSE (jeton absent, API illisible, moins de 8 sondes lues, aucun run lu, aucune sonde n'ayant rendu de verdict) sort en 2 et n'ecrase jamais une alerte reelle deja ouverte, et une issue ne se referme que sur un verdict VERT — mesure du 11/11/2026, ou une panne d'Actions a fait publier six sondes en echec sans qu'aucune n'ait rien mesure"
+    },
+    {
+      "chemin": ".github/scripts/reprise_sondes.py",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "backend/tests/test_reprise_sondes.py",
+      "runner": "pytest",
+      "motif": "relance le run en echec d'une sonde planifiee quand celui-ci n'a pas rendu de verdict, borne a TROIS tentatives et a une fenetre de 24 h, sans jamais reprendre un `cancelled` (rien n'a echoue) ni un `success`, et sans jamais se reprendre lui-meme (sinon un rouge de reprise se relancerait toutes les 30 minutes). Mesure du 11/11/2026 : six sondes planifiees rouges dans la meme heure sans avoir rien mesure, pendant une panne d'Actions ou tout rerun manuel mourait en `startup_failure` ; relancees apres retablissement, les six rendaient 0. Une sonde qui echoue trois fois reste rouge : ce n'est plus un blip, c'est un verdict"
     },
     {
       "chemin": ".github/scripts/check-email-auth.py",
@@ -1335,8 +1343,8 @@
       "id": "sondes: run annule compte comme rouge",
       "garde": ".github/scripts/alerte_sondes.py",
       "cible": ".github/scripts/alerte_sondes.py",
-      "trouve": "CONCLUSIONS_ECHEC = (\"failure\", \"startup_failure\", \"timed_out\")",
-      "remplace": "CONCLUSIONS_ECHEC = (\"failure\", \"startup_failure\", \"timed_out\", \"cancelled\")",
+      "trouve": "CONCLUSIONS_ECHEC = (\"failure\", \"timed_out\")",
+      "remplace": "CONCLUSIONS_ECHEC = (\"failure\", \"timed_out\", \"cancelled\")",
       "runner": "python",
       "preuve": "backend/tests/test_sondes_sante_workflow.py",
       "commande": [
@@ -1350,6 +1358,28 @@
       "cwd": "backend",
       "attend": [
         "FAILED tests/test_sondes_sante_workflow.py::TestVerdict::test_un_run_annule_n_est_pas_un_rouge"
+      ]
+    },
+    {
+      "id": "sondes: un run qui n'a rien fait est repris quand meme",
+      "garde": ".github/scripts/reprise_sondes.py",
+      "cible": ".github/scripts/reprise_sondes.py",
+      "trouve": "    if conclusion not in CONCLUSIONS_A_REPRENDRE:",
+      "remplace": "    if False:  # mutation",
+      "runner": "python",
+      "preuve": "backend/tests/test_reprise_sondes.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_reprise_sondes.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_reprise_sondes.py::TestBornesDeLaReprise::test_un_succes_n_est_jamais_repris",
+        "FAILED tests/test_reprise_sondes.py::TestBornesDeLaReprise::test_un_run_annule_n_est_pas_un_echec"
       ]
     },
     {

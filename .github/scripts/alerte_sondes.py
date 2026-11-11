@@ -76,11 +76,26 @@ MARQUEUR = "<!-- kojo-sondes-sante -->"
 MARQUEUR_EMPREINTE = "<!-- empreinte: "
 TITRE = "Sondes de production en échec"
 
-# Conclusions qui disent qu'une sonde a REFUSÉ quelque chose. `cancelled` et
-# `skipped` n'en sont pas : un run annulé n'a rien jugé, et le compter comme un
-# rouge apprendrait à ignorer l'alerte.
-CONCLUSIONS_ECHEC = ("failure", "startup_failure", "timed_out")
-CONCLUSIONS_NON_JUGEES = ("cancelled", "skipped", "neutral", "")
+# Conclusions qui disent qu'une sonde a REFUSÉ quelque chose. `cancelled`,
+# `skipped` et `startup_failure` n'en sont pas : un run annulé n'a rien jugé, et
+# un run qui n'a même pas DÉMARRÉ n'a pas exécuté une seule ligne de la sonde.
+# Les compter comme des rouges apprendrait à ignorer l'alerte, et c'est
+# exactement ce qui s'est produit le 11/11/2026 : une panne d'Actions a fait
+# échouer six sondes AVANT leur verdict (14:43 → 15:38 UTC), puis a refusé de
+# démarrer le moindre run — mesuré : `startup_failure` sur six reruns ET sur
+# `backend-health-probe`, une sonde fetch qui n'installe pas de navigateur —
+# pendant que les six sondes, relancées à la main contre la production, rendaient
+# toutes 0 (CDN conforme 12 routes, session restaurée, jeton invisible, jobs
+# client depuis une page ville conformes). L'issue #301 accusait donc six sondes
+# qui n'avaient rien mesuré.
+#
+# Ce que ce classement ne fait PAS, écrit pour ne pas le croire plus fort : il ne
+# tait pas une sonde cassée dans son PROPRE fichier. Le run reste rouge dans
+# l'onglet Actions, il est publié « non démarrée » dès qu'une autre raison ouvre
+# l'issue, et une flotte entière qui ne démarre plus est une PRÉMISSE (voir
+# `main`), jamais un rétablissement.
+CONCLUSIONS_ECHEC = ("failure", "timed_out")
+CONCLUSIONS_NON_JUGEES = ("cancelled", "skipped", "neutral", "startup_failure", "")
 
 # Plancher de lecture : 13 workflows planifiés le 27/10/2026. Sous huit, ce n'est
 # pas le dépôt qui a cessé d'avoir des sondes, c'est la LECTURE qui est cassée.
@@ -291,7 +306,8 @@ def corps_issue(verdict: dict, *, depot: str, branche: str, maintenant: str | No
 
     if verdict["non_jugees"]:
         parties += [
-            "**Non jugées** (run annulé, sauté ou en cours — rien n'a été mesuré) :",
+            "**Non jugées** (run annulé, sauté, en cours ou jamais démarré — rien "
+            "n'a été mesuré, ce n'est pas un verdict sur le produit) :",
             "",
         ]
         parties += [
@@ -411,7 +427,11 @@ def gerer_issue(verdict: dict | None, *, depot: str, branche: str, token: str,
     # Tout est vert (ou seule une prémisse reste) : on ferme en le DISANT.
     if existante is None:
         return "rien"
-    if verdict is not None and not verdict["echecs"]:
+    # Une issue ne se ferme que sur un RÉTABLISSEMENT CONSTATÉ : au moins une
+    # sonde doit avoir rendu un verdict VERT. Une flotte dont aucun run n'a
+    # démarré (panne de la plateforme) n'est pas un rétablissement — la refermer
+    # ici effacerait la seule trace d'une surveillance qui ne voit rien.
+    if verdict is not None and not verdict["echecs"] and verdict["vertes"]:
         http(
             "POST",
             f"/repos/{depot}/issues/{existante['number']}/comments",
@@ -478,6 +498,15 @@ def main(argv: list[str] | None = None) -> int:
             raise Premisse(
                 "aucun run lu pour aucune sonde : la CI n'a jamais tourné, ou la "
                 "branche est mauvaise — rien n'a été mesuré"
+            )
+        if not verdict["echecs"] and not verdict["vertes"]:
+            # Toute la flotte est « non jugée » : panne de la plateforme qui ne
+            # démarre plus les runs, ou runs annulés en masse. Ce n'est pas un
+            # rétablissement — et le dire comme tel serait le mensonge le plus
+            # coûteux de cette alerte (mesuré le 11/11/2026).
+            raise Premisse(
+                "aucune sonde n'a rendu de verdict : les runs n'ont pas démarré "
+                "ou ont été annulés — rien n'a été mesuré"
             )
 
         for ligne in verdict["echecs"]:

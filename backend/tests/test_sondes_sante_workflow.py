@@ -199,6 +199,17 @@ class TestVerdict:
         assert verdict["echecs"] == []
         assert len(verdict["non_jugees"]) == 1
 
+    def test_un_run_qui_n_a_pas_demarre_n_est_pas_un_rouge(self):
+        """Mesuré le 11/11/2026 : `startup_failure` n'exécute pas une ligne de la sonde."""
+        verdict = alerte.juger([{
+            "fichier": "pas-demarre.yml", "nom": "Pas démarré",
+            "run": {"conclusion": "startup_failure", "statut": "completed",
+                    "url": "", "cree_le": "", "tete": ""},
+        }])
+
+        assert verdict["echecs"] == [], "un run qui n'a pas démarré n'a rien mesuré"
+        assert [ligne["fichier"] for ligne in verdict["non_jugees"]] == ["pas-demarre.yml"]
+
     def test_l_empreinte_ne_bouge_pas_tant_que_la_panne_est_la_meme(self):
         premier = alerte.empreinte(_verdict(echecs=[_ligne()]))
         identique = alerte.empreinte(_verdict(echecs=[_ligne()]))
@@ -273,6 +284,20 @@ class TestEcritureSeulementSurUnRouge:
 
         assert resultat == "rien"
         assert http.ecritures() == []
+
+    def test_aucun_verdict_rendu_ne_ferme_pas_l_issue(self):
+        """Une flotte qui n'a pas démarré n'est pas un rétablissement (11/11/2026)."""
+        http = _Faux([(200, [{"number": 7, "body": alerte.MARQUEUR}])])
+
+        resultat = alerte.gerer_issue(
+            _verdict(non_jugees=[_ligne(conclusion="startup_failure")]),
+            depot="o/r", branche="main", token="t", http=http,
+        )
+
+        assert resultat == "inchangee"
+        assert http.ecritures() == [], (
+            "refermer sur un silence effacerait le seul fait actionnable du fil"
+        )
 
 
 class TestPremisses:
