@@ -35,7 +35,7 @@
   ],
   "reference": {
     "etablie_le": "2026-11-11",
-    "motif": "11/11/2026 : une panne d'Actions ne se publie plus comme six sondes en echec (startup_failure = non jugee, et aucune issue ne se ferme sans verdict vert)",
+    "motif": "11/11/2026 : cible de la mutation qui prouve qu'une reprise ne relance ni un succes ni un run annule",
     "fichiers": {
       ".githooks/pre-push": "054aed0b877cb2a90362b5ae16ceef5bc5fcafff6f40f92e5ae0516df4d8dd91",
       ".github/scripts/check-email-auth.py": "5e5a11428c152f1f8f856c5157d284b9d59cfacc08deb4b7bb4fced33d45372e",
@@ -155,7 +155,8 @@
       "frontend/api/sitemap.js": "cc9ccd3decd9f058153db97b101c6a083db7ad4c2a2215386daa13397d18daf6",
       "frontend/scripts/vitest-build-frais.js": "325f80e7429720f1b5b10fdbbd6d673489048bf42143a0133a71b86072e8108e",
       ".github/scripts/livrer.py": "5dad20140e21d7735d9736ef541232edc40bb31da84df84b08317ae4234e5371",
-      ".github/scripts/alerte_sondes.py": "8d0ef0929ab6a8dcabd5616c4ec42cfd28d8d6279f5222891cafa0ad502e667e"
+      ".github/scripts/alerte_sondes.py": "8d0ef0929ab6a8dcabd5616c4ec42cfd28d8d6279f5222891cafa0ad502e667e",
+      ".github/scripts/reprise_sondes.py": "34fd490ddd927a58c1e21c25af709db1780f9b24a4f8449ea2a4150157446962"
     }
   },
   "hors_perimetre": [
