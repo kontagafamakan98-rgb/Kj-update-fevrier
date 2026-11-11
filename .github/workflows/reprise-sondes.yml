@@ -1,0 +1,76 @@
+name: Reprise des sondes non mesurées (toutes les 30 min)
+
+# ─── POURQUOI CETTE REPRISE EXISTE ──────────────────────────────────────────
+# Mesuré le 11/11/2026 : six sondes planifiées sont passées au rouge dans la
+# même heure (14:43 → 15:38 UTC) alors que `main` n'avait pas bougé depuis le
+# 3 novembre. Aucune n'avait rendu de verdict : l'une a échoué dans
+# `actions/checkout` (`unable to access 'https://github.com/…': 403`), les
+# autres n'ont publié aucun `::error` de sonde, et tout run relancé mourait en
+# `startup_failure` — y compris `backend-health-probe`, qui n'installe pas de
+# navigateur et dont le code n'a rien en commun avec les six. GitHub publiait
+# au même moment « Actions is experiencing degraded availability ». Relancées
+# à la main une fois la plateforme rétablie, les six ont rendu 0, et l'issue
+# #301 accusait six sondes qui n'avaient rien mesuré.
+#
+# Ce workflow est le rattrapage automatique de ce cas-là : toutes les 30 min,
+# il lit le dernier run de CHAQUE sonde planifiée et relance celles qui ont
+# échoué, avec un plafond de trois tentatives (`reprise_sondes.py`). Une panne
+# de plateforme se répare donc en une demi-heure au lieu d'attendre le cron du
+# lendemain — et une sonde qui échoue TROIS fois reste rouge, parce que ce
+# n'est plus un blip mais un verdict.
+#
+# Ce que cette reprise ne fait pas, écrit pour ne pas le croire plus fort :
+#   * elle ne relance pas un run `cancelled` (il n'a pas échoué) ;
+#   * elle ne relance pas un run de plus de 24 h ;
+#   * elle ne se relance pas elle-même (un rouge de reprise se relancerait
+#     toutes les 30 minutes) ;
+#   * elle ne remplace pas l'alerte : `alerte_sondes.py` reste le seul à
+#     publier une issue, et il lit le dernier run, donc la tentative reprise.
+#
+# Coût : ~25 appels d'API toutes les 30 min, zéro minute de runner quand tout
+# va bien (le job ne fait que lire et sortir).
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    inputs:
+      simulation:
+        description: "Ne rien relancer (essai à blanc)"
+        type: boolean
+        default: false
+
+permissions:
+  actions: write   # relancer le run d'une sonde
+  contents: read   # lire la liste des workflows du dépôt
+
+# Deux passages simultanés relanceraient deux fois le même run : ils s'enchaînent.
+concurrency:
+  group: reprise-sondes
+  cancel-in-progress: false
+
+jobs:
+  reprise:
+    name: Reprise des sondes non mesurées
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Aucune neutralisation : la sortie du script est le verdict du run. Un 2
+      # (prémisse) DOIT rougir ce job, sinon une reprise aveugle se tairait.
+      - name: Relancer les sondes qui n'ont pas rendu de verdict (3 tentatives au plus)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          SIMULATION: ${{ inputs.simulation }}
+        run: |
+          arguments=(--branche "${{ github.event.repository.default_branch || 'main' }}")
+          if [ "${SIMULATION:-false}" = "true" ]; then
+            arguments+=(--simulation)
+          fi
+          python .github/scripts/reprise_sondes.py "${arguments[@]}"
