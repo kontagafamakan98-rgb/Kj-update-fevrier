@@ -150,5 +150,13 @@
     "code": null,
     "response_model": null,
     "dependances": []
+  },
+  {
+    "methode": "HEAD",
+    "chemin": "/api/health",
+    "nom": "health_check",
+    "code": null,
+    "response_model": null,
+    "dependances": []
   }
 ]

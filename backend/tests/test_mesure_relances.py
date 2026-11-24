@@ -50,6 +50,22 @@ def _il_y_a(jours: float = 0, heures: float = 0) -> str:
     ).isoformat()
 
 
+def _il_y_a_reel(jours: float = 0, heures: float = 0) -> str:
+    """Horodatage relatif à l'INSTANT du test, pas à `MAINTENANT`.
+
+    `MAINTENANT` convient aux cas qui passent leur propre `now=` : la mesure et
+    les données parlent alors du même instant figé. La ROUTE, elle, lit
+    l'horloge à l'appel et mesure sur une fenêtre GLISSANTE de 30 jours : ses
+    données doivent donc être relatives à maintenant, sinon elles en sortent au
+    fil du calendrier. Mesuré le 24/11/2026 : la relance du 23/10/2026
+    (`MAINTENANT` - 4 h) était hors fenêtre, `mesurees` valait 0 et le cas
+    rougissait sur `main` sans qu'une ligne de code ait bougé.
+    """
+    return (
+        datetime.now(timezone.utc) - timedelta(days=jours, hours=heures)
+    ).isoformat()
+
+
 def _job(
     identifiant: str,
     relance_le: str | None = None,
@@ -370,8 +386,8 @@ class TestCompteurEtPublication:
         intrus = await register_and_login(
             client, {**BASE_USER, "email": "tiers-%s@kojo.sn" % uuid.uuid4().hex[:6]}
         )
-        await db_insert("jobs", _job("job-1", relance_le=_il_y_a(heures=4)))
-        await _proposition("job-1", _il_y_a(heures=1))
+        await db_insert("jobs", _job("job-1", relance_le=_il_y_a_reel(heures=4)))
+        await _proposition("job-1", _il_y_a_reel(heures=1))
 
         refuse = await client.get(
             "/api/owner/relances/mesures",

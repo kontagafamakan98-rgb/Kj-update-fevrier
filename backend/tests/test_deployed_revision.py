@@ -164,8 +164,29 @@ class TestInvocation:
     def test_le_cli_sort_en_0_quand_la_revision_correspond(self, garde, monkeypatch):
         monkeypatch.setattr(garde, "interroger",
                             lambda _u, fetch=None: ({"revision": SHA_ATTENDU}, None))
+        # La révision est la bonne ET les deux routes de santé répondent à HEAD :
+        # sans ce second faux, le CLI interrogerait le réseau de la machine.
+        monkeypatch.setattr(garde, "statut_head",
+                            lambda _u, fetch=None, timeout=20.0: (200, None))
         assert garde.main(["--attendu", SHA_ATTENDU, "--url", "https://exemple.test/health",
                            "--tentatives", "1", "--delai", "0"]) == 0
+
+    def test_le_cli_sort_en_1_quand_une_route_refuse_head(self, garde, monkeypatch, capsys):
+        """Le cas mesuré le 18/11/2026 : la bonne révision est servie, et
+        `/api/health` rend 405 à un HEAD — la livraison doit être refusée."""
+        monkeypatch.setattr(garde, "interroger",
+                            lambda _u, fetch=None: ({"revision": SHA_ATTENDU}, None))
+        monkeypatch.setattr(
+            garde, "statut_head",
+            lambda url, fetch=None, timeout=20.0:
+                (405 if url.endswith("/api/health") else 200, None),
+        )
+        code = garde.main(["--attendu", SHA_ATTENDU, "--url", "https://exemple.test/health",
+                           "--tentatives", "1", "--delai", "0"])
+        sortie = capsys.readouterr().out
+        assert code == 1
+        assert "::error title=Santé en HEAD::" in sortie
+        assert "405" in sortie and "/api/health" in sortie
 
     def test_le_cli_sort_en_1_et_nomme_la_revision_servie(self, garde, monkeypatch, capsys):
         monkeypatch.setattr(garde, "interroger",
@@ -247,3 +268,80 @@ class TestLeServiceAnnonceSaRevision:
         # La variable que kojo_settings lit réellement (même nom des deux côtés).
         settings = (REPO_ROOT / "backend" / "kojo_settings.py").read_text(encoding="utf-8")
         assert 'os.environ.get("KOJO_GIT_SHA"' in settings
+
+
+class TestSanteEnHead:
+    """Les DEUX routes de santé répondent 200 à un HEAD — mesuré le 18/11/2026.
+
+    Ce jour-là, `/health` rendait 200 à un HEAD et `/api/health` rendait **405**
+    (`allow: GET`) : la révision déployée était la bonne, la CI était verte (elle
+    interroge en GET), et un moniteur d'infra — UptimeRobot envoie HEAD par
+    défaut — lisait une panne. Ce qui est verrouillé ici, c'est que la
+    vérification d'après déploiement mesure les DEUX routes, et nomme celle qui
+    refuse : une asymétrie qui revient doit rougir en le disant.
+    """
+
+    @staticmethod
+    def _fetch_par_route(statuts: dict[str, int]):
+        """Un `fetch` injecté qui répond par URL — aucun test ne touche le réseau."""
+        def fetch(url, _timeout=None):
+            return statuts[url]
+        return fetch
+
+    def test_les_deux_routes_repondent_200(self, garde):
+        appels = []
+
+        def fetch(url, _timeout=None):
+            appels.append(url)
+            return 200
+
+        ok, journal = garde.verifier_head_des_deux_routes(
+            "https://exemple.test/health", fetch=fetch, log=lambda *_a: None,
+        )
+        assert ok is True
+        assert appels == ["https://exemple.test/health", "https://exemple.test/api/health"]
+        assert "répondent 200 à HEAD" in journal[-1]
+
+    def test_une_route_qui_refuse_head_est_nommee(self, garde):
+        """Le refus doit nommer la ROUTE et le STATUT, et dire qui la lit."""
+        ok, journal = garde.verifier_head_des_deux_routes(
+            "https://exemple.test/health",
+            fetch=self._fetch_par_route({
+                "https://exemple.test/health": 200,
+                "https://exemple.test/api/health": 405,
+            }),
+            log=lambda *_a: None,
+        )
+        assert ok is False
+        assert "/api/health" in journal[-1]
+        assert "405" in journal[-1]
+        assert "UptimeRobot" in journal[-1]
+        # Les deux routes sont MESURÉES même quand la première échoue : un refus
+        # qui s'arrêterait à la première ne dirait pas l'état de l'autre.
+        assert any("HEAD /health : 200" in ligne for ligne in journal)
+
+    def test_un_head_injoignable_est_nomme(self, garde):
+        def fetch(_url, _timeout=None):
+            raise ConnectionError("refused")
+
+        ok, journal = garde.verifier_head_des_deux_routes(
+            "https://exemple.test/health", fetch=fetch, log=lambda *_a: None,
+        )
+        assert ok is False
+        assert "ConnectionError" in journal[-1]
+
+    def test_les_routes_se_deduisent_de_l_origine_de_url(self, garde):
+        """Un `--url` qui pointe déjà sur `/api/health` ne fait pas oublier l'autre."""
+        for url in ("https://exemple.test/health", "https://exemple.test/api/health",
+                    "https://exemple.test/api/health?x=1"):
+            routes = garde.routes_head(url)
+            assert sorted(routes.values()) == ["https://exemple.test/api/health",
+                                               "https://exemple.test/health"]
+
+    def test_une_url_sans_origine_refuse_de_conclure(self, garde):
+        """Sans origine, il n'y a rien à interroger : refus, jamais un vert muet."""
+        ok, journal = garde.verifier_head_des_deux_routes(
+            "/health", fetch=lambda *_a: 200, log=lambda *_a: None,
+        )
+        assert ok is False
+        assert "origine" in journal[-1]

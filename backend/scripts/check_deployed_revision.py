@@ -41,6 +41,15 @@ Usage :
 Optionnel :
     --url https://api.kojoforafrica.cc.cd/health   (défaut : env KOJO_BACKEND_HEALTH_URL)
     --tentatives 6 --delai 20                      (attente d'un déploiement en cours)
+
+── Les deux routes de santé répondent-elles à un HEAD ? ────────────────────
+MESURÉ le 18/11/2026 : `/health` acceptait HEAD (200) et `/api/health` rendait
+405 (`allow: GET`) — deux verdicts opposés pour un service en bonne santé, et la
+CI verte ne pouvait pas le voir puisqu'elle interroge en GET. UptimeRobot, dont
+le moniteur HTTP envoie HEAD par défaut, lisait le 405 et déclarait une panne.
+Un déploiement peut donc servir la BONNE révision et publier une route qui
+refuse la méthode qu'un moniteur emploie : la révision et l'accessibilité des
+deux routes se mesurent l'une après l'autre, jamais l'une à la place de l'autre.
 """
 from __future__ import annotations
 
@@ -50,6 +59,7 @@ import os
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 # Adresse par défaut : la même que fly.toml (BACKEND_PUBLIC_URL), jamais un
@@ -178,6 +188,85 @@ def verifier_servi(
     return False, journal
 
 
+# ─── Les DEUX routes de santé répondent-elles à un HEAD ? ─────────────────────
+# MESURÉ le 18/11/2026 : `/health` rendait 200 à un HEAD, `/api/health` rendait
+# 405 (`allow: GET`) — deux verdicts opposés pour un service en bonne santé. La
+# révision peut donc être la bonne ET une des deux routes refuser la méthode
+# qu'un moniteur d'infra emploie : ce contrôle-là se fait APRÈS la révision, pas
+# à sa place, et il échoue en nommant la route qui refuse.
+# Les deux chemins viennent de l'origine de `--url` : un `--url` qui pointe déjà
+# sur `/api/health` ne fait pas oublier l'autre route.
+ROUTES_HEAD = ("/health", "/api/health")
+
+
+def routes_head(url: str) -> dict[str, str]:
+    """Les deux routes de santé, sur l'ORIGINE de `--url` — son chemin ne compte pas."""
+    morceaux = urllib.parse.urlsplit(url)
+    if not morceaux.scheme or not morceaux.netloc:
+        return {}
+    origine = "%s://%s" % (morceaux.scheme, morceaux.netloc)
+    return {route: origine + route for route in ROUTES_HEAD}
+
+
+def _fetch_head_defaut(url: str, timeout: float):
+    """Le STATUT d'un HEAD. Un 405 est une réponse, pas une exception à propager."""
+    requete = urllib.request.Request(url, method="HEAD")
+    try:
+        with urllib.request.urlopen(requete, timeout=timeout) as reponse:
+            return reponse.status
+    except urllib.error.HTTPError as exc:
+        return exc.code
+
+
+def statut_head(url: str, fetch=None, timeout: float = 20.0):
+    """(statut, erreur) d'un HEAD — aucune exception ne sort, comme `interroger`."""
+    fetch = fetch or _fetch_head_defaut
+    try:
+        return fetch(url, timeout), None
+    except Exception as exc:  # réseau, DNS, TLS, timeout…
+        return None, "%s: %s" % (type(exc).__name__, exc)
+
+
+def verifier_head_des_deux_routes(url: str, fetch=None, log=print) -> tuple[bool, list[str]]:
+    """200 exigé sur LES DEUX routes ; le refus NOMME celles qui ne l'ont pas.
+
+    Aucune tentative ici : un 405 est une RÉPONSE, pas un déploiement en cours —
+    réessayer n'allongerait que la durée du refus.
+    """
+    cibles = routes_head(url)
+    if not cibles:
+        return False, [
+            "URL sans origine (%r) : les deux routes de santé ne peuvent pas être "
+            "déduites, donc elles ne sont pas vérifiées" % url
+        ]
+    journal: list[str] = []
+    en_echec: list[str] = []
+    for route, cible in cibles.items():
+        statut, erreur = statut_head(cible, fetch=fetch)
+        if erreur:
+            raison = "injoignable (%s)" % erreur
+        elif statut != 200:
+            raison = "HTTP %s (attendu 200)" % statut
+        else:
+            raison = "200"
+        ligne = "HEAD %s : %s" % (route, raison)
+        if statut != 200:
+            en_echec.append("%s : %s" % (route, raison))
+        journal.append(ligne)
+        log("  %s" % ligne)
+    if en_echec:
+        # La synthèse porte la CAUSE de chaque route : un refus qui ne dirait que
+        # « une route échoue » enverrait chercher au mauvais endroit.
+        journal.append(
+            "route(s) de santé qui n'acceptent pas HEAD : %s — un moniteur d'infra "
+            "(UptimeRobot envoie HEAD par défaut) lirait une panne là où le service "
+            "répond" % " · ".join(en_echec)
+        )
+        return False, journal
+    journal.append("les deux routes de santé répondent 200 à HEAD")
+    return True, journal
+
+
 def _valider_attendu(attendu: str) -> str:
     """Refuse une invocation qui ne dit pas quoi comparer (code 2, pas un succès)."""
     brut = (attendu or "").strip()
@@ -212,18 +301,26 @@ def main(argv=None) -> int:
         options.url, attendu,
         tentatives=options.tentatives, delai=options.delai,
     )
-    if ok:
-        print("::notice title=Backend servi::%s — le service tourne bien le commit attendu."
-              % journal[-1])
-        return 0
-    erreur = journal[-1]
-    if "aucune réponse exploitable" in erreur:
-        print("::error title=Backend injoignable::%s (URL %s)" % (erreur, options.url))
-    elif "AUCUNE révision" in erreur:
-        print("::error title=Révision non annoncée::%s" % erreur)
-    else:
-        print("::error title=Révision déployée ≠ attendue::%s" % erreur)
-    return 1
+    if not ok:
+        erreur = journal[-1]
+        if "aucune réponse exploitable" in erreur:
+            print("::error title=Backend injoignable::%s (URL %s)" % (erreur, options.url))
+        elif "AUCUNE révision" in erreur:
+            print("::error title=Révision non annoncée::%s" % erreur)
+        else:
+            print("::error title=Révision déployée ≠ attendue::%s" % erreur)
+        return 1
+    print("::notice title=Backend servi::%s — le service tourne bien le commit attendu."
+          % journal[-1])
+
+    # La révision est la bonne ; reste à savoir si les deux routes de santé
+    # répondent à la méthode qu'un moniteur d'infra emploie (HEAD).
+    ok_head, journal_head = verifier_head_des_deux_routes(options.url)
+    if not ok_head:
+        print("::error title=Santé en HEAD::%s" % journal_head[-1])
+        return 1
+    print("::notice title=Santé en HEAD::%s" % journal_head[-1])
+    return 0
 
 
 if __name__ == "__main__":
