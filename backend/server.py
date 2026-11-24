@@ -248,7 +248,11 @@ async def _health_payload() -> dict:
     }
 
 
-@api_router.get("/health")
+# GET + HEAD, comme la racine : un moniteur d'infra (UptimeRobot, dont le
+# moniteur HTTP envoie HEAD par défaut) lisait un 405 sur CETTE route et un 200
+# sur `/health` — deux verdicts pour un service en bonne santé. FastAPI
+# n'ajoute pas HEAD aux routes GET (Starlette, si), donc la méthode se déclare.
+@api_router.api_route("/health", methods=["GET", "HEAD"])
 async def health_check():
     return await _health_payload()
 

@@ -7550,6 +7550,27 @@
       "attend": [
         "dit PÉRIMÉ quand une source est plus récente"
       ]
+    },
+    {
+      "id": "deployed-revision: une route de sante qui refuse HEAD toleree",
+      "garde": "backend/scripts/check_deployed_revision.py",
+      "cible": "backend/scripts/check_deployed_revision.py",
+      "trouve": "            en_echec.append(\"%s : %s\" % (route, raison))",
+      "remplace": "            pass  # mutation : la route en echec n'est plus comptee",
+      "runner": "python",
+      "preuve": "backend/tests/test_deployed_revision.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_deployed_revision.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_deployed_revision.py::TestSanteEnHead::test_une_route_qui_refuse_head_est_nommee"
+      ]
     }
   ]
 }
